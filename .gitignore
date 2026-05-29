@@ -1,0 +1,17 @@
+# Build output
+build/
+
+# ROMs — copyrighted, never commit (CRC 9BC192CE; see segagenesisrecomp memory)
+*.bin
+*.md5
+*.sha256
+
+# Runtime artifacts
+debug.ini
+*.log
+*.exe
+*.dll
+*.map
+ramdump_*.bin
+*_save_*.bin
+savestate*.bin
