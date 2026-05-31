@@ -1,17 +1,24 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3Recomp C)
+project(Sonic3AndKnucklesRecomp C)
 
 set(CMAKE_C_STANDARD 11)
 
 # ---------------------------------------------------------------------------
-# Sonic the Hedgehog 3 (USA) STANDALONE native build — "Sonic 3 mode".
+# Sonic 3 & Knuckles — native static recompilation.
 #
-# First of three planned modes (Sonic 3 alone / S&K alone / S3K locked-on).
-# Clean single 2 MB ROM at $000000, identity-mapped, no lock-on, no offsets.
+# Sonic 3 and Sonic & Knuckles are two separate ~2 MB ROMs; "Sonic 3 &
+# Knuckles" is the 4 MB lock-on UNION of the two (S&K boots at $000000, Sonic 3
+# maps at $200000). They share this engine, so one repo hosts all three as
+# build modes — each a native target + a paired _oracle (interpreter) target:
 #
-# Shares the engine (runner) + recompiler from the segagenesisrecomp submodule
-# under Sonic 1's release repo (sibling SonicTheHedgehogRecomp). Per-game files
-# live in segagenesisrecomp/sonic3/.
+#   Target            ROM                      Ports (native/oracle)  Status
+#   Sonic3Recomp      Sonic 3 alone, 2 MB      4384 / 4385            playable bring-up
+#   Sonic3KRecomp     S3+S&K combined, 4 MB    4386 / 4387            scaffold / bring-up
+#   (Sonic&Knuckles alone)                     —                      planned (no sandk/ data yet)
+#
+# Engine (runner + recompiler + clownmdemu fork) comes from the
+# segagenesisrecomp submodule under the sibling SonicTheHedgehogRecomp checkout;
+# per-game data lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
 # ---------------------------------------------------------------------------
 
 set(SHARED_REPO_ROOT "${CMAKE_SOURCE_DIR}/../SonicTheHedgehogRecomp")
@@ -26,11 +33,7 @@ set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
 set(SDL2_DIR "${SDL2_BUNDLED}/cmake" CACHE PATH "" FORCE)
 find_package(SDL2 REQUIRED CONFIG NO_DEFAULT_PATH PATHS "${SDL2_DIR}")
 
-# ---------------------------------------------------------------------------
-# Source set shared by native and oracle targets.
-# ---------------------------------------------------------------------------
-
-set(S3_SHARED_SOURCES
+set(RUNNER_SOURCES
     "${RUNNER_ROOT}/main.c"
     "${RUNNER_ROOT}/audio.c"
     "${RUNNER_ROOT}/cmd_server.c"
@@ -46,83 +49,79 @@ set(S3_SHARED_SOURCES
     "${RUNNER_ROOT}/audio/sn76489.c"
     "${RUNNER_ROOT}/audio/mixer.c"
     "${RUNNER_ROOT}/audio/observability.c"
-    "${RECOMP_ROOT}/sonic3/generated/sonic3_full.c"
-    "${RECOMP_ROOT}/sonic3/generated/sonic3_dispatch.c"
-    "${RECOMP_ROOT}/sonic3/generated/sonic3_layout.c"
-    "${RECOMP_ROOT}/sonic3/sonic3_spec.c"
 )
 
-set(S3_INCLUDES
-    "${RUNNER_ROOT}"
-    "${RUNNER_ROOT}/include"
-    "${RECOMP_ROOT}/sonic3"
-    "${RECOMP_ROOT}/clownmdemu-core/source"
-    "${RECOMP_ROOT}/clownmdemu-core/libraries/clowncommon"
-    "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
-)
-
-set(S3_LIBS clownmdemu-core SDL2::SDL2 SDL2::SDL2main)
+set(COMMON_LIBS clownmdemu-core SDL2::SDL2 SDL2::SDL2main)
 if(WIN32)
-    list(APPEND S3_LIBS ws2_32 comdlg32)
+    list(APPEND COMMON_LIBS ws2_32 comdlg32)
 endif()
 
-function(_s3_finalize_target tgt)
-    target_include_directories(${tgt} PRIVATE ${S3_INCLUDES})
-    target_link_libraries(${tgt} PRIVATE ${S3_LIBS})
-    if(MSVC)
-        target_compile_options(${tgt} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
-        target_link_options(${tgt} PRIVATE /MAP)
-        set_source_files_properties(
-            "${RECOMP_ROOT}/sonic3/generated/sonic3_full.c"
-            PROPERTIES COMPILE_FLAGS "/bigobj"
-        )
-    endif()
-    if(WIN32)
-        add_custom_command(TARGET ${tgt} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${SDL2_BUNDLED}/lib/x64/SDL2.dll"
-                "$<TARGET_FILE_DIR:${tgt}>"
-            COMMENT "Copying SDL2.dll for ${tgt}")
-        add_custom_command(TARGET ${tgt} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${RECOMP_ROOT}/sonic3/sonic3.bin"
-                "$<TARGET_FILE_DIR:${tgt}>/sonic3.bin"
-            COMMENT "Copying Sonic 3 ROM for ${tgt}")
-    endif()
+# add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
+#   Builds <target> (native) and <target>_oracle (interpreter) for one game
+#   mode, pulling generated C + spec from segagenesisrecomp/<game_dir>/.
+function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
+    set(GAME "${RECOMP_ROOT}/${GAME_DIR}")
+    set(GEN  "${GAME}/generated")
+    set(SHARED_SRC
+        ${RUNNER_SOURCES}
+        "${GEN}/${PREFIX}_full.c"
+        "${GEN}/${PREFIX}_dispatch.c"
+        "${GEN}/${PREFIX}_layout.c"
+        "${GAME}/${PREFIX}_spec.c"
+    )
+    set(INCLUDES
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${GAME}"
+        "${RECOMP_ROOT}/clownmdemu-core/source"
+        "${RECOMP_ROOT}/clownmdemu-core/libraries/clowncommon"
+        "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
+    )
+
+    # Native — recompiled 68K drives the game.
+    add_executable(${TARGET} ${SHARED_SRC} "${RUNNER_ROOT}/stub_clown68000.c")
+    target_compile_definitions(${TARGET} PRIVATE
+        INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1
+        DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
+
+    # Oracle — clown68000 interpreter executes everything (parity reference).
+    add_executable(${TARGET}_oracle ${SHARED_SRC}
+        "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
+        "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
+    target_compile_definitions(${TARGET}_oracle PRIVATE
+        INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
+        DEFAULT_DEBUG_PORT=${PORT_ORACLE} SONIC_REVERSE_DEBUG=1)
+
+    foreach(t ${TARGET} ${TARGET}_oracle)
+        target_include_directories(${t} PRIVATE ${INCLUDES})
+        target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
+        if(MSVC)
+            target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
+            target_link_options(${t} PRIVATE /MAP)
+            set_source_files_properties("${GEN}/${PREFIX}_full.c"
+                PROPERTIES COMPILE_FLAGS "/bigobj")
+        endif()
+        if(WIN32)
+            add_custom_command(TARGET ${t} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${SDL2_BUNDLED}/lib/x64/SDL2.dll" "$<TARGET_FILE_DIR:${t}>"
+                COMMENT "Copying SDL2.dll for ${t}")
+            # Bring-your-own ROM: copy next to the exe only if present. ROMs are
+            # gitignored and never committed/distributed (see RELEASING.md).
+            if(EXISTS "${GAME}/${ROM}")
+                add_custom_command(TARGET ${t} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${GAME}/${ROM}" "$<TARGET_FILE_DIR:${t}>/${ROM}"
+                    COMMENT "Copying ${ROM} for ${t}")
+            endif()
+        endif()
+    endforeach()
 endfunction()
 
-# ---------------------------------------------------------------------------
-# Native target — recompiled 68K drives the game.
-# ---------------------------------------------------------------------------
+# --- Mode: Sonic 3 alone (2 MB @ $000000) — playable bring-up ---------------
+add_recomp_mode(Sonic3Recomp  sonic3  sonic3  sonic3.bin  4384 4385)
 
-add_executable(Sonic3Recomp
-    ${S3_SHARED_SOURCES}
-    "${RUNNER_ROOT}/stub_clown68000.c"
-)
-target_compile_definitions(Sonic3Recomp PRIVATE
-    INCLUDE_GENERATED_CODE=1
-    ENABLE_RECOMPILED_CODE=1
-    DEFAULT_DEBUG_PORT=4384
-    SONIC_REVERSE_DEBUG=1
-)
-_s3_finalize_target(Sonic3Recomp)
+# --- Mode: Sonic 3 & Knuckles combined (4 MB lock-on) — scaffold ------------
+add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 
-# ---------------------------------------------------------------------------
-# Oracle target — clown68000 interpreter executes everything.
-# ---------------------------------------------------------------------------
-
-add_executable(Sonic3Recomp_oracle
-    ${S3_SHARED_SOURCES}
-    "${RUNNER_ROOT}/hybrid.c"
-    "${RECOMP_ROOT}/sonic3/sonic3_hybrid_table.c"
-    "${RUNNER_ROOT}/hybrid_jmp.c"
-    "${RUNNER_ROOT}/oracle_trace.c"
-)
-target_compile_definitions(Sonic3Recomp_oracle PRIVATE
-    INCLUDE_GENERATED_CODE=1
-    HYBRID_RECOMPILED_CODE=1
-    SONIC_ORACLE_BUILD=1
-    DEFAULT_DEBUG_PORT=4385
-    SONIC_REVERSE_DEBUG=1
-)
-_s3_finalize_target(Sonic3Recomp_oracle)
+# --- Mode: Sonic & Knuckles alone — PLANNED ---------------------------------
+# No segagenesisrecomp/sandk/ data yet. When it exists, mirror the calls above:
+#   add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
