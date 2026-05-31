@@ -1,5 +1,5 @@
-# Build output
-build/
+# Build output (build/, build_fix/, build-rdb/, …)
+build*/
 
 # ROMs — copyrighted, never commit (CRC 9BC192CE; see segagenesisrecomp memory)
 *.bin
