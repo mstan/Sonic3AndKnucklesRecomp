@@ -1,37 +1,31 @@
-# Sonic3Recomp
+# Sonic 3 & Knuckles — Recompiled
 
-Static recompilation of **Sonic the Hedgehog 3** (USA, 1994) for the Sega
-Genesis / Mega Drive, built on the shared
+Native x64 static recompilation of **Sonic the Hedgehog 3** and **Sonic &
+Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
-This is the **Sonic 3 standalone** target — the first of three planned modes:
+Sonic 3 and Sonic & Knuckles shipped as two separate ~2 MB cartridges; **"Sonic
+3 & Knuckles"** is the 4 MB **lock-on** combination of the two (S&K boots at
+`$000000`, Sonic 3 maps in at `$200000`). They share one engine, so this repo
+hosts all three as **build modes** — each a native target plus a paired
+`_oracle` (interpreter parity-reference) target:
 
-| Mode | ROM | Status |
-|------|-----|--------|
-| **Sonic 3 alone** | Sonic 3 (USA), 2 MB | boots to title; bring-up in progress |
-| Sonic & Knuckles alone | S&K, 2 MB | planned |
-| Sonic 3 & Knuckles (locked-on) | combined 4 MB | separate target (`Sonic3KRecomp`) |
+| Target | Game / ROM | Ports (native/oracle) | Status |
+|---|---|---|---|
+| `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, monkey, saves) |
+| `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Scaffold / early bring-up |
+| *Sonic & Knuckles alone* | S&K, 2 MB | — | Planned (no `sandk/` data yet) |
 
-Standalone Sonic 3 is the cleanest target: a single 2 MB ROM at `$000000`,
-identity-mapped, so file offset == runtime address == disassembly address — no
-lock-on banking, no address offsets.
-
-## Layout
-
-- `CMakeLists.txt` — build config. Reaches the shared engine through a sibling
-  checkout of `SonicTheHedgehogRecomp` (which carries the `segagenesisrecomp`
-  submodule): `../SonicTheHedgehogRecomp/segagenesisrecomp/`.
-- Per-game files (`game.toml`, `sonic3_spec.c`, generated C, discovery data)
-  live in `segagenesisrecomp/sonic3/`.
+> **No prebuilt binaries are distributed — build from source and supply your own
+> ROM.** (The shipped binary statically links the AGPL-3.0 clownmdemu core; see
+> `../SonicTheHedgehogRecomp/segagenesisrecomp/RELEASING.md` before publishing.)
 
 ## Building from source
 
-No prebuilt binaries are distributed — build it yourself and bring your own ROM.
-
 **Prerequisites**
 - Visual Studio 2022 (MSVC) and CMake 3.16+
-- A Sonic the Hedgehog 3 (USA) ROM, 2 MB, CRC32 `9BC192CE`
+- Your own legally-obtained ROM(s); ROMs are gitignored and never committed.
 
 **1. Clone, with the shared engine alongside.** This repo reaches the engine
 through a *sibling* checkout of `SonicTheHedgehogRecomp` (which carries the
@@ -39,32 +33,64 @@ through a *sibling* checkout of `SonicTheHedgehogRecomp` (which carries the
 
 ```
 git clone --recursive https://github.com/mstan/SonicTheHedgehogRecomp.git
-git clone https://github.com/mstan/Sonic3Recomp.git
-# layout:  <parent>/SonicTheHedgehogRecomp/   and   <parent>/Sonic3Recomp/
+git clone https://github.com/mstan/Sonic3AndKnucklesRecomp.git
+# layout:  <parent>/SonicTheHedgehogRecomp/   and   <parent>/Sonic3AndKnucklesRecomp/
 ```
-
 (Cloned without `--recursive`? Run
 `git -C SonicTheHedgehogRecomp submodule update --init --recursive`.)
 
-**2. Supply your own ROM.** Place your Sonic 3 (USA) image (CRC32 `9BC192CE`)
-as `sonic3.bin` at
-`SonicTheHedgehogRecomp/segagenesisrecomp/sonic3/sonic3.bin`. ROMs are
-copyrighted and are never committed or distributed.
+**2. Supply your own ROM(s)**, into the engine's per-mode data dir:
 
-**3. Build and run.**
+| Mode | Place ROM at | CRC32 |
+|---|---|---|
+| Sonic 3 alone | `SonicTheHedgehogRecomp/segagenesisrecomp/sonic3/sonic3.bin` | `9BC192CE` |
+| S3 & Knuckles | `SonicTheHedgehogRecomp/segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
+
+**3. Build the mode you want, then run.**
 
 ```
-cd Sonic3Recomp
+cd Sonic3AndKnucklesRecomp
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --target Sonic3Recomp
-build\Release\Sonic3Recomp.exe          # the build copies sonic3.bin next to the exe
+
+cmake --build build --config Release --target Sonic3Recomp     # Sonic 3 alone
+cmake --build build --config Release --target Sonic3KRecomp    # S3&K combined
+
+build\Release\Sonic3Recomp.exe          # the build copies the ROM next to the exe
 ```
 
-The interpreter **oracle** build (used for native↔interpreter parity
-debugging) is a separate target and needs `debug.ini` next to the exe:
+Each mode also has an `_oracle` target (e.g. `Sonic3Recomp_oracle`) that runs
+the clown68000 interpreter for native↔interpreter parity debugging; it needs
+`debug.ini` next to the exe.
+
+## Regenerate the C from a ROM
 
 ```
-cmake --build build --config Release --target Sonic3Recomp_oracle
+cd ..\SonicTheHedgehogRecomp\segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
+cd ..\SonicTheHedgehogRecomp\segagenesisrecomp\sonic3k    &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3k.bin --game game.toml
 ```
 
-Native debug server: port 4384. Oracle: 4385.
+## Sonic 3 & Knuckles (combined) mode — why it's harder
+
+The combined 4 MB target is early bring-up. Beyond the standalone Sonic 3 work,
+it has to handle:
+
+1. **RAM-installed IRQ handlers.** VBlank/HBlank vectors point into 68K RAM
+   (`$FFFFFFF0` / `$FFFFFFF6`); boot code copies trampolines into RAM at
+   runtime, which a static call-graph walk can't follow without a hook/directive.
+2. **Sega lock-on memory map.** S&K at `$000000–$1FFFFF`, Sonic 3 at
+   `$200000–$3FFFFF`; S&K code JSRs into the Sonic 3 bank. The runtime must
+   honor the lock-on mapping.
+3. **Battery SRAM** (`$200001–$203FFF`, odd bytes) for combined save data.
+4. **Header quirks**: SSP = `$00000000` (boot sets it), header checksum covers
+   only the original 2 MB, and one `NBCD` (`$4300`) opcode appears at `$3000EE`.
+
+See `ISSUES.md` / `FEATURES.md` (currently focused on the Sonic-3-alone mode).
+
+## License & ROM
+
+This project's own code: [PolyForm Noncommercial](LICENSE.md) (the recompiler /
+build wiring). **Third-party engine components are separately licensed and
+mostly AGPL-3.0** — see
+`../SonicTheHedgehogRecomp/segagenesisrecomp/THIRD-PARTY-LICENSES.md`.
+
+ROM files are **not** included — supply your own legally-obtained copy.
