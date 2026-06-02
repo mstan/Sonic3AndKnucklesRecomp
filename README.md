@@ -13,7 +13,7 @@ hosts all three as **build modes** — each a native target plus a paired
 
 | Target | Game / ROM | Ports (native/oracle) | Status |
 |---|---|---|---|
-| `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, monkey, saves) |
+| `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, saves) |
 | `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Scaffold / early bring-up |
 | *Sonic & Knuckles alone* | S&K, 2 MB | — | Planned (no `sandk/` data yet) |
 
