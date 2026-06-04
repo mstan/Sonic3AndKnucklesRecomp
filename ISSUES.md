@@ -4,7 +4,7 @@ Sonic-3-standalone bring-up. Boots to AIZ Act 1, playable, **0 dispatch
 misses**. All known remaining problems are **value divergences** in the
 recompiled C (the recompiler is the product — never patched in the runner;
 oracle/interpreter renders these correctly). See
-`SonicTheHedgehogRecomp/segagenesisrecomp/PRINCIPLES.md`.
+`segagenesisrecomp/PRINCIPLES.md` (local junction to the top-level checkout).
 
 Ports: native = 4384, oracle = 4385. `debug.ini` must sit next to each exe.
 Observe via the always-on rings (`frame_timeseries` / `get_frame` /
@@ -57,8 +57,10 @@ vars, increment+wrap `Next_demo_number`, set `Demo_mode_flag = 1`,
       rebuild.
 - [x] Rebuilt native, monkey body renders correctly — **user-confirmed
       2026-05-31**. The WaitOffscreen return-capture fix is validated end-to-end.
-- [ ] Next: pivot to the Giant Ring (#2) and the AIZ water/reflection bug (#3,
-      redefined below) with the same attract-demo parity harness.
+- [x] AIZ water/reflection bug (#3) **FIXED 2026-06-03** — HInt was dispatched
+      at the static stub instead of the RAM-installed handler; see #3 below.
+- [ ] Next: pivot to the Giant Ring (#2) and the Special Stage rings (#4) with
+      the same attract-demo parity harness.
 
 ---
 
@@ -164,7 +166,7 @@ process to avoid round-trip overshoot).
 The big bonus-stage warp ring does not appear. Likely a value divergence;
 possibly a clean single-instruction bug. Not yet localized.
 
-## Visual bug #3 — AIZ water not rendering correctly (reflections)  *(deferred, not yet investigated)*
+## Visual bug #3 — AIZ water not rendering correctly (reflections)  — **FIXED 2026-06-03 (user-reported working)**
 
 **Redefined 2026-05-31 (user).** Previously filed as "ground missing" /
 below-ground transparency (see-through where terrain should be opaque). On
@@ -172,10 +174,26 @@ closer look this is **not** missing ground — it's the **AIZ water surface /
 reflection effect rendering incorrectly**. What read as "background plane shows
 through" is the water reflection not being drawn right.
 
-Likely a water-line raster / palette-swap / scroll effect (AIZ uses a
-horizontal-interrupt water line with a reflected/recoloured lower region).
-Suspect an HInt-timing or palette/raster value divergence rather than a
-geometry problem. Not yet localized.
+As suspected, the AIZ water line is a **horizontal-interrupt (HInt) raster /
+palette-swap effect** — the prediction was correct.
+
+**Root cause (recompiler):** the ROM installs its H-blank handler into **RAM**
+at boot and reaches it via a `JmpTo_HInt` stub (vector `$70`). The recompiler
+dispatched HInt at the *static* stub address, so the RAM-installed handler was
+never reached and the water raster/palette swap never ran — the lower region
+rendered with the unmodified (non-reflected) palette/scroll.
+
+**Fix (recompiler, in `segagenesisrecomp`):**
+- `runner/glue.c`: `recomp_resolve_ram_trampoline()` follows `JMP`/`JSR`
+  (abs.l/abs.w) trampolines installed in RAM (≤4 hops) to the real handler.
+- `recompiler/src/code_generator.c`: `recomp_dispatch_once()` resolves RAM
+  trampolines before the dispatch-table lookup, so RAM-redirected handlers
+  (HInt) dispatch to the correct recompiled function.
+- `sonic3/sonic3_spec.c` / `sonic3k/sonic3k_spec.c`: point HBlank at
+  `JmpTo_HInt` (`$000F9E` / `$000D0C`) so it routes through the RAM handler.
+
+Committed as `segagenesisrecomp@4528b2d` (dev + master). **Verify:** user
+reported the AIZ water rendering correctly 2026-06-03.
 
 ## Visual bug #4 — Special Stage rings do not work  *(new 2026-05-31, user-reported; not yet investigated)*
 
