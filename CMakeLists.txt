@@ -16,14 +16,14 @@ set(CMAKE_C_STANDARD 11)
 #   Sonic3KRecomp     S3+S&K combined, 4 MB    4386 / 4387            scaffold / bring-up
 #   (Sonic&Knuckles alone)                     —                      planned (no sandk/ data yet)
 #
-# Engine (runner + recompiler + clownmdemu fork) comes from the
-# segagenesisrecomp submodule under the sibling SonicTheHedgehogRecomp checkout;
-# per-game data lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
+# Engine (runner + recompiler + clownmdemu fork) comes from the canonical
+# segagenesisrecomp checkout at the workspace root, reached here through a local
+# directory junction (./segagenesisrecomp -> ../segagenesisrecomp); per-game data
+# lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
 # ---------------------------------------------------------------------------
 
-set(SHARED_REPO_ROOT "${CMAKE_SOURCE_DIR}/../SonicTheHedgehogRecomp")
-set(RECOMP_ROOT      "${SHARED_REPO_ROOT}/segagenesisrecomp")
-set(RUNNER_ROOT      "${RECOMP_ROOT}/runner")
+set(RECOMP_ROOT "${CMAKE_SOURCE_DIR}/segagenesisrecomp")
+set(RUNNER_ROOT "${RECOMP_ROOT}/runner")
 
 # clownmdemu-core is the mstan fork; our changes are committed in it directly
 # (no build-time patch step — see THIRD-PARTY-LICENSES.md).

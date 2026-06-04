@@ -15,3 +15,7 @@ debug.ini
 ramdump_*.bin
 *_save_*.bin
 savestate*.bin
+
+# Recompiler engine: local junction to the top-level canonical checkout
+# (../segagenesisrecomp). Tracked in its own repo, not here.
+segagenesisrecomp
