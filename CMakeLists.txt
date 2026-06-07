@@ -72,7 +72,14 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/audio/observability.c"
 )
 
-set(COMMON_LIBS clownmdemu-core SDL2::SDL2 SDL2::SDL2main)
+# Clean-room own backend (VDP+bus+Z80 scheduler) — native targets only; the
+# AGPL-free Sonic 3 runtime. Oracle targets keep clownmdemu as ground truth.
+set(OWN_BACKEND_SOURCES
+    "${RUNNER_ROOT}/video/genesis_vdp.c"
+    "${RUNNER_ROOT}/video/genesis_bus.c"
+    "${RUNNER_ROOT}/video/genesis_machine.c")
+
+set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)   # clownmdemu-core linked by oracle only
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
 endif()
@@ -91,7 +98,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GAME}/${PREFIX}_spec.c"
     )
     set(INCLUDES
-        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/ymfm/src"
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+        "${RUNNER_ROOT}/external/ymfm/src"
         "${RUNNER_ROOT}/external/superzazu"
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clownz80/source" "${GAME}"
         "${RECOMP_ROOT}/clownmdemu-core/source"
@@ -99,10 +107,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
     )
 
-    # Native — recompiled 68K drives the game.
-    add_executable(${TARGET} ${SHARED_SRC} "${RUNNER_ROOT}/stub_clown68000.c")
+    # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown link).
+    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES}
+        "${RUNNER_ROOT}/stub_clown68000.c")
     target_compile_definitions(${TARGET} PRIVATE
-        INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1
+        INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
 
     # Oracle — clown68000 interpreter executes everything (parity reference).
@@ -137,6 +146,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             endif()
         endif()
     endforeach()
+    # Oracle (clown68000 interpreter + clownmdemu VDP/bus) is the only target
+    # that links the AGPL core. Dev-only ground truth; never shipped.
+    target_link_libraries(${TARGET}_oracle PRIVATE clownmdemu-core)
 endfunction()
 
 # --- Mode: Sonic 3 alone (2 MB @ $000000) — playable bring-up ---------------
