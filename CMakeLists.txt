@@ -22,7 +22,17 @@ set(CMAKE_C_STANDARD 11)
 # lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
 # ---------------------------------------------------------------------------
 
-set(RECOMP_ROOT "${CMAKE_SOURCE_DIR}/segagenesisrecomp")
+# Engine root. Public layout: the committed `segagenesisrecomp` submodule
+# (clone --recursive is self-contained). Local-dev override: if a gitignored
+# `engine-local` symlink -> ../segagenesisrecomp is present, prefer it so every
+# game repo shares ONE engine checkout. Create it with scripts/link-engine.*.
+if(EXISTS "${CMAKE_SOURCE_DIR}/engine-local")
+    set(RECOMP_ROOT "${CMAKE_SOURCE_DIR}/engine-local")
+    message(STATUS "engine: local-dev override (engine-local/ -> shared checkout)")
+else()
+    set(RECOMP_ROOT "${CMAKE_SOURCE_DIR}/segagenesisrecomp")
+    message(STATUS "engine: committed segagenesisrecomp/ submodule")
+endif()
 set(RUNNER_ROOT "${RECOMP_ROOT}/runner")
 
 # clownmdemu-core is the mstan fork; our changes are committed in it directly
@@ -30,8 +40,39 @@ set(RUNNER_ROOT "${RECOMP_ROOT}/runner")
 add_subdirectory("${RECOMP_ROOT}/clownmdemu-core" clownmdemu-core)
 
 set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
-set(SDL2_DIR "${SDL2_BUNDLED}/cmake" CACHE PATH "" FORCE)
-find_package(SDL2 REQUIRED CONFIG NO_DEFAULT_PATH PATHS "${SDL2_DIR}")
+# SDL2 discovery. Windows pins the bundled VC devel package (NO_DEFAULT_PATH
+# keeps a stray MSYS2 SDL2 from leaking msys64 headers onto cl.exe). macOS/Linux
+# use the system/Homebrew SDL2 (Apple Silicon: /opt/homebrew).
+if(WIN32)
+    set(SDL2_DIR "${SDL2_BUNDLED}/cmake" CACHE PATH "" FORCE)
+    find_package(SDL2 REQUIRED CONFIG NO_DEFAULT_PATH PATHS "${SDL2_DIR}")
+else()
+    if(APPLE)
+        find_program(BREW_EXECUTABLE brew)
+        if(BREW_EXECUTABLE)
+            execute_process(COMMAND "${BREW_EXECUTABLE}" --prefix sdl2
+                OUTPUT_VARIABLE _brew_sdl2_prefix
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET RESULT_VARIABLE _brew_sdl2_rc)
+            if(_brew_sdl2_rc EQUAL 0 AND _brew_sdl2_prefix)
+                list(APPEND CMAKE_PREFIX_PATH "${_brew_sdl2_prefix}")
+            endif()
+        endif()
+    endif()
+    find_package(SDL2 REQUIRED)
+endif()
+
+# The runner includes SDL as <SDL2/SDL.h> (the bundled Windows devel layout).
+# Homebrew's SDL2::SDL2 points the include dir *at* .../include/SDL2, so add
+# its parent so <SDL2/SDL.h> resolves the same way on every platform.
+set(SDL2_PARENT_INCLUDE_DIRS "")
+foreach(_inc IN LISTS SDL2_INCLUDE_DIRS)
+    get_filename_component(_inc_name "${_inc}" NAME)
+    if(_inc_name STREQUAL "SDL2")
+        get_filename_component(_inc_parent "${_inc}" DIRECTORY)
+        list(APPEND SDL2_PARENT_INCLUDE_DIRS "${_inc_parent}")
+    endif()
+endforeach()
 
 set(RUNNER_SOURCES
     "${RUNNER_ROOT}/main.c"
@@ -40,6 +81,7 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/frame_snapshots.c"
     "${RUNNER_ROOT}/hybrid_global.c"
     "${RUNNER_ROOT}/glue.c"
+    "${RUNNER_ROOT}/fiber_compat.c"
     "${RUNNER_ROOT}/crash_report.c"
     "${RUNNER_ROOT}/input_script.c"
     "${RUNNER_ROOT}/reverse_debug.c"
@@ -74,6 +116,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RECOMP_ROOT}/clownmdemu-core/source"
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clowncommon"
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
+        ${SDL2_PARENT_INCLUDE_DIRS}
     )
 
     # Native — recompiled 68K drives the game.
