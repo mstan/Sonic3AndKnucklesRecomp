@@ -3,6 +3,11 @@ project(Sonic3AndKnucklesRecomp C)
 
 set(CMAKE_C_STANDARD 11)
 
+option(SONIC_RELEASE_BUILD
+    "Use the clean release window title (e.g. 'Sonic 3 Recompiled') with no dev \
+variant tag. OFF (default) keeps the dev-tagged title so native/oracle differ."
+    OFF)
+
 # ---------------------------------------------------------------------------
 # Sonic 3 & Knuckles — native static recompilation.
 #
@@ -101,7 +106,7 @@ endif()
 # add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
 #   Builds <target> (native) and <target>_oracle (interpreter) for one game
 #   mode, pulling generated C + spec from segagenesisrecomp/<game_dir>/.
-function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
+function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE RELEASE_TITLE)
     set(GAME "${RECOMP_ROOT}/${GAME_DIR}")
     set(GEN  "${GAME}/generated")
     set(SHARED_SRC
@@ -124,6 +129,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
+    # Clean release window title (no dev variant tag) — native target only; the
+    # _oracle target keeps its dev tag. Enable with -DSONIC_RELEASE_BUILD=ON.
+    if(SONIC_RELEASE_BUILD)
+        target_compile_definitions(${TARGET} PRIVATE "SONIC_RELEASE_TITLE=\"${RELEASE_TITLE}\"")
+    endif()
 
     # Oracle — clown68000 interpreter executes everything (parity reference).
     add_executable(${TARGET}_oracle ${SHARED_SRC}
@@ -160,11 +170,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
 endfunction()
 
 # --- Mode: Sonic 3 alone (2 MB @ $000000) — playable bring-up ---------------
-add_recomp_mode(Sonic3Recomp  sonic3  sonic3  sonic3.bin  4384 4385)
+add_recomp_mode(Sonic3Recomp  sonic3  sonic3  sonic3.bin  4384 4385 "Sonic 3 Recompiled")
 
 # --- Mode: Sonic 3 & Knuckles combined (4 MB lock-on) — scaffold ------------
-add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
+add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387 "Sonic 3 & Knuckles Recompiled")
 
 # --- Mode: Sonic & Knuckles alone — PLANNED ---------------------------------
 # No segagenesisrecomp/sandk/ data yet. When it exists, mirror the calls above:
-#   add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
+#   add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389 "Sonic & Knuckles Recompiled")
