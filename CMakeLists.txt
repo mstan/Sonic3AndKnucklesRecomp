@@ -77,6 +77,11 @@ set(OWN_BACKEND_SOURCES
     "${RUNNER_ROOT}/video/genesis_machine.c"
     "${RUNNER_ROOT}/external/superzazu/z80.c")   # MIT Z80 core, embedded by genesis_machine
 
+option(SONIC_REVERSE_DEBUG
+    "Tier-1 reverse-debug instrumentation (WRAM store ring; dev builds)" ON)
+option(GEN_DEV_TRACE
+    "Compile the dev chip/snd trace rings + dumps (NEVER in release builds)" OFF)
+
 set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)   # clownmdemu-core linked by oracle only
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
@@ -120,7 +125,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES})
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
-        DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
+        DEFAULT_DEBUG_PORT=${PORT_NATIVE}
+        $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
+        $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
     # Oracle — clown68000 interpreter executes everything (parity reference).
     add_executable(${TARGET}_oracle ${SHARED_SRC}
@@ -128,7 +135,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
     target_compile_definitions(${TARGET}_oracle PRIVATE
         INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-        DEFAULT_DEBUG_PORT=${PORT_ORACLE} SONIC_REVERSE_DEBUG=1)
+        DEFAULT_DEBUG_PORT=${PORT_ORACLE}
+        $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
+        $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
     target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
     target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
