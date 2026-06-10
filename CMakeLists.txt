@@ -33,6 +33,22 @@ set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
 set(SDL2_DIR "${SDL2_BUNDLED}/cmake" CACHE PATH "" FORCE)
 find_package(SDL2 REQUIRED CONFIG NO_DEFAULT_PATH PATHS "${SDL2_DIR}")
 
+# ---------------------------------------------------------------------------
+# YM2612 FM = vendored ymfm (Aaron Giles, BSD-3) behind the stable ym2612_*
+# API (runner/audio/ym2612.h). Replaced clownmdemu's FM (AGPL) 2026-06-05 as
+# part of the AGPL-free runtime initiative — see segagenesisrecomp/LICENSING.md
+# (teardown item #2). enable_language(CXX) because ymfm is C++.
+# ---------------------------------------------------------------------------
+enable_language(CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(FM_SOURCES
+    "${RUNNER_ROOT}/audio/ym2612_ymfm.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_opn.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_ssg.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_adpcm.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_pcm.cpp"
+)
+
 set(RUNNER_SOURCES
     "${RUNNER_ROOT}/main.c"
     "${RUNNER_ROOT}/audio.c"
@@ -40,18 +56,33 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/frame_snapshots.c"
     "${RUNNER_ROOT}/hybrid_global.c"
     "${RUNNER_ROOT}/glue.c"
+    "${RUNNER_ROOT}/fiber_compat.c"   # cross-platform fiber shim (Win32 Fibers / POSIX ucontext) — glue.c depends on it
     "${RUNNER_ROOT}/crash_report.c"
     "${RUNNER_ROOT}/input_script.c"
     "${RUNNER_ROOT}/reverse_debug.c"
     "${RUNNER_ROOT}/gamepad.c"
+    "${RUNNER_ROOT}/chip_trace.c"
     "${RUNNER_ROOT}/audio/event_queue.c"
-    "${RUNNER_ROOT}/audio/ym2612.c"
+    ${FM_SOURCES}
     "${RUNNER_ROOT}/audio/sn76489.c"
     "${RUNNER_ROOT}/audio/mixer.c"
     "${RUNNER_ROOT}/audio/observability.c"
 )
 
-set(COMMON_LIBS clownmdemu-core SDL2::SDL2 SDL2::SDL2main)
+# Clean-room own backend (VDP+bus+Z80 scheduler) — native targets only; the
+# AGPL-free Sonic 3 runtime. Oracle targets keep clownmdemu as ground truth.
+set(OWN_BACKEND_SOURCES
+    "${RUNNER_ROOT}/video/genesis_vdp.c"
+    "${RUNNER_ROOT}/video/genesis_bus.c"
+    "${RUNNER_ROOT}/video/genesis_machine.c"
+    "${RUNNER_ROOT}/external/superzazu/z80.c")   # MIT Z80 core, embedded by genesis_machine
+
+option(SONIC_REVERSE_DEBUG
+    "Tier-1 reverse-debug instrumentation (WRAM store ring; dev builds)" ON)
+option(GEN_DEV_TRACE
+    "Compile the dev chip/snd trace rings + dumps (NEVER in release builds)" OFF)
+
+set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)   # clownmdemu-core linked by oracle only
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
 endif()
@@ -69,18 +100,34 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GEN}/${PREFIX}_layout.c"
         "${GAME}/${PREFIX}_spec.c"
     )
-    set(INCLUDES
-        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${GAME}"
+    # THE NATIVE LIST MUST CONTAIN NO clownmdemu-core PATHS — that is the
+    # enforcement that no AGPL header can be compiled into a release binary
+    # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
+    set(INCLUDES_NATIVE
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+        "${RUNNER_ROOT}/external/ymfm/src"
+        "${RUNNER_ROOT}/external/superzazu"
+        "${RUNNER_ROOT}/external/clowncommon"
+        "${GAME}"
+    )
+    set(INCLUDES_ORACLE
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+        "${RUNNER_ROOT}/external/ymfm/src"
+        "${RUNNER_ROOT}/external/superzazu"
+        "${RECOMP_ROOT}/clownmdemu-core/libraries/clownz80/source" "${GAME}"
         "${RECOMP_ROOT}/clownmdemu-core/source"
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clowncommon"
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
     )
 
-    # Native — recompiled 68K drives the game.
-    add_executable(${TARGET} ${SHARED_SRC} "${RUNNER_ROOT}/stub_clown68000.c")
+    # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown
+    # link, no clown headers).
+    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES})
     target_compile_definitions(${TARGET} PRIVATE
-        INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1
-        DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
+        INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
+        DEFAULT_DEBUG_PORT=${PORT_NATIVE}
+        $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
+        $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
     # Oracle — clown68000 interpreter executes everything (parity reference).
     add_executable(${TARGET}_oracle ${SHARED_SRC}
@@ -88,10 +135,13 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
     target_compile_definitions(${TARGET}_oracle PRIVATE
         INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-        DEFAULT_DEBUG_PORT=${PORT_ORACLE} SONIC_REVERSE_DEBUG=1)
+        DEFAULT_DEBUG_PORT=${PORT_ORACLE}
+        $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
+        $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
+    target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
+    target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
     foreach(t ${TARGET} ${TARGET}_oracle)
-        target_include_directories(${t} PRIVATE ${INCLUDES})
         target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
@@ -114,6 +164,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             endif()
         endif()
     endforeach()
+    # Oracle (clown68000 interpreter + clownmdemu VDP/bus) is the only target
+    # that links the AGPL core. Dev-only ground truth; never shipped.
+    target_link_libraries(${TARGET}_oracle PRIVATE clownmdemu-core)
 endfunction()
 
 # --- Mode: Sonic 3 alone (2 MB @ $000000) — playable bring-up ---------------
