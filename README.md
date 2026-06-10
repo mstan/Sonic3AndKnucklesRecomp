@@ -19,44 +19,53 @@ hosts all three as **build modes** — each a native target plus a paired
 
 > **No prebuilt binaries are distributed — build from source and supply your own
 > ROM.** (The shipped binary statically links the AGPL-3.0 clownmdemu core; see
-> `../SonicTheHedgehogRecomp/segagenesisrecomp/RELEASING.md` before publishing.)
+> `segagenesisrecomp/RELEASING.md` before publishing.)
 
 ## Building from source
 
 **Prerequisites**
-- Visual Studio 2022 (MSVC) and CMake 3.16+
+- A C compiler — Windows: Visual Studio 2022 (MSVC); macOS: Apple Clang (Xcode
+  CLT); Linux: Clang/GCC. Plus CMake 3.16+ (and Ninja on macOS/Linux).
+- SDL2 2.28+ — bundled on Windows; `brew install sdl2` (macOS); `libsdl2-dev` (Linux).
 - Your own legally-obtained ROM(s); ROMs are gitignored and never committed.
 
-**1. Clone, with the shared engine alongside.** This repo reaches the engine
-through a *sibling* checkout of `SonicTheHedgehogRecomp` (which carries the
-`segagenesisrecomp` submodule), so clone both side by side:
+**1. Clone.** The shared engine (`segagenesisrecomp`) is a git submodule, so a
+recursive clone is self-contained:
 
+```bash
+git clone --recursive https://github.com/mstan/Sonic3AndKnucklesRecomp.git
+cd Sonic3AndKnucklesRecomp
+# (cloned without --recursive? run: git submodule update --init --recursive)
 ```
-git clone --recursive https://github.com/mstan/SonicTheHedgehogRecomp.git
-git clone https://github.com/mstan/Sonic3AndKnucklesRecomp.git
-# layout:  <parent>/SonicTheHedgehogRecomp/   and   <parent>/Sonic3AndKnucklesRecomp/
-```
-(Cloned without `--recursive`? Run
-`git -C SonicTheHedgehogRecomp submodule update --init --recursive`.)
 
-**2. Supply your own ROM(s)**, into the engine's per-mode data dir:
+**2. Supply your own ROM(s).** Either pass the ROM path on the command line, or
+drop it into the engine's per-mode data dir so the build copies it next to the exe:
 
 | Mode | Place ROM at | CRC32 |
 |---|---|---|
-| Sonic 3 alone | `SonicTheHedgehogRecomp/segagenesisrecomp/sonic3/sonic3.bin` | `9BC192CE` |
-| S3 & Knuckles | `SonicTheHedgehogRecomp/segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
+| Sonic 3 alone | `segagenesisrecomp/sonic3/sonic3.bin` | `9BC192CE` |
+| S3 & Knuckles | `segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
 
 **3. Build the mode you want, then run.**
 
-```
-cd Sonic3AndKnucklesRecomp
+Windows (MSVC):
+```cmd
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-
-cmake --build build --config Release --target Sonic3Recomp     # Sonic 3 alone
-cmake --build build --config Release --target Sonic3KRecomp    # S3&K combined
-
-build\Release\Sonic3Recomp.exe          # the build copies the ROM next to the exe
+cmake --build build --config Release --target Sonic3Recomp     :: Sonic 3 alone
+cmake --build build --config Release --target Sonic3KRecomp    :: S3&K combined
+build\Release\Sonic3Recomp.exe          :: the build copies the ROM next to the exe
 ```
+
+macOS / Linux (Ninja + Clang/GCC):
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C build Sonic3Recomp Sonic3KRecomp
+./build/Sonic3Recomp "path/to/Sonic 3.bin"
+```
+
+> **Local dev across games:** clone `segagenesisrecomp` once at the workspace root
+> and run `scripts/link-engine.sh` (or `.bat`) to share ONE engine checkout; CMake
+> prefers the gitignored `engine-local` symlink over the submodule.
 
 Each mode also has an `_oracle` target (e.g. `Sonic3Recomp_oracle`) that runs
 the clown68000 interpreter for native↔interpreter parity debugging; it needs
@@ -65,8 +74,8 @@ the clown68000 interpreter for native↔interpreter parity debugging; it needs
 ## Regenerate the C from a ROM
 
 ```
-cd ..\SonicTheHedgehogRecomp\segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
-cd ..\SonicTheHedgehogRecomp\segagenesisrecomp\sonic3k    &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3k.bin --game game.toml
+cd segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
+cd segagenesisrecomp\sonic3k    &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3k.bin --game game.toml
 ```
 
 ## Sonic 3 & Knuckles (combined) mode — why it's harder
