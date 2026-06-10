@@ -61,11 +61,6 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/input_script.c"
     "${RUNNER_ROOT}/reverse_debug.c"
     "${RUNNER_ROOT}/gamepad.c"
-    # AGPL-free Z80 core (superzazu, MIT). These definitions override
-    # clownz80-interpreter.lib via MSVC first-wins linking (same trick as
-    # stub_clown68000.c) so clownz80's AGPL interpreter is never linked.
-    "${RUNNER_ROOT}/z80_superzazu.c"
-    "${RUNNER_ROOT}/external/superzazu/z80.c"
     "${RUNNER_ROOT}/chip_trace.c"
     "${RUNNER_ROOT}/audio/event_queue.c"
     ${FM_SOURCES}
@@ -79,7 +74,8 @@ set(RUNNER_SOURCES
 set(OWN_BACKEND_SOURCES
     "${RUNNER_ROOT}/video/genesis_vdp.c"
     "${RUNNER_ROOT}/video/genesis_bus.c"
-    "${RUNNER_ROOT}/video/genesis_machine.c")
+    "${RUNNER_ROOT}/video/genesis_machine.c"
+    "${RUNNER_ROOT}/external/superzazu/z80.c")   # MIT Z80 core, embedded by genesis_machine
 
 set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)   # clownmdemu-core linked by oracle only
 if(WIN32)
@@ -99,7 +95,17 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GEN}/${PREFIX}_layout.c"
         "${GAME}/${PREFIX}_spec.c"
     )
-    set(INCLUDES
+    # THE NATIVE LIST MUST CONTAIN NO clownmdemu-core PATHS — that is the
+    # enforcement that no AGPL header can be compiled into a release binary
+    # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
+    set(INCLUDES_NATIVE
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+        "${RUNNER_ROOT}/external/ymfm/src"
+        "${RUNNER_ROOT}/external/superzazu"
+        "${RUNNER_ROOT}/external/clowncommon"
+        "${GAME}"
+    )
+    set(INCLUDES_ORACLE
         "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
         "${RUNNER_ROOT}/external/ymfm/src"
         "${RUNNER_ROOT}/external/superzazu"
@@ -109,9 +115,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
     )
 
-    # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown link).
-    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES}
-        "${RUNNER_ROOT}/stub_clown68000.c")
+    # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown
+    # link, no clown headers).
+    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES})
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE} SONIC_REVERSE_DEBUG=1)
@@ -124,8 +130,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
         DEFAULT_DEBUG_PORT=${PORT_ORACLE} SONIC_REVERSE_DEBUG=1)
 
+    target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
+    target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
     foreach(t ${TARGET} ${TARGET}_oracle)
-        target_include_directories(${t} PRIVATE ${INCLUDES})
         target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
