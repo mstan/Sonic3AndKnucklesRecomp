@@ -14,8 +14,8 @@ hosts all three as **build modes** — each a native target plus a paired
 | Target | Game / ROM | Ports (native/oracle) | Status |
 |---|---|---|---|
 | `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, saves) |
+| `SonicAndKnucklesRecomp` | Sonic & Knuckles alone, 2 MB (MD5 `4ea493ea…`) | 4388 / 4389 | Bring-up |
 | `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Scaffold / early bring-up |
-| *Sonic & Knuckles alone* | S&K, 2 MB | — | Planned (no `sandk/` data yet) |
 
 > **Prebuilt Sonic 3 binaries are on the
 > [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases) page —
@@ -44,9 +44,10 @@ cd Sonic3AndKnucklesRecomp
 **2. Supply your own ROM(s).** Either pass the ROM path on the command line, or
 drop it into the engine's per-mode data dir so the build copies it next to the exe:
 
-| Mode | Place ROM at | CRC32 |
+| Mode | Place ROM at | Identity |
 |---|---|---|
-| Sonic 3 alone | `segagenesisrecomp/sonic3/sonic3.bin` | `9BC192CE` |
+| Sonic 3 alone | `segagenesisrecomp/sonic3/sonic3.bin` | CRC32 `9BC192CE` |
+| Sonic & Knuckles alone | `segagenesisrecomp/sandk/sandk.bin` | MD5 `4ea493ea…` (2 MB) |
 | S3 & Knuckles | `segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
 
 **3. Build the mode you want, then run.**
@@ -54,8 +55,9 @@ drop it into the engine's per-mode data dir so the build copies it next to the e
 Windows (MSVC):
 ```cmd
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --target Sonic3Recomp     :: Sonic 3 alone
-cmake --build build --config Release --target Sonic3KRecomp    :: S3&K combined
+cmake --build build --config Release --target Sonic3Recomp           :: Sonic 3 alone
+cmake --build build --config Release --target SonicAndKnucklesRecomp  :: S&K alone
+cmake --build build --config Release --target Sonic3KRecomp           :: S3&K combined
 build\Release\Sonic3Recomp.exe          :: the build copies the ROM next to the exe
 ```
 
@@ -78,8 +80,13 @@ the clown68000 interpreter for native↔interpreter parity debugging; it needs
 
 ```
 cd segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
+cd segagenesisrecomp\sandk      &&  ..\recompiler\build\Release\GenesisRecomp.exe sandk.bin   --game game.toml
 cd segagenesisrecomp\sonic3k    &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3k.bin --game game.toml
 ```
+
+> Sonic & Knuckles alone shares the S&K master boot path with the combined cart,
+> so its disasm data is regenerated from the same byte-perfect `skdisasm`
+> `sonic3k.lst` at offset 0 — see `segagenesisrecomp/sandk/game.toml`.
 
 ## Sonic 3 & Knuckles (combined) mode — why it's harder
 
