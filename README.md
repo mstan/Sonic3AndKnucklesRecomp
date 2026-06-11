@@ -17,9 +17,12 @@ hosts all three as **build modes** — each a native target plus a paired
 | `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Scaffold / early bring-up |
 | *Sonic & Knuckles alone* | S&K, 2 MB | — | Planned (no `sandk/` data yet) |
 
-> **No prebuilt binaries are distributed — build from source and supply your own
-> ROM.** (The shipped binary statically links the AGPL-3.0 clownmdemu core; see
-> `segagenesisrecomp/RELEASING.md` before publishing.)
+> **Prebuilt Sonic 3 binaries are on the
+> [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases) page —
+> supply your own ROM.** Release binaries are AGPL-free clean-room builds
+> (PolyForm Noncommercial 1.0.0 + permissive third-party notices). The AGPL
+> clownmdemu core is used only by unshipped development/oracle targets; see
+> `segagenesisrecomp/RELEASING.md`.
 
 ## Building from source
 
