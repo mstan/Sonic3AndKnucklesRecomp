@@ -12,9 +12,9 @@ set(CMAKE_C_STANDARD 11)
 # build modes — each a native target + a paired _oracle (interpreter) target:
 #
 #   Target            ROM                      Ports (native/oracle)  Status
-#   Sonic3Recomp      Sonic 3 alone, 2 MB      4384 / 4385            playable bring-up
-#   Sonic3KRecomp     S3+S&K combined, 4 MB    4386 / 4387            scaffold / bring-up
-#   (Sonic&Knuckles alone)                     —                      planned (no sandk/ data yet)
+#   Sonic3Recomp           Sonic 3 alone, 2 MB     4384 / 4385       playable bring-up
+#   Sonic3KRecomp          S3+S&K combined, 4 MB   4386 / 4387       scaffold / bring-up
+#   SonicAndKnucklesRecomp S&K alone, 2 MB         4388 / 4389       bring-up
 #
 # Engine (runner + recompiler + clownmdemu fork) comes from the canonical
 # segagenesisrecomp checkout at the workspace root, reached here through a local
@@ -217,6 +217,9 @@ add_recomp_mode(Sonic3Recomp  sonic3  sonic3  sonic3.bin  4384 4385)
 # --- Mode: Sonic 3 & Knuckles combined (4 MB lock-on) — scaffold ------------
 add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 
-# --- Mode: Sonic & Knuckles alone — PLANNED ---------------------------------
-# No segagenesisrecomp/sandk/ data yet. When it exists, mirror the calls above:
-#   add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
+# --- Mode: Sonic & Knuckles alone (2 MB @ $000000) — bring-up ----------------
+# Standalone S&K: byte-identical to the low 2 MB of the combined cart, so it
+# shares the S&K master boot path and the S&K-half disasm (org 0). Data lives in
+# segagenesisrecomp/sandk/ (game.toml + discovery files regenerated from skdisasm
+# sonic3k.lst at offset 0). See segagenesisrecomp/sandk/game.toml.
+add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
