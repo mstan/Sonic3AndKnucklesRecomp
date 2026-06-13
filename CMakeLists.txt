@@ -108,6 +108,11 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/audio/sn76489.c"
     "${RUNNER_ROOT}/audio/mixer.c"
     "${RUNNER_ROOT}/audio/observability.c"
+    # Verified-enhancement shadow layer (opt-in via env, default OFF; links no
+    # clownmdemu, safe to ship). See docs/SHADOW_ENHANCEMENTS.md.
+    "${RUNNER_ROOT}/audio/audio_shadow.c"   # envelope-correlation verifier
+    "${RUNNER_ROOT}/audio/fm_shadow.cpp"    # parallel ymfm chip (cleaner highs)
+    "${RUNNER_ROOT}/video/color_lut.c"      # present-time 9-bit CRT/composite LUT
 )
 
 # Clean-room own backend (VDP+bus+Z80 scheduler) — native targets only; the
