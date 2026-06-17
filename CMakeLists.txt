@@ -115,6 +115,8 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/input_script.c"
     "${RUNNER_ROOT}/reverse_debug.c"
     "${RUNNER_ROOT}/gamepad.c"
+    "${RUNNER_ROOT}/input_map.c"      # per-player Genesis button bindings (kbd+pad, 3/6-btn)
+    "${RUNNER_ROOT}/app_config.c"     # settings.ini + rom.cfg load/save
     "${RUNNER_ROOT}/chip_trace.c"
     "${RUNNER_ROOT}/audio/event_queue.c"
     ${FM_SOURCES}
@@ -241,3 +243,13 @@ add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 # segagenesisrecomp/sandk/ (game.toml + discovery files regenerated from skdisasm
 # sonic3k.lst at offset 0). See segagenesisrecomp/sandk/game.toml.
 add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
+
+# RmlUi pre-boot launcher — added to ALL THREE native targets (each is its own
+# game/exe sharing this repo's output dir). Targets are global, so this runs
+# after add_recomp_mode created them. Per-game box art is selected at runtime by
+# g_game_spec.short_name -> img/boxart-<short>.png (sonic3 / sonic3k / sonick),
+# all staged into the shared launcher/img/. Never the _oracle targets.
+include(${RUNNER_ROOT}/launcher/launcher.cmake)
+genesisrecomp_add_launcher(Sonic3Recomp)
+genesisrecomp_add_launcher(Sonic3KRecomp)
+genesisrecomp_add_launcher(SonicAndKnucklesRecomp)
