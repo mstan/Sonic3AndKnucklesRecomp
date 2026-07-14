@@ -50,7 +50,9 @@ drop it into the engine's per-mode data dir so the build copies it next to the e
 | Sonic & Knuckles alone | `segagenesisrecomp/sandk/sandk.bin` | MD5 `4ea493ea…` (2 MB) |
 | S3 & Knuckles | `segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
 
-**3. Build the mode you want, then run.**
+**3. Build the mode you want, then run.** Generated C is ignored build output;
+CMake builds the current recompiler and regenerates the selected mode whenever
+its ROM, configuration/discovery inputs, or the recompiler changes.
 
 Windows (MSVC):
 ```cmd
@@ -76,7 +78,7 @@ Each mode also has an `_oracle` target (e.g. `Sonic3Recomp_oracle`) that runs
 the clown68000 interpreter for native↔interpreter parity debugging; it needs
 `debug.ini` next to the exe.
 
-## Regenerate the C from a ROM
+## Manually regenerate the C from a ROM
 
 ```
 cd segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
