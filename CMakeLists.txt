@@ -152,15 +152,16 @@ endif()
 
 # add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
 #   Builds <target> (native) and <target>_oracle (interpreter) for one game
-#   mode, pulling generated C + spec from segagenesisrecomp/<game_dir>/.
+#   mode, generating C in this build tree and pulling the spec from the engine.
+include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${RECOMP_ROOT}/${GAME_DIR}")
-    set(GEN  "${GAME}/generated")
+    genesisrecomp_add_generated_sources(
+        GENERATED_SOURCES "${PREFIX}" "${GAME_DIR}" "${ROM}"
+        REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
     set(SHARED_SRC
         ${RUNNER_SOURCES}
-        "${GEN}/${PREFIX}_full.c"
-        "${GEN}/${PREFIX}_dispatch.c"
-        "${GEN}/${PREFIX}_layout.c"
+        ${GENERATED_SOURCES}
         "${GAME}/${PREFIX}_spec.c"
     )
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
@@ -195,6 +196,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
     add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
+    add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE}
@@ -205,6 +207,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     add_executable(${TARGET}_oracle ${SHARED_SRC}
         "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
         "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
+    add_dependencies(${TARGET}_oracle ${GENERATED_SOURCES_TARGET})
     target_compile_definitions(${TARGET}_oracle PRIVATE
         INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
         DEFAULT_DEBUG_PORT=${PORT_ORACLE}
@@ -218,7 +221,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
             target_link_options(${t} PRIVATE /MAP)
-            set_source_files_properties("${GEN}/${PREFIX}_full.c"
+            set_source_files_properties("${GENERATED_SOURCES_FULL}"
                 PROPERTIES COMPILE_FLAGS "/bigobj")
         endif()
         if(WIN32)
@@ -245,9 +248,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # interpreter/decoder/rom_parser (the shared glue.c references them under
     # GENESIS_COSIM; RUNNER_SOURCES omits them). game_cycles.c + the generated
     # <prefix>_cycles.c give the cross-backend work-cycle ruler its cost table.
-    # Only for modes whose cost table has been regenerated (the ruler + interp
-    # pacing require <prefix>_cycles.c). Other modes (sonic3-alone, sandk) skip.
-    if(GENESIS_BUILD_COSIM AND EXISTS "${GEN}/${PREFIX}_cycles.c")
+    # The generation rule emits the cost table with the compiled translations,
+    # so a clean build can configure these targets before either file exists.
+    if(GENESIS_BUILD_COSIM)
         set(COSIM_FLOOR
             "${RUNNER_ROOT}/m68k_interp.c"
             "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
@@ -255,10 +258,12 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         add_executable(${TARGET}_cosim ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${COSIM_FLOOR}
             "${RUNNER_ROOT}/cosim.c" "${RUNNER_ROOT}/cosim_state.c"
             "${RUNNER_ROOT}/cosim_visible.c" "${RUNNER_ROOT}/cosim_cycles.c"
-            "${RUNNER_ROOT}/game_cycles.c" "${GEN}/${PREFIX}_cycles.c")
+            "${RUNNER_ROOT}/game_cycles.c" "${GENERATED_SOURCES_CYCLES}")
+        add_dependencies(${TARGET}_cosim ${GENERATED_SOURCES_TARGET})
         target_compile_definitions(${TARGET}_cosim PRIVATE
             INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
-            GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4398)
+            GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4398
+            $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>)
         target_include_directories(${TARGET}_cosim PRIVATE ${INCLUDES_NATIVE}
             "${RECOMP_ROOT}/recompiler/src")
 
@@ -267,10 +272,12 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${RUNNER_ROOT}/hybrid_jmp.c" ${COSIM_FLOOR}
             "${RUNNER_ROOT}/cosim.c" "${RUNNER_ROOT}/cosim_visible.c"
             "${RUNNER_ROOT}/cosim_cycles.c" "${RUNNER_ROOT}/game_cycles.c"
-            "${GEN}/${PREFIX}_cycles.c")
+            "${GENERATED_SOURCES_CYCLES}")
+        add_dependencies(${TARGET}_oracle_cosim ${GENERATED_SOURCES_TARGET})
         target_compile_definitions(${TARGET}_oracle_cosim PRIVATE
             INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-            GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4399)
+            GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4399
+            $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>)
         target_include_directories(${TARGET}_oracle_cosim PRIVATE ${INCLUDES_ORACLE}
             "${RECOMP_ROOT}/recompiler/src")
         target_link_libraries(${TARGET}_oracle_cosim PRIVATE clownmdemu-core)
@@ -279,8 +286,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
             if(MSVC)
                 target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
-                set_source_files_properties("${GEN}/${PREFIX}_full.c"   PROPERTIES COMPILE_FLAGS "/bigobj")
-                set_source_files_properties("${GEN}/${PREFIX}_cycles.c" PROPERTIES COMPILE_FLAGS "/bigobj")
+                set_source_files_properties("${GENERATED_SOURCES_FULL}"   PROPERTIES COMPILE_FLAGS "/bigobj")
+                set_source_files_properties("${GENERATED_SOURCES_CYCLES}" PROPERTIES COMPILE_FLAGS "/bigobj")
             endif()
             if(WIN32)
                 add_custom_command(TARGET ${t} POST_BUILD
