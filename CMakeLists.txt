@@ -318,12 +318,15 @@ add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 # sonic3k.lst at offset 0). See segagenesisrecomp/sandk/game.toml.
 add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 
-# RmlUi pre-boot launcher — added to ALL THREE native targets (each is its own
-# game/exe sharing this repo's output dir). Targets are global, so this runs
-# after add_recomp_mode created them. Per-game box art is selected at runtime by
-# g_game_spec.short_name -> img/boxart-<short>.png (sonic3 / sonic3k / sonick),
-# all staged into the shared launcher/img/. Never the _oracle targets.
-include(${RUNNER_ROOT}/launcher/launcher.cmake)
-genesisrecomp_add_launcher(Sonic3Recomp)
-genesisrecomp_add_launcher(Sonic3KRecomp)
-genesisrecomp_add_launcher(SonicAndKnucklesRecomp)
+# Shared recomp-ui (Dear ImGui) pre-boot launcher — added to ALL THREE native
+# targets (each is its own game/exe sharing this repo's output dir). Each stages
+# its OWN box art under a distinct name (BOXART_NAME); the runner's seam selects
+# it per mode via g_game_spec.boxart -> assets/img/boxart-<mode>.tga. Defines
+# RECOMP_LAUNCHER; replaces the old RmlUi launcher. Never the _oracle targets.
+include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
+recomp_target_launcher_ui(Sonic3Recomp
+    BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3.tga  BOXART_NAME boxart-sonic3.tga)
+recomp_target_launcher_ui(Sonic3KRecomp
+    BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3k.tga BOXART_NAME boxart-sonic3k.tga)
+recomp_target_launcher_ui(SonicAndKnucklesRecomp
+    BOXART ${CMAKE_SOURCE_DIR}/boxart-sonick.tga  BOXART_NAME boxart-sonick.tga)
