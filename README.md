@@ -78,6 +78,28 @@ Each mode also has an `_oracle` target (e.g. `Sonic3Recomp_oracle`) that runs
 the clown68000 interpreter for native↔interpreter parity debugging; it needs
 `debug.ini` next to the exe.
 
+### Optional statically recompiled sound Z80
+
+Native targets normally retain the embedded Z80 interpreter. For development,
+the sound driver can instead use the flat static backend from
+[`smsggrecomp`](https://github.com/mstan/smsggrecomp/tree/feature/genesis-z80-step).
+Capture and generate the ROM-derived `<game>_step.c` locally as described in
+[`docs/Z80_STATIC_RECOMP.md`](segagenesisrecomp/docs/Z80_STATIC_RECOMP.md), then
+configure with:
+
+```bash
+cmake -S . -B build-z80 \
+  -DGENESIS_Z80_RECOMP=ON \
+  -DGENESIS_Z80_CORE_ROOT=/path/to/smsggrecomp \
+  -DGENESIS_Z80_AOT_SOURCE=/path/to/generated/s3kz80_step.c
+cmake --build build-z80 --config Release --target Sonic3KRecomp
+```
+
+The capture and generated C contain ROM-derived data and remain uncommitted.
+Opcode shapes are statically decoded; mutable driver operands are read live,
+with one-instruction interpreter fallback only for unmatched code. Turbo mode
+silences speaker playback while preserving headless WAV capture.
+
 ## Manually regenerate the C from a ROM
 
 ```
