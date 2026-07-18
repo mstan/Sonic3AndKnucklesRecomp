@@ -83,6 +83,8 @@ the clown68000 interpreter for native↔interpreter parity debugging; it needs
 Native targets normally retain the embedded Z80 interpreter. For development,
 the sound driver can instead use the flat static backend from
 [`smsggrecomp`](https://github.com/mstan/smsggrecomp/tree/feature/genesis-z80-step).
+The generated code consumes the framework's pinned
+[`z80-recomp-core`](https://github.com/mstan/z80-recomp-core) submodule.
 Capture and generate the ROM-derived `<game>_step.c` locally as described in
 [`docs/Z80_STATIC_RECOMP.md`](segagenesisrecomp/docs/Z80_STATIC_RECOMP.md), then
 configure with:
@@ -90,7 +92,6 @@ configure with:
 ```bash
 cmake -S . -B build-z80 \
   -DGENESIS_Z80_RECOMP=ON \
-  -DGENESIS_Z80_CORE_ROOT=/path/to/smsggrecomp \
   -DGENESIS_Z80_AOT_SOURCE=/path/to/generated/s3kz80_step.c
 cmake --build build-z80 --config Release --target Sonic3KRecomp
 ```
