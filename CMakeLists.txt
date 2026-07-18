@@ -42,13 +42,13 @@ set(RUNNER_ROOT "${RECOMP_ROOT}/runner")
 
 option(GENESIS_Z80_RECOMP
     "Run a Genesis sound Z80 through a flat statically-recompiled backend" OFF)
-set(GENESIS_Z80_CORE_ROOT "" CACHE PATH
-    "SMS/GG Z80 semantic-core checkout used by GENESIS_Z80_RECOMP")
 set(GENESIS_Z80_AOT_SOURCE "" CACHE FILEPATH
     "Generated <game>_step.c emitted by SmsRecomp --flat-step")
+set(Z80_RECOMP_CORE_ROOT "${RECOMP_ROOT}/external/z80-recomp-core")
 if(GENESIS_Z80_RECOMP)
-    if(NOT EXISTS "${GENESIS_Z80_CORE_ROOT}/runner/include/sms_runtime.h")
-        message(FATAL_ERROR "GENESIS_Z80_CORE_ROOT must point at an smsggrecomp checkout")
+    if(NOT EXISTS "${Z80_RECOMP_CORE_ROOT}/include/sms_runtime.h")
+        message(FATAL_ERROR
+            "z80-recomp-core submodule is missing; run git submodule update --init --recursive")
     endif()
     if(NOT EXISTS "${GENESIS_Z80_AOT_SOURCE}")
         message(FATAL_ERROR "GENESIS_Z80_AOT_SOURCE does not exist: ${GENESIS_Z80_AOT_SOURCE}")
@@ -210,7 +210,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     )
     if(GENESIS_Z80_RECOMP)
         list(APPEND INCLUDES_NATIVE
-            "${GENESIS_Z80_CORE_ROOT}/runner/include"
+            "${Z80_RECOMP_CORE_ROOT}/include"
             "${GENESIS_Z80_AOT_DIR}")
     endif()
     set(INCLUDES_ORACLE
