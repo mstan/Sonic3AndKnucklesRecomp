@@ -82,7 +82,7 @@ the clown68000 interpreter for native↔interpreter parity debugging; it needs
 
 Native targets normally retain the embedded Z80 interpreter. For development,
 the sound driver can instead use the flat static backend from
-[`smsggrecomp`](https://github.com/mstan/smsggrecomp/tree/feature/genesis-z80-step).
+[`smsggrecomp`](https://github.com/mstan/smsggrecomp).
 The generated code consumes the framework's pinned
 [`z80-recomp-core`](https://github.com/mstan/z80-recomp-core) submodule.
 Capture and generate the ROM-derived `<game>_step.c` locally as described in
