@@ -57,8 +57,14 @@ if(GENESIS_Z80_RECOMP)
 endif()
 
 # clownmdemu-core is the mstan fork; our changes are committed in it directly
-# (no build-time patch step — see THIRD-PARTY-LICENSES.md).
-add_subdirectory("${RECOMP_ROOT}/clownmdemu-core" clownmdemu-core)
+# (no build-time patch step — see THIRD-PARTY-LICENSES.md). It is an OPT-IN
+# submodule: AGPL, private fork, needed by nothing that ships. Only the
+# dev-only _oracle / _oracle_cosim targets below use it.
+include("${RECOMP_ROOT}/cmake/GenesisOracle.cmake")
+genesis_oracle_resolve("${RECOMP_ROOT}")
+if(GENESIS_ORACLE)
+    add_subdirectory("${RECOMP_ROOT}/clownmdemu-core" clownmdemu-core)
+endif()
 
 set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
 # SDL2 discovery. Windows pins the bundled VC devel package (NO_DEFAULT_PATH
@@ -237,19 +243,25 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
     # Oracle — clown68000 interpreter executes everything (parity reference).
-    add_executable(${TARGET}_oracle ${SHARED_SRC}
-        "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
-        "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
-    add_dependencies(${TARGET}_oracle ${GENERATED_SOURCES_TARGET})
-    target_compile_definitions(${TARGET}_oracle PRIVATE
-        INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-        DEFAULT_DEBUG_PORT=${PORT_ORACLE}
-        $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
-        $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
+    # AGPL-linked and dev-only, so present only when the opt-in
+    # clownmdemu-core submodule is checked out (cmake/GenesisOracle.cmake).
+    set(_MODE_TARGETS ${TARGET})
+    if(GENESIS_ORACLE)
+        list(APPEND _MODE_TARGETS ${TARGET}_oracle)
+        add_executable(${TARGET}_oracle ${SHARED_SRC}
+            "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
+            "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
+        add_dependencies(${TARGET}_oracle ${GENERATED_SOURCES_TARGET})
+        target_compile_definitions(${TARGET}_oracle PRIVATE
+            INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
+            DEFAULT_DEBUG_PORT=${PORT_ORACLE}
+            $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
+            $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
+        target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
+    endif()
 
     target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
-    target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
-    foreach(t ${TARGET} ${TARGET}_oracle)
+    foreach(t ${_MODE_TARGETS})
         target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
@@ -274,7 +286,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     endforeach()
     # Oracle (clown68000 interpreter + clownmdemu VDP/bus) is the only target
     # that links the AGPL core. Dev-only ground truth; never shipped.
-    target_link_libraries(${TARGET}_oracle PRIVATE clownmdemu-core)
+    if(GENESIS_ORACLE)
+        target_link_libraries(${TARGET}_oracle PRIVATE clownmdemu-core)
+    endif()
 
     # --- Differential co-sim targets (dev-only; see engine COSIM.md) ---------
     # Mirror native/oracle but add the cosim modules + the clean-room 68000
@@ -300,6 +314,10 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         target_include_directories(${TARGET}_cosim PRIVATE ${INCLUDES_NATIVE}
             "${RECOMP_ROOT}/recompiler/src")
 
+        # Pairing #2 needs the opt-in submodule; pairing #1 above links none.
+        set(_COSIM_TARGETS ${TARGET}_cosim)
+        if(GENESIS_ORACLE)
+        list(APPEND _COSIM_TARGETS ${TARGET}_oracle_cosim)
         add_executable(${TARGET}_oracle_cosim ${SHARED_SRC}
             "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
             "${RUNNER_ROOT}/hybrid_jmp.c" ${COSIM_FLOOR}
@@ -314,8 +332,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         target_include_directories(${TARGET}_oracle_cosim PRIVATE ${INCLUDES_ORACLE}
             "${RECOMP_ROOT}/recompiler/src")
         target_link_libraries(${TARGET}_oracle_cosim PRIVATE clownmdemu-core)
+        endif()
 
-        foreach(t ${TARGET}_cosim ${TARGET}_oracle_cosim)
+        foreach(t ${_COSIM_TARGETS})
             target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
             if(MSVC)
                 target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
