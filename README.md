@@ -41,6 +41,10 @@ cd Sonic3AndKnucklesRecomp
 # (cloned without --recursive? run: git submodule update --init --recursive)
 ```
 
+`Skipping submodule 'clownmdemu-core'` in that output is expected and correct.
+That core is AGPL and dev-only; nothing you build needs it, and CMake skips the
+dev-only `_oracle` targets automatically when it is absent.
+
 **2. Supply your own ROM(s).** Either pass the ROM path on the command line, or
 drop it into the engine's per-mode data dir so the build copies it next to the exe:
 
