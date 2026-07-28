@@ -9,14 +9,14 @@ set(CMAKE_C_STANDARD 11)
 # Sonic 3 and Sonic & Knuckles are two separate ~2 MB ROMs; "Sonic 3 &
 # Knuckles" is the 4 MB lock-on UNION of the two (S&K boots at $000000, Sonic 3
 # maps at $200000). They share this engine, so one repo hosts all three as
-# build modes — each a native target + a paired _oracle (interpreter) target:
+# build modes, one native target each:
 #
 #   Target            ROM                      Ports (native/oracle)  Status
 #   Sonic3Recomp           Sonic 3 alone, 2 MB     4384 / 4385       playable bring-up
 #   Sonic3KRecomp          S3+S&K combined, 4 MB   4386 / 4387       scaffold / bring-up
 #   SonicAndKnucklesRecomp S&K alone, 2 MB         4388 / 4389       bring-up
 #
-# Engine (runner + recompiler + clownmdemu fork) comes from the canonical
+# Engine (runner + recompiler) comes from the canonical
 # segagenesisrecomp checkout at the workspace root, reached here through a local
 # directory junction (./segagenesisrecomp -> ../segagenesisrecomp); per-game data
 # lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
@@ -54,16 +54,6 @@ if(GENESIS_Z80_RECOMP)
         message(FATAL_ERROR "GENESIS_Z80_AOT_SOURCE does not exist: ${GENESIS_Z80_AOT_SOURCE}")
     endif()
     get_filename_component(GENESIS_Z80_AOT_DIR "${GENESIS_Z80_AOT_SOURCE}" DIRECTORY)
-endif()
-
-# clownmdemu-core is the mstan fork; our changes are committed in it directly
-# (no build-time patch step — see THIRD-PARTY-LICENSES.md). It is an OPT-IN
-# submodule: AGPL, private fork, needed by nothing that ships. Only the
-# dev-only _oracle / _oracle_cosim targets below use it.
-include("${RECOMP_ROOT}/cmake/GenesisOracle.cmake")
-genesis_oracle_resolve("${RECOMP_ROOT}")
-if(GENESIS_ORACLE)
-    add_subdirectory("${RECOMP_ROOT}/clownmdemu-core" clownmdemu-core)
 endif()
 
 set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
@@ -135,7 +125,6 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/main.c"
     "${RUNNER_ROOT}/audio.c"
     ${GEN_TRACE_SOURCES}
-    "${RUNNER_ROOT}/hybrid_global.c"
     "${RUNNER_ROOT}/glue.c"
     "${RUNNER_ROOT}/fiber_compat.c"   # cross-platform fiber shim (Win32 Fibers / POSIX ucontext) — glue.c depends on it
     "${RUNNER_ROOT}/crash_report.c"
@@ -157,8 +146,7 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/video/color_lut.c"      # present-time 9-bit CRT/composite LUT
 )
 
-# Clean-room own backend (VDP+bus+Z80 scheduler) — native targets only; the
-# AGPL-free Sonic 3 runtime. Oracle targets keep clownmdemu as ground truth.
+# Clean-room own backend (VDP+bus+Z80 scheduler) — the only backend.
 set(OWN_BACKEND_SOURCES
     "${RUNNER_ROOT}/video/genesis_vdp.c"
     "${RUNNER_ROOT}/video/genesis_bus.c"
@@ -177,13 +165,13 @@ option(GEN_DEV_TRACE
 option(GENESIS_BUILD_COSIM
     "Build the differential co-simulation targets (dev-only, never shipped)" OFF)
 
-set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)   # clownmdemu-core linked by oracle only
+set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
 endif()
 
 # add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
-#   Builds <target> (native) and <target>_oracle (interpreter) for one game
+#   Builds <target> (native) for one game mode
 #   mode, generating C in this build tree and pulling the spec from the engine.
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
@@ -203,7 +191,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/m68k_interp.c"
         "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
         "${RECOMP_ROOT}/recompiler/src/rom_parser.c")
-    # THE NATIVE LIST MUST CONTAIN NO clownmdemu-core PATHS — that is the
+    # Nothing third-party beyond ymfm/superzazu/clowncommon — that is the
     # enforcement that no AGPL header can be compiled into a release binary
     # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
     set(INCLUDES_NATIVE
@@ -219,16 +207,6 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${Z80_RECOMP_CORE_ROOT}/include"
             "${GENESIS_Z80_AOT_DIR}")
     endif()
-    set(INCLUDES_ORACLE
-        "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
-        "${RUNNER_ROOT}/external/ymfm/src"
-        "${RUNNER_ROOT}/external/superzazu"
-        "${RECOMP_ROOT}/clownmdemu-core/libraries/clownz80/source" "${GAME}"
-        "${RECOMP_ROOT}/clownmdemu-core/source"
-        "${RECOMP_ROOT}/clownmdemu-core/libraries/clowncommon"
-        "${RECOMP_ROOT}/clownmdemu-core/libraries/clown68000/source/interpreter"
-        ${SDL2_PARENT_INCLUDE_DIRS}
-    )
 
     # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
@@ -242,26 +220,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
         $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
 
-    # Oracle — clown68000 interpreter executes everything (parity reference).
-    # AGPL-linked and dev-only, so present only when the opt-in
-    # clownmdemu-core submodule is checked out (cmake/GenesisOracle.cmake).
-    set(_MODE_TARGETS ${TARGET})
-    if(GENESIS_ORACLE)
-        list(APPEND _MODE_TARGETS ${TARGET}_oracle)
-        add_executable(${TARGET}_oracle ${SHARED_SRC}
-            "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
-            "${RUNNER_ROOT}/hybrid_jmp.c" "${RUNNER_ROOT}/oracle_trace.c")
-        add_dependencies(${TARGET}_oracle ${GENERATED_SOURCES_TARGET})
-        target_compile_definitions(${TARGET}_oracle PRIVATE
-            INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-            DEFAULT_DEBUG_PORT=${PORT_ORACLE}
-            $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
-            $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
-        target_include_directories(${TARGET}_oracle PRIVATE ${INCLUDES_ORACLE})
-    endif()
-
     target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
-    foreach(t ${_MODE_TARGETS})
+    foreach(t ${TARGET})
         target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
@@ -284,11 +244,6 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             endif()
         endif()
     endforeach()
-    # Oracle (clown68000 interpreter + clownmdemu VDP/bus) is the only target
-    # that links the AGPL core. Dev-only ground truth; never shipped.
-    if(GENESIS_ORACLE)
-        target_link_libraries(${TARGET}_oracle PRIVATE clownmdemu-core)
-    endif()
 
     # --- Differential co-sim targets (dev-only; see engine COSIM.md) ---------
     # Mirror native/oracle but add the cosim modules + the clean-room 68000
@@ -314,27 +269,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         target_include_directories(${TARGET}_cosim PRIVATE ${INCLUDES_NATIVE}
             "${RECOMP_ROOT}/recompiler/src")
 
-        # Pairing #2 needs the opt-in submodule; pairing #1 above links none.
-        set(_COSIM_TARGETS ${TARGET}_cosim)
-        if(GENESIS_ORACLE)
-        list(APPEND _COSIM_TARGETS ${TARGET}_oracle_cosim)
-        add_executable(${TARGET}_oracle_cosim ${SHARED_SRC}
-            "${RUNNER_ROOT}/hybrid.c" "${GAME}/${PREFIX}_hybrid_table.c"
-            "${RUNNER_ROOT}/hybrid_jmp.c" ${COSIM_FLOOR}
-            "${RUNNER_ROOT}/cosim.c" "${RUNNER_ROOT}/cosim_visible.c"
-            "${RUNNER_ROOT}/cosim_cycles.c" "${RUNNER_ROOT}/game_cycles.c"
-            "${GENERATED_SOURCES_CYCLES}")
-        add_dependencies(${TARGET}_oracle_cosim ${GENERATED_SOURCES_TARGET})
-        target_compile_definitions(${TARGET}_oracle_cosim PRIVATE
-            INCLUDE_GENERATED_CODE=1 HYBRID_RECOMPILED_CODE=1 SONIC_ORACLE_BUILD=1
-            GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4399
-            $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>)
-        target_include_directories(${TARGET}_oracle_cosim PRIVATE ${INCLUDES_ORACLE}
-            "${RECOMP_ROOT}/recompiler/src")
-        target_link_libraries(${TARGET}_oracle_cosim PRIVATE clownmdemu-core)
-        endif()
 
-        foreach(t ${_COSIM_TARGETS})
+        foreach(t ${TARGET}_cosim)
             target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
             if(MSVC)
                 target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
@@ -374,7 +310,7 @@ add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 # targets (each is its own game/exe sharing this repo's output dir). Each stages
 # its OWN box art under a distinct name (BOXART_NAME); the runner's seam selects
 # it per mode via g_game_spec.boxart -> assets/img/boxart-<mode>.tga. Defines
-# RECOMP_LAUNCHER. Never the _oracle targets.
+# RECOMP_LAUNCHER.
 include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
 recomp_target_launcher_ui(Sonic3Recomp
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3.tga  BOXART_NAME boxart-sonic3.tga)
