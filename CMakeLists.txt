@@ -139,6 +139,7 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/audio/sn76489.c"
     "${RUNNER_ROOT}/audio/mixer.c"
     "${RUNNER_ROOT}/audio/observability.c"
+    "${RUNNER_ROOT}/cosim_state.c"  # pointer-free end-state hash for benchmarks + co-sim
     # Verified-enhancement shadow layer (opt-in via env, default OFF; links no
     # clownmdemu, safe to ship). See docs/SHADOW_ENHANCEMENTS.md.
     "${RUNNER_ROOT}/audio/audio_shadow.c"   # envelope-correlation verifier
@@ -165,7 +166,7 @@ option(GEN_DEV_TRACE
 option(GENESIS_BUILD_COSIM
     "Build the differential co-simulation targets (dev-only, never shipped)" OFF)
 
-set(COMMON_LIBS SDL2::SDL2 SDL2::SDL2main)
+set(COMMON_LIBS SDL2::SDL2main SDL2::SDL2)
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
 endif()
@@ -258,7 +259,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
             "${RECOMP_ROOT}/recompiler/src/rom_parser.c")
         add_executable(${TARGET}_cosim ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${COSIM_FLOOR}
-            "${RUNNER_ROOT}/cosim.c" "${RUNNER_ROOT}/cosim_state.c"
+            "${RUNNER_ROOT}/cosim.c"
             "${RUNNER_ROOT}/cosim_visible.c" "${RUNNER_ROOT}/cosim_cycles.c"
             "${RUNNER_ROOT}/game_cycles.c" "${GENERATED_SOURCES_CYCLES}")
         add_dependencies(${TARGET}_cosim ${GENERATED_SOURCES_TARGET})
