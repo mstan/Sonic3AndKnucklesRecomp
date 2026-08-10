@@ -314,8 +314,11 @@ add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 # RECOMP_LAUNCHER.
 include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
 recomp_target_launcher_ui(Sonic3Recomp
+    CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3.tga  BOXART_NAME boxart-sonic3.tga)
 recomp_target_launcher_ui(Sonic3KRecomp
+    CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3k.tga BOXART_NAME boxart-sonic3k.tga)
 recomp_target_launcher_ui(SonicAndKnucklesRecomp
+    CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonick.tga  BOXART_NAME boxart-sonick.tga)
