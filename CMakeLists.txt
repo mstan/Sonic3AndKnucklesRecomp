@@ -169,6 +169,8 @@ option(GENESIS_BUILD_COSIM
 set(COMMON_LIBS SDL2::SDL2main SDL2::SDL2)
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
+elseif(UNIX)
+    list(APPEND COMMON_LIBS m)
 endif()
 
 # add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
@@ -185,6 +187,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         ${GENERATED_SOURCES}
         "${GAME}/${PREFIX}_spec.c"
     )
+    list(APPEND SHARED_SRC "${RECOMP_ROOT}/sonic3k/sonic3_video.c")
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
     # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)
     # unconditionally, so every target built against it links these (AGPL-free).
@@ -216,6 +219,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE}
+        $<$<STREQUAL:${PREFIX},sonic3>:SONIC3_STANDALONE=1>
         $<$<BOOL:${GENESIS_Z80_RECOMP}>:GENESIS_Z80_RECOMP=1>
         $<$<BOOL:${GENESIS_Z80_RECOMP}>:SMS_RUNTIME_NO_CALL_BY_ADDRESS=1>
         $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
@@ -266,6 +270,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         target_compile_definitions(${TARGET}_cosim PRIVATE
             INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
             GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4398
+            $<$<STREQUAL:${PREFIX},sonic3>:SONIC3_STANDALONE=1>
             $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>)
         target_include_directories(${TARGET}_cosim PRIVATE ${INCLUDES_NATIVE}
             "${RECOMP_ROOT}/recompiler/src")
@@ -312,6 +317,7 @@ add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 # its OWN box art under a distinct name (BOXART_NAME); the runner's seam selects
 # it per mode via g_game_spec.boxart -> assets/img/boxart-<mode>.tga. Defines
 # RECOMP_LAUNCHER.
+set(RECOMP_UI_ENABLE_MODS ON CACHE BOOL "Expose Sonic 3 family's opt-in built-in mods")
 include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
 recomp_target_launcher_ui(Sonic3Recomp
     CONSOLE genesis
@@ -322,3 +328,9 @@ recomp_target_launcher_ui(Sonic3KRecomp
 recomp_target_launcher_ui(SonicAndKnucklesRecomp
     CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonick.tga  BOXART_NAME boxart-sonick.tga)
+
+option(BUILD_TESTING "Build ROM-independent renderer and framework tests" ON)
+if(BUILD_TESTING)
+    enable_testing()
+    add_subdirectory("${RECOMP_ROOT}/tests" "${CMAKE_BINARY_DIR}/tests")
+endif()

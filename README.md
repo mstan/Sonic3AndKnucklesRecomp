@@ -5,6 +5,24 @@ Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
+## Opt-in widescreen experiment
+
+The custom renderer is available in all three targets, developed first on
+**Sonic3KRecomp** (the combined cartridge). Open **Mods**, enable **Widescreen**, and select **Adaptive**, **16:9**,
+**21:9** or **32:9**. Native rendering remains the default. Adaptive follows
+the window beyond 32:9; the same settings are available in the in-game overlay.
+
+The experiment expands stage/background rendering, object activation, rings
+and the screen-anchored HUD, with optional gameplay CPU headroom. It does not
+rewrite stage collision or decompression. Initial validation covers Angel
+Island and Mushroom Hill routes, not every stage or boss. Blue Spheres now has
+an expanded ground/sphere projection and edge-anchored counters; its native
+board, movement and collection logic are unchanged. Combined-cartridge save
+replays cover turning, collection, jumping and the exit fade.
+See [renderer notes](segagenesisrecomp/sonic3k/CUSTOM-VIDEO.md) for implementation,
+validation and known limits. Existing build caches may need
+`-DRECOMP_UI_ENABLE_MODS=ON` to expose the Mods page.
+
 Sonic 3 and Sonic & Knuckles shipped as two separate ~2 MB cartridges; **"Sonic
 3 & Knuckles"** is the 4 MB **lock-on** combination of the two (S&K boots at
 `$000000`, Sonic 3 maps in at `$200000`). They share one engine, so this repo
