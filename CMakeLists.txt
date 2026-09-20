@@ -188,6 +188,14 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GAME}/${PREFIX}_spec.c"
     )
     list(APPEND SHARED_SRC "${RECOMP_ROOT}/sonic3k/sonic3_video.c")
+    if(PREFIX STREQUAL "sonic3k")
+        list(APPEND SHARED_SRC "${RECOMP_ROOT}/sonic3k/trilogy_sram.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_campaign.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_progress.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_assets.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_codecs.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_runtime.c")
+    endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
     # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)
     # unconditionally, so every target built against it links these (AGPL-free).
