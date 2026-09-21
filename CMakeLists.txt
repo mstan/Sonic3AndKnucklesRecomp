@@ -196,6 +196,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${RECOMP_ROOT}/sonic3k/trilogy_object_assets.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_objects.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_codecs.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_music.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_audio.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_runtime.c")
     endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
