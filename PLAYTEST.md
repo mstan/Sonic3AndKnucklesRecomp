@@ -9,8 +9,9 @@ cycles and background scrolling are restored. HUD, rings and donor enemies
 use the correct palettes. Original Sonic 1/2 stage, boss, act-clear, 1-up,
 invincibility, game-over and drowning music now comes from the donor ROMs.
 Sonic 3 menus, player abilities and sound effects remain in use. The update
-preserves your existing playtest save; the table below describes the starter
-presets, not necessarily your current progress.
+preserves slots 1–7 and replaces slot 8 with the requested cleared Sonic & Tails
+save. The previous live save is in `before-special-stage-update/sonic3k.srm`.
+The table below describes the presets, not necessarily your current progress.
 
 The prepared folder has its own save and local copies of the owner's verified
 ROMs. The normal installed game's save is not used.
@@ -24,13 +25,24 @@ ROMs. The normal installed game's save is not used.
 | 5 | Green Hill 1 | Sonic |
 | 6 | Green Hill 1 | Tails |
 | 7 | Green Hill 1 | Knuckles |
-| 8 | Emerald Hill 1 | Knuckles |
+| 8 | Cleared — choose any available stage | Sonic & Tails |
 
 These are starter presets for testing, not a record of completed playthroughs.
-Slots 2 and 3 have the preceding GHZ acts marked cleared. Slots 4 and 8 enroll
-only the Sonic 2 chapter. The other slots play GHZ1 -> GHZ2 -> GHZ3 -> EHZ1 ->
+Slots 2 and 3 have the preceding GHZ acts marked cleared. Slot 4 enrolls
+only the Sonic 2 chapter. The other active slots play GHZ1 -> GHZ2 -> GHZ3 -> EHZ1 ->
 native S3&K. A new No Save game starts at GHZ1. Up/down on No Save changes the
 character. The GHZ boss has eight hits; release the capsule to finish GHZ3.
+
+On slot 8, **Up/Down chooses a stage or act; Enter starts it**. This includes
+GHZ1–3, EHZ1 and the native S3&K stages, including Doomsday. The save has seven
+Chaos Emeralds. It is a test preset, not an earned campaign clear.
+
+To test Blue Spheres, use an active slot without all seven Chaos Emeralds.
+Jump into the giant ring near the start or above a checkpoint. Sonic 3's special
+stage and results return you to that act, preserving checkpoint and rings.
+Used entrances and emeralds autosave. With seven Chaos Emeralds, the donor
+giant rings give 50 rings, as in Sonic 3. Native checkpoint bonus-star portals
+are disabled in imported acts; use the nearby giant ring instead.
 
 Keyboard defaults: arrows move, Z/X/C are A/B/C, Enter is Start. Controllers
 use the existing runner bindings. Down + repeated jump charges a spin dash.
@@ -44,6 +56,7 @@ and last checkpoint. To restore the presets, close the game and copy
   the EHZ corkscrew, with your usual character.
 - Rings, monitors, springs, spikes, enemy shots, the GHZ boss and capsule.
 - Checkpoints, death/retry, quitting/reopening, and act transitions.
+- Giant rings, Blue Spheres, emerald awards and the return to the imported act.
 - Original music, the GHZ boss/results cues, 1-up return, and Sonic 3 music
   resuming when you reach its stages or return to its menus.
 - Data Select previews and titles. Report the slot, approximate location,
@@ -52,9 +65,9 @@ and last checkpoint. To restore the presets, close the game and copy
 ## Current limits
 
 This is a gameplay prototype. It includes GHZ1-3 and EHZ1; EHZ2 and the other
-Sonic 1/2 zones are not included. Hidden bonuses and giant-ring/Blue
-Spheres integration remain unfinished. Sonic 3 special stages will serve all
-chapters; the original S1/S2 special stages are not part of this build.
+Sonic 1/2 zones are not included. Hidden bonuses remain unfinished. Sonic 3
+Blue Spheres serves all chapters; the original S1/S2 special stages are not
+part of this build.
 Bridges, ledge collapse and some
 enemy/object timing are approximations that need playtesting against the
 original games. Machine snapshots and netplay are disabled for this experiment.
@@ -75,6 +88,13 @@ component tests are not a substitute for full human playthroughs.
 With the experiment disabled, 16 reference screenshots and RAM/VRAM captures
 match the native build byte for byte. Native save writes and checksum repair
 preserve the extension records.
+
+All four imported acts pass Blue Spheres entry/return and saved entrance checks.
+Emerald awards, checkpoint return and reload pass component tests with explicit
+position/last-sphere fixtures. Controller-only jumps reach each starting giant
+ring. Cleared-slot browsing launches imported acts, native Act 2 and Doomsday;
+the other seven save slots remain intact. This does not claim a full human
+Blue Spheres playthrough.
 
 The corrected visuals were inspected against original S1/S2 captures, including
 GHZ2/3, the boss and capsule. Both chapters' seven music cues pass real-driver
