@@ -5,6 +5,10 @@ Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
+The `feature/sonic-trilogy-campaign` branch also includes a first GHZ1-3/EHZ1
+campaign playtest through the native Data Select menu. See [playtest notes](PLAYTEST.md)
+for setup, starter slots, validation and the remaining prototype limitations.
+
 ## Opt-in widescreen experiment
 
 The custom renderer is available in all three targets, developed first on
