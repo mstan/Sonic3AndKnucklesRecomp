@@ -193,6 +193,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${RECOMP_ROOT}/sonic3k/trilogy_campaign.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_progress.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_assets.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_object_assets.c"
+            "${RECOMP_ROOT}/sonic3k/trilogy_objects.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_codecs.c"
             "${RECOMP_ROOT}/sonic3k/trilogy_runtime.c")
     endif()
