@@ -4,6 +4,14 @@ Run **Play Trilogy.cmd** from the prepared `build/Trilogy-Playtest` folder.
 It opens the game directly. Press Enter at the title, then use Sonic 3's
 Data Select menu. Left/right selects a slot; Enter starts it.
 
+Updated build: original GHZ/EHZ art, animated flowers/waterfall, water palette
+cycles and background scrolling are restored. HUD, rings and donor enemies
+use the correct palettes. Original Sonic 1/2 stage, boss, act-clear, 1-up,
+invincibility, game-over and drowning music now comes from the donor ROMs.
+Sonic 3 menus, player abilities and sound effects remain in use. The update
+preserves your existing playtest save; the table below describes the starter
+presets, not necessarily your current progress.
+
 The prepared folder has its own save and local copies of the owner's verified
 ROMs. The normal installed game's save is not used.
 
@@ -36,15 +44,18 @@ and last checkpoint. To restore the presets, close the game and copy
   the EHZ corkscrew, with your usual character.
 - Rings, monitors, springs, spikes, enemy shots, the GHZ boss and capsule.
 - Checkpoints, death/retry, quitting/reopening, and act transitions.
+- Original music, the GHZ boss/results cues, 1-up return, and Sonic 3 music
+  resuming when you reach its stages or return to its menus.
 - Data Select previews and titles. Report the slot, approximate location,
   character and what you were doing if something breaks.
 
 ## Current limits
 
 This is a gameplay prototype. It includes GHZ1-3 and EHZ1; EHZ2 and the other
-Sonic 1/2 zones are not included. Stage music still uses the native S3 backing
-track. Donor tile/palette animations, hidden bonuses and giant-ring/Blue
-Spheres integration remain unfinished. Bridges, ledge collapse and some
+Sonic 1/2 zones are not included. Hidden bonuses and giant-ring/Blue
+Spheres integration remain unfinished. Sonic 3 special stages will serve all
+chapters; the original S1/S2 special stages are not part of this build.
+Bridges, ledge collapse and some
 enemy/object timing are approximations that need playtesting against the
 original games. Machine snapshots and netplay are disabled for this experiment.
 
@@ -64,6 +75,12 @@ component tests are not a substitute for full human playthroughs.
 With the experiment disabled, 16 reference screenshots and RAM/VRAM captures
 match the native build byte for byte. Native save writes and checksum repair
 preserve the extension records.
+
+The corrected visuals were inspected against original S1/S2 captures, including
+GHZ2/3, the boss and capsule. Both chapters' seven music cues pass real-driver
+playback checks; 1-up returns to the stage music and native audio tables restore
+on entering Sonic 3. Captured stage music also closely matches the originals
+in a spectral comparison. A human listening/playthrough review remains useful.
 
 ## Donor settings
 
