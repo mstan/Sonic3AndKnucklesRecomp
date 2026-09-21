@@ -85,6 +85,10 @@ original games. Netplay is disabled for this experiment.
 The launcher uses 4:3. Initial 16:9 rendering checks also pass; wider formats
 have not been validated for imported object activation.
 
+Remaining campaign work is tracked in central Beads `beads-3ixl`: EHZ2 and its
+boss, the other donor zones and events, object fidelity, compatible save-format
+expansion, and complete routes/campaign clears for every supported character.
+
 ## Validation
 
 Verified native-menu launches for all eight presets and all four character
@@ -109,6 +113,12 @@ GHZ2/3, the boss and capsule. Both chapters' seven music cues pass real-driver
 playback checks; 1-up returns to the stage music and native audio tables restore
 on entering Sonic 3. Captured stage music also closely matches the originals
 in a spectral comparison. A human listening/playthrough review remains useful.
+
+An independent original-Sonic-1 comparison confirms all three GHZ starts and
+camera positions. Across the full foreground maps, 185,856 terrain blocks match
+the donor's block IDs, flips and primary solidity; 16x16 art mappings also match.
+The owner reviewed the original/port GHZ2/3 start screenshots. This verifies the
+terrain and start locations, not full object behavior or completed playthroughs.
 
 ## Donor settings
 
