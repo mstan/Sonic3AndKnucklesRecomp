@@ -9,8 +9,8 @@ cycles and background scrolling are restored. HUD, rings and donor enemies
 use the correct palettes. Original Sonic 1/2 stage, boss, act-clear, 1-up,
 invincibility, game-over and drowning music now comes from the donor ROMs.
 Sonic 3 menus, player abilities and sound effects remain in use. The update
-preserves slots 1–7 and replaces slot 8 with the requested cleared Sonic & Tails
-save. The previous live save is in `before-special-stage-update/sonic3k.srm`.
+preserves your current save, including the cleared slot 8. The save immediately
+before this update is backed up in `before-donor-entry-state-update/sonic3k.srm`.
 The table below describes the presets, not necessarily your current progress.
 
 The prepared folder has its own save and local copies of the owner's verified
@@ -37,12 +37,22 @@ On slot 8, **Up/Down chooses a stage or act; Enter starts it**. This includes
 GHZ1–3, EHZ1 and the native S3&K stages, including Doomsday. The save has seven
 Chaos Emeralds. It is a test preset, not an earned campaign clear.
 
-To test Blue Spheres, use an active slot without all seven Chaos Emeralds.
-Jump into the giant ring near the start or above a checkpoint. Sonic 3's special
-stage and results return you to that act, preserving checkpoint and rings.
-Used entrances and emeralds autosave. With seven Chaos Emeralds, the donor
-giant rings give 50 rings, as in Sonic 3. Native checkpoint bonus-star portals
-are disabled in imported acts; use the nearby giant ring instead.
+To test Blue Spheres, use a slot without all seven Chaos Emeralds:
+
+- **GHZ1/2:** finish with at least 50 rings and jump into the original goal ring.
+  Act results run first, then Blue Spheres, then the next act. GHZ3 has no ring.
+- **EHZ:** activate a new checkpoint with at least 50 rings, then jump into its
+  orbiting stars before they disappear. Blue Spheres returns to that checkpoint.
+
+The starting giant rings have been removed. Emeralds and used entrances autosave.
+Slot 8 has all seven emeralds, so use another slot for entrance testing.
+
+**Save states work:** Shift+F1 saves; F1 loads. F2-F9 provide more slots with the
+same Shift-to-save convention. Controller L1/LB saves slot 1; R1/RB loads it.
+The files are `native_save_1.bin` etc. in this folder. Save during stage gameplay
+or Blue Spheres, not loading/menu screens. Loading restores progress too. States
+require this build and the same enabled donor ROMs; they survive closing the game.
+Include the state file when reporting a reproducible bug.
 
 Keyboard defaults: arrows move, Z/X/C are A/B/C, Enter is Start. Controllers
 use the existing runner bindings. Down + repeated jump charges a spin dash.
@@ -70,7 +80,7 @@ Blue Spheres serves all chapters; the original S1/S2 special stages are not
 part of this build.
 Bridges, ledge collapse and some
 enemy/object timing are approximations that need playtesting against the
-original games. Machine snapshots and netplay are disabled for this experiment.
+original games. Netplay is disabled for this experiment.
 
 The launcher uses 4:3. Initial 16:9 rendering checks also pass; wider formats
 have not been validated for imported object activation.
@@ -89,12 +99,10 @@ With the experiment disabled, 16 reference screenshots and RAM/VRAM captures
 match the native build byte for byte. Native save writes and checksum repair
 preserve the extension records.
 
-All four imported acts pass Blue Spheres entry/return and saved entrance checks.
-Emerald awards, checkpoint return and reload pass component tests with explicit
-position/last-sphere fixtures. Controller-only jumps reach each starting giant
-ring. Cleared-slot browsing launches imported acts, native Act 2 and Doomsday;
-the other seven save slots remain intact. This does not claim a full human
-Blue Spheres playthrough.
+Donor entrance tests cover GHZ1/2 goal jumps, EHZ checkpoint entry, the 49/50-ring
+threshold, all-emerald suppression, portal expiry, native outcomes and return.
+Position/last-sphere fixtures make these component tests, not full playthroughs.
+Quickstates are checked across process restarts and different imported stages.
 
 The corrected visuals were inspected against original S1/S2 captures, including
 GHZ2/3, the boss and capsule. Both chapters' seven music cues pass real-driver
