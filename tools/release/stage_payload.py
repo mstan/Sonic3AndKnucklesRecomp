@@ -52,7 +52,10 @@ def stage(build, dest, version, mode):
     assert f"{spec['title']} v{version}".encode() in binary.read_bytes(), "Missing binary version stamp"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / f"release/README_{mode}.txt", dest / "README.txt")
-    shutil.copy2(ROOT / "LICENSE.md", dest / "LICENSE")
+    license_path = ROOT / "LICENSE"
+    license_text = license_path.read_text().upper()
+    assert "POLYFORM NONCOMMERCIAL" in license_text and "AFFERO GENERAL PUBLIC LICENSE" not in license_text
+    shutil.copy2(license_path, dest / "LICENSE")
     shutil.copy2(ROOT / "segagenesisrecomp/THIRD-PARTY-LICENSES.md", dest)
     shutil.copy2(metadata, dest / "build-info.json")
     assets = build / "assets"
