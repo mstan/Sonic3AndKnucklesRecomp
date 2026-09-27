@@ -28,8 +28,10 @@ validation and known limits. Existing build caches may need
 In **Sonic3KRecomp** and **SonicAndKnucklesRecomp**, enable **Mods →
 Knuckles & Knuckles** and play as Knuckles: 8, 16, 24 or 34 extra Knuckles
 follow you. A controller on player 2-4 drives the matching extra; the rest
-use Tails-style CPU following. The titles get the "Knuckles & Knuckles"
-treatment too. Local play only, off by default. See
+use Tails-style CPU following. S3K's title shows a still Knuckles and
+**KNUCKLES 3**, and empty save files default to Knuckles. Existing save files
+keep their character. Both titles get the "Knuckles & Knuckles" treatment.
+Local play only, off by default. See
 [docs/KNUCKLES_ARMY.md](docs/KNUCKLES_ARMY.md).
 
 Sonic 3 and Sonic & Knuckles shipped as two separate ~2 MB cartridges; **"Sonic
