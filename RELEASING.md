@@ -46,7 +46,8 @@ baseline; older distributions and Steam Deck require separate validation.
    actual package and its owner ROM. It checks attract state/audio hashes,
    native/wide title captures, mod titles, empty/existing saves and Knuckles
    gameplay. Linux `--reference` can point at the Windows evidence to compare
-   every captured pixel and RAM/VRAM byte. Pillow is required.
+   every captured pixel and RAM/VRAM byte. Add `--launcher` to capture launcher
+   and controller pages (using Xvfb on Linux). Pillow is required.
 2. Smoke-test the packaged launcher on both platforms with its assets. Confirm
    Windows starts with a system-only PATH and Linux passes state/ROM discovery,
    relocation and read-only payload checks. Keep evidence under `build*/`.
