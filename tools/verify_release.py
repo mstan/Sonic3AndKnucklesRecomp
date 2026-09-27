@@ -52,9 +52,11 @@ def main():
             (dest / f"{args.mode}-mods.ini").write_text(f"[knuckles-army]\nenabled={int(mod)}\nsize=16\n")
         if save:
             shutil.copy2(save, dest / "sonic3k.srm")
-        command += [str(args.rom.resolve())]
-        if not launcher:
-            command += ["--no-launcher", "--benchmark", "3600" if script is None else "12000"]
+        if launcher:
+            (dest / f"rom-{spec['short']}.cfg").write_text(str(args.rom.resolve()) + "\n")
+            command += ["--launcher"]
+        else:
+            command += [str(args.rom.resolve()), "--no-launcher", "--benchmark", "3600" if script is None else "12000"]
         if wide:
             command += ["--widescreen", "32:9"]
         if script is not None:
