@@ -9,7 +9,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import zipfile
@@ -88,8 +87,10 @@ def main():
             report["cases"][name] = {"size": Image.open(dest / "scene.png").size, "reference_equal": bool(args.reference)}
         else:
             # The benchmark's stable state/audio fingerprints, excluding timings.
-            hashes = re.findall(r"(?:state|audio)(?:_hash)?[=:]\s*([0-9A-Fa-f]{16})", log)
-            assert len(hashes) >= 2, (name, "missing benchmark fingerprints", dest)
+            lines = [line.split(" ", 1)[1] for line in log.splitlines() if line.startswith("GENESISRECOMP_BENCHMARK {")]
+            assert len(lines) == 1, (name, "missing benchmark fingerprints", dest)
+            benchmark = json.loads(lines[0])
+            hashes = [benchmark["state_fnv1a64"], benchmark["audio_state_fnv1a64"]]
             if args.reference:
                 reference = json.loads((args.reference / "verification.json").read_text())
                 assert hashes == reference["cases"][name]["hashes"], (name, "benchmark parity")

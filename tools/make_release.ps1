@@ -22,8 +22,11 @@ foreach ($mode in @('sonic3','sonic3k','sandk')) {
   New-Item -ItemType Directory -Path $stage -Force | Out-Null
   Copy-Item -LiteralPath (Join-Path $build "$target.exe") -Destination $stage
   Copy-Item -LiteralPath (Join-Path $build 'SDL2.dll') -Destination $stage
+  $ErrorActionPreference = 'Continue'
   & $Python "$PSScriptRoot/release/stage_payload.py" --build $build --dest $stage --version $Version --mode $mode
-  if ($LASTEXITCODE) { throw 'Release payload validation failed' }
+  $payloadExit = $LASTEXITCODE
+  $ErrorActionPreference = 'Stop'
+  if ($payloadExit) { throw 'Release payload validation failed' }
   $added = @(Copy-RuntimeDllClosure -StageDir $stage -SearchDirs (@($build) + $RuntimeBinDir))
   Assert-RuntimeDllClosure -StageDir $stage | Out-Null
   Write-Host "Staged $target dependency closure: $($added -join ', ')"
