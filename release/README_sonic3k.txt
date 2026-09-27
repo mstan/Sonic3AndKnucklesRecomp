@@ -1,39 +1,36 @@
-Sonic3KRecomp — native static recompilation of Sonic 3 & Knuckles (lock-on)
-===========================================================================
+Sonic 3 & Knuckles Recomp v0.4.0
+============================================================
 
-A native Windows port produced by statically recompiling the Sega Genesis
-68000 code to C. No emulator core: recompiled CPU code, clean-room
-VDP/bus/scheduler, ymfm FM synthesis, clean-room SN76489 PSG.
+Native static recompilation for Windows x64 and Linux x86_64.
+Bring your own matching raw Genesis ROM; no ROM is included.
+Variant: Sonic 3 & Knuckles; ROM size: 4 MB.
+Suggested filename: sonic3k.bin. Use the launcher's ROM picker.
 
-This is the 4 MB "lock-on" combination: Sonic & Knuckles with Sonic 3 mapped
-in, so you play the full combined game (Angel Island through Death Egg) with
-the Sonic 3 & Knuckles data-select save slots.
+WINDOWS
+Extract the entire ZIP and run Sonic3KRecomp.exe.
+Keep assets/ and the bundled DLLs beside the executable.
 
-BRING YOUR OWN ROM
-------------------
-This package contains NO game data. Place your own legally obtained
-Sonic 3 & Knuckles (4 MB combined / lock-on) ROM next to the exe, named:
+LINUX
+Place the AppImage in a writable folder, chmod +x it, and launch.
+Use --appimage-extract-and-run when FUSE is unavailable.
+Requires Ubuntu 24.04 (glibc 2.39) or compatible x86_64 Linux with OpenGL.
+Older distributions and Steam Deck have not been validated.
 
-    sonic3k.bin
+PLAY AND SETTINGS
+Configure keyboard/gamepad controls in the launcher. Enable widescreen in
+Mods > Widescreen; Adaptive fits the window. Up to four controller seats.
+Enable Mods > Knuckles & Knuckles for the optional local crowd mod.
+Choose 8/16/24/34 extras. Play as Knuckles; controllers 2-4 can drive extras.
+The mod is off by default and unavailable in netplay.
+With the mod on, empty files and No Save default to Knuckles; existing saves retain their character.
 
-then run Sonic3KRecomp.exe. Battery saves persist next to the exe
-(sonic3k.srm) — the data-select slots survive between runs.
+Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
+Linux refreshes bundled assets without replacing your settings or saves.
+Do not place the application in a read-only installation folder.
 
-CONTROLS
---------
-Arrow keys = D-pad, A/S/D = A/B/C, Enter = Start. Gamepads supported (SDL2).
-On the DATA SELECT screen, C confirms the highlighted slot.
-
-LICENSE
--------
-This software: PolyForm Noncommercial 1.0.0 — see LICENSE.
-Third-party components (ymfm BSD-3-Clause, superzazu Z80 MIT, clowncommon
-ISC, SDL2 zlib): see THIRD-PARTY-LICENSES.md.
-
-Sonic the Hedgehog 3 and Sonic & Knuckles are trademarks of SEGA. This
-project is not affiliated with or endorsed by SEGA. No SEGA assets are
-distributed.
-
-SOURCE
-------
-https://github.com/mstan/Sonic3AndKnucklesRecomp
+LICENSE AND SOURCE
+Project: PolyForm Noncommercial 1.0.0 (see LICENSE).
+Third-party notices: THIRD-PARTY-LICENSES.md and licenses/.
+Exact source and dependency commits: build-info.json.
+Source: https://github.com/mstan/Sonic3AndKnucklesRecomp
+This project is not affiliated with or endorsed by SEGA.

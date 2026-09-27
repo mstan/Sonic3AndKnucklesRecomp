@@ -1,0 +1,5 @@
+{
+  "sonic3": {"target": "Sonic3Recomp", "title": "Sonic 3", "short": "Sonic3", "boxart": "boxart-sonic3.tga", "size": 2097152, "product": "GM MK-1079 -00"},
+  "sonic3k": {"target": "Sonic3KRecomp", "title": "Sonic 3 & Knuckles", "short": "Sonic3K", "boxart": "boxart-sonic3k.tga", "size": 4194304, "product": "GM MK-1563 -00"},
+  "sandk": {"target": "SonicAndKnucklesRecomp", "title": "Sonic & Knuckles", "short": "SonicK", "boxart": "boxart-sonick.tga", "size": 2097152, "product": "GM MK-1563 -00"}
+}
