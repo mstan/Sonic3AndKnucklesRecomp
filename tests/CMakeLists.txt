@@ -21,6 +21,18 @@ add_executable(sonic3_knuckles_art_test runtime/sonic3_knuckles_art_test.c
 target_include_directories(sonic3_knuckles_art_test PRIVATE "${S3_GAME_COMMON}")
 add_test(NAME sonic3_knuckles_art COMMAND sonic3_knuckles_art_test)
 
+add_executable(sonic3_title_art_test runtime/sonic3_title_art_test.c)
+target_include_directories(sonic3_title_art_test PRIVATE "${S3_GAME_COMMON}")
+add_test(NAME sonic3_title_art COMMAND sonic3_title_art_test)
+add_executable(sonic3_knuckles_menu_test runtime/sonic3_knuckles_menu_test.c)
+target_include_directories(sonic3_knuckles_menu_test PRIVATE "${S3_GAME_COMMON}"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
+add_test(NAME sonic3_knuckles_menu COMMAND sonic3_knuckles_menu_test)
+if(EXISTS "${S3_GAME_COMMON}/../sonic3k/sonic3k.bin")
+    add_test(NAME sonic3_title_rom_art COMMAND sonic3_title_art_test
+        "${S3_GAME_COMMON}/../sonic3k/sonic3k.bin")
+endif()
+
 find_package(Python3 QUIET COMPONENTS Interpreter)
 set(S3_SK_LISTING "" CACHE FILEPATH
     "Built skdisasm sonic3k.lst (tools/sonic3_disassembly.py); enables the hook-site drift check")
