@@ -25,12 +25,13 @@ def main():
     p.add_argument("--mode", choices=MODES, required=True)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--reference", type=Path)
+    p.add_argument("--launcher", action="store_true", help="Also capture the actual launcher (uses Xvfb on Linux)")
     args = p.parse_args()
     spec, out = MODES[args.mode], args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
     report = {"package_sha256": hashlib.sha256(args.package.read_bytes()).hexdigest(), "cases": {}}
 
-    def run(name, script=None, mod=False, wide=False, save=None):
+    def run(name, script=None, mod=False, wide=False, save=None, launcher=False):
         dest = out / name
         dest.mkdir()
         if args.package.suffix == ".zip":
@@ -51,7 +52,9 @@ def main():
             (dest / f"{args.mode}-mods.ini").write_text(f"[knuckles-army]\nenabled={int(mod)}\nsize=16\n")
         if save:
             shutil.copy2(save, dest / "sonic3k.srm")
-        command += [str(args.rom.resolve()), "--no-launcher", "--benchmark", "3600" if script is None else "12000"]
+        command += [str(args.rom.resolve())]
+        if not launcher:
+            command += ["--no-launcher", "--benchmark", "3600" if script is None else "12000"]
         if wide:
             command += ["--widescreen", "32:9"]
         if script is not None:
@@ -59,7 +62,15 @@ def main():
             (dest / "route.input").write_text(route.replace("{out}", dest.as_posix()))
             command += ["--input-script", str(dest / "route.input")]
         env = {k: v for k, v in os.environ.items() if not k.startswith(("SDL_", "GENESIS_", "RNET_", "LNG_"))}
-        env.update(SDL_VIDEODRIVER="dummy", SDL_RENDER_DRIVER="software", SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1")
+        env.update(SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1")
+        if launcher:
+            env["LNG_SCRIPT"] = (f"wait:15;shot:{dest.as_posix()}/launcher.png;"
+                                 f"view:controller;wait:10;shot:{dest.as_posix()}/controls.png;quit")
+            if os.name != "nt":
+                env["SDL_VIDEODRIVER"] = "x11"
+                command = ["xvfb-run", "-a"] + command
+        else:
+            env.update(SDL_VIDEODRIVER="dummy", SDL_RENDER_DRIVER="software")
         if os.name == "nt":
             system_root = os.environ["SystemRoot"]
             env["PATH"] = system_root + "\\System32;" + system_root
@@ -72,7 +83,14 @@ def main():
         misses = dest / "dispatch_misses.toml"
         if misses.exists():
             assert not misses.read_text().split("extra = [", 1)[1].split("]", 1)[0].strip(), name
-        if script is not None:
+        if launcher:
+            for page in ("launcher", "controls"):
+                shot = dest / f"{page}.png"
+                assert shot.is_file() and Image.open(shot).width > 320, (name, page)
+            assert (dest / "assets/fonts/LatoLatin-Regular.ttf").is_file()
+            assert (dest / "assets/img" / spec["boxart"]).is_file()
+            report["cases"][name] = {"captured": ["launcher", "controls"]}
+        elif script is not None:
             assert "[input_script] EXIT 0" in log, (name, "route incomplete", dest)
             for suffix in ("png", "ram", "vram"):
                 actual = dest / f"scene.{suffix}"
@@ -98,6 +116,8 @@ def main():
         print(f"PASS {args.mode}: {name}", flush=True)
         return dest
 
+    if args.launcher:
+        run("launcher", launcher=True)
     run("attract")
     run("native-title", "WAIT 600\n")
     run("wide-title", "WAIT 600\n", wide=True)
