@@ -48,6 +48,21 @@ FIXED = [  # (C name, label, reason)
     ("ARMY_MAP_SK_BANNER", "Map_SKTitle_Banner", None),
     ("ARMY_MAP_AND_KNUCKLES", "Map_TitleANDKnuckles", None),
     ("ARMY_PAL_KNUCKLES", "Pal_Knuckles", None),
+    ("ARMY_PC_TITLE_LOAD", "TitleSonic_LoadFrame", "Still Knuckles title: skip Sonic intro art"),
+    ("ARMY_PC_TITLE_ITERATE", "Iterate_TitleSonicFrame", "Still Knuckles title: finish the Sonic intro"),
+    ("ARMY_PC_TITLE_MAP", "Eni_Decomp", "Still Knuckles title: replace final Sonic plane map"),
+    ("ARMY_MAP_TITLE_SONIC", "MapEni_S3TitleSonicD", None),
+    ("ARMY_ART_TITLE_POSE", "ArtKosM_SonicKnuxStand", None),
+    ("ARMY_ART_TITLE_POSE_END", "ArtKosM_SonicLand", None),
+    ("ARMY_MAP_TITLE_POSE", "MapEni_SKTitle_Frame4", None),
+    ("ARMY_MAP_TITLE_POSE_END", "MapEni_SKTitle_Background", None),
+    ("ARMY_ART_TITLE_HANDS", "ArtKos_SKTitle_SonKnuxHand", None),
+    ("ARMY_ART_TITLE_HANDS_END", "ArtKosM_SKTitle_Menu", None),
+    ("ARMY_ART_TITLE_WORD", "ArtKosM_SKTitle_Banner", None),
+    ("ARMY_ART_TITLE_WORD_END", "ArtKos_SKTitle_SonKnuxHand", None),
+    ("ARMY_PAL_TITLE_KNUCKLES", "Pal_SKTitle_Knux", None),
+    ("ARMY_PC_SAVE_INIT", "Obj_SaveScreen_Selector", "Knuckles mod: initialize no-save selection"),
+    ("ARMY_PC_SAVE_SLOT", "loc_D41A", "Knuckles mod: initialize empty save slot selection"),
 ]
 LINE = re.compile(r'^(?:\(\d+\))?\s*\d+/\s*([0-9A-F]+) :(?: [0-9A-F ]+)?\s{2,}(.*)$')
 CALL = re.compile(r'(?:bsr|jsr)(?:\.[wsl])?\s+\(?(\w+)\)?(?:\.[wl])?$')
@@ -64,7 +79,7 @@ def load(path):
             rows.append((int(m.group(1), 16), text))
     labels = {}
     for i, (_, t) in enumerate(rows):
-        m = re.match(r"^([A-Za-z_.][\w.]*):$", t)
+        m = re.match(r"^([A-Za-z_.][\w.]*):(?:$|\s+ds\.)", t)
         if m and m.group(1) not in labels:
             labels[m.group(1)] = i
     return rows, labels

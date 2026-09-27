@@ -17,6 +17,7 @@
 #include "sim_step.h"
 #include "video/genesis_machine.h"
 #include "sonic3_knuckles_title.h"
+#include "sonic3_knuckles_menu.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -711,9 +712,11 @@ static void capture(void)
 static int title_enabled(void) { return s3_army.enabled && art_ready; }
 int s3_army_owns(uint32_t pc)
 {
+    if (s3_knuckles_menu_owns(pc)) return 1;
     switch (pc) {
     case PC_STEP: case PC_RENDER: case PC_DRAW: case PC_DPLC: case PC_DEATH:
     case PC_ALLOC: case PC_ALLOC_AFTER: case PC_TRANSITION: case ARMY_PC_SK_TITLE_FRAMES:
+    case ARMY_PC_TITLE_LOAD: case ARMY_PC_TITLE_ITERATE: case ARMY_PC_TITLE_MAP:
         return 1;
     default:
         return solid_callee(pc);
@@ -721,6 +724,10 @@ int s3_army_owns(uint32_t pc)
 }
 int s3_army_hook(uint32_t pc)
 {
+    if (s3_knuckles_menu_owns(pc)) {
+        s3_knuckles_menu_hook(pc, s3_army.enabled);
+        return 0;
+    }
     switch (pc) {
     case PC_STEP:
         if (inside_actor < 0 && !inside_solid) step();
@@ -757,6 +764,7 @@ int s3_army_hook(uint32_t pc)
         }
         return 0;
     case ARMY_PC_SK_TITLE_FRAMES:
+    case ARMY_PC_TITLE_LOAD: case ARMY_PC_TITLE_ITERATE: case ARMY_PC_TITLE_MAP:
         return s3_title_hook(pc, title_enabled());
     case PC_TRANSITION:
         if (count) { shift_x = (int16_t)g_cpu.D[0]; shift_y = (int16_t)g_cpu.D[1]; shift_age = 0; }
@@ -862,6 +870,7 @@ int s3_sk_instruction_hook(uint32_t pc)
 }
 void s3_army_init(void)
 {
+    s3_title_init();
     s3_video_set_actor_overlay(s3_army_draw_wide);
     if (!art_ready) {
         char error[160];

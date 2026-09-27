@@ -368,6 +368,26 @@ addr = 0x51A4 # Title gag: mirror the standing pose so Knuckles faces Knuckles (
 kind = "game_hook"
 
 [[widescreen_site]]
+addr = 0x440C # Still Knuckles title: skip Sonic intro art (TitleSonic_LoadFrame)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x43D4 # Still Knuckles title: finish the Sonic intro (Iterate_TitleSonicFrame)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x18B4 # Still Knuckles title: replace final Sonic plane map (Eni_Decomp)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xD1B6 # Knuckles mod: initialize no-save selection (Obj_SaveScreen_Selector)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xD41A # Knuckles mod: initialize empty save slot selection (loc_D41A)
+kind = "game_hook"
+
+[[widescreen_site]]
 addr = 0x1D696 # Extras collide with SolidObject_Monitor_SonicKnux
 kind = "game_hook"
 

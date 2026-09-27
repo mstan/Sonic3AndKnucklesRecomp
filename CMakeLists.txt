@@ -199,6 +199,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${S3_GAME_COMMON}/sonic3_knuckles_army.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_art.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_title.c"
+            "${S3_GAME_COMMON}/sonic3_knuckles_menu.c"
+            "${S3_GAME_COMMON}/sonic3_title_art.c"
             "${S3_GAME_COMMON}/sonic3_mods.c")
     endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's

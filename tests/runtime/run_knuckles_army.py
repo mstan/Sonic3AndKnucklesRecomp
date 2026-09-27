@@ -38,7 +38,7 @@ def command(sock, payload):
     return json.loads(data.split(b"\n")[0])
 
 
-def timeline(variant, shots, seat):
+def timeline(variant, shots, seat, knuckles_default=False):
     s = "WAIT 700\nSCREENSHOT %s/title.png\n" % shots
     if variant == "sandk":
         # Knuckles' MHZ opening: he naps under cutscene control ($83), then
@@ -47,9 +47,14 @@ def timeline(variant, shots, seat):
     else:
         # Title -> Data Select -> No Save: cycle its character to Knuckles
         # (Dataselect_nosave_player $FFEF4C: 0 Sonic & Tails ... 3 Knuckles).
-        s += "PRESS START 2\nWAIT 90\nPRESS START 2\nWAIT 400\nSCREENSHOT %s/data-select.png\n" % shots
+        if knuckles_default:
+            s += "PRESS START 2\nWAIT_RAM8 FFF600 4C\nWAIT 300\nSCREENSHOT %s/data-select.png\n" % shots
+        else:
+            s += "PRESS START 2\nWAIT 90\nPRESS START 2\nWAIT 400\nSCREENSHOT %s/data-select.png\n" % shots
         s += "PRESS LEFT 2\nWAIT 40\n"  # the cursor starts on the first save slot
-        s += "PRESS DOWN 2\nWAIT 60\n"  # sub_D6D0: Down decrements and wraps 0 -> 3
+        if not knuckles_default:
+            s += "PRESS DOWN 2\n"  # sub_D6D0: Down decrements and wraps 0 -> 3
+        s += "WAIT 60\n"
         s += "SCREENSHOT %s/data-select-knuckles.png\n" % shots
         s += "ASSERT_RAM8 FFEF4D 03\nPRESS START 2\nWAIT_RAM8 FFF600 8C\n"
     s += "WAIT_RAM8 FFF600 0C\nWAIT 90\nSCREENSHOT %s/start.png\n" % shots
@@ -77,7 +82,7 @@ def run(exe, rom, out, variant, size, enabled, seat, max_frames, widescreen=None
     mode = "sandk" if variant == "sandk" else "sonic3k"
     (runtime / ("%s-mods.ini" % mode)).write_text("[knuckles-army]\nenabled=%d\nsize=%d\n" % (enabled, size))
     (runtime / "debug.ini").write_text("[debug]\nenabled=1\nport=%d\n" % PORT)
-    (out / "input.txt").write_text(timeline(variant, out.as_posix(), seat))
+    (out / "input.txt").write_text(timeline(variant, out.as_posix(), seat, bool(enabled)))
     env = os.environ.copy()
     env.update(SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", SDL_RENDER_DRIVER="software",
                GENESIS_STRICT_JSR_STACK="1")
@@ -168,7 +173,7 @@ def main():
             mode = "sandk" if args.variant == "sandk" else "sonic3k"
             (runtime / ("%s-mods.ini" % mode)).write_text(
                 "[knuckles-army]\nenabled=%d\nsize=%d\n" % (1 if size else 0, size or 16))
-            script = timeline(args.variant, runtime.as_posix(), False).replace("EXIT\n", "")
+            script = timeline(args.variant, runtime.as_posix(), False, bool(size)).replace("EXIT\n", "")
             script = "\n".join(l for l in script.splitlines() if not l.startswith("SCREENSHOT")) + "\n"
             script += "HOLD RIGHT\nWAIT 100000\n"
             (runtime / "input.txt").write_text(script)

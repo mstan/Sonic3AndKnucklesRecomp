@@ -13,6 +13,21 @@
 #define ARMY_MAP_SK_BANNER       0x0CB994u /* Map_SKTitle_Banner */
 #define ARMY_MAP_AND_KNUCKLES    0x0049AEu /* Map_TitleANDKnuckles */
 #define ARMY_PAL_KNUCKLES        0x0A8AFCu /* Pal_Knuckles */
+#define ARMY_PC_TITLE_LOAD       0x00440Cu /* TitleSonic_LoadFrame */
+#define ARMY_PC_TITLE_ITERATE    0x0043D4u /* Iterate_TitleSonicFrame */
+#define ARMY_PC_TITLE_MAP        0x0018B4u /* Eni_Decomp */
+#define ARMY_MAP_TITLE_SONIC     0x350018u /* MapEni_S3TitleSonicD */
+#define ARMY_ART_TITLE_POSE      0x0CD910u /* ArtKosM_SonicKnuxStand */
+#define ARMY_ART_TITLE_POSE_END  0x0D0E12u /* ArtKosM_SonicLand */
+#define ARMY_MAP_TITLE_POSE      0x0CC1C4u /* MapEni_SKTitle_Frame4 */
+#define ARMY_MAP_TITLE_POSE_END  0x0CC3AAu /* MapEni_SKTitle_Background */
+#define ARMY_ART_TITLE_HANDS     0x0D4BA6u /* ArtKos_SKTitle_SonKnuxHand */
+#define ARMY_ART_TITLE_HANDS_END 0x0D5CC6u /* ArtKosM_SKTitle_Menu */
+#define ARMY_ART_TITLE_WORD      0x0D3BB4u /* ArtKosM_SKTitle_Banner */
+#define ARMY_ART_TITLE_WORD_END  0x0D4BA6u /* ArtKos_SKTitle_SonKnuxHand */
+#define ARMY_PAL_TITLE_KNUCKLES  0x005608u /* Pal_SKTitle_Knux */
+#define ARMY_PC_SAVE_INIT        0x00D1B6u /* Obj_SaveScreen_Selector */
+#define ARMY_PC_SAVE_SLOT        0x00D41Au /* loc_D41A */
 #ifndef ARMY_SITES_DEFINES_ONLY
 static const uint32_t army_callees[] = {
     0x01D696u, /* SolidObject_Monitor_SonicKnux */
