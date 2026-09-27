@@ -23,3 +23,13 @@ savestate*.bin
 # engine-local when present. Create it with scripts/link-engine.{sh,bat}.
 engine-local
 release/*.zip
+
+# Private reverse-engineering inputs and generated/runtime output.
+# Owner ROMs live at game/<mode>/<rom>.bin (covered by *.bin above).
+**/generated/
+**/__pycache__/
+*.gpr
+*.rep/
+*.lock
+*.lock~
+**/dispatch_misses.toml

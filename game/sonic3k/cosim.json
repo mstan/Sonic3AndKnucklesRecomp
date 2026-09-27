@@ -1,0 +1,6 @@
+{
+  "wt": "_wt-cosim-s3",
+  "exe": "Sonic3KRecomp",
+  "waitvbl": "1d18",
+  "rom": "sonic3k.bin"
+}
