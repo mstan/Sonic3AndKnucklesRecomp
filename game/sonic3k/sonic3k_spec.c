@@ -220,7 +220,7 @@ const GameSpec g_game_spec = {
     .load_settings          = s3k_load_settings,
     .mods                   = s3_mods,
     .netplay_allowed        = s3_mods_netplay_allowed,
-    .display_name           = "Sonic 3 & Knuckles",
+    .display_name           = "Sonic 3 & Knuckles v" S3_BUILD_VERSION,
     .short_name             = "Sonic3K",
     .boxart                 = "boxart-sonic3k.tga",
 

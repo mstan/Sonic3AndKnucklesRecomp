@@ -1,0 +1,15 @@
+{
+  "version": "@S3_BUILD_VERSION@",
+  "mode": "@_mode@",
+  "target": "@_target@",
+  "source_commit": "@S3_SOURCE_COMMIT@",
+  "engine_commit": "@S3_ENGINE_COMMIT@",
+  "ui_commit": "@S3_UI_COMMIT@",
+  "disasm_commit": "@S3_DISASM_COMMIT@",
+  "trace": "@GEN_ENABLE_TRACE@",
+  "reverse_debug": "@SONIC_REVERSE_DEBUG@",
+  "dev_trace": "@GEN_DEV_TRACE@",
+  "cosim": "@GENESIS_BUILD_COSIM@",
+  "system": "@CMAKE_SYSTEM_NAME@",
+  "compiler": "@CMAKE_CXX_COMPILER_ID@ @CMAKE_CXX_COMPILER_VERSION@"
+}

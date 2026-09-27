@@ -1,0 +1,34 @@
+#!/bin/sh
+# The engine resolves settings/assets beside APPIMAGE; keep user data writable.
+set -eu
+HERE=$(dirname "$(readlink -f "$0")")
+export LD_LIBRARY_PATH="$HERE/usr/lib:${LD_LIBRARY_PATH:-}"
+export SDL_JOYSTICK_HIDAPI_STEAM=1
+export SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD=1
+SELF=${APPIMAGE:-$0}
+STATE=$(dirname "$(readlink -f "$SELF")")
+export APPIMAGE="$STATE/$(basename "$SELF")"
+if [ ! -w "$STATE" ]; then
+    echo 'Place the AppImage in a writable folder for settings and launcher assets.' >&2
+    exit 1
+fi
+mkdir -p "$STATE/assets"
+cp -R "$HERE/usr/bin/assets/." "$STATE/assets/"
+chmod -R u+rwX "$STATE/assets"
+[ -f "$STATE/settings.ini" ] || printf '[video]\ncustom_widescreen=0\ncustom_aspect=0\n' > "$STATE/settings.ini"
+cd "$STATE"
+cached=''
+[ ! -f rom-@SHORT@.cfg ] || cached=$(head -n1 rom-@SHORT@.cfg | tr -d '\r\n')
+if [ -z "$cached" ] || [ ! -f "$cached" ]; then
+    # Exact filename first, then raw cartridges matching this variant's size
+    # and product header. Never pick a README or another Sonic variant.
+    for rom in ./@MODE@.bin ./*.bin ./*.md ./*.gen ./*.BIN ./*.MD ./*.GEN; do
+        [ -f "$rom" ] || continue
+        [ "$(wc -c < "$rom")" -eq @SIZE@ ] || continue
+        [ "$(dd if="$rom" bs=1 skip=256 count=4 2>/dev/null)" = SEGA ] || continue
+        [ "$(dd if="$rom" bs=1 skip=384 count=14 2>/dev/null)" = '@PRODUCT@' ] || continue
+        printf '%s/%s\n' "$STATE" "${rom#./}" > rom-@SHORT@.cfg
+        break
+    done
+fi
+exec "$HERE/usr/bin/@TARGET@" "$@"

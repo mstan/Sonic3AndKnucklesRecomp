@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp C)
+project(Sonic3AndKnucklesRecomp VERSION 0.4.0 LANGUAGES C)
+set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
+if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
+    message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
+endif()
+add_compile_definitions(S3_BUILD_VERSION="${S3_BUILD_VERSION}")
 
 set(CMAKE_C_STANDARD 11)
 
@@ -327,6 +332,38 @@ add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 # game/sandk/ (game.toml + discovery files regenerated from skdisasm
 # sonic3k.lst at offset 0). See game/sandk/game.toml.
 add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
+
+# Record the exact source and submodule inputs for release payload validation.
+find_package(Git REQUIRED)
+foreach(_repo SOURCE ENGINE UI DISASM)
+    if(_repo STREQUAL "SOURCE")
+        set(_dir "${CMAKE_SOURCE_DIR}")
+    elseif(_repo STREQUAL "ENGINE")
+        set(_dir "${RECOMP_ROOT}")
+    elseif(_repo STREQUAL "UI")
+        set(_dir "${CMAKE_SOURCE_DIR}/recomp-ui")
+    else()
+        set(_dir "${S3_GAME_ROOT}/skdisasm")
+    endif()
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${_dir}" rev-parse HEAD
+        OUTPUT_VARIABLE S3_${_repo}_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE
+        RESULT_VARIABLE _git_result)
+    if(NOT _git_result EQUAL 0)
+        message(FATAL_ERROR "Cannot identify ${_repo} source commit")
+    endif()
+endforeach()
+foreach(_mode sonic3 sonic3k sandk)
+    if(_mode STREQUAL "sonic3")
+        set(_target Sonic3Recomp)
+    elseif(_mode STREQUAL "sonic3k")
+        set(_target Sonic3KRecomp)
+    else()
+        set(_target SonicAndKnucklesRecomp)
+    endif()
+    configure_file(tools/release/build-info.json.in "release-${_mode}.json" @ONLY)
+    file(GENERATE OUTPUT "$<TARGET_FILE_DIR:${_target}>/build-info-${_mode}.json"
+        INPUT "${CMAKE_BINARY_DIR}/release-${_mode}.json" TARGET ${_target})
+endforeach()
 
 # Shared recomp-ui (Dear ImGui) pre-boot launcher — added to ALL THREE native
 # targets (each is its own game/exe sharing this repo's output dir). Each stages
