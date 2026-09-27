@@ -56,7 +56,11 @@ def main():
             (dest / f"rom-{spec['short']}.cfg").write_text(str(args.rom.resolve()) + "\n")
             command += ["--launcher"]
         else:
-            command += [str(args.rom.resolve()), "--no-launcher", "--benchmark", "3600" if script is None else "12000"]
+            command += [str(args.rom.resolve()), "--no-launcher"]
+            # Benchmarks intentionally disable SRAM writes. Input routes need
+            # normal autosave so the next process can verify an existing file.
+            command += (["--benchmark", "3600"] if script is None else
+                        ["--max-frames", "12000", "--target-fps", "1000"])
         if wide:
             command += ["--widescreen", "32:9"]
         if script is not None:
