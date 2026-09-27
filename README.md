@@ -19,9 +19,18 @@ Island and Mushroom Hill routes, not every stage or boss. Blue Spheres now has
 an expanded ground/sphere projection and edge-anchored counters; its native
 board, movement and collection logic are unchanged. Combined-cartridge save
 replays cover turning, collection, jumping and the exit fade.
-See [renderer notes](segagenesisrecomp/sonic3k/CUSTOM-VIDEO.md) for implementation,
+See [renderer notes](game/common/CUSTOM-VIDEO.md) for implementation,
 validation and known limits. Existing build caches may need
 `-DRECOMP_UI_ENABLE_MODS=ON` to expose the Mods page.
+
+## Knuckles & Knuckles (opt-in gag)
+
+In **Sonic3KRecomp** and **SonicAndKnucklesRecomp**, enable **Mods →
+Knuckles & Knuckles** and play as Knuckles: 8, 16, 24 or 34 extra Knuckles
+follow you. A controller on player 2-4 drives the matching extra; the rest
+use Tails-style CPU following. The titles get the "Knuckles & Knuckles"
+treatment too. Local play only, off by default. See
+[docs/KNUCKLES_ARMY.md](docs/KNUCKLES_ARMY.md).
 
 Sonic 3 and Sonic & Knuckles shipped as two separate ~2 MB cartridges; **"Sonic
 3 & Knuckles"** is the 4 MB **lock-on** combination of the two (S&K boots at
@@ -64,13 +73,13 @@ That core is AGPL and dev-only; nothing you build needs it, and CMake skips the
 dev-only `_oracle` targets automatically when it is absent.
 
 **2. Supply your own ROM(s).** Either pass the ROM path on the command line, or
-drop it into the engine's per-mode data dir so the build copies it next to the exe:
+drop it into this repo's per-mode game dir so the build copies it next to the exe:
 
 | Mode | Place ROM at | Identity |
 |---|---|---|
-| Sonic 3 alone | `segagenesisrecomp/sonic3/sonic3.bin` | CRC32 `9BC192CE` |
-| Sonic & Knuckles alone | `segagenesisrecomp/sandk/sandk.bin` | MD5 `4ea493ea…` (2 MB) |
-| S3 & Knuckles | `segagenesisrecomp/sonic3k/sonic3k.bin` | 4 MB combined |
+| Sonic 3 alone | `game/sonic3/sonic3.bin` | CRC32 `9BC192CE` |
+| Sonic & Knuckles alone | `game/sandk/sandk.bin` | MD5 `4ea493ea…` (2 MB) |
+| S3 & Knuckles | `game/sonic3k/sonic3k.bin` | 4 MB combined |
 
 **3. Build the mode you want, then run.** Generated C is ignored build output;
 CMake builds the current recompiler and regenerates the selected mode whenever
@@ -123,17 +132,38 @@ Opcode shapes are statically decoded; mutable driver operands are read live,
 with one-instruction interpreter fallback only for unmatched code. Turbo mode
 silences speaker playback while preserving headless WAV capture.
 
-## Manually regenerate the C from a ROM
+## Layout
+
+This repo owns the Sonic 3 family implementation; only reusable framework
+code comes from the pinned `segagenesisrecomp` submodule
+(see [docs/REPOSITORY_OWNERSHIP.md](docs/REPOSITORY_OWNERSHIP.md)):
 
 ```
-cd segagenesisrecomp\sonic3     &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3.bin  --game game.toml
-cd segagenesisrecomp\sandk      &&  ..\recompiler\build\Release\GenesisRecomp.exe sandk.bin   --game game.toml
-cd segagenesisrecomp\sonic3k    &&  ..\recompiler\build\Release\GenesisRecomp.exe sonic3k.bin --game game.toml
+Sonic3AndKnucklesRecomp/
+├── CMakeLists.txt              ← three build modes
+├── game/
+│   ├── common/                 ← shared renderer (sonic3_video.c, Blue Spheres)
+│   ├── sonic3/ sonic3k/ sandk/ ← game.toml, discovery inputs, <mode>_spec.c, ROM
+│   └── skdisasm/               ← pinned source disassembly submodule
+├── ghidra/annotations/         ← reproducible annotation exports
+├── tests/, tools/, docs/       ← game-owned validation, tooling, documentation
+└── segagenesisrecomp/          ← submodule (shared engine)
+```
+
+## Manually regenerate the C from a ROM
+
+Use the configured build's generation targets (a normal build also runs them
+automatically):
+
+```
+cmake --build build --config Release --target genesisrecomp_generate_sonic3
+cmake --build build --config Release --target genesisrecomp_generate_sandk
+cmake --build build --config Release --target genesisrecomp_generate_sonic3k
 ```
 
 > Sonic & Knuckles alone shares the S&K master boot path with the combined cart,
 > so its disasm data is regenerated from the same byte-perfect `skdisasm`
-> `sonic3k.lst` at offset 0 — see `segagenesisrecomp/sandk/game.toml`.
+> `sonic3k.lst` at offset 0 — see `game/sandk/game.toml`.
 
 ## Sonic 3 & Knuckles (combined) mode — why it's harder
 
