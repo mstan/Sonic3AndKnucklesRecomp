@@ -189,7 +189,8 @@ rendered with the unmodified (non-reflected) palette/scroll.
 - `recompiler/src/code_generator.c`: `recomp_dispatch_once()` resolves RAM
   trampolines before the dispatch-table lookup, so RAM-redirected handlers
   (HInt) dispatch to the correct recompiled function.
-- `sonic3/sonic3_spec.c` / `sonic3k/sonic3k_spec.c`: point HBlank at
+- `sonic3/sonic3_spec.c` / `sonic3k/sonic3k_spec.c` (now this repo's
+  `game/sonic3/`, `game/sonic3k/`): point HBlank at
   `JmpTo_HInt` (`$000F9E` / `$000D0C`) so it routes through the RAM handler.
 
 Committed as `segagenesisrecomp@4528b2d` (dev + master). **Verify:** user
