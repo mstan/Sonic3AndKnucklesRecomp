@@ -16,10 +16,13 @@ set(CMAKE_C_STANDARD 11)
 #   Sonic3KRecomp          S3+S&K combined, 4 MB   4386 / 4387       scaffold / bring-up
 #   SonicAndKnucklesRecomp S&K alone, 2 MB         4388 / 4389       bring-up
 #
-# Engine (runner + recompiler) comes from the canonical
-# segagenesisrecomp checkout at the workspace root, reached here through a local
-# directory junction (./segagenesisrecomp -> ../segagenesisrecomp); per-game data
-# lives in segagenesisrecomp/<mode>/. See README.md / RELEASING.md.
+# Shared framework code (runner + recompiler) comes from RECOMP_ROOT. Game-
+# specific adapters, ROM configuration, discovery/annotation inputs, the shared
+# family renderer, the pinned skdisasm source and tests belong to this repo:
+#   game/common/   sonic3_video.{c,h} + Blue Spheres (all three modes)
+#   game/<mode>/   game.toml, discovery files, <mode>_spec.c, owner ROM
+#   game/skdisasm/ pinned Sonic Retro source disassembly (submodule)
+# See docs/REPOSITORY_OWNERSHIP.md.
 # ---------------------------------------------------------------------------
 
 # Engine root. Public layout: the committed `segagenesisrecomp` submodule
@@ -174,20 +177,30 @@ elseif(UNIX)
 endif()
 
 # add_recomp_mode(<target> <prefix> <game_dir> <rom> <native_port> <oracle_port>)
-#   Builds <target> (native) for one game mode
-#   mode, generating C in this build tree and pulling the spec from the engine.
+#   Builds <target> (native) for one game mode, generating C in this build tree
+#   from this repo's game/<game_dir>/ (an absolute, caller-owned directory).
+set(S3_GAME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/game")
+set(S3_GAME_COMMON "${S3_GAME_ROOT}/common")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
-    set(GAME "${RECOMP_ROOT}/${GAME_DIR}")
+    set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
     genesisrecomp_add_generated_sources(
-        GENERATED_SOURCES "${PREFIX}" "${GAME_DIR}" "${ROM}"
+        GENERATED_SOURCES "${PREFIX}" "${GAME}" "${ROM}"
         REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
     set(SHARED_SRC
         ${RUNNER_SOURCES}
         ${GENERATED_SOURCES}
         "${GAME}/${PREFIX}_spec.c"
     )
-    list(APPEND SHARED_SRC "${RECOMP_ROOT}/sonic3k/sonic3_video.c")
+    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c")
+    # Game-owned mods that run S&K code: the combined cart and S&K alone.
+    if(NOT PREFIX STREQUAL "sonic3")
+        list(APPEND SHARED_SRC
+            "${S3_GAME_COMMON}/sonic3_knuckles_army.c"
+            "${S3_GAME_COMMON}/sonic3_knuckles_art.c"
+            "${S3_GAME_COMMON}/sonic3_knuckles_title.c"
+            "${S3_GAME_COMMON}/sonic3_mods.c")
+    endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
     # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)
     # unconditionally, so every target built against it links these (AGPL-free).
@@ -205,6 +218,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/external/clowncommon"
         "${RECOMP_ROOT}/recompiler/src"          # m68k_decoder.h (floor)
         "${GAME}"
+        "${S3_GAME_COMMON}"                      # sonic3_video.h (all modes)
     )
     if(GENESIS_Z80_RECOMP)
         list(APPEND INCLUDES_NATIVE
@@ -308,8 +322,8 @@ add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 # --- Mode: Sonic & Knuckles alone (2 MB @ $000000) — bring-up ----------------
 # Standalone S&K: byte-identical to the low 2 MB of the combined cart, so it
 # shares the S&K master boot path and the S&K-half disasm (org 0). Data lives in
-# segagenesisrecomp/sandk/ (game.toml + discovery files regenerated from skdisasm
-# sonic3k.lst at offset 0). See segagenesisrecomp/sandk/game.toml.
+# game/sandk/ (game.toml + discovery files regenerated from skdisasm
+# sonic3k.lst at offset 0). See game/sandk/game.toml.
 add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 
 # Shared recomp-ui (Dear ImGui) pre-boot launcher — added to ALL THREE native
@@ -332,5 +346,6 @@ recomp_target_launcher_ui(SonicAndKnucklesRecomp
 option(BUILD_TESTING "Build ROM-independent renderer and framework tests" ON)
 if(BUILD_TESTING)
     enable_testing()
-    add_subdirectory("${RECOMP_ROOT}/tests" "${CMAKE_BINARY_DIR}/tests")
+    add_subdirectory("${RECOMP_ROOT}/tests" "${CMAKE_BINARY_DIR}/engine-tests")
+    add_subdirectory(tests)
 endif()

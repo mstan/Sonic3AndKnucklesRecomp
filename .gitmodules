@@ -4,3 +4,6 @@
 [submodule "recomp-ui"]
 	path = recomp-ui
 	url = https://github.com/mstan/recomp-ui.git
+[submodule "game/skdisasm"]
+	path = game/skdisasm
+	url = https://github.com/sonicretro/skdisasm.git
