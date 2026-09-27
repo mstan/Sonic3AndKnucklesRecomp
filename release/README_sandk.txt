@@ -1,33 +1,35 @@
-SonicAndKnucklesRecomp — native static recompilation of Sonic & Knuckles
-========================================================================
+Sonic & Knuckles Recomp v0.4.0
+============================================================
 
-A native Windows port produced by statically recompiling the Sega Genesis
-68000 code to C. No emulator core: recompiled CPU code, clean-room
-VDP/bus/scheduler, ymfm FM synthesis, clean-room SN76489 PSG.
+Native static recompilation for Windows x64 and Linux x86_64.
+Bring your own matching raw Genesis ROM; no ROM is included.
+Variant: Sonic & Knuckles; ROM size: 2 MB.
+Suggested filename: sandk.bin. Use the launcher's ROM picker.
 
-BRING YOUR OWN ROM
-------------------
-This package contains NO game data. Place your own legally obtained
-Sonic & Knuckles (2 MB) ROM next to the exe, named:
+WINDOWS
+Extract the entire ZIP and run SonicAndKnucklesRecomp.exe.
+Keep assets/ and the bundled DLLs beside the executable.
 
-    sandk.bin
+LINUX
+Place the AppImage in a writable folder, chmod +x it, and launch.
+Use --appimage-extract-and-run when FUSE is unavailable.
+Requires Ubuntu 24.04 (glibc 2.39) or compatible x86_64 Linux with OpenGL.
+Older distributions and Steam Deck have not been validated.
 
-then run SonicAndKnucklesRecomp.exe. (Standalone Sonic & Knuckles has no
-data-select save game, so it writes no .srm — that's correct for this cart.)
+PLAY AND SETTINGS
+Configure keyboard/gamepad controls in the launcher. Enable widescreen in
+Mods > Widescreen; Adaptive fits the window. Up to four controller seats.
+Enable Mods > Knuckles & Knuckles for the optional local crowd mod.
+Choose 8/16/24/34 extras. Play as Knuckles; controllers 2-4 can drive extras.
+The mod is off by default and unavailable in netplay.
 
-CONTROLS
---------
-Arrow keys = D-pad, A/S/D = A/B/C, Enter = Start. Gamepads supported (SDL2).
+Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
+Linux refreshes bundled assets without replacing your settings or saves.
+Do not place the application in a read-only installation folder.
 
-LICENSE
--------
-This software: PolyForm Noncommercial 1.0.0 — see LICENSE.
-Third-party components (ymfm BSD-3-Clause, superzazu Z80 MIT, clowncommon
-ISC, SDL2 zlib): see THIRD-PARTY-LICENSES.md.
-
-Sonic & Knuckles is a trademark of SEGA. This project is not affiliated
-with or endorsed by SEGA. No SEGA assets are distributed.
-
-SOURCE
-------
-https://github.com/mstan/Sonic3AndKnucklesRecomp
+LICENSE AND SOURCE
+Project: PolyForm Noncommercial 1.0.0 (see LICENSE).
+Third-party notices: THIRD-PARTY-LICENSES.md and licenses/.
+Exact source and dependency commits: build-info.json.
+Source: https://github.com/mstan/Sonic3AndKnucklesRecomp
+This project is not affiliated with or endorsed by SEGA.

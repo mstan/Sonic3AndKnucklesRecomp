@@ -233,7 +233,7 @@ const GameSpec g_game_spec = {
     .video                  = &sonic3_video,
     .instruction_hook       = s3_video_hook,
     .main_cpu_divisor       = s3_video_main_cpu_divisor,
-    .display_name           = "Sonic 3",
+    .display_name           = "Sonic 3 v" S3_BUILD_VERSION,
     .short_name             = "Sonic3",
     .boxart                 = "boxart-sonic3.tga",
 
