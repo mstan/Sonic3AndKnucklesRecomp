@@ -4,6 +4,7 @@
 #include "video/genesis_vdp.h"
 
 int  s3_title_active(void);
+void s3_title_init(void);
 /* Instruction hook share: returns 1 to replace the routine at pc. */
 int  s3_title_hook(uint32_t pc, int enabled);
 /* Latch this frame's title composition (at V-int, before the SAT upload). */

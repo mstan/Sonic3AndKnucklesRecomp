@@ -1,15 +1,18 @@
 # Knuckles & Knuckles
 
 Opt-in gag for the S&K-code targets (Sonic 3 & Knuckles, Sonic & Knuckles).
-Tracking: central Beads `beads-tdq.3.3`.
+Tracking: central Beads `beads-tdq.3.3` (crowd), `beads-tdq.3.4` (title and defaults).
 
 ## Use
 
 Mods → **Knuckles & Knuckles** (group *Characters*, exclusive with any other
 character mod), option **Extra Knuckles**: 8 / 16 / 24 / 34. Persisted in
 `<mode>-mods.ini` beside `settings.ini` (`[knuckles-army] enabled=1 size=16`),
-which tests write directly. Pick Knuckles alone: Data Select (No Save or a new
-slot) on the combined cart, the title's Sonic/Knuckles switch on S&K alone.
+which tests write directly. On the combined cart, Data Select's empty files
+and No Save start on Knuckles while the mod is active. Existing files keep
+their character; up/down can still change an empty file's selection. Opening
+the menu does not write these defaults into SRAM. On S&K alone, pick Knuckles
+with the title's Sonic/Knuckles switch.
 Story zones only; special/bonus/competition stages, DDZ and demos stay stock.
 
 ## How it works (`game/common/sonic3_knuckles_army.c`)
@@ -50,8 +53,19 @@ Story zones only; special/bonus/competition stages, DDZ and demos stay stock.
 
 S&K: the standing pose name tables are mirrored so Knuckles faces Knuckles and
 the banner is recomposed from its VRAM tiles to read KNUCKLES & KNUCKLES.
-S3&K: the "& KNUCKLES" subtitle echoes down the screen. Both get a parade of
-running/gliding Knuckles (colours remapped to the nearest live CRAM entries).
+S3&K: a still Knuckles replaces Sonic and his intro animation, finger and wink.
+The S&K title's red word replaces SONIC to read **KNUCKLES 3**, with
+**Knuckles The Echidna** beneath it in original small pixel lettering using
+the banner's live palette and shadow. The portrait,
+resting hands and banner are decoded at startup from the owner's ROM by
+`sonic3_title_art.c`; no extracted artwork ships. The host palette preserves
+their original colors and follows title fades without changing guest CRAM.
+The "& KNUCKLES" subtitle still echoes down the screen. Both titles retain
+their running/gliding parade (remapped to the live CRAM palette).
+
+`sonic3_knuckles_menu.c` changes the initial menu selections only. The hooks
+are generated from `Obj_SaveScreen_Selector` and `loc_D41A`; the stock save
+logic persists the chosen character when the player starts a new file.
 
 ## Validation (2026-09-27, local)
 
@@ -65,7 +79,24 @@ running/gliding Knuckles (colours remapped to the nearest live CRAM entries).
 | Host throughput (S&K, `--benchmark 6000`) | 0.85 ms/frame off → 1.05 ms/frame at 34 extras |
 | Springs / solids (34 extras) | ~70 solid checks per frame; standing and side spring reactions fire |
 
-Owner playtest pending; no whole-campaign claim.
+The crowd implementation passed owner validation before its merge. The
+title/defaults follow-up passed owner review, including the small caption
+and complete still fist; no whole-campaign claim. Follow-up checks
+(`tests/runtime/run_knuckles_title.py`):
+
+- Native, 16:9 and 32:9 title captures; mod-off output matches game main
+  `1b698c5` at 23 framebuffer checkpoints per width.
+- All eight empty files and No Save default to Knuckles; opening the menu
+  leaves empty save data untouched. A user-selected Sonic & Tails file stays
+  Sonic & Tails on the next launch; another empty file starts as Knuckles.
+- Mod-off Data Select matches 32 framebuffer checkpoints. The existing
+  gameplay route matches 44 checkpoints with the mod off.
+- 34 extras at 32:9 with seat 2 driving: no dispatch misses or strict JSR
+  stack errors, no lag in the sampled 1597 frames.
+- CTest: 22/22, including host palette priority, bounded art decoding, actual
+  owner-ROM decoding, save-default isolation and hook generation drift.
+- Mod-off 3600-frame attract runs: state/audio hashes match `1b698c5` for
+  Sonic 3, Sonic 3 & Knuckles and Sonic & Knuckles.
 
 ## Known limits / disproved
 
