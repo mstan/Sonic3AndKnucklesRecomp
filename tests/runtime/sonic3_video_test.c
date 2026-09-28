@@ -76,6 +76,20 @@ int main(int argc,char **argv)
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(scene_read32(0xFFB128)==0x234567 && g_ram[0xB12C]==3 && g_ram[0xB152]==3);
+    /* AIZ's art-loading miniboss cutscene must not enter the expanded
+     * activation margin: its VRAM bank still belongs to a stage PLC. */
+    word(g_rom,0x10000C,0x3020);word(g_rom,0x10000E,0x8060);g_rom[0x100010]=3;
+    word(g_rom,0x100012,65535);
+    longword(g_rom,0x11000C,S3_AIZ_MINIBOSS_CUTSCENE);
+    longword(g_rom,0x5CCA2,S3_AIZ_MINIBOSS_CUTSCENE);
+    word(g_ram,0x8000,256);
+    s_placement_count=0;
+    write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(!(g_ram[0xEB02]&128));
+    write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(g_ram[0xEB02]&128);
+    CHECK(scene_read32(0xFFB172)==S3_AIZ_MINIBOSS_CUTSCENE);
+    word(g_ram,0x8000,16);
     CHECK(configure("off"));g_cpu.D[0]=12345;s3_video_hook(0x1B594);CHECK(g_cpu.D[0]==12345);
     /* Front-buffer retention through partial SAT DMA / producer rollover. */
     CHECK(configure("32:9"));write16(0xEE80,0);g_ram[0xF711]=1;
@@ -105,6 +119,121 @@ int main(int argc,char **argv)
     scanline(&v,0,native,320,out,796);CHECK(s_background_frame[128]==old);
     word(g_ram,0xEEC2,4);word(g_ram,0xEEC6,0);
     scanline(&v,0,native,320,out,796);CHECK(s_background_frame[128]==g_ram[128]);
+    /* AIZ2 streams a 512px BG canvas at X=0, then scrolls/repeats it.
+     * Put a green unrelated bank after it: large scroll offsets must still
+     * draw the red canvas, including the extended margins. */
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    g_ram[0xFE11]=1;word(g_ram,0xEEC2,12);
+    word(g_ram,0x8000,16);word(g_ram,0x8002,32);
+    word(g_ram,0x8008,0x8100);word(g_ram,0x800A,0x8140);
+    memset(g_ram+0x8140,2,32);memset(g_ram+0x8140,1,4);
+    for(unsigned n=0;n<64;++n){word(g_ram,128+n*2,1);word(g_ram,256+n*2,2);}
+    for(unsigned n=0;n<4;++n){word(g_ram,0x9008+n*2,1);word(g_ram,0x9010+n*2,2);}
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned n=0;n<64;++n)word(v.vram,0xE000+n*2,1);
+    word(v.vram,0xF002,(uint16_t)-1024);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
+    CHECK(s_bg_checks>0 && s_bg_errors==0);
+    /* The AIZ fire curtain lives in the uploaded name table while RAM
+     * changes to the incoming stage. Its 16px columns have independent
+     * vertical scroll. Use red/green rows over unrelated blue world art,
+     * including negative native columns and more than 20 screen columns. */
+    memset(g_ram+0x8100,3,16);memset(g_ram+0x8140,3,32);
+    for(unsigned n=0;n<64;++n)word(g_ram,384+n*2,3);
+    for(unsigned n=0;n<4;++n)word(g_ram,0x9018+n*2,3);
+    v.cram[3]=0xE00;memset(v.vram+96,0x33,32);
+    memset(v.vram+32,0x11,16);memset(v.vram+48,0x22,16);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,0x8001);
+    v.reg[11]=4;
+    for(unsigned col=0;col<20;++col)v.vsram[col*2+1]=col%8;
+    word(v.vram,0xF000,(uint16_t)-512);word(v.vram,0xF002,(uint16_t)-0x1060);
+    word(g_ram,0xEE80,512);
+    const unsigned phases[][2]={{0,12},{0,16},{0,20},{1,0},{1,4},{1,8}};
+    for(unsigned phase=0;phase<sizeof phases/sizeof phases[0];++phase) {
+        g_ram[0xFE11]=(uint8_t)phases[phase][0];word(g_ram,0xEEC2,phases[phase][1]);
+        scanline(&v,0,native,320,out,796);
+        CHECK(s_native_x==238);
+        for(int x=0;x<796;++x) {
+            int nx=x-238;
+            unsigned column=((unsigned)nx>>4)&7;
+            CHECK(out[x]==(column<4?0xFFFF0000:0xFF00FF00));
+        }
+    }
+    /* High-priority tree canopy in the added margins must stay behind
+     * opaque flames. The native viewport retains the VDP's A-over-B tie.
+     * During art replacement, the staged Plane A overrides garbage RAM. */
+    for(unsigned n=0;n<4;++n)word(g_ram,0x9018+n*2,0x8003);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xC000+n*2,0x8002);
+    for(unsigned phase=0;phase<sizeof phases/sizeof phases[0];++phase) {
+        g_ram[0xFE11]=(uint8_t)phases[phase][0];word(g_ram,0xEEC2,phases[phase][1]);
+        int staged=phase==1 || phase==2 || phase==3;
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int nx=x-238;
+            unsigned column=((unsigned)nx>>4)&7;
+            uint32_t expected=nx>=0 && nx<320?(staged?0xFF00FF00:0xFF0000FF):
+                column<4?0xFFFF0000:0xFF00FF00;
+            CHECK(out[x]==expected);
+        }
+    }
+    /* Transparent flame pixels reveal foreground even in the margins. */
+    memset(v.vram+32,0,32);
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF0000FF);
+    /* Once the staged BG redraw ends, return to the incoming world. */
+    word(g_ram,0xEEC2,12);v.reg[11]=0;
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF0000FF);
+    /* AIZ's hollow tree reveals individual blocks in Plane A before it
+     * edits complete layout chunks. Keep its uploaded mask/priority while
+     * drawing the surrounding expanded world from the layout. */
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0x8000,128);word(g_ram,0x8002,128);
+    for(unsigned row=0;row<32;++row) {
+        word(g_ram,0x8008+row*4,0x8200);word(g_ram,0x800A+row*4,0x8300);
+    }
+    memset(g_ram+0x8200,1,128);memset(g_ram+0x8300,2,128);
+    for(unsigned n=0;n<64;++n){word(g_ram,128+n*2,1);word(g_ram,256+n*2,2);}
+    for(unsigned n=0;n<4;++n){word(g_ram,0x9008+n*2,0x8003);word(g_ram,0x9010+n*2,2);}
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+    for(unsigned n=0;n<64*32;++n) {
+        word(v.vram,0xC000+n*2,n&1?0:0x8001);
+        word(v.vram,0xE000+n*2,2);
+    }
+    word(g_ram,0xEEC2,8);word(g_ram,0xEEC4,17);
+    word(g_ram,0xEE84,0x380);v.vsram[0]=0x380;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    for(int camera=0x2C54;camera<=0x2C60;camera+=12) {
+        word(g_ram,0xEE80,camera);word(v.vram,0xF000,(uint16_t)-camera);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int wx=camera+x-s_native_x;
+            uint32_t expected=wx>=0x2C80 && wx<0x2D80?
+                (wx&8?0xFF00FF00:0xFFFF0000):0xFF0000FF;
+            CHECK(out[x]==expected);
+        }
+    }
+    /* Finished reveal, another act/zone, and rows outside the tree keep
+     * normal terrain. */
+    for(unsigned case_id=0;case_id<4;++case_id) {
+        word(g_ram,0xEEC4,case_id==0?0:17);
+        g_ram[0xFE10]=case_id==1;g_ram[0xFE11]=case_id==2;
+        word(g_ram,0xEE84,case_id==3?0x480:0x380);v.vsram[0]=case_id==3?0x480:0x380;
+        scanline(&v,0,native,320,out,796);
+        for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF0000FF);
+    }
     /* Blue Spheres' forward and inverse projections agree on the same
      * surface, including expanded margins. Behind-horizon points are not
      * mistaken for the near intersection. */

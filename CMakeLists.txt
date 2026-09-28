@@ -186,6 +186,34 @@ endif()
 #   from this repo's game/<game_dir>/ (an absolute, caller-owned directory).
 set(S3_GAME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/game")
 set(S3_GAME_COMMON "${S3_GAME_ROOT}/common")
+# Raw machine/host snapshots belong to this source, compiler and build setup.
+file(GLOB_RECURSE _state_inputs CONFIGURE_DEPENDS
+    "${RUNNER_ROOT}/*.c" "${RUNNER_ROOT}/*.cpp" "${RUNNER_ROOT}/*.h"
+    "${S3_GAME_ROOT}/*.c" "${S3_GAME_ROOT}/*.h" "${S3_GAME_ROOT}/*.inc" "${S3_GAME_ROOT}/*.toml"
+    "${RECOMP_ROOT}/recompiler/src/*.c" "${RECOMP_ROOT}/recompiler/src/*.h"
+    "${RECOMP_ROOT}/external/m68k-recomp-core/*.c" "${RECOMP_ROOT}/external/m68k-recomp-core/*.h")
+list(FILTER _state_inputs EXCLUDE REGEX "/(generated|skdisasm|external/SDL2)/")
+list(SORT _state_inputs)
+set(_state_fingerprint "Sonic3-state-v1;${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_SIZEOF_VOID_P};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${SONIC_REVERSE_DEBUG};${GEN_ENABLE_TRACE};${GEN_DEV_TRACE};${GENESIS_Z80_RECOMP};${CMAKE_C_FLAGS};${CMAKE_CXX_FLAGS}")
+foreach(_input IN LISTS _state_inputs)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_input}")
+    file(SHA256 "${_input}" _hash)
+    string(APPEND _state_fingerprint ";${_hash}")
+endforeach()
+if(CMAKE_CONFIGURATION_TYPES)
+    set(_state_id "")
+    foreach(_config IN LISTS CMAKE_CONFIGURATION_TYPES)
+        string(TOUPPER "${_config}" _config_upper)
+        string(SHA256 _config_id "${_state_fingerprint};${_config};${CMAKE_C_FLAGS_${_config_upper}};${CMAKE_CXX_FLAGS_${_config_upper}}")
+        string(APPEND _state_id "$<$<CONFIG:${_config}>:${_config_id}>")
+    endforeach()
+else()
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _config_upper)
+    string(SHA256 _state_id "${_state_fingerprint};${CMAKE_BUILD_TYPE};${CMAKE_C_FLAGS_${_config_upper}};${CMAKE_CXX_FLAGS_${_config_upper}}")
+endif()
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/state-$<CONFIG>/sonic3_state_build.h"
+    CONTENT "#define SONIC3_STATE_BUILD_ID \"${_state_id}\"\n")
+include_directories("${CMAKE_BINARY_DIR}/state-$<CONFIG>")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
@@ -201,6 +229,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # Game-owned mods that run S&K code: the combined cart and S&K alone.
     if(NOT PREFIX STREQUAL "sonic3")
         list(APPEND SHARED_SRC
+            "${S3_GAME_COMMON}/sonic3_state.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_army.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_art.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_title.c"

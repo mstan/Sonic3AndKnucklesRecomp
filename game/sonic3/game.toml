@@ -26,6 +26,8 @@ output_prefix = "sonic3"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sonic3.code_addrs.txt"
 discovery_files = [
+    # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
+    "sonic3.special_vint_s3.toml",
     "sonic3.disasm_labels.toml",       # 10,966 code labels
     "sonic3.disasm_jumptables.toml",   # 272 tables / 1,448 targets
 ]

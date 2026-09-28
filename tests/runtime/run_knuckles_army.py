@@ -156,13 +156,15 @@ def main():
     ap.add_argument("--max-frames", type=int, default=3600)
     ap.add_argument("--widescreen", help="custom-width renderer mode for the mod-on run (e.g. 16:9)")
     ap.add_argument("--off", action="store_true", help="diagnostic: run the same timeline with the mod off only")
-    ap.add_argument("--benchmark", type=int, metavar="FRAMES", help="throughput: mod off vs 8/16/24/34 extras")
+    ap.add_argument("--benchmark", type=int, metavar="FRAMES", help="throughput: mod off vs requested crowd sizes")
+    ap.add_argument("--benchmark-sizes", type=int, nargs="+", default=[16, 34, 48, 64, 74])
+    ap.add_argument("--zero-lag", action="store_true", help="require zero repeated gameplay ticks")
     args = ap.parse_args()
     out, failures = args.out.resolve(), []
     if args.benchmark:
         # Uncapped throughput of the same timeline, mod off and each crowd size.
         results = {}
-        for size in [0] + [n for n in (8, 16, 24, 34)]:
+        for size in [0] + args.benchmark_sizes:
             runtime = out / ("bench-%d" % size)
             if runtime.exists():
                 shutil.rmtree(runtime)
@@ -178,12 +180,23 @@ def main():
             script += "HOLD RIGHT\nWAIT 100000\n"
             (runtime / "input.txt").write_text(script)
             env = os.environ.copy()
-            env.update(SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", SDL_RENDER_DRIVER="software")
-            text = subprocess.run([str(runtime / exe.name), str(args.rom.resolve()), "--benchmark",
-                                   str(args.benchmark), "--input-script", str(runtime / "input.txt")],
-                                  cwd=runtime, env=env, capture_output=True, text=True, timeout=900).stdout
+            env.update(SDL_VIDEODRIVER="dummy", SDL_AUDIODRIVER="dummy", SDL_RENDER_DRIVER="software",
+                       GENESIS_STRICT_JSR_STACK="1")
+            result = subprocess.run([str(runtime / exe.name), str(args.rom.resolve()), "--no-launcher", "--benchmark",
+                                   str(args.benchmark), "--input-script", str(runtime / "input.txt")] +
+                                   (["--widescreen", args.widescreen] if args.widescreen else []),
+                                  cwd=runtime, env=env, capture_output=True, text=True, timeout=900)
+            text = result.stdout
+            (runtime / "run.log").write_text(text + result.stderr)
+            assert result.returncode == 0, result.stderr[-1000:]
+            assert "JSR stack mismatch" not in result.stderr
+            misses = runtime / "dispatch_misses.toml"
+            if misses.exists():
+                import tomllib
+                assert not tomllib.loads(misses.read_text()).get("functions", {}).get("extra"), misses
             line = [l for l in text.splitlines() if l.startswith("GENESISRECOMP_BENCHMARK ")]
-            results[size] = json.loads(line[-1].split(" ", 1)[1]) if line else None
+            assert line, "benchmark summary missing: %s" % runtime
+            results[size] = json.loads(line[-1].split(" ", 1)[1])
             r = results[size]
             print("extras=%2d  fps=%s  ms/frame=%s" % (size, r and round(r["fps"]), r and round(r["ms_per_frame"], 3)))
         (out / "benchmark.json").write_text(json.dumps(results, indent=1))
@@ -216,7 +229,7 @@ def main():
             following.append(len(placed))
             if len(placed) >= 2:
                 ratios.append(len({(a["x"], a["y"]) for a in placed}) / len(placed))
-        spread = sum(ratios) / len(ratios) if ratios else 0
+        spread = sum(ratios) / len(ratios) if ratios else int(args.size == 1 and max(following) == 1)
         report_spread = {"mean_distinct_ratio": round(spread, 3), "max_following": max(following)}
         if max(following) < min(8, args.size) or spread < 0.45:
             failures.append("crowd stacked or missing: %s" % report_spread)
@@ -242,9 +255,16 @@ def main():
                 prev = lives
     report = {"exit": code, "samples": len(samples), "active_samples": len(active),
               "last": active[-1] if active else None, "failures": failures}
+    if code:
+        failures.append("runtime exit %s" % code)
     if active:
         report.update(report_spread)
         report["lag"] = "%s/%s" % (active[-1].get("lag"), active[-1].get("vblanks"))
+        report["max_shown"] = max(s["shown"] for s in active)
+        report["max_allocated"] = max(sum(bool(a["slot"]) for a in s["actors"]) for s in active)
+        report["min_free_slots"] = min(s["free_slots"] for s in active)
+        if args.zero_lag and active[-1].get("lag"):
+            failures.append("expected zero lag: %s frames" % report["lag"])
         if active[-1].get("vblanks") and active[-1]["lag"] * 50 > active[-1]["vblanks"]:
             failures.append("crowd causes lag: %s frames" % report["lag"])
     if args.reference:
