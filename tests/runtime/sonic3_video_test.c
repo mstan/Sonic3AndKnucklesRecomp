@@ -13,6 +13,61 @@ void cmd_send_response(const char *json){(void)json;}
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static void word(uint8_t *p,unsigned a,unsigned v){p[a]=(uint8_t)(v>>8);p[a+1]=(uint8_t)v;}
 static void longword(uint8_t *p,unsigned a,unsigned v){word(p,a,v>>16);word(p,a+2,v);}
+static void test_file_select(void)
+{
+    static GVDP v;
+    static uint8_t before[65536];
+    uint32_t native[320],out[1792];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("fit"));
+    g_ram[0xF600]=0x4C;v.reg[1]=64;v.reg[2]=0x38;v.reg[4]=6;
+    v.reg[3]=0x38;v.reg[18]=0x80;
+    v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=3;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;
+    for(unsigned tile=1;tile<=4;++tile)memset(v.vram+tile*32,tile*17,32);
+    for(unsigned row=0;row<2;++row) {
+        for(unsigned col=0;col<40;++col)word(v.vram,0xE000+row*128+col*2,col<20?1:2);
+        word(v.vram,0xC000+row*256+2,0x8003);
+        word(v.vram,0xC000+row*256+252,0x8003);
+    }
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
+    /* Capture a native-queued multi-sprite crossing the right edge and its
+     * offscreen child; no SAT wrapping and no extra writes to guest state. */
+    write32(0xB172,0x1234);write32(0xB17E,S3_FILE_SELECT_MAP);g_ram[0xB176]=64;
+    word(g_ram,0xB182,128+316);word(g_ram,0xB186,128);g_ram[0xB194]=1;
+    word(g_ram,0xB188,1);word(g_ram,0xB18A,128+330);word(g_ram,0xB18C,128);g_ram[0xB18F]=1;
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB172);
+    word(g_rom,S3_FILE_SELECT_MAP+2,4);word(g_rom,S3_FILE_SELECT_MAP+4,1);word(g_rom,S3_FILE_SELECT_MAP+6,0);
+    word(g_rom,S3_FILE_SELECT_MAP+8,0x8004);word(g_rom,S3_FILE_SELECT_MAP+10,0);
+    memcpy(before,g_ram,sizeof before);capture_objects();
+    CHECK(s_build.count==2 && s_build.sprites[0].hud==4 && s_build.sprites[1].x==330);
+    publish_sprites();CHECK(!memcmp(before,g_ram,sizeof before));
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    /* Native exit changes mode before fading this same installed screen. */
+    g_ram[0xF600]=4;before[0xF600]=4;
+    const int widths[]={320,398,523,796,1792};
+    for(unsigned w=0;w<sizeof widths/sizeof widths[0];++w)for(int scroll=0;scroll<=704;scroll+=352) {
+        int canvas=widths[w],origin=(canvas-320)/2;
+        word(v.vram,0xF002,(unsigned)-scroll);
+        scanline(&v,0,native,320,out,canvas);
+        for(int x=0;x<canvas;++x) {
+            int nx=x-origin;
+            if(nx>=0 && nx<320)CHECK(out[x]==native[nx]);
+            if((nx>=320 && nx<324)||(nx>=330 && nx<338))CHECK(out[x]==0xFFFFFFFF);
+        }
+        scanline(&v,8,native,320,out,canvas);
+        for(int x=0;x<canvas;++x) {
+            int nx=x-origin,card=nx+scroll;
+            /* Alternating 320px reflected half-panels: no black seams. */
+            int band=(nx+1600)/160;
+            uint32_t bg=(band%4==1 || band%4==2)?0xFFFF0000:0xFF00FF00;
+            uint32_t expected=nx>=0 && nx<320?native[nx]:
+                ((card>=8 && card<16)||(card>=1008 && card<1016))?0xFF0000FF:bg;
+            CHECK(out[x]==expected);
+        }
+    }
+    CHECK(!memcmp(before,g_ram,sizeof before));
+}
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -358,6 +413,7 @@ int main(int argc,char **argv)
         }
         ss_count=count;
     }
-    puts("Sonic 3 video terrain, activation, publication and Blue Spheres PASS");
+    test_file_select();
+    puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }
