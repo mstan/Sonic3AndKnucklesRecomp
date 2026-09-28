@@ -22,7 +22,7 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_HUD_MAP=0xE932, S3_RING_MAP=0xF87E,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
-       S3_TITLE_PLANE_MAP=0x4620,
+       S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374 };
@@ -31,7 +31,7 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
-       S3_TITLE_PLANE_MAP=0x4FE8,
+       S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C };
@@ -276,6 +276,13 @@ static uint16_t plane_attr(const GVDP *v, unsigned base, int x, int y)
     int col = (x >> 3) & (wt - 1), row = (y >> 3) & (ht - 1);
     return vram16(v, base + (unsigned)(row * wt + col) * 2u);
 }
+static int file_select_layout(const GVDP *v)
+{
+    /* Keep the outgoing menu through its fade, after Game_mode changes.
+     * SaveScreen alone installs this full-screen Window/128-column B pair. */
+    return (v->reg[12]&1) && (v->reg[2]&56)==0x38 && (v->reg[3]&62)==0x38 &&
+        (v->reg[4]&7)==6 && v->reg[18]==0x80 && (v->reg[16]&3)==3;
+}
 
 /* Enhanced scene data lives on the host: no SAT coordinate wrap, 80-piece
  * ceiling, or 20-sprites-per-line ceiling. Native BuildSprites still executes
@@ -511,6 +518,9 @@ static void capture_objects(void)
             /* The title plane is queued even beyond the hardware viewport.
              * Retain its signed position instead of the wrapped/cut SAT. */
             if((g_ram[0xF600]&127)==4 && map==S3_TITLE_PLANE_MAP)anchor=3;
+            /* Data Select queues every card, including those culled by the
+             * native SAT builder. Preserve their signed carousel positions. */
+            if(map==S3_FILE_SELECT_MAP)anchor=4;
             if(multi) {
                 if(g_ram[o+0x22])add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,0);
                 unsigned count=ram16(o+0x16);if(count>8)count=8;
@@ -612,8 +622,8 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
     if(!s_display)return;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
-        int title=s_display->scene==0;
-        if(title && s->hud!=3)continue;
+        int menu=s_display->scene==0;
+        if(menu && s->hud!=(file_select_layout(v)?4:3))continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
         int world=!s->hud && s_display->scene==1;
         int y=s->y+(world?s_display->camera_y-s_camera_y:0);
@@ -628,7 +638,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<cw*8;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
-            if(title && x>=origin && x<origin+320)continue;
+            if(menu && x>=origin && x<origin+320)continue;
             int ix=(s->attr&0x800)?cw*8-1-i:i;
             uint16_t cell=(uint16_t)((s->attr&0xE000u)|
                 (((s->attr&2047u)+(unsigned)(ix/8*ch+iy/8))&2047u));
@@ -758,6 +768,11 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
+    /* SaveScreen reverses the usual plane roles: the 320px portrait lives
+     * on the full-screen Window ($E000, 64 tiles per row), while B ($C000)
+     * holds the complete 1024px card strip (128 tiles per row).
+     * Use the installed layout through both entry and exit fades. */
+    int file_select=!level && file_select_layout(v);
     int wy=camera_y+line;
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
@@ -838,7 +853,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         int reference_bx=nx-hs_b,bx=reference_bx;
         /* Title/menu backgrounds only initialize the visible 40 tile
          * columns; repeat that composition, not the stale 512px name table. */
-        if(!level && !special){bx%=nw;if(bx<0)bx+=nw;}
+        if(!level && !special && !file_select){bx%=nw;if(bx<0)bx+=nw;}
 
         int background_x=bx;
         if(bg_width>0) { background_x%=bg_width;if(background_x<0)background_x+=bg_width; }
@@ -846,6 +861,16 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         uint16_t b=bg_world?world_attr(s_background_frame,background_x,by,1):plane_attr(v,base_b,bx,by);
         uint8_t ap=pattern_pixel(v,a,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         uint8_t bp=pattern_pixel(v,b,bg_world?background_x:bx,by);
+        if(file_select) {
+            /* Reflect only the portrait at its edges, retaining its native
+             * pixel scale and a continuous backdrop at every aspect ratio.
+             * The carousel is finite: never wrap Delete back to No Save. */
+            int ax=nx%(2*nw);if(ax<0)ax+=2*nw;
+            if(ax>=nw)ax=2*nw-1-ax;
+            a=vram16(v,0xE000u+(unsigned)(line/8*64+ax/8)*2u);
+            ap=pattern_pixel(v,a,ax,line);
+            if(bx<0 || bx>=1024)bp=0;
+        }
         const uint32_t *apalette=palette,*bpalette=palette;
         if(bg_canvas) {
             b=plane_attr(v,base_b,reference_bx,by);
@@ -903,7 +928,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         if(level && (wx<0 || wx>=s_stage_width))ap=0;
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
-        if(!level && (nx<0 || nx>=nw))ap=0;
+        if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
         /* The authored transition viewport has no high-priority tree
          * canopy in front of its flame curtain. Expanded margins do: let
@@ -963,7 +988,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         /* Logos/copyright/menus remain centered at their original pixel
          * scale. The full-width background follows the live scene palette. */
         if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof(uint32_t));
-        if((g_ram[0xF600]&127)==4 && s_display && s_display->scene==0)
+        if(((g_ram[0xF600]&127)==4 || file_select) && s_display && s_display->scene==0)
             draw_scene_sprites(v,line,out,width,origin,palette);
         if((g_ram[0xF600]&127)==4 && s_actor_overlay)
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
