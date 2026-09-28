@@ -5,6 +5,8 @@ int s3_video_hook(uint32_t pc);
 void s3_video_command(int id, const char *json);
 void s3_video_vblank(void);
 unsigned s3_video_main_cpu_divisor(void);
+/* Full custom canvas, or 320 while the opt-in renderer is disabled. */
+int s3_video_canvas_width(void);
 /* Additive host actors in the custom-width renderer, after every scene sprite.
  * priority bit 0 = high-priority plane pixel, bit 1 = sprite already drawn;
  * `origin` is the output column of camera_x. */

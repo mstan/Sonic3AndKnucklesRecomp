@@ -869,13 +869,16 @@ void s3_army_draw_wide(const GVDP *v, int line, uint32_t *out, int width, int or
                        const uint32_t *palette, uint8_t *priority, int camera_x, int camera_y)
 {
     (void)v;
-    if (!shown.count) return;
+    int title = s3_title_active();
+    if (!shown.count && !title) return;
     enum { MAXW = 4096 };
     static uint8_t index[MAXW], opaque[MAXW], high[MAXW], before[MAXW];
     if (width > MAXW) width = MAXW;
-    for (int x = 0; x < width; ++x) before[x] = opaque[x] = (priority[x] & 2) != 0;
+    for (int x = 0; x < width; ++x)
+        before[x] = opaque[x] = (priority[x] & 2) != 0 || (title && x >= origin && x < origin + 320);
     GVDPSpriteLayer layer = { line, width, origin, index, opaque, high };
-    draw_line(&layer, origin, camera_x, camera_y);
+    if (title) s3_title_draw_parade(&layer, art_ready ? &art : NULL);
+    else draw_line(&layer, origin, camera_x, camera_y);
     for (int x = 0; x < width; ++x) {
         if (before[x] || !opaque[x]) continue;
         priority[x] |= 2;

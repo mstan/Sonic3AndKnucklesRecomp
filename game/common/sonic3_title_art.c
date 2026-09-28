@@ -143,20 +143,26 @@ int s3_title_art_decode(const uint8_t *rom, size_t size, S3TitleArt *out)
         for (unsigned x = 0; x < S3_TITLE_POSE_W; x += 8) {
             unsigned a = map[y / 8 * 40 + 20 + x / 8], tile = a & 0x7FF;
             if (tile >= sizeof pose / 32) return 0;
-            if (((a >> 13) & 3) != 1) {
+            unsigned palette = (a >> 13) & 3, shared_white = 0;
+            if (palette != 1) {
                 /* Knuckles uses palette 1, but the map reuses palette 0's
                  * solid-white tile inside his gloves. White is color 11 in
                  * both palettes. Retain these shared tiles while excluding
                  * Sonic's adjacent art/placeholders from the portrait. */
-                if ((a >> 13) & 3) continue;
+                if (palette) continue;
                 unsigned i = 0;
                 while (i < 32 && pose[tile * 32 + i] == 0xBB) ++i;
-                if (i != 32) continue;
+                shared_white = i == 32;
             }
             for (unsigned dy = 0; dy < 8; ++dy)
-                for (unsigned dx = 0; dx < 8; ++dx)
-                    out->pose[(y + dy) * S3_TITLE_POSE_W + x + dx] =
-                        (uint8_t)pixel(pose, sizeof pose, a, dx, dy);
+                for (unsigned dx = 0; dx < 8; ++dx) {
+                    unsigned color = pixel(pose, sizeof pose, a, dx, dy);
+                    /* Two boundary tiles mix Sonic's blue with Knuckles'
+                     * red hair. Both palettes share red entries 2/3; keep
+                     * those pixels without importing the adjacent Sonic. */
+                    if (!palette && !shared_white && color != 2 && color != 3) continue;
+                    out->pose[(y + dy) * S3_TITLE_POSE_W + x + dx] = (uint8_t)color;
+                }
         }
     for (unsigned i = 14; i < 30; ++i) {
         const uint8_t *p = rom + m + 2 + i * 6;

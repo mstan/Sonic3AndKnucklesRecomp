@@ -22,6 +22,7 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_HUD_MAP=0xE932, S3_RING_MAP=0xF87E,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
+       S3_TITLE_PLANE_MAP=0x4620,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374 };
@@ -30,6 +31,7 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
+       S3_TITLE_PLANE_MAP=0x4FE8,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C };
@@ -55,6 +57,7 @@ static uint8_t s_background_frame[0xA800];
 static int s_frame_level,s_frame_special,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
 static unsigned s_frame_zone,s_frame_act,s_frame_bg_event;
 static unsigned s_frame_tree_reveal;
+static int s_frame_bg_band[2];
 static void scene_mode_changed(int was_enabled);
 static void ss_capture(void);
 
@@ -214,6 +217,7 @@ static int width(int dw, int dh, int nw, int nh)
     s_requested_width = pixels < nw ? nw : pixels;
     return s_requested_width;
 }
+int s3_video_canvas_width(void) { return enabled()?s_requested_width:320; }
 
 /* Full 16-bit scroll is unwrapped against the live camera's 10-bit VDP
  * position. This avoids the one-frame camera/streaming seam seen in SMB. */
@@ -234,11 +238,14 @@ static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int w
 {
     unsigned header=background?0x8002u:0x8000u;
     int width=((ram[header]<<8)|ram[header+1])*128;
-    if(width<=0 || wx<0 || wx>=width)return 0;
+    if(width<=0 || (!background && (wx<0 || wx>=width)))return 0;
     unsigned row=((unsigned)wy>>5)&0x7Cu;
     unsigned p=0x8008u+row+(background?2u:0u);
     unsigned rowaddr=(ram[p]<<8)|ram[p+1];
-    unsigned cell=rowaddr+((unsigned)wx>>7);
+    /* Get_ChunkRow uses a signed chunk offset. A moving background can
+     * expose the guard chunks preceding its row (HCZ wall/HPZ/LRZ3);
+     * wrapping that offset to the row's far end selects different art. */
+    int cell=(int)rowaddr+(wx>>7);
     if(cell<0x8088 || cell>=0x9000)return 0;
     unsigned address=ram[cell]*128u+((unsigned)wy&112u)+((unsigned)wx&112u)/8u;
     uint16_t block=(uint16_t)((ram[address]<<8)|ram[address+1]);
@@ -501,6 +508,9 @@ static void capture_objects(void)
                 if(s_visible_count<144)s_visible_objects[s_visible_count++]=o;
             } else {x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;anchor=2;}
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
+            /* The title plane is queued even beyond the hardware viewport.
+             * Retain its signed position instead of the wrapped/cut SAT. */
+            if((g_ram[0xF600]&127)==4 && map==S3_TITLE_PLANE_MAP)anchor=3;
             if(multi) {
                 if(g_ram[o+0x22])add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,0);
                 unsigned count=ram16(o+0x16);if(count>8)count=8;
@@ -602,11 +612,13 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
     if(!s_display)return;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
+        int title=s_display->scene==0;
+        if(title && s->hud!=3)continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
         int world=!s->hud && s_display->scene==1;
         int y=s->y+(world?s_display->camera_y-s_camera_y:0);
         if(line<y || line>=y+ch*8)continue;
-        int base=s->x+(s->hud==1?0:s->hud==2?(width-320)/2:origin);
+        int base=s->x+(s->hud==1?0:s->hud>=2?(width-320)/2:origin);
         /* Native camera scroll may advance while a completed host frame is
          * retained. Reproject its world coordinates, not its old screen
          * coordinates; otherwise stationary rings jitter with the camera. */
@@ -616,13 +628,14 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<cw*8;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+            if(title && x>=origin && x<origin+320)continue;
             int ix=(s->attr&0x800)?cw*8-1-i:i;
             uint16_t cell=(uint16_t)((s->attr&0xE000u)|
                 (((s->attr&2047u)+(unsigned)(ix/8*ch+iy/8))&2047u));
             uint8_t p=pattern_pixel(v,cell,ix,iy);
             if(!p)continue;
             s_priority[x]|=2;
-            if(s->hud || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=palette[p];
+            if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=palette[p];
         }
     }
 }
@@ -685,6 +698,8 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
             s_frame_bg_event==0 && ram16(0xEEC6);
         if(!replacing_intro)memcpy(s_background_frame,s_world_frame,sizeof s_background_frame);
         s_frame_fg_x=ram16(0xEE80);s_frame_fg_y=ram16(0xEE84);s_frame_bg_y=ram16(0xEE90);
+        s_frame_bg_band[0]=(int16_t)ram16(0xA800);
+        s_frame_bg_band[1]=(int16_t)ram16(0xA804);
         s_width=width;s_requested_width=width;
         s_terrain_checks=s_terrain_errors=s_bg_checks=s_bg_errors=s_bg_unstreamed=0;
         s_uninitialized_scroll_lines=s_terrain_unstreamed=0;
@@ -760,6 +775,23 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     int aiz_fire_fg=aiz_fire &&
         ((s_frame_act==0 && s_frame_bg_event>=0x10) ||
          (s_frame_act==1 && s_frame_bg_event==0));
+    /* FBZ streams complete 512px rows from one of two layout canvases
+     * (X=0 indoors, X=$200 outdoors). Its doorway events replace that
+     * canvas a row/column at a time. The uploaded plane is authoritative
+     * for both the selected bank and every mixed transition frame. */
+    int fbz_canvas=bg_world && s_frame_zone==4;
+    /* ICZ1's outdoor bank starts at layout X=$1880; the snow and cave
+     * entrance then replace it in strips. ICZ2 also swaps complete indoor
+     * and outdoor canvases. Keep those uploaded compositions through each
+     * redraw rather than treating their source banks as adjacent scenery. */
+    int icz_canvas=bg_world && s_frame_zone==5 &&
+        (s_frame_act==1 || s_frame_bg_event<0x10);
+    /* SSZ1's cloud band is a separate 512px bank at X=$1C00; entry and
+     * exit replace it progressively. DEZ3's auto-scrolling runway is a
+     * live Plane B canvas edited by the boss, independent of its layout. */
+    int ssz_canvas=bg_world && s_frame_zone==10 && !s_frame_act && s_frame_bg_event;
+    int dez3_canvas=bg_world && s_frame_zone==23;
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
@@ -782,6 +814,25 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
      * treating it as one wide world reads unrelated tile banks. */
     if(bg_world && s_frame_zone==0 && s_frame_act==1 && s_frame_bg_event>=8)
         bg_width=512;
+    /* SOZ1's desert also uses Draw_TileRow(X=0, d6=$20). The rest
+     * of its layout belongs to the rising pyramid/boss presentation. */
+    if(bg_world && s_frame_zone==8 && s_frame_act==0 && s_frame_bg_event==0)
+        bg_width=512;
+    /* CNZ's normal city parallax is another X=0, 32-block row. Its other
+     * layout banks are used as collidable scenery during the act-1 boss. */
+    if(bg_world && s_frame_zone==3 &&
+       ((!s_frame_act && !s_frame_bg_event) || (s_frame_act==1 && s_frame_bg_event>=4)))
+        bg_width=512;
+    /* HCZ2's crushing wall is a moving world, not a repeating panorama.
+     * Negative coordinates to its left must remain blank. */
+    if(bg_world && ((s_frame_zone==1 && s_frame_act==1 && s_frame_bg_event<=4) ||
+       s_frame_zone==22))
+        bg_width=0;
+    /* LRZ3's distant lava cavern occupies the first 512px. Its upper
+     * parallax camera stays within that panorama; the remaining layout
+     * is the close, collidable boss arena entered by the later events. */
+    if(bg_world && s_frame_zone==22 && !s_frame_act && !s_frame_bg_event)
+        bg_width=512;
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=reference_bx;
@@ -796,6 +847,10 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         uint8_t ap=pattern_pixel(v,a,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         uint8_t bp=pattern_pixel(v,b,bg_world?background_x:bx,by);
         const uint32_t *apalette=palette,*bpalette=palette;
+        if(bg_canvas) {
+            b=plane_attr(v,base_b,reference_bx,by);
+            bp=pattern_pixel(v,b,reference_bx,by);
+        }
         if(aiz_fire) {
             unsigned vs=1;
             if(v->reg[11]&4) {
@@ -878,6 +933,19 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
                  * Until finished, the old name table is not an oracle for
                  * the new world layout, which the opt-in renderer shows. */
                 ++s_bg_unstreamed;
+            } else if(bg_canvas) {
+                /* A streamed composition has no single world-layout bank
+                 * to compare against during its directional wipes. */
+                ++s_bg_unstreamed;
+            } else if(bg_world && s_frame_zone==22 && s_frame_act==1 &&
+                      (reference_bx<(s_frame_bg_band[by<512?0:1]&~15) ||
+                       reference_bx>=(s_frame_bg_band[by<512?0:1]&~15)+336)) {
+                /* HPZ_BGDrawArray streams two bands (split at Y=$200),
+                 * while HPZ_BGDeformArray scrolls ten finer bands. Some
+                 * fine-band pixels can see outside Draw_TileColumn's
+                 * 21-block interval. Those stale native cells are not a
+                 * reference for the expanded world's actual layout. */
+                ++s_bg_unstreamed;
             } else if(bg_world && !aiz_fire) {
                 int rx=reference_bx;
                 if(bg_width>0){rx%=bg_width;if(rx<0)rx+=bg_width;}
@@ -895,6 +963,10 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         /* Logos/copyright/menus remain centered at their original pixel
          * scale. The full-width background follows the live scene palette. */
         if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof(uint32_t));
+        if((g_ram[0xF600]&127)==4 && s_display && s_display->scene==0)
+            draw_scene_sprites(v,line,out,width,origin,palette);
+        if((g_ram[0xF600]&127)==4 && s_actor_overlay)
+            s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
     } else if(s_display) {
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(s_actor_overlay)s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);

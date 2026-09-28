@@ -44,6 +44,18 @@ int main(int argc, char **argv)
         /* The adjacent Sonic art and hand placeholders must stay excluded. */
         CHECK(art.pose[40 * S3_TITLE_POSE_W] == 0);
         CHECK(art.pose[64 * S3_TITLE_POSE_W] == 0);
+        /* These mixed Sonic/Knuckles tiles contain fourteen hair pixels.
+         * Preserve the red outline but exclude every blue/transparent pixel. */
+        unsigned hair = 0;
+        for (unsigned y = 40; y < 56; ++y)
+            for (unsigned x = 0; x < 8; ++x) {
+                unsigned color = art.pose[y * S3_TITLE_POSE_W + x];
+                CHECK(color == 0 || color == 3);
+                hair += color != 0;
+            }
+        CHECK(hair == 14);
+        CHECK(art.pose[47 * S3_TITLE_POSE_W + 7] == 3);
+        CHECK(art.pose[55 * S3_TITLE_POSE_W + 6] == 3);
         rom[ARMY_MAP_TITLE_POSE] = 0xFF;
         CHECK(!s3_title_art_decode(rom, (size_t)size, &art));
         free(rom);
