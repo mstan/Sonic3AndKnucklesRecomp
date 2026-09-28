@@ -10,6 +10,7 @@
 #include "sonic3_knuckles_title.h"
 #include "sonic3_knuckles_art.h"
 #include "sonic3_title_art.h"
+#include "sonic3_video.h"
 #include "genesis_runtime.h"
 #include "video/genesis_vdp.h"
 #include "video/genesis_dac.h"
@@ -267,16 +268,19 @@ static void draw_caption(const GVDPSpriteLayer *l)
 }
 
 /* Runners along the ground and gliders across the sky, looping. */
-static void draw_parade(const GVDPSpriteLayer *l, const KnuxArt *art)
+void s3_title_draw_parade(const GVDPSpriteLayer *l, const void *knuckles_art)
 {
+    if (!shown.active || !knuckles_art) return;
+    const KnuxArt *art = (const KnuxArt *)knuckles_art;
     enum { RUNNERS = 9, GLIDERS = 4 };
     static const uint8_t run[4] = { 0x21, 0x22, 0x23, 0x24 };
     for (unsigned n = 0; n < RUNNERS + GLIDERS; ++n) {
         int glider = n >= RUNNERS;
         unsigned k = glider ? n - RUNNERS : n, t = shown.tick;
-        int span = 320 + 96;
+        int canvas = s3_video_canvas_width(), span = canvas + 96;
         int x = glider ? span - (int)((t * 3 / 2 + k * 104) % (unsigned)span) - 48
                        : (int)((t * (2 + k % 3) + k * 46) % (unsigned)span) - 48;
+        x -= (canvas - 320) / 2;
         int y = glider ? 36 + (int)(k * 22) : 206 - (int)(k % 3) * 3;
         unsigned frame = glider ? 0xC0 : run[(t / 4 + k) & 3], flip = glider ? 1 : 0;
         if (frame >= art->count) continue;
@@ -346,5 +350,5 @@ void s3_title_draw(const GVDP *v, const GVDPSpriteLayer *l, const void *knuckles
             l->opaque[col] = 1; l->high[col] = 1;
         }
     }
-    if (knuckles_art) draw_parade(l, (const KnuxArt *)knuckles_art);
+    s3_title_draw_parade(l, knuckles_art);
 }

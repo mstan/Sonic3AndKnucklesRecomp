@@ -1,4 +1,4 @@
-Sonic & Knuckles Recomp v0.4.0
+Sonic & Knuckles Recomp v0.5.0
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -20,8 +20,14 @@ PLAY AND SETTINGS
 Configure keyboard/gamepad controls in the launcher. Enable widescreen in
 Mods > Widescreen; Adaptive fits the window. Up to four controller seats.
 Enable Mods > Knuckles & Knuckles for the optional local crowd mod.
-Choose 8/16/24/34 extras. Play as Knuckles; controllers 2-4 can drive extras.
+Type 1-74 extras (default 16). Play as Knuckles; controllers 2-4 can drive extras.
+Busy stages may temporarily use fewer extras to reserve room for level objects.
 The mod is off by default and unavailable in netplay.
+
+During story gameplay, Shift+F1-F9 saves a state; F1-F9 loads it.
+Controller LB/RB saves/loads slot 1. States preserve the stage and crowd.
+States require the same build and mod/widescreen configuration. Keep normal
+cartridge saves (*.srm) for progress across upgrades.
 
 Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
 Linux refreshes bundled assets without replacing your settings or saves.

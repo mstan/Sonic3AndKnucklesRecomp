@@ -11,3 +11,5 @@ int  s3_title_hook(uint32_t pc, int enabled);
 void s3_title_vblank(const GVDP *v, int enabled);
 /* Host sprite layer: draw the latched composition. */
 void s3_title_draw(const GVDP *v, const GVDPSpriteLayer *layer, const void *knuckles_art);
+/* Extend the same parade into the custom canvas; caller masks the center. */
+void s3_title_draw_parade(const GVDPSpriteLayer *layer, const void *knuckles_art);
