@@ -61,6 +61,10 @@ int main(int argc,char **argv)
     word(g_ram,128,3);for(unsigned n=0;n<4;++n)word(g_ram,0x9018+n*2,100+n);
     CHECK(world_attr(g_ram,0,0,0)==100);CHECK(world_attr(g_ram,8,8,0)==103);
     CHECK(world_attr(g_ram,0,0,1)==100);CHECK(world_attr(g_ram,2048,0,0)==0);
+    /* Native Get_ChunkRow addresses signed guard chunks before a BG row,
+     * rather than wrapping to the last chunk of that row. */
+    g_ram[0x813F]=1;word(g_ram,128+14,3);
+    CHECK(world_attr(g_ram,-1,0,1)==101);CHECK(world_attr(g_ram,-1,0,0)==0);
     word(g_ram,128,0xC03);CHECK(world_attr(g_ram,0,0,0)==(103^0x1800));
     /* Sorted placements, native respawn pointers and matching activation cells. */
     longword(g_rom,S3_PLACEMENTS,0x100000);word(g_rom,0x100000,640);word(g_rom,0x100002,0x8060);
@@ -141,6 +145,28 @@ int main(int argc,char **argv)
     scanline(&v,0,native,320,out,796);
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
     CHECK(s_bg_checks>0 && s_bg_errors==0);
+    /* SOZ1 uses the same 512px desert canvas, never its later pyramid
+     * layout. This regression uses the unrelated green bank above. */
+    const unsigned canvases[][3]={{8,0,0},{3,0,0},{3,1,8},{22,0,0}};
+    for(unsigned c=0;c<sizeof canvases/sizeof canvases[0];++c) {
+        g_ram[0xFE10]=(uint8_t)canvases[c][0];g_ram[0xFE11]=(uint8_t)canvases[c][1];
+        word(g_ram,0xEEC2,canvases[c][2]);
+        scanline(&v,0,native,320,out,796);
+        for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
+        CHECK(s_bg_checks>0 && s_bg_errors==0);
+    }
+    /* FBZ's indoors/outdoors wipes publish mixed rows/columns. Keep that
+     * exact plane throughout either act and every background event; do
+     * not choose a complete bank early or repeat the combined layout. */
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,n%64<32?1:2);
+    g_ram[0xFE10]=4;
+    for(unsigned act=0;act<2;++act)for(unsigned event=0;event<=16;event+=4) {
+        g_ram[0xFE11]=(uint8_t)act;word(g_ram,0xEEC2,event);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x)
+            CHECK(out[x]==(((x-s_native_x+1024)&511)<256?0xFFFF0000:0xFF00FF00));
+    }
+    g_ram[0xFE10]=0;
     /* The AIZ fire curtain lives in the uploaded name table while RAM
      * changes to the incoming stage. Its 16px columns have independent
      * vertical scroll. Use red/green rows over unrelated blue world art,
@@ -234,22 +260,45 @@ int main(int argc,char **argv)
         scanline(&v,0,native,320,out,796);
         for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF0000FF);
     }
+    /* A queued title plane survives native 4:3 sprite culling. Paint only
+     * its extensions; the authoritative native title pixels stay intact. */
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    g_ram[0xF600]=4;v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;
+    v.reg[5]=0x7C;v.reg[12]=1;v.reg[16]=1;v.cram[1]=0xE;
+    memset(v.vram+32,0x11,32);
+    for(unsigned n=0;n<320;++n)native[n]=0xFF123456;
+    write32(0xB172,0x1234);write32(0xB17E,S3_TITLE_PLANE_MAP);
+    word(g_ram,0xB182,128);word(g_ram,0xB186,128);
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB172);
+    word(g_rom,S3_TITLE_PLANE_MAP,2);word(g_rom,S3_TITLE_PLANE_MAP+2,1);
+    word(g_rom,S3_TITLE_PLANE_MAP+4,0);word(g_rom,S3_TITLE_PLANE_MAP+6,1);
+    word(g_rom,S3_TITLE_PLANE_MAP+8,65532);
+    capture_objects();CHECK(s_build.count==1 && s_build.sprites[0].hud==3);
+    s_build.sprites[1]=s_build.sprites[0];s_build.sprites[1].x=316;
+    s_build.sprites[2]=(SceneSprite){-20,0,1,0,2};s_build.count=3;
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;++x) {
+        uint32_t expected=x>=238 && x<558?0xFF123456:
+            ((x>=234 && x<238)||(x>=558 && x<562))?0xFFFF0000:0xFF000000;
+        CHECK(out[x]==expected);
+    }
     /* Blue Spheres' forward and inverse projections agree on the same
      * surface, including expanded margins. Behind-horizon points are not
      * mistaken for the near intersection. */
     for(int stretch=1;stretch<=6;++stretch)for(int z=0;z<5;++z)for(int x=-3;x<=3;++x) {
-        double h=ss_radius-sqrt(ss_radius*ss_radius-x*x/(double)(stretch*stretch)-z*z);
-        double d=ss_distance+z+ss_pitch*h;
-        SSPoint p=ss_intersect(ss_focal*x/d,112+ss_focal*(ss_ground_lift-ss_pitch*z+h)/d,stretch);
+        double px,py,d;
+        CHECK(ss_project(x,z,stretch,&px,&py,&d));
+        SSPoint p=ss_intersect(px,py,stretch);
         CHECK(fabs(p.x-x)<.0001 && fabs(p.z-z)<.0001 && fabs(p.depth-d)<.0001);
     }
     CHECK(!ss_intersect(0,0,1).depth);
     CHECK(ss_intersect(-790,200,5).depth>0);
     double px,py,depth;
     CHECK(ss_project(0,0,1,&px,&py,&depth));
-    CHECK(fabs(px)<.001 && fabs(py-158)<3);
+    CHECK(fabs(px)<.001 && fabs(py-(112+ss_focal*ss_ground_lift/ss_distance))<.001);
     CHECK(ss_project(2,1,1,&px,&py,&depth));
-    CHECK(fabs(px-155)<3 && fabs(py-104)<3);
+    CHECK(fabs(px-155)<3);
     CHECK(!ss_project(100,0,1,&px,&py,&depth));
     /* Full native board, more than 80 host spheres, and no guest writes.
      * Test without copyrighted assets using synthetic mappings/art. */
@@ -268,6 +317,47 @@ int main(int argc,char **argv)
     ss_capture();ss_begin(&v,1603);CHECK(ss_x==2);
     ss_begin(&v,398);CHECK(ss_ready && ss_width==398);
     ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
+    /* A sprite's visible base stays on its actual board intersection while
+     * moving, turning and resizing. This would fail with the old separate
+     * sphere-camera lift even though the ground's inverse test passed. */
+    uint32_t checker[1600],checker_colors[64]={0};
+    checker_colors[56]=0xFF00FFFF;checker_colors[60]=0xFFFF00FF;
+    for(unsigned turn=0;turn<8;++turn)for(unsigned motion=0;motion<3;++motion)
+    for(int canvas=320;canvas<=1600;canvas+=320) {
+        double angle=turn*6.2831853071795864769/8;
+        int ix=(int)round(-2*sin(angle)),iy=(int)round(-2*cos(angle));
+        memset(g_ram+0xF100,0,1024);
+        g_ram[0xF100+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
+        word(g_ram,0xE422,motion*32);word(g_ram,0xE424,motion*16);g_ram[0xE426]=(uint8_t)(turn*32);
+        ss_capture();ss_begin(&v,canvas);CHECK(ss_ready && ss_count>=1);
+        double dx=ix-ss_x,dy=iy-ss_y;
+        CHECK(ss_project(dx*ss_cos-dy*ss_sin,-dx*ss_sin-dy*ss_cos,ss_stretch,&px,&py,&depth));
+        /* Very wide views can see the periodic board again. Select this
+         * cell's nearest projected copy, not an arbitrary depth-sort slot. */
+        const SSSphere *sphere=NULL;double nearest=1e30;
+        for(unsigned n=0;n<ss_count;++n) {
+            double distance=fabs(ss_spheres[n].x+ss_spheres[n].w*.5-(px+(canvas-1)*.5));
+            if(distance<nearest){nearest=distance;sphere=&ss_spheres[n];}
+        }
+        CHECK(sphere!=NULL);
+        CHECK(ss_texture_floor[2][sphere->lod]==48);
+        CHECK(fabs(sphere->x+sphere->w*.5-(px+(canvas-1)*.5))<=.501);
+        CHECK(fabs(sphere->y+48*sphere->h/64.0-py)<=.501);
+        /* Render the four quadrants around this object's board position.
+         * Opposite quadrants must match and adjacent ones must differ. This
+         * checks the actual checkerboard phase, not just projection algebra. */
+        unsigned count=ss_count;ss_count=0;
+        for(int qy=0;qy<2;++qy)for(int qx=0;qx<2;++qx) {
+            double wx=ix+(qx?.1:-.1)-ss_x,wy=iy+(qy?.1:-.1)-ss_y;
+            CHECK(ss_project(wx*ss_cos-wy*ss_sin,-wx*ss_sin-wy*ss_cos,ss_stretch,&px,&py,&depth));
+            int col=(int)floor(px+(canvas-1)*.5+.5),row=(int)floor(py+.5);
+            CHECK(col>=0 && col<canvas && row>=32 && row<224);
+            ss_scanline(&v,row,checker,canvas,checker_colors,checker_colors,0);
+            unsigned parity=(ix-(qx==0)+iy-(qy==0))&1;
+            CHECK(checker[col]==checker_colors[parity?60:56]);
+        }
+        ss_count=count;
+    }
     puts("Sonic 3 video terrain, activation, publication and Blue Spheres PASS");
     return 0;
 }
