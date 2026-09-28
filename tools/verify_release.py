@@ -127,6 +127,16 @@ def main():
     run("attract")
     run("native-title", "WAIT 600\n")
     run("wide-title", "WAIT 600\n", wide=True)
+    # Exercise each cartridge's complete attract selection through its stock
+    # initializer. These scenes cover the background banks and Blue Spheres
+    # projection that a first-attract benchmark alone does not reach.
+    demos = {"sonic3": (0, 1, 2), "sonic3k": (0, 1, 2, 4, 5, 6), "sandk": (3, 4, 5, 6)}
+    next_demo = "FFFFF2" if args.mode == "sonic3" else "FFFFD2"
+    for demo in demos[args.mode]:
+        mode = "34" if demo == 6 else "08"
+        run(f"wide-demo-{demo}", "WAIT 600\nASSERT_RAM8 FFF600 04\n"
+            f"WRITE_RAM16 {next_demo} {demo:04X}\nWRITE_RAM16 FFF614 0001\n"
+            f"WAIT_RAM8 FFF600 {mode}\nWAIT 900\nASSERT_RAM8 FFF600 {mode}\n", wide=True)
     if args.mode != "sonic3":
         run("knuckles-title", "WAIT 600\n", mod=True, wide=True)
     if args.mode == "sonic3k":

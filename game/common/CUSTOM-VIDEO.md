@@ -108,6 +108,71 @@ transition routes, bonus stages, other Blue Spheres layouts/emerald-clear sequen
 standalone special-stage runtime routes, and saves during expanded activation.
 The experiment is not ready to publish as a full-game-certified mod.
 
+## Backgrounds, title margins and Blue Spheres follow-up (2026-09-28)
+
+The renderer distinguishes scrolling worlds from authored background canvases:
+
+- Flying Battery streams 512px indoor/outdoor banks from layout X=0/$200.
+  Doorways replace rows or columns progressively. Sample the uploaded Plane B
+  through these wipes instead of treating both banks as one landscape.
+- Sandopolis 1's desert, Carnival Night's normal city and Lava Reef 3's distant
+  cavern repeat a 512px canvas. The remaining layout contains other scenes or
+  boss geometry, and must not become part of the repeating panorama.
+- IceCap's outdoor/cave redraws, Sky Sanctuary's cloud bank at X=$1C00 and
+  Death Egg 3's edited runway retain their uploaded Plane B compositions.
+- Hydrocity 2's moving wall and Hidden Palace use signed world coordinates.
+  Native `Get_ChunkRow` can read guard chunks before a layout row; wrapping to
+  the row's far end instead selected unrelated art.
+
+Hidden Palace streams two coarse horizontal bands split at Y=$200, while its
+deformation uses ten finer bands. The native name table can expose stale cells
+outside a coarse band's 21-block streaming interval. Those samples count as
+`background_unstreamed`, like the existing foreground streaming exclusion;
+the expanded view still draws the actual world layout there.
+
+The title's Tails plane is captured before native SAT clipping and rendered
+in the custom margins at its signed position. The native center retains its
+original sprite/plane ordering. The mod's Knuckles parade uses the actual
+canvas width for both its native-center draw and margin extension, so its
+loop endpoints sit beyond the visible edges.
+
+Blue Spheres now projects grid cells and objects using the same camera lift.
+Each sphere/ring's visible base, measured from the decoded native distance
+and animation frame, anchors to its projected grid intersection. The checkerboard
+changes color at integer board coordinates, placing objects at square corners;
+the previous half-cell phase put them at cell centers. Transparent texture padding
+no longer supplies the anchor. The board, controls and collisions are unchanged.
+Tests render all four quadrants around object anchors through movement, turns,
+distance frames and widths 320–1600.
+
+`tests/runtime/run_sonic3_video_sweep.py` selects stock attract demos or uses
+the original level-select initializer for normal play. It runs one process at
+a time in a fresh directory, with strict JSR checks, dispatch-miss checks,
+screenshots, RAM/VRAM checkpoints and renderer telemetry. It never patches
+stage layouts or scroll state. Examples:
+
+```powershell
+python tests/runtime/run_sonic3_video_sweep.py `
+  --exe build-count/Release/Sonic3KRecomp.exe --rom game/sonic3k/sonic3k.bin `
+  --out build-video-attract --widescreen 32:9 --knuckles
+python tests/runtime/run_sonic3_video_sweep.py `
+  --exe build-count/Release/Sonic3KRecomp.exe --rom game/sonic3k/sonic3k.bin `
+  --out build-video-levels --widescreen 32:9 --stages 3,6,7,14,15,20,21,22
+```
+
+Local validation: all 13 native attract selections across the three cartridges
+pass at width 654; Flying Battery, Sandopolis and Blue Spheres also pass at
+32:9. All 610 recorded S3K/S&K attract RAM and VRAM checkpoints match the
+pre-change build. Native/off Blue Spheres and the mod title each retain all 61
+reference screenshots. Both playable Blue Spheres selections were exercised
+with movement, turning and jumping at 32:9. The normal-stage sweep covered all
+28 main level-select entries; affected scenes were replayed after correction.
+These are entry/short-route checks, not every boss or transition in a campaign.
+The longer IceCap 1 baseline route hit a pre-existing strict JSR-stack abort
+at `$653A -> Process_Sprites ($1AADA)` with no dispatch misses; it is tracked
+separately as `beads-tdq.3.14`. The shorter corrected IceCap entry run passes.
+Owner visual confirmation remains pending.
+
 ## Angel Island follow-up (2026-09-27)
 
 Burning AIZ2's `AIZ2BGE_Normal` streams the same 512-pixel background row

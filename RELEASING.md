@@ -8,7 +8,7 @@ those ROMs, generated art, settings, saves or developer builds.
 ## Windows x64
 
 ```powershell
-./tools/build-windows.ps1 -Version 0.4.0 -Python C:/path/to/python.exe
+./tools/build-windows.ps1 -Version 0.5.0 -Python C:/path/to/python.exe
 ```
 
 Requires Visual Studio 2022 C++ tools, CMake and Python. `-CMake`, `-BuildDir`
@@ -24,7 +24,7 @@ On Ubuntu 24.04 install `build-essential cmake pkg-config libsdl2-dev
 libgl1-mesa-dev curl python3 patchelf imagemagick` and run:
 
 ```sh
-bash tools/build-linux.sh --version 0.4.0 --jobs 8
+bash tools/build-linux.sh --version 0.5.0 --jobs 8
 ```
 
 `--build DIR`, `--out DIR` and `--no-package` are available. An ext4 build
@@ -44,7 +44,8 @@ baseline; older distributions and Steam Deck require separate validation.
 
 1. Run CTest for both production builds. Use `tools/verify_release.py` for each
    actual package and its owner ROM. It checks attract state/audio hashes,
-   native/wide title captures, mod titles, empty/existing saves and Knuckles
+   native/wide title captures, every widescreen attract demo (including Blue
+   Spheres), mod titles, empty/existing saves and Knuckles
    gameplay. Linux `--reference` can point at the Windows evidence to compare
    every captured pixel and RAM/VRAM byte. Add `--launcher` to capture launcher
    and controller pages (using Xvfb on Linux). Pillow is required.
@@ -54,7 +55,7 @@ baseline; older distributions and Steam Deck require separate validation.
 3. Merge the release tooling/notes to `main`, then reconfigure and package from
    that exact clean commit. `build-info.json` must identify the tag target and
    the committed engine/UI/disassembly pins. Keep repository visibility as-is.
-4. Tag `v0.4.0`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
+4. Tag `v0.5.0`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
    Verify the remote tag, `origin/main`, asset names/sizes and uploaded SHA256s.
 
 Do not zip a build folder. All staging uses explicit native targets and

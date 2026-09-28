@@ -85,6 +85,8 @@ the banner's live palette and shadow. The portrait,
 resting hands and banner are decoded at startup from the owner's ROM by
 `sonic3_title_art.c`; no extracted artwork ships. The host palette preserves
 their original colors and follows title fades without changing guest CRAM.
+The portrait retains shared white glove tiles and the red hair pixels in mixed
+Sonic/Knuckles boundary tiles, while excluding Sonic's blue pixels.
 The "& KNUCKLES" subtitle still echoes down the screen. Both titles retain
 their running/gliding parade (remapped to the live CRAM palette).
 

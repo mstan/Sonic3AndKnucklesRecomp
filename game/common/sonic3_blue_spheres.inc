@@ -18,7 +18,7 @@ enum { SS_EXTRA=0xE480 };
 #endif
 static const double ss_radius=15.18430653,ss_distance=3.35173470;
 static const double ss_focal=345.3564589,ss_pitch=.69874597;
-static const double ss_lift=.42983566,ss_ground_lift=.64;
+static const double ss_ground_lift=.64;
 typedef struct { float x,z,depth; } SSPoint;
 typedef struct { int x,y,w,h; float depth; unsigned kind,lod; } SSSphere;
 static SSPoint *ss_ground;
@@ -28,6 +28,7 @@ static int ss_width,ss_ready;
 static double ss_stretch,ss_sin,ss_cos,ss_x,ss_y;
 static uint8_t ss_board[1024],ss_texture[SS_KINDS][16][SS_TEXTURE*SS_TEXTURE];
 static uint16_t ss_texture_ready[SS_KINDS];
+static uint8_t ss_texture_floor[SS_KINDS][16];
 static unsigned ss_color_phase,ss_clear;
 static uint8_t ss_state[65536];
 static int ss_latched;
@@ -76,7 +77,10 @@ static int ss_project(double x,double z,double stretch,double *px,double *py,dou
     if(rad<=0)return 0;
     double h=ss_radius-sqrt(rad),d=ss_distance+z+ss_pitch*h;
     if(d<=.4)return 0;
-    *px=ss_focal*x/d;*py=112+ss_focal*(ss_lift-ss_pitch*z+h)/d;*depth=d;
+    /* Project the point on the grid, using the exact inverse-camera model.
+     * Sprite artwork is anchored to this contact point after choosing its
+     * native distance frame; a second fitted camera lift makes it float. */
+    *px=ss_focal*x/d;*py=112+ss_focal*(ss_ground_lift-ss_pitch*z+h)/d;*depth=d;
     return 1;
 }
 static int ss_depth_order(const void *a,const void *b)
@@ -91,6 +95,7 @@ static void ss_load_texture(const GVDP *v,unsigned kind,unsigned lod)
     unsigned frame=(anim&0x7FFF)+((anim&0x8000)?0:lod);
     unsigned gfx=ss_word(ss_state,entry+4);
     memset(ss_texture[kind][lod],0,sizeof ss_texture[kind][lod]);
+    ss_texture_floor[kind][lod]=32;
     ss_texture_ready[kind]|=(uint16_t)(1u<<lod);
     if(map>=0x400000u || frame>255)return;
     unsigned p=map+(int16_t)ss_rom_word(map+frame*2),count=ss_rom_word(p);p+=2;
@@ -109,6 +114,10 @@ static void ss_load_texture(const GVDP *v,unsigned kind,unsigned lod)
             if(pixel)ss_texture[kind][lod][ty*SS_TEXTURE+tx]=(uint8_t)(((attr>>9)&48)|pixel);
         }
     }
+    /* Native distance frames have different radii, and ring frames differ
+     * from sphere frames. Transparent 64px canvas padding is not geometry. */
+    for(unsigned y=0;y<SS_TEXTURE;++y)for(unsigned x=0;x<SS_TEXTURE;++x)
+        if(ss_texture[kind][lod][y*SS_TEXTURE+x])ss_texture_floor[kind][lod]=(uint8_t)(y+1);
 }
 static void ss_begin(const GVDP *v,int width)
 {
@@ -150,7 +159,9 @@ static void ss_begin(const GVDP *v,int width)
         if(lod>15)lod=15;
         int size=depth<ss_distance?(int)(64*ss_distance/depth):64;
         if(size>256)size=256;
-        int sx=(int)floor(px+(width-1)*.5-size*.5+.5),sy=(int)floor(py-size*.5+.5);
+        if(!(ss_texture_ready[kind]&(1u<<lod)))ss_load_texture(v,kind,(unsigned)lod);
+        int sx=(int)floor(px+(width-1)*.5-size*.5+.5);
+        int sy=(int)floor(py-ss_texture_floor[kind][lod]*size/64.0+.5);
         if(sx>=width || sx+size<=0 || sy>=SS_HEIGHT || sy+size<=0)continue;
         if(ss_count==ss_capacity) {
             unsigned capacity=ss_capacity?ss_capacity*2:512;
@@ -158,7 +169,6 @@ static void ss_begin(const GVDP *v,int width)
             if(!sprites)return;
             ss_spheres=sprites;ss_capacity=capacity;
         }
-        if(!(ss_texture_ready[kind]&(1u<<lod)))ss_load_texture(v,kind,(unsigned)lod);
         ss_spheres[ss_count++]=(SSSphere){sx,sy,size,size,(float)depth,kind,(unsigned)lod};
         if(sx<(width-320)/2 || sx+size>(width+320)/2)++ss_margin_count;
     }
@@ -232,7 +242,9 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
         if(p->depth) {
             double wx=ss_x+p->x*ss_cos-p->z*ss_sin;
             double wy=ss_y-p->x*ss_sin-p->z*ss_cos;
-            int parity=((int)floor(wx+.5)+(int)floor(wy+.5))&1;
+            /* Board objects occupy integer intersections. A half-cell
+             * shift here would put their contact points inside squares. */
+            int parity=((int)floor(wx)+(int)floor(wy))&1;
             out[x]=palette[parity?color1:color0];
         } else {
             int bx=x-origin-hs_b;
