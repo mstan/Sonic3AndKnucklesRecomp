@@ -43,6 +43,12 @@ overrides include `--widescreen fit`, `off`, `stage`, and arbitrary `W:H`.
   bounds tests and optional ROM asset hashes cover both cartridge profiles.
 - Title scenery repeats its initialized 40 tile columns while the logo stays
   centered. Fades keep the selected output dimensions.
+- Data Select uses its actual plane roles: a fixed 320px portrait in the
+  full-screen Window (64 tiles per row), and the complete scrolling card strip
+  in Plane B (128 tiles per row). Reflect the portrait into the margins at
+  native scale, stop the cards at the ends of their 1024px canvas, and draw
+  their queued characters beyond native sprite culling. The original center
+  pixels and selection behavior remain intact, including entry/exit fades.
 - Blue Spheres uses a host-only perspective ellipsoid: horizontal radius
   follows the window while local sprite/tile scale stays fixed. An inverse
   ray/surface cache draws the checkerboard and occludes far-side spheres.

@@ -139,6 +139,14 @@ def main():
             f"WAIT_RAM8 FFF600 {mode}\nWAIT 900\nASSERT_RAM8 FFF600 {mode}\n", wide=True)
     if args.mode != "sonic3":
         run("knuckles-title", "WAIT 600\n", mod=True, wide=True)
+    if args.mode in ("sonic3", "sonic3k"):
+        enter = "WAIT 600\nPRESS START 2\nWAIT_RAM8 FFF600 4C\nWAIT 300\n"
+        # Data Select uses the Window portrait over a 1024px Plane B card
+        # strip. Cover its offscreen characters and finite right boundary.
+        move = "PRESS RIGHT 2\nWAIT 40\n"
+        for name, steps in (("wide-file-select", 2), ("wide-file-select-end", 9)):
+            run(name, enter + move * steps + "ASSERT_RAM8 FFF600 4C\n",
+                mod=args.mode == "sonic3k", wide=True)
     if args.mode == "sonic3k":
         enter = "WAIT 600\nPRESS START 2\nWAIT_RAM8 FFF600 4C\nWAIT 300\n"
         defaults = "ASSERT_RAM16 FFEF4C 0003\n"
