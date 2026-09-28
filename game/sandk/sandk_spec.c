@@ -21,6 +21,8 @@
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
 #include "sonic3_knuckles_army.h"
 #include "sonic3_mods.h"
+#include "sonic3_state.h"
+#include "sonic3_state_build.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -229,6 +231,11 @@ static const GameDebugCommand sandk_commands[] = {
 };
 
 const GameSpec g_game_spec = {
+    .state_build_id         = SONIC3_STATE_BUILD_ID,
+    .state_size             = s3_state_size,
+    .state_save             = s3_state_save,
+    .state_load             = s3_state_load,
+    .state_at_boundary      = s3_state_at_boundary,
     .video                  = &sonic3_video,
     .instruction_hook       = s3_sk_instruction_hook,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,

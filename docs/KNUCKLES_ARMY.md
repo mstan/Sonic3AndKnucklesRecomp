@@ -1,12 +1,16 @@
 # Knuckles & Knuckles
 
 Opt-in gag for the S&K-code targets (Sonic 3 & Knuckles, Sonic & Knuckles).
-Tracking: central Beads `beads-tdq.3.3` (crowd), `beads-tdq.3.4` (title and defaults).
+Tracking: central Beads `beads-tdq.3.3` (crowd), `beads-tdq.3.4` (title and defaults), `beads-tdq.3.6` (numeric size).
 
 ## Use
 
 Mods → **Knuckles & Knuckles** (group *Characters*, exclusive with any other
-character mod), option **Extra Knuckles**: 8 / 16 / 24 / 34. Persisted in
+character mod), option **Extra Knuckles**: type a whole number from **1 to 74**
+(default **16**, plus your own character). The game has 90 dynamic object
+slots; the crowd targets a reserve of 16 for stage objects. Busy stages temporarily reduce
+the crowd, so this is a maximum rather than a guaranteed visible count.
+Persisted in
 `<mode>-mods.ini` beside `settings.ini` (`[knuckles-army] enabled=1 size=16`),
 which tests write directly. On the combined cart, Data Select's empty files
 and No Save start on Knuckles while the mod is active. Existing files keep
@@ -22,7 +26,7 @@ Story zones only; special/bonus/competition stages, DDZ and demos stay stock.
   `Process_Sprites` ignores it. The host steps every extra through stock
   `Obj_Knuckles` from `Obj_ResetCollisionResponseList` — Player 2's timing,
   before the collision list is cleared. A reserve of 16 free dynamic slots is
-  kept: extras step aside (and glide back later) when a stage needs slots.
+  maintained at each crowd tick: extras step aside (and glide back later) when a stage needs slots.
 - **Player-1-only state** is saved around each extra: `Ctrl_1*`, `Max_speed`
   block (per-extra copy), `Distance_from_top`, the Dust and Breathing_bubbles
   objects, Super flag and `Update_HUD_timer` (so extras can never transform),
@@ -46,8 +50,29 @@ Story zones only; special/bonus/competition stages, DDZ and demos stay stock.
   behind every native sprite, with native plane priority and CRAM (underwater
   palettes included); the custom-width renderer draws the same list.
 - **CPU headroom.** Each extra is a full native Knuckles tick charged at 68K
-  speed. The crowd adds `2 + ceil(n/4)` to the main-CPU divisor (on top of the
+  speed. The crowd adds `4 + ceil(n/3)` to the main-CPU divisor (on top of the
   renderer's). LevelLoop still waits for V-int, so unused headroom is free.
+
+## Save states
+
+In S3K and S&K, **Shift+F1-F9** saves a slot and **F1-F9** loads it;
+controller **L1/R1** saves/loads slot 1. Save during normal story gameplay
+or while it is paused. The request waits for a completed native gameplay
+tick, then captures the machine, crowd AI, renderer loader/publication state
+and deferred audio. Loading resumes `LevelLoop`, preserving the current
+stage position and crowd instead of entering stage initialization.
+
+States are private to the exact source/compiler/build and the same ROM,
+mod enable/count and widescreen mode. Legacy `GROWNS2` states do not contain
+the host state and are rejected; make a fresh save in the updated build.
+Requests outside a supported gameplay/pause-loop boundary time out without
+overwriting the previous slot. Sonic 3 standalone retains its existing state implementation.
+
+`tests/runtime/run_sonic3_quickstates.py --exe <exe> --rom <owner-rom>
+--variant sonic3k --out <fresh-directory>` verifies exact RAM restoration,
+repeated and fresh-process RAM/VRAM/image equality, all 16 extra object slots,
+paused resume, and rejection of damaged/legacy/configuration-mismatched files.
+Use `--variant sandk` with the standalone S&K executable/ROM as well.
 
 ## Title gag (`sonic3_knuckles_title.c`)
 
@@ -97,6 +122,23 @@ and complete still fist; no whole-campaign claim. Follow-up checks
   owner-ROM decoding, save-default isolation and hook generation drift.
 - Mod-off 3600-frame attract runs: state/audio hashes match `1b698c5` for
   Sonic 3, Sonic 3 & Knuckles and Sonic & Knuckles.
+
+Numeric-count and save-state follow-up (local, awaiting owner review):
+
+- Config tests round-trip every integer from 1-74 and reject malformed,
+  out-of-range and overflowing values; the default remains 16.
+- S3K and S&K, native/16:9/32:9, default 16/maximum 74: **12/12** strict-stack
+  gameplay routes with zero lag, zero dispatch misses and working seat 2.
+  S3K reaches 74 extras; busy Mushroom Hill reaches 59-67 on these routes.
+  This is route validation, not a claim that every stage has been tested.
+- Save/load: **30/30** fixtures across both targets; native/16:9/adaptive,
+  repeated loads and fresh-process continuation reproduce RAM, VRAM and pixels.
+- Minimum 1 and intermediate 17/48 routes also pass with zero lag. S3K
+  mod-off gameplay matches v0.4.0 at 44 framebuffer checkpoints.
+- At 32:9, a 6000-frame sweep of off/16/34/48/64/74 measured 4.78 ms/frame
+  at 74 in S3K and 6.49 in S&K (instrumented Release, reverse tracing on).
+- CTest: **24/24**, including count parsing/persistence, generated discovery
+  drift and the AIZ2 repeating-background regression.
 
 ## Known limits / disproved
 

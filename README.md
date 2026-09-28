@@ -26,8 +26,9 @@ validation and known limits. Existing build caches may need
 ## Knuckles & Knuckles (opt-in gag)
 
 In **Sonic3KRecomp** and **SonicAndKnucklesRecomp**, enable **Mods →
-Knuckles & Knuckles** and play as Knuckles: 8, 16, 24 or 34 extra Knuckles
-follow you. A controller on player 2-4 drives the matching extra; the rest
+Knuckles & Knuckles** and play as Knuckles. Type **1-74** in **Extra Knuckles**
+(default **16**) to choose how many follow you. Busy stages may temporarily
+use fewer extras. A controller on player 2-4 drives the matching extra; the rest
 use Tails-style CPU following. S3K's title shows a still Knuckles and
 **KNUCKLES 3**, and empty save files default to Knuckles. Existing save files
 keep their character. Both titles get the "Knuckles & Knuckles" treatment.

@@ -9,12 +9,13 @@
 
 struct GVDP;
 
-enum { S3_ARMY_MAX = 34 };            /* 35 Knuckles including player 1 */
-extern const unsigned s3_army_sizes[4];
+/* The 90 dynamic object slots must retain room for the stage. */
+enum { S3_ARMY_RESERVE = 16, S3_ARMY_MIN = 1,
+       S3_ARMY_MAX = 90 - S3_ARMY_RESERVE, S3_ARMY_DEFAULT = 16 };
 
 typedef struct S3ArmyConfig {
     int enabled;
-    unsigned size;                    /* extra Knuckles, one of s3_army_sizes */
+    unsigned size;                    /* extra Knuckles, excluding player 1 */
 } S3ArmyConfig;
 extern S3ArmyConfig s3_army;
 
