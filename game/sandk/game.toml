@@ -34,6 +34,8 @@ output_prefix = "sandk"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sandk.code_addrs.txt"
 discovery_files = [
+    # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
+    "sandk.special_vint_sk.toml",
     "sandk.disasm_labels.toml",       # 18,946 code labels + 394 interior seeds
     "sandk.disasm_jumptables.toml",   # 418 tables / 2,394 targets
 ]

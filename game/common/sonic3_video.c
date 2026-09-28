@@ -8,6 +8,8 @@
 #include "video/genesis_vdp.h"
 #include "video/genesis_dac.h"
 #include "cmd_server.h"
+#include "sonic3_state.h"
+#include "sonic3_state_io.h"
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +22,7 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_HUD_MAP=0xE932, S3_RING_MAP=0xF87E,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
+       S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374 };
 #else
@@ -27,6 +30,7 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
+       S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C };
 #endif
@@ -50,6 +54,7 @@ static uint8_t s_world_frame[0xA800];
 static uint8_t s_background_frame[0xA800];
 static int s_frame_level,s_frame_special,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
 static unsigned s_frame_zone,s_frame_act,s_frame_bg_event;
+static unsigned s_frame_tree_reveal;
 static void scene_mode_changed(int was_enabled);
 static void ss_capture(void);
 
@@ -283,23 +288,23 @@ static const SceneFrame *s_display;
 static unsigned s_serial, s_scene_tick, s_spawned, s_pool_pressure;
 static unsigned s_tick_samples,s_tick_updates,s_tick_lag,s_tick_multi;
 static unsigned s_publication_lag;
+static int s_tick_was_active;
+static unsigned s_tick_last,s_tick_zone,s_tick_serial;
 void s3_video_vblank(void)
 {
     if(enabled())ss_capture();
-    static int was_active;
-    static unsigned last_tick,last_zone,last_serial;
     unsigned tick=ram16(0xFE04),zone=ram16(0xFE10);
     int active=enabled() && g_ram[0xF600]==12 && gameplay() &&
         g_ram[0xF711] && g_ram[0xB005]<6 && !ram16(0xF63A);
     /* Sample at the same IRQ entry, not end-of-wall-frame: native variable
      * V-int DMA debt can shift the next tick across that later sample point. */
-    if(active && was_active && zone==last_zone) {
-        unsigned delta=(uint16_t)(tick-last_tick);
+    if(active && s_tick_was_active && zone==s_tick_zone) {
+        unsigned delta=(uint16_t)(tick-s_tick_last);
         ++s_tick_samples;s_tick_updates+=delta;
         s_tick_lag+=delta==0;s_tick_multi+=delta>1;
-        s_publication_lag+=s_serial==last_serial;
+        s_publication_lag+=s_serial==s_tick_serial;
     }
-    was_active=active;last_tick=tick;last_zone=zone;last_serial=s_serial;
+    s_tick_was_active=active;s_tick_last=tick;s_tick_zone=zone;s_tick_serial=s_serial;
 }
 static unsigned s_visible_objects[144], s_visible_count;
 typedef struct { unsigned address; uint16_t x, y; uint8_t id, subtype, loaded; uint16_t state; } Placement;
@@ -380,6 +385,14 @@ static void load_placements(void)
         q->state=(uint16_t)(0xEB00+s_placement_count++);q->loaded=0;
     }
 }
+static unsigned placement_code(const Placement *p)
+{
+#ifdef SONIC3_STANDALONE
+    return scene_read32(0x5CC96u+p->id*4u);
+#else
+    return scene_read32(scene_read32(0xFFEF5Au)+p->id*4u);
+#endif
+}
 static void spawn_scene(void)
 {
     load_placements();s_loader_active=1;
@@ -396,6 +409,14 @@ static void spawn_scene(void)
         for(unsigned i=0;i<s_placement_count;++i) {
             Placement *p=&s_placements[i];
             if(p->loaded || (g_ram[p->state]&128) || (int)p->x<lo || (int)p->x>=hi)continue;
+            /* This cutscene's initializer loads PLC $5A into the same VRAM
+             * bank that AIZ1_Resize subsequently uses for PLC $0C at camera
+             * $2E00. Early wide activation reverses their native order and
+             * overwrites the miniboss with vines/trees. Keep this scripted
+             * object inside Load_Sprites' native 128px-aligned interval.
+             * Addresses: Obj_AIZMinibossCutscene in the pinned S3/S&K lists. */
+            if(((int)p->x<((camera-128)&~127) || (int)p->x>=(camera&~127)+640) &&
+                placement_code(p)==S3_AIZ_MINIBOSS_CUTSCENE)continue;
             int y=p->y&4095;
             if(!(p->y&0x8000)) {
                 if((int16_t)ram16(0xEE18)<0) {
@@ -414,11 +435,7 @@ static void spawn_scene(void)
         unsigned flip=(p->y>>13)&3;
         write8(o+4,flip);write8(o+0x2A,flip);write16(o+0x48,p->state);
         write8(o+0x2C,p->subtype);write8(p->state,g_ram[p->state]|128);
-#ifdef SONIC3_STANDALONE
-        write32(o,scene_read32(0x5CC96u+p->id*4u));
-#else
-        write32(o,scene_read32(scene_read32(0xFFEF5Au)+p->id*4u));
-#endif
+        write32(o,placement_code(p));
         p->loaded=1;++s_spawned;
     }
     unsigned r=0,l=0;
@@ -659,6 +676,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         if(s_frame_special)ss_begin(v,width);
         s_frame_zone=g_ram[0xFE10];
         s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
+        s_frame_tree_reveal=ram16(0xEEC4);
         if(s_frame_level && !s_frame_zone && !s_frame_act)load_aiz_art();
         /* The intro queues the main-level block definitions before its
          * two-row-at-a-time name-table refresh. Keep the outgoing background
@@ -727,6 +745,21 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     int wy=camera_y+line;
     int bg_world=level && !special;
+    /* The fire is a streamed Plane B composition, not the background at
+     * the world's current layout coordinates. AIZ1BGE_FireTransition
+     * writes rows from layout X=$1000 while replacing foreground blocks;
+     * AIZ2BGE_WaitFire continues at X=$200 before a gradual BG redraw.
+     * Follow the uploaded name table through that redraw so the flames
+     * cover the same in-progress art replacement as on the native VDP. */
+    int aiz_fire=bg_world && s_frame_zone==0 &&
+        ((s_frame_act==0 && s_frame_bg_event>=0xC && s_frame_bg_event<=0x14) ||
+         (s_frame_act==1 && s_frame_bg_event<=8));
+    /* FireRefresh builds a temporary foreground from layout X=$180,
+     * then AIZ2BGE_FireRedraw installs the incoming stage. RAM's current
+     * chunks no longer describe the displayed foreground in between. */
+    int aiz_fire_fg=aiz_fire &&
+        ((s_frame_act==0 && s_frame_bg_event>=0x10) ||
+         (s_frame_act==1 && s_frame_bg_event==0));
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
@@ -743,6 +776,12 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
          * canvas in VRAM while hardware HScroll wraps through it. */
         if(s_frame_bg_event==0 && hs_b>0)bg_width=512;
     }
+    /* AIZ2BGE_Normal streams whole 512px rows from layout X=0 (d1=0,
+     * d6=$20), then scrolls that repeating canvas for its heat shimmer.
+     * The rest of the layout contains the outgoing fire and other scenes;
+     * treating it as one wide world reads unrelated tile banks. */
+    if(bg_world && s_frame_zone==0 && s_frame_act==1 && s_frame_bg_event>=8)
+        bg_width=512;
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=reference_bx;
@@ -757,6 +796,23 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         uint8_t ap=pattern_pixel(v,a,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         uint8_t bp=pattern_pixel(v,b,bg_world?background_x:bx,by);
         const uint32_t *apalette=palette,*bpalette=palette;
+        if(aiz_fire) {
+            unsigned vs=1;
+            if(v->reg[11]&4) {
+                /* AIZTrans_WavyFlame advances its 16-entry wave by two
+                 * per 16px column: extend that eight-column period into
+                 * either margin. Keep every native column verbatim. */
+                unsigned col=nx>=0 && nx<nw?(unsigned)nx/16:((unsigned)nx/16)&7;
+                vs=col*2+1;
+            }
+            int fire_y=line+(v->vsram[vs]&1023);
+            b=plane_attr(v,base_b,reference_bx,fire_y);
+            bp=pattern_pixel(v,b,reference_bx,fire_y);
+        }
+        if(aiz_fire_fg) {
+            a=plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
+            ap=pattern_pixel(v,a,nx-hs_a,line+(v->vsram[0]&1023));
+        }
         if(aiz_banks && (nx<0 || nx>=nw)) {
             /* The hollow tree at $1300 shares primary blocks across both
              * banks. The coast behind it and forest ahead need independent
@@ -776,13 +832,31 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
                 bpalette=by>=0x380?intro_palette:forest_palette;
             }
         }
+        /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
+         * tree's 16px blocks before committing whole 128px layout chunks.
+         * Its locked camera keeps the entire 256px reveal strip resident
+         * in Plane A. Use that published composition, including its mask
+         * and priority, instead of jumping between the coarse chunk edits.
+         * The rest of the expanded world still comes from its own layout. */
+        if(bg_world && !s_frame_zone && !s_frame_act && s_frame_tree_reveal &&
+           wx>=0x2C80 && wx<0x2D80 && wy>=0x280 && wy<0x480) {
+            int ax=nx-hs_a,ay=line+(v->vsram[0]&1023);
+            a=plane_attr(v,base_a,ax,ay);
+            ap=pattern_pixel(v,a,ax,ay);
+            apalette=palette;
+        }
         if(level && (wx<0 || wx>=s_stage_width))ap=0;
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && (nx<0 || nx>=nw))ap=0;
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
-        uint8_t p=ap&&(a&0x8000)?ap:bp&&(b&0x8000)?bp:ap?ap:bp;
-        int foreground=ap && ((a&0x8000) || !bp || !(b&0x8000));
+        /* The authored transition viewport has no high-priority tree
+         * canopy in front of its flame curtain. Expanded margins do: let
+         * the opaque high-priority flames cover that extra scenery too.
+         * Keep native overlap ordering and transparent flame edges intact. */
+        int fire_curtain=aiz_fire && (nx<0 || nx>=nw) && (b&0x8000) && bp;
+        int foreground=ap && !fire_curtain && ((a&0x8000) || !bp || !(b&0x8000));
+        uint8_t p=foreground?ap:bp;
         out[x]=p?(foreground?apalette[p]:bpalette[p]):backdrop;
         /* Outside a native special-stage projection only planes are drawn,
          * so plane priority alone
@@ -792,7 +866,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         if(nx>=0 && nx<nw && !(x&7) && !missing_scroll) {
             if(level && !native_terrain_streamed(wy,s_frame_fg_y)) {
                 ++s_terrain_unstreamed;
-            } else if(level) {
+            } else if(level && !aiz_fire_fg) {
                 uint16_t expected=plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
                 ++s_terrain_checks;
                 int bad=attributes_differ(v,a,expected,wx,wy);
@@ -804,7 +878,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
                  * Until finished, the old name table is not an oracle for
                  * the new world layout, which the opt-in renderer shows. */
                 ++s_bg_unstreamed;
-            } else if(bg_world) {
+            } else if(bg_world && !aiz_fire) {
                 int rx=reference_bx;
                 if(bg_width>0){rx%=bg_width;if(rx<0)rx+=bg_width;}
                 uint16_t expected=plane_attr(v,base_b,reference_bx,by);
@@ -858,5 +932,44 @@ void s3_video_command(int id, const char *json)
         s_tick_samples,s_tick_updates,s_tick_lag,s_tick_multi,s_publication_lag,
         s_frame_special && ss_ready,ss_count,ss_margin_count);
     cmd_send_response(reply);
+}
+static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
+{
+    unsigned count = frame->count;
+    s3_state_peek(io, offsetof(SceneFrame, count), &count, sizeof count);
+    if (count > SCENE_SPRITES) io->ok = 0;
+    S3_STATE(io, *frame);
+}
+void s3_video_state(S3StateIO *io)
+{
+    int mode = s_mode; double ratio = s_ratio;
+    if (io->mode) {
+        if (io->pos > io->size || sizeof mode + sizeof ratio > io->size - io->pos) { io->ok = 0; return; }
+        memcpy(&mode, io->data + io->pos, sizeof mode);
+        memcpy(&ratio, io->data + io->pos + sizeof mode, sizeof ratio);
+        if (mode != s_mode || ratio != s_ratio) io->ok = 0;
+    }
+    S3_STATE(io, mode); S3_STATE(io, ratio);
+    /* Published scene frames and loader ownership affect future frames.
+     * Scanline scratch and decoded ROM caches are rebuilt on demand. */
+    scene_frame_state(io, &s_build);
+    for (unsigned i = 0; i < 3; ++i) scene_frame_state(io, &s_history[i]);
+    scene_frame_state(io, &s_display_frame);
+    int display = s_display != NULL; S3_STATE(io, display);
+    S3_STATE(io, s_serial); S3_STATE(io, s_scene_tick);
+    S3_STATE(io, s_tick_was_active); S3_STATE(io, s_tick_last);
+    S3_STATE(io, s_tick_zone); S3_STATE(io, s_tick_serial);
+    S3_STATE(io, s_tick_samples); S3_STATE(io, s_tick_updates);
+    S3_STATE(io, s_tick_lag); S3_STATE(io, s_tick_multi); S3_STATE(io, s_publication_lag);
+    S3_STATE(io, s_placements);
+    if (s3_state_peek_unsigned(io, s_placement_count) > SCENE_PLACEMENTS) io->ok = 0;
+    S3_STATE(io, s_placement_count); S3_STATE(io, s_placement_base);
+    S3_STATE(io, s_loader_active); S3_STATE(io, s_visible_objects);
+    if (s3_state_peek_unsigned(io, s_visible_count) > 144) io->ok = 0;
+    S3_STATE(io, s_visible_count); S3_STATE(io, s_background_frame);
+    if (io->mode == 2) {
+        s_display = display ? &s_display_frame : NULL;
+        s_frame_special = ss_ready = ss_latched = 0;
+    }
 }
 const GameVideo sonic3_video = { configure, enabled, width, scanline };

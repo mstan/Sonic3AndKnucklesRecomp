@@ -12,6 +12,26 @@
 
 static char s_path[1024], s_error[256];
 
+S3ArmyConfig s3_army;
+void s3_army_defaults(void) { s3_army.enabled = 0; s3_army.size = S3_ARMY_DEFAULT; }
+int s3_army_valid_size(unsigned size) { return size >= S3_ARMY_MIN && size <= S3_ARMY_MAX; }
+
+/* Both the UI and hand-edited INI use the same bounded decimal parser.
+ * Reject signs, suffixes and overflow without changing the current value. */
+static int parse_size(const char *text, unsigned *result)
+{
+    unsigned size = 0;
+    if (!text || !*text) return 0;
+    for (; *text; ++text) {
+        if (*text < '0' || *text > '9') return 0;
+        size = size * 10 + (unsigned)(*text - '0');
+        if (size > S3_ARMY_MAX) return 0;
+    }
+    if (!s3_army_valid_size(size)) return 0;
+    *result = size;
+    return 1;
+}
+
 void s3_mods_load(const char *settings_path, const char *mode)
 {
     s3_army_defaults();
@@ -30,8 +50,8 @@ void s3_mods_load(const char *settings_path, const char *mode)
         *value++ = 0;
         if (!strcmp(line, "enabled")) s3_army.enabled = atoi(value) == 1;
         else if (!strcmp(line, "size")) {
-            unsigned size = (unsigned)strtoul(value, NULL, 10);
-            if (s3_army_valid_size(size)) s3_army.size = size;
+            unsigned size;
+            if (parse_size(value, &size)) s3_army.size = size;
         }
     }
     fclose(file);
@@ -131,27 +151,33 @@ static int option_get(void *ctx, const char *p, const char *f, int n, RecompLaun
     if (n || !out) return 0;
     memset(out, 0, sizeof *out);
     COPY(out->id, "crowd"); COPY(out->label, "Extra Knuckles");
-    COPY(out->description, "How many Knuckles join you. Extras step aside when a busy stage needs object slots.");
-    snprintf(out->value, sizeof out->value, "%u", s3_army.size); COPY(out->default_value, "16");
-    out->type = RECOMP_MOD_OPTION_CHOICE; out->step = 1; out->choice_count = 4;
+    snprintf(out->description, sizeof out->description,
+        "1-%u extra Knuckles, plus your character. Default: %u. "
+        "Busy stages may temporarily use fewer extras to keep room for level objects.",
+        S3_ARMY_MAX, S3_ARMY_DEFAULT);
+    snprintf(out->value, sizeof out->value, "%u", s3_army.size);
+    snprintf(out->default_value, sizeof out->default_value, "%u", S3_ARMY_DEFAULT);
+    out->type = RECOMP_MOD_OPTION_INTEGER; out->step = 1;
+    out->min_value = S3_ARMY_MIN; out->max_value = S3_ARMY_MAX;
     return 1;
 }
 static int choice_get(void *ctx, const char *p, const char *f, const char *o, int n, RecompLauncherCModChoice *out)
 {
     (void)ctx;
     if (!mine(p, f)) return !mine(p, NULL) && base && base->feature_choice_get && base->feature_choice_get(base->ctx, p, f, o, n, out);
-    if (!o || strcmp(o, "crowd") || n < 0 || n >= 4 || !out) return 0;
-    memset(out, 0, sizeof *out);
-    snprintf(out->value, sizeof out->value, "%u", s3_army_sizes[n]);
-    snprintf(out->label, sizeof out->label, n == 3 ? "%u (35 Knuckles)" : "%u", s3_army_sizes[n]);
-    return 1;
+    return 0;
 }
 static int set_option(void *ctx, const char *p, const char *f, const char *o, const char *v)
 {
-    (void)ctx;
+    (void)ctx; s_error[0] = 0;
     if (!mine(p, f)) return !mine(p, NULL) && base && base->feature_set_option && base->feature_set_option(base->ctx, p, f, o, v);
-    unsigned size = v ? (unsigned)strtoul(v, NULL, 10) : 0;
-    if (!o || strcmp(o, "crowd") || !s3_army_valid_size(size)) return 0;
+    unsigned size;
+    if (!o || strcmp(o, "crowd")) return 0;
+    if (!parse_size(v, &size)) {
+        snprintf(s_error, sizeof s_error, "Enter a whole number from %u to %u for Extra Knuckles.",
+                 S3_ARMY_MIN, S3_ARMY_MAX);
+        return 0;
+    }
     s3_army.size = size;
     return 1;
 }

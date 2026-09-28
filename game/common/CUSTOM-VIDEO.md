@@ -103,7 +103,84 @@ the same projection; the original save is hashed before/after. Unit tests
 cover projection/intersection agreement, native camera reference points,
 sprite counts beyond 80, host-only state and both cartridge address profiles.
 
-Remaining certification includes other zones/boss routes, burning-island
-transitions, bonus stages, other Blue Spheres layouts/emerald-clear sequences,
+Remaining certification includes other zones/boss routes, other burning-island
+transition routes, bonus stages, other Blue Spheres layouts/emerald-clear sequences,
 standalone special-stage runtime routes, and saves during expanded activation.
 The experiment is not ready to publish as a full-game-certified mod.
+
+## Angel Island follow-up (2026-09-27)
+
+Burning AIZ2's `AIZ2BGE_Normal` streams the same 512-pixel background row
+from layout X=0, then applies horizontal heat shimmer. Wide rendering now
+wraps that row at 512 instead of sampling the unrelated banks later in the
+layout. The owner save reproduces clean native output and corruption at
+16:9 before the fix; fixed captures are clean at native, 16:9 and 32:9.
+A synthetic regression checks all 796 columns with a large scroll offset.
+A separate activation-order bug corrupted the first AIZ1 miniboss. Expanded
+activation loaded `Obj_AIZMinibossCutscene`'s PLC $5A before `AIZ1_Resize`
+queued PLC $0C at camera $2E00. The latter overwrote the boss bank with vine
+and tree patterns. That scripted object now uses the stock 128-pixel-aligned
+activation interval; ordinary objects retain expanded activation.
+
+`tests/runtime/run_sonic3_aiz_miniboss.py --exe <Sonic3KRecomp> --rom <owner-rom>
+--out <fresh-directory>` positions P1 on the approach, then runs the stock
+camera lock/cutscene. At 16:9 and 32:9 the boss VRAM matches native width byte
+for byte through its descent and flames; captures are visually clean and
+all runs have zero dispatch misses. A synthetic regression checks both
+cartridge address profiles. Owner confirmation on a normal route is pending.
+
+The owner's later F2 capture exposed a separate green-to-burning transition
+bug. `AIZ1BGE_FireTransition` streams a flame composition into Plane B from
+layout X=$1000; `AIZ2BGE_WaitFire` continues at X=$200. The curtain uses
+`AIZTrans_WavyFlame`'s per-16px-column VScroll, with an eight-column wave
+period. World-layout sampling missed the curtain and exposed chunks/blocks
+and patterns while the game replaced them. The renderer now follows the
+uploaded Plane B through `AIZ2BGE_BGRedraw`, extending the wave into both
+margins. It also follows staged Plane A during `AIZ1BGE_FireRefresh`/Finish
+and `AIZ2BGE_FireRedraw`. Opaque high-priority flames cover high-priority
+canopy in the extended margins; native overlap priority and transparent
+flame edges retain their original behavior. This changes no guest memory.
+
+Synthetic tests cover the seven event phases, column scroll, foreground
+replacement, margin coverage and native priority in both cartridge profiles.
+`tests/runtime/run_sonic3_aiz_transition.py --exe <build> --rom <owner-rom>
+--save <compatible-Adaptive-state> --mods <sonic3k-mods.ini> --out <fresh-dir>`
+replays a normal-play save through 120 checkpoints. `--width 796` exercises
+32:9; `--native` switches to native rendering after loading. `--compare`
+checks a previous capture directory's RAM/VRAM (also PNGs with `--native`).
+The owner's original F2 and matching executable remain backed up locally.
+Adaptive and 32:9 captures show the complete fire curtain and clean art
+replacement. Native output and guest RAM/VRAM match the pre-fix F2 replay
+at all 120 checkpoints; owner confirmation is pending.
+
+The owner's F1 tree-climb capture exposed another difference between the
+uploaded foreground and the world layout. `AIZ1_ScreenEvent` calls
+`AIZ_TreeReveal` to replace individual 16px blocks with a widening mask;
+`AIZ1SE_ChangeChunk1..4` commit the complete 128px chunks afterward. Reading
+only the layout skipped the small steps and exposed the interior in large
+rectangles. While `Events_fg_4` is active, the renderer now samples the
+uploaded Plane A for the reveal strip at X=$2C80..$2D7F, Y=$280..$47F.
+The original camera lock keeps that whole 256px strip resident. Surrounding
+widescreen terrain still uses its world coordinates. The flag is frame-local
+scratch reconstructed from RAM; private save-state layout is unchanged.
+
+The same replay tool accepts `--scene tree` for an Adaptive save on the
+approach: hold right and capture 200 checkpoints through the climb.
+`--reference-native <native-capture-dir>` compares the reveal strip's pixels,
+excluding the screen-fixed HUD. At widths 796 and 1156, all 42 active-reveal
+checkpoints match native output. All 200 RAM/VRAM checkpoints are unchanged,
+and native mode's images are byte-identical. Synthetic regressions cover the
+uploaded mask, foreground priority, surrounding terrain and event/zone/act
+boundaries in both cartridge profiles. Owner replay confirmation is pending.
+
+`SpecialVInt_Array` begins with RTS/NOP before seven unlabeled BRA.W entries.
+The generic branch-table scan misses those entries. Game-owned executable
+entry discovery comes from the byte-matched listings:
+
+```text
+python tools/gen_special_vint_sites.py --sk-listing <sonic3k.lst> --s3-listing <s3.lst>
+```
+
+`--check` verifies drift (also wired to CTest through `S3_SK_LISTING` and
+`S3_S3_LISTING`). The generated TOML files cover both cartridge halves and
+are included by the three game configs. Generated C is never edited.
