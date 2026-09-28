@@ -68,6 +68,9 @@ code_addrs_file = "sonic3k.code_addrs.txt"
 #   python <engine>/tests/tools/gen_disasm_labels.py ../skdisasm/s3.lst \
 #       --max-addr 0x200000 --offset 0x200000 > sonic3k.disasm_labels_s3.toml
 discovery_files = [
+    # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
+    "sonic3k.special_vint_sk.toml",
+    "sonic3k.special_vint_s3.toml",
     "sonic3k.disasm_labels_sk.toml",       # S&K half, $000000-$1FFFFF (18946 funcs)
     "sonic3k.disasm_labels_s3.toml",       # S3  half, $200000-$3FFFFF (10819 funcs)
     # PC-indexed jump tables (pcrel16/abs offset tables + bra-trampoline

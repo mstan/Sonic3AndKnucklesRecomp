@@ -18,22 +18,14 @@
 #include "video/genesis_machine.h"
 #include "sonic3_knuckles_title.h"
 #include "sonic3_knuckles_menu.h"
+#include "sonic3_state.h"
+#include "sonic3_state_io.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 void cmd_send_response(const char *json);
-
-const unsigned s3_army_sizes[4] = { 8, 16, 24, 34 };
-S3ArmyConfig s3_army;
-
-void s3_army_defaults(void) { s3_army.enabled = 0; s3_army.size = 16; }
-int s3_army_valid_size(unsigned size)
-{
-    for (unsigned i = 0; i < 4; ++i) if (s3_army_sizes[i] == size) return 1;
-    return 0;
-}
 
 /* ---- Stock S&K RAM ($FFxxxx) -------------------------------------------- */
 enum {
@@ -590,7 +582,7 @@ static void step(void)
         return;
     }
     if (!count) {
-        count = s3_army_valid_size(s3_army.size) ? s3_army.size : 16;
+        count = s3_army_valid_size(s3_army.size) ? s3_army.size : S3_ARMY_DEFAULT;
         for (unsigned k = 0; k < count; ++k) {
             memset(&actors[k], 0, sizeof actors[k]);
             configure_actor(k);
@@ -612,11 +604,10 @@ static void step(void)
     if (fresh) shift_age = 64;
     /* Never starve the level: keep a reserve of free dynamic slots, benching
      * the last extras first and returning them when room reappears. */
-    enum { RESERVE = 16 };
     unsigned free = free_slots();
-    for (int k = (int)count - 1; k >= 0 && free < RESERVE; --k)
+    for (int k = (int)count - 1; k >= 0 && free < S3_ARMY_RESERVE; --k)
         if (actors[k].slot) { release(&actors[k]); ++free; }
-    for (unsigned k = 0; k < count && free > RESERVE; ++k) {
+    for (unsigned k = 0; k < count && free > S3_ARMY_RESERVE; ++k) {
         if (actors[k].slot) continue;
         int o = free_slot(); if (!o) break;
         spawn(k, (unsigned)o, fresh); --free;
@@ -775,14 +766,14 @@ int s3_army_hook(uint32_t pc)
 }
 
 /* ---- Presentation ---------------------------------------------------------- */
-static unsigned lag_ticks, vblank_ticks;
+static unsigned lag_ticks, vblank_ticks, last_tick;
+static int was_active;
 void s3_army_vblank(void)
 {
     /* The SAT built with this capture is uploaded by this V-int. */
     shown = published;
     s3_title_vblank(&g_machine.vdp, title_enabled());
     /* Lag telemetry, sampled at the IRQ like the family renderer's. */
-    static unsigned last_tick; static int was_active;
     unsigned tick = rd16(LEVEL_FRAME);
     /* Running gameplay only: loading ($8C), pause and Player 1's own death
      * legitimately hold the level frame counter. */
@@ -791,6 +782,39 @@ void s3_army_vblank(void)
         rd32(PLAYER_1) != 0;
     if (active && was_active) { ++vblank_ticks; lag_ticks += tick == last_tick; }
     was_active = active; last_tick = tick;
+}
+
+int s3_army_state_ready(void) { return inside_actor < 0 && !inside_solid; }
+void s3_army_state(S3StateIO *io)
+{
+    unsigned config[2] = { (unsigned)s3_army.enabled, s3_army.size };
+    if (io->mode) {
+        if (io->pos > io->size || sizeof config > io->size - io->pos) { io->ok = 0; return; }
+        if (memcmp(io->data + io->pos, config, sizeof config)) io->ok = 0;
+    }
+    S3_STATE(io, config);
+    unsigned saved_count = s3_state_peek_unsigned(io, count);
+    if (saved_count > S3_ARMY_MAX) io->ok = 0;
+    S3_STATE(io, count);
+    if (io->mode) for (unsigned n = 0; n < S3_ARMY_MAX; ++n) {
+        Actor actor = {0}; s3_state_peek(io, n * sizeof actor, &actor, sizeof actor);
+        if (actor.slot && (actor.slot < DYN_FIRST || actor.slot >= DYN_END ||
+            (actor.slot - DYN_FIRST) % OBJ)) io->ok = 0;
+        if (actor.mode > MODE_CATCHUP) io->ok = 0;
+    }
+    S3_STATE(io, actors); S3_STATE(io, slot_codes);
+    S3_STATE(io, shift_x); S3_STATE(io, shift_y); S3_STATE(io, shift_age);
+    unsigned visible = published.count;
+    s3_state_peek(io, offsetof(Crowd, count), &visible, sizeof visible);
+    if (visible > S3_ARMY_MAX) io->ok = 0;
+    S3_STATE(io, published);
+    visible = shown.count;
+    s3_state_peek(io, offsetof(Crowd, count), &visible, sizeof visible);
+    if (visible > S3_ARMY_MAX) io->ok = 0;
+    S3_STATE(io, shown);
+    S3_STATE(io, lag_ticks); S3_STATE(io, vblank_ticks);
+    S3_STATE(io, last_tick); S3_STATE(io, was_active);
+    if (io->mode == 2) { inside_actor = -1; inside_solid = 0; }
 }
 /* Each extra is a full native Knuckles tick charged at 68K speed; a crowd
  * would otherwise turn every frame into a lag frame. LevelLoop still waits
@@ -803,11 +827,11 @@ unsigned s3_sk_main_cpu_divisor(void)
      * follows the crowd rather than Level_started_flag. */
     if (!s3_army_active()) return video;
     /* The renderer's expanded activation and the crowd are independent
-     * costs, so their headroom adds. One native frame per 4 extras plus two
-     * of margin: 1 + count/8 sufficed natively but lagged widescreen S&K's
-     * MHZ intro (before Level_started_flag gates the renderer's own share).
+     * costs, so their headroom adds. One native frame per 3 extras plus four
+     * of margin covers MHZ's opening solids: the previous 2 + ceil(n/4)
+     * missed 28 ticks at 74 extras / 16:9 during the first playable 90 ticks.
      * Unused headroom costs nothing: LevelLoop still waits for V-int. */
-    return video + 2 + (count + 3) / 4;
+    return video + 4 + (count + 2) / 3;
 }
 /* Draw the latched crowd into one output row. `origin` is the output column of
  * camera_x; earlier extras win, all of them behind every native sprite. */
@@ -892,7 +916,7 @@ static void jappend(Json *j, const char *fmt, ...)
 void s3_army_command(int id, const char *json)
 {
     (void)json;
-    static char buf[16384];
+    static char buf[1024 + S3_ARMY_MAX * 256];
     Json j = { buf, sizeof buf - 3, 0 };
     jappend(&j, "{\"id\":%d,\"ok\":true,\"enabled\":%d,\"art\":%d,\"active\":%d,"
         "\"count\":%u,\"free_slots\":%u,\"shown\":%u,\"frame\":%u,\"vblanks\":%u,\"lag\":%u,\"divisor\":%u,"
