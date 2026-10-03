@@ -1,6 +1,6 @@
 # Adapted from RocketKnightAdventuresRecomp's validated release workflow.
 param(
-  [string]$Version = '0.5.1',
+  [string]$Version = '0.5.2',
   [string]$BuildDir = 'build-release',
   [string]$CMake = 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe',
   [string]$Python = 'python',
