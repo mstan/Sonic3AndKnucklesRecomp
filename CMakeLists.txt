@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.5.1 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.5.2 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")

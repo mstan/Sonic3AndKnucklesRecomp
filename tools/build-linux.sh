@@ -2,10 +2,10 @@
 # Adapted from RocketKnightAdventuresRecomp's validated AppImage workflow.
 # Ubuntu 24.04: build-essential cmake pkg-config libsdl2-dev libgl1-mesa-dev
 # curl python3 patchelf imagemagick. Owner ROMs go under game/<mode>/.
-# Usage: bash tools/build-linux.sh --version 0.5.1 --jobs 8 [--no-package]
+# Usage: bash tools/build-linux.sh --version 0.5.2 --jobs 8 [--no-package]
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-VERSION=0.5.1
+VERSION=0.5.2
 JOBS=8
 OUT="$REPO/release-linux"
 BUILD="$REPO/build-linux-prod"

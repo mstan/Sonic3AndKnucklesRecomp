@@ -1,4 +1,4 @@
-Sonic & Knuckles Recomp v0.5.0
+Sonic & Knuckles Recomp v0.5.2
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
