@@ -8,7 +8,7 @@ those ROMs, generated art, settings, saves or developer builds.
 ## Windows x64
 
 ```powershell
-./tools/build-windows.ps1 -Version 0.5.1 -Python C:/path/to/python.exe
+./tools/build-windows.ps1 -Version 0.5.2 -Python C:/path/to/python.exe
 ```
 
 Requires Visual Studio 2022 C++ tools, CMake and Python. `-CMake`, `-BuildDir`
@@ -24,7 +24,7 @@ On Ubuntu 24.04 install `build-essential cmake pkg-config libsdl2-dev
 libgl1-mesa-dev curl python3 patchelf imagemagick` and run:
 
 ```sh
-bash tools/build-linux.sh --version 0.5.1 --jobs 8
+bash tools/build-linux.sh --version 0.5.2 --jobs 8
 ```
 
 `--build DIR`, `--out DIR` and `--no-package` are available. An ext4 build
@@ -56,7 +56,7 @@ baseline; older distributions and Steam Deck require separate validation.
 3. Merge the release tooling/notes to `main`, then reconfigure and package from
    that exact clean commit. `build-info.json` must identify the tag target and
    the committed engine/UI/disassembly pins. Keep repository visibility as-is.
-4. Tag `v0.5.1`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
+4. Tag `v0.5.2`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
    Verify the remote tag, `origin/main`, asset names/sizes and uploaded SHA256s.
 
 Do not zip a build folder. All staging uses explicit native targets and
