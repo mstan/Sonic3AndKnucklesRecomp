@@ -1,0 +1,780 @@
+{
+  "date": "2026-10-03",
+  "issue": "beads-hj4v",
+  "engine_commit": "6e1f74d66252ae529752115022bb55da3bcc1689",
+  "game_base_commit": "d137f45478c03ec8de98c9143eb11d6ff381c518",
+  "status": "Implemented and measured; owner visual/runtime/audio acceptance pending (PRINCIPLES.md #25).",
+  "change": [
+    "Pace completed frames immediately before presentation, preserving fractional NTSC deadlines.",
+    "Prefer Direct3D 11 on Windows at default SDL hint priority, preserving renderer overrides and fallback.",
+    "Reset cadence on new sessions, leaving turbo, and stalls; retain phase for small scheduling delays."
+  ],
+  "host": {
+    "cpu": "AMD Ryzen 7 9800X3D",
+    "gpu": "NVIDIA GeForce RTX 3080 Ti",
+    "os": "Windows 11 10.0.26200",
+    "displays": [
+      {
+        "name": "LC34G55T",
+        "width": 3440,
+        "height": 1440,
+        "refresh_hz": 165,
+        "x": 0,
+        "y": 0
+      },
+      {
+        "name": "VG248",
+        "width": 1080,
+        "height": 1920,
+        "refresh_hz": 60,
+        "x": 3440,
+        "y": 0
+      },
+      {
+        "name": "ZOWIE RL LCD",
+        "width": 1080,
+        "height": 1920,
+        "refresh_hz": 60,
+        "x": -1080,
+        "y": 0
+      }
+    ]
+  },
+  "method": {
+    "route": "Input-only Angel Island scrolling/jumping; fresh executable-local SRAM and settings.",
+    "display": "4200 paced frames; PresentMon 2.6.0 v1 metrics; discard first 2800 present rows (about 23 seconds steady).",
+    "window": "Verify active window on primary 165 Hz display; keep only the owned test window topmost; real default audio device.",
+    "production": "MSVC Release; trace, reverse debug, dev trace and cosim OFF.",
+    "diagnostic": "Combined cartridge: same source, trace ON only; retrospective guest/timing/audio counter snapshots.",
+    "parity": "6000 uncapped frames per variant/width; dummy SDL audio/video, software renderer override."
+  },
+  "baseline_32_9": {
+    "case": "sonic3-32-9-display",
+    "exe_sha256": "9729e45bc631548e3b0d2bea0e0b4b14261f45d113df61e8733fa18974ecf2f7",
+    "exit_code": 0,
+    "errors": [],
+    "live_audio": true,
+    "actual_window": {
+      "rect": [
+        1392,
+        465,
+        2048,
+        952
+      ],
+      "monitor_device": "\\\\.\\DISPLAY1",
+      "foreground": true,
+      "topmost_requested": true,
+      "monitor_rect": [
+        0,
+        0,
+        3440,
+        1440
+      ]
+    },
+    "final_state": {
+      "frames": 4200,
+      "hash": "3D53CF9C1AAE430E"
+    },
+    "presentmon": {
+      "rows": 4199,
+      "skip_rows": 2800,
+      "present_modes": [
+        "Composed: Copy with GPU GDI"
+      ],
+      "MsBetweenPresents": {
+        "n": 1399,
+        "mean_ms": 16.683089349535383,
+        "p50_ms": 16.6789,
+        "p95_ms": 18.2993,
+        "p99_ms": 19.127,
+        "max_ms": 23.8613,
+        "over_20ms": 6,
+        "over_25ms": 0
+      },
+      "MsBetweenDisplayChange": {
+        "n": 1399,
+        "mean_ms": 16.683765618298786,
+        "p50_ms": 18.1756,
+        "p95_ms": 24.2497,
+        "p99_ms": 30.2928,
+        "max_ms": 33.3931,
+        "over_20ms": 251,
+        "over_25ms": 30
+      },
+      "MsInPresentAPI": {
+        "n": 1399,
+        "mean_ms": 0.351363545389564,
+        "p50_ms": 0.3324,
+        "p95_ms": 0.4906,
+        "p99_ms": 0.8476,
+        "max_ms": 2.2376,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "dropped": 0
+    }
+  },
+  "candidate_native_16_9_32_9": [
+    {
+      "case": "sonic3-off-display",
+      "exe_sha256": "4f6a0e11c3e596d63e3986f7caff67ffa001dda087e218da1e40597d7ba9104c",
+      "exit_code": 0,
+      "errors": [],
+      "live_audio": true,
+      "actual_window": {
+        "rect": [
+          1392,
+          465,
+          2048,
+          952
+        ],
+        "monitor_device": "\\\\.\\DISPLAY1",
+        "foreground": true,
+        "topmost_requested": true,
+        "monitor_rect": [
+          0,
+          0,
+          3440,
+          1440
+        ]
+      },
+      "renderer": {
+        "name": "direct3d11",
+        "vsync": true
+      },
+      "final_state": {
+        "frames": 4200,
+        "hash": "D337E84B3F83E7D6"
+      },
+      "presentmon": {
+        "rows": 4199,
+        "skip_rows": 2800,
+        "present_modes": [
+          "Hardware Composed: Independent Flip"
+        ],
+        "MsBetweenPresents": {
+          "n": 1399,
+          "mean_ms": 16.683343388134382,
+          "p50_ms": 16.6833,
+          "p95_ms": 16.6865,
+          "p99_ms": 16.9392,
+          "max_ms": 22.7821,
+          "over_20ms": 1,
+          "over_25ms": 0
+        },
+        "MsBetweenDisplayChange": {
+          "n": 1399,
+          "mean_ms": 16.683696854896354,
+          "p50_ms": 18.1733,
+          "p95_ms": 18.2437,
+          "p99_ms": 18.3372,
+          "max_ms": 24.2643,
+          "over_20ms": 11,
+          "over_25ms": 0
+        },
+        "MsInPresentAPI": {
+          "n": 1399,
+          "mean_ms": 0.542479199428163,
+          "p50_ms": 0.4483,
+          "p95_ms": 1.3008,
+          "p99_ms": 2.4575,
+          "max_ms": 5.538,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "dropped": 0
+      }
+    },
+    {
+      "case": "sonic3-16-9-display",
+      "exe_sha256": "4f6a0e11c3e596d63e3986f7caff67ffa001dda087e218da1e40597d7ba9104c",
+      "exit_code": 0,
+      "errors": [],
+      "live_audio": true,
+      "actual_window": {
+        "rect": [
+          1392,
+          465,
+          2048,
+          952
+        ],
+        "monitor_device": "\\\\.\\DISPLAY1",
+        "foreground": true,
+        "topmost_requested": true,
+        "monitor_rect": [
+          0,
+          0,
+          3440,
+          1440
+        ]
+      },
+      "renderer": {
+        "name": "direct3d11",
+        "vsync": true
+      },
+      "final_state": {
+        "frames": 4200,
+        "hash": "18A3487388650EA6"
+      },
+      "presentmon": {
+        "rows": 4199,
+        "skip_rows": 2800,
+        "present_modes": [
+          "Hardware Composed: Independent Flip"
+        ],
+        "MsBetweenPresents": {
+          "n": 1399,
+          "mean_ms": 16.683332308791993,
+          "p50_ms": 16.6833,
+          "p95_ms": 16.6848,
+          "p99_ms": 16.7801,
+          "max_ms": 17.1122,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "MsBetweenDisplayChange": {
+          "n": 1399,
+          "mean_ms": 16.683049035025018,
+          "p50_ms": 16.7065,
+          "p95_ms": 17.9405,
+          "p99_ms": 19.0548,
+          "max_ms": 20.5853,
+          "over_20ms": 5,
+          "over_25ms": 0
+        },
+        "MsInPresentAPI": {
+          "n": 1399,
+          "mean_ms": 0.7384072909220872,
+          "p50_ms": 0.551,
+          "p95_ms": 1.6219,
+          "p99_ms": 2.6659,
+          "max_ms": 4.1722,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "dropped": 0
+      }
+    },
+    {
+      "case": "sonic3-32-9-display",
+      "exe_sha256": "4f6a0e11c3e596d63e3986f7caff67ffa001dda087e218da1e40597d7ba9104c",
+      "exit_code": 0,
+      "errors": [],
+      "live_audio": true,
+      "actual_window": {
+        "rect": [
+          1392,
+          465,
+          2048,
+          952
+        ],
+        "monitor_device": "\\\\.\\DISPLAY1",
+        "foreground": true,
+        "topmost_requested": true,
+        "monitor_rect": [
+          0,
+          0,
+          3440,
+          1440
+        ]
+      },
+      "renderer": {
+        "name": "direct3d11",
+        "vsync": true
+      },
+      "final_state": {
+        "frames": 4200,
+        "hash": "3D53CF9C1AAE430E"
+      },
+      "presentmon": {
+        "rows": 4199,
+        "skip_rows": 2800,
+        "present_modes": [
+          "Hardware Composed: Independent Flip"
+        ],
+        "MsBetweenPresents": {
+          "n": 1399,
+          "mean_ms": 16.68333338098642,
+          "p50_ms": 16.6833,
+          "p95_ms": 16.6842,
+          "p99_ms": 16.8046,
+          "max_ms": 17.7039,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "MsBetweenDisplayChange": {
+          "n": 1399,
+          "mean_ms": 16.683712723373837,
+          "p50_ms": 18.1768,
+          "p95_ms": 18.2252,
+          "p99_ms": 18.2706,
+          "max_ms": 24.2668,
+          "over_20ms": 6,
+          "over_25ms": 0
+        },
+        "MsInPresentAPI": {
+          "n": 1399,
+          "mean_ms": 0.7057611865618298,
+          "p50_ms": 0.4965,
+          "p95_ms": 1.8951,
+          "p99_ms": 2.8647,
+          "max_ms": 4.0911,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "dropped": 0
+      }
+    }
+  ],
+  "production_combined_cartridge": {
+    "case": "sonic3k-32-9-display",
+    "exe_sha256": "75146479bff413d6975650c9b51e842bb0522e1ffed53f4fa950b4acc051f96e",
+    "exit_code": 0,
+    "errors": [],
+    "live_audio": true,
+    "actual_window": {
+      "rect": [
+        1392,
+        465,
+        2048,
+        952
+      ],
+      "monitor_device": "\\\\.\\DISPLAY1",
+      "foreground": true,
+      "topmost_requested": true,
+      "monitor_rect": [
+        0,
+        0,
+        3440,
+        1440
+      ]
+    },
+    "renderer": {
+      "name": "direct3d11",
+      "vsync": true
+    },
+    "final_state": {
+      "frames": 4200,
+      "hash": "4B5EB720A237E43A"
+    },
+    "presentmon": {
+      "rows": 4199,
+      "skip_rows": 2800,
+      "present_modes": [
+        "Hardware Composed: Independent Flip"
+      ],
+      "MsBetweenPresents": {
+        "n": 1399,
+        "mean_ms": 16.683349035025017,
+        "p50_ms": 16.6833,
+        "p95_ms": 16.6929,
+        "p99_ms": 16.8735,
+        "max_ms": 17.0983,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "MsBetweenDisplayChange": {
+        "n": 1399,
+        "mean_ms": 16.682722659042174,
+        "p50_ms": 16.7463,
+        "p95_ms": 18.4971,
+        "p99_ms": 20.0951,
+        "max_ms": 21.6945,
+        "over_20ms": 15,
+        "over_25ms": 0
+      },
+      "MsInPresentAPI": {
+        "n": 1399,
+        "mean_ms": 0.9580523945675482,
+        "p50_ms": 0.7835,
+        "p95_ms": 2.105,
+        "p99_ms": 3.1931,
+        "max_ms": 5.1315,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "dropped": 0
+    }
+  },
+  "renderer_override": {
+    "case": "sonic3-32-9-display",
+    "exe_sha256": "4f6a0e11c3e596d63e3986f7caff67ffa001dda087e218da1e40597d7ba9104c",
+    "exit_code": 0,
+    "errors": [],
+    "live_audio": true,
+    "actual_window": {
+      "rect": [
+        1392,
+        465,
+        2048,
+        952
+      ],
+      "monitor_device": "\\\\.\\DISPLAY1",
+      "foreground": true,
+      "topmost_requested": true,
+      "monitor_rect": [
+        0,
+        0,
+        3440,
+        1440
+      ]
+    },
+    "renderer": {
+      "name": "direct3d",
+      "vsync": true
+    },
+    "final_state": {
+      "frames": 300,
+      "hash": "2C05D3DD40CE7A68"
+    },
+    "render_driver": "direct3d"
+  },
+  "renderer_fallback": {
+    "case": "sonic3-32-9-display",
+    "exe_sha256": "4f6a0e11c3e596d63e3986f7caff67ffa001dda087e218da1e40597d7ba9104c",
+    "exit_code": 0,
+    "errors": [],
+    "live_audio": true,
+    "actual_window": {
+      "rect": [
+        1392,
+        465,
+        2048,
+        952
+      ],
+      "monitor_device": "\\\\.\\DISPLAY1",
+      "foreground": true,
+      "topmost_requested": true,
+      "monitor_rect": [
+        0,
+        0,
+        3440,
+        1440
+      ]
+    },
+    "renderer": {
+      "name": "direct3d",
+      "vsync": true
+    },
+    "final_state": {
+      "frames": 300,
+      "hash": "2C05D3DD40CE7A68"
+    },
+    "render_driver": "intentionally-unavailable"
+  },
+  "standalone_sandk_boot_smoke": {
+    "case": "sandk-32-9-benchmark",
+    "exe_sha256": "16c2c2644a5e05747e1cbefc4f3fe45fad81bdc5edc27914bb89f2425111ce7d",
+    "exit_code": 0,
+    "errors": [],
+    "live_audio": false,
+    "final_state": {
+      "frames": 600,
+      "hash": "A2FC08E58AE85900"
+    },
+    "benchmark": {
+      "game": "SonicK",
+      "frames": 600,
+      "seconds": 1.8378794,
+      "fps": 326.463,
+      "ms_per_frame": 3.063132,
+      "cpu_seconds": 1.84375,
+      "cpu_fps": 325.424,
+      "cpu_cycles": 8640420310,
+      "cycles_per_frame": 14400700.517,
+      "state_fnv1a64": "A2FC08E58AE85900",
+      "audio_state_fnv1a64": "D6BA617104DBB843"
+    }
+  },
+  "combined_cartridge_primary_and_secondary": [
+    {
+      "case": "sonic3k-32-9-display",
+      "exe_sha256": "a7c6f97ec55d0e69fc68ed7aefbd6dfcbf0e87375cfee5743224e3dfb9224adc",
+      "exit_code": 0,
+      "errors": [],
+      "live_audio": true,
+      "actual_window": {
+        "rect": [
+          1392,
+          465,
+          2048,
+          952
+        ],
+        "monitor_device": "\\\\.\\DISPLAY1",
+        "foreground": true,
+        "topmost_requested": true,
+        "monitor_rect": [
+          0,
+          0,
+          3440,
+          1440
+        ]
+      },
+      "renderer": {
+        "name": "direct3d11",
+        "vsync": true
+      },
+      "final_state": {
+        "frames": 4200,
+        "hash": "4B5EB720A237E43A"
+      },
+      "timing_frames": 4189,
+      "machine": {
+        "n": 1389,
+        "mean_ms": 4.82940460763139,
+        "p50_ms": 4.541,
+        "p95_ms": 6.488,
+        "p99_ms": 6.886,
+        "max_ms": 8.663,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "work_without_present_or_input": {
+        "n": 1389,
+        "mean_ms": 4.9375910727141825,
+        "p50_ms": 4.58,
+        "p95_ms": 6.57,
+        "p99_ms": 7.042,
+        "max_ms": 20.046,
+        "over_20ms": 1,
+        "over_25ms": 0
+      },
+      "present": {
+        "n": 1389,
+        "mean_ms": 11.595167026637869,
+        "p50_ms": 11.939,
+        "p95_ms": 12.777,
+        "p99_ms": 13.461,
+        "max_ms": 14.411,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "steady_video_delta": {
+        "tick_samples": 1379,
+        "tick_updates": 1379,
+        "tick_lag": 0,
+        "tick_multi": 0,
+        "publication_lag": 0,
+        "scene_match_misses": 0,
+        "scene_held_frames": 0,
+        "pool_pressure": 0
+      },
+      "steady_audio_delta": {
+        "total_flushes": 1379,
+        "dropped_flushes": 0,
+        "turbo_dropped_flushes": 0,
+        "underrun_flushes": 0
+      },
+      "presentmon": {
+        "rows": 4199,
+        "skip_rows": 2800,
+        "present_modes": [
+          "Hardware Composed: Independent Flip"
+        ],
+        "MsBetweenPresents": {
+          "n": 1399,
+          "mean_ms": 17.200085418155826,
+          "p50_ms": 16.6833,
+          "p95_ms": 16.685,
+          "p99_ms": 17.0069,
+          "max_ms": 343.0829,
+          "over_20ms": 6,
+          "over_25ms": 3
+        },
+        "MsBetweenDisplayChange": {
+          "n": 1399,
+          "mean_ms": 17.200425518227306,
+          "p50_ms": 16.6915,
+          "p95_ms": 17.7745,
+          "p99_ms": 19.253,
+          "max_ms": 343.1698,
+          "over_20ms": 9,
+          "over_25ms": 4
+        },
+        "MsInPresentAPI": {
+          "n": 1399,
+          "mean_ms": 0.6055528949249463,
+          "p50_ms": 0.5131,
+          "p95_ms": 1.2937,
+          "p99_ms": 2.3055,
+          "max_ms": 3.1901,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "dropped": 0
+      }
+    },
+    {
+      "case": "sonic3k-32-9-display",
+      "exe_sha256": "a7c6f97ec55d0e69fc68ed7aefbd6dfcbf0e87375cfee5743224e3dfb9224adc",
+      "exit_code": 0,
+      "errors": [],
+      "live_audio": true,
+      "actual_window": {
+        "rect": [
+          3540,
+          100,
+          4196,
+          587
+        ],
+        "monitor_device": "\\\\.\\DISPLAY2",
+        "foreground": true,
+        "topmost_requested": true,
+        "monitor_rect": [
+          3440,
+          0,
+          4520,
+          1920
+        ]
+      },
+      "renderer": {
+        "name": "direct3d11",
+        "vsync": true
+      },
+      "final_state": {
+        "frames": 4200,
+        "hash": "4B5EB720A237E43A"
+      },
+      "window_position": [
+        3540,
+        100
+      ],
+      "timing_frames": 4195,
+      "machine": {
+        "n": 1395,
+        "mean_ms": 4.353672401433692,
+        "p50_ms": 4.174,
+        "p95_ms": 5.366,
+        "p99_ms": 6.463,
+        "max_ms": 7.86,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "work_without_present_or_input": {
+        "n": 1395,
+        "mean_ms": 4.392272401433692,
+        "p50_ms": 4.213,
+        "p95_ms": 5.424,
+        "p99_ms": 6.507,
+        "max_ms": 7.908,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "present": {
+        "n": 1395,
+        "mean_ms": 12.243832974910394,
+        "p50_ms": 12.423,
+        "p95_ms": 12.632,
+        "p99_ms": 12.704,
+        "max_ms": 13.245,
+        "over_20ms": 0,
+        "over_25ms": 0
+      },
+      "steady_video_delta": {
+        "tick_samples": 1391,
+        "tick_updates": 1391,
+        "tick_lag": 0,
+        "tick_multi": 0,
+        "publication_lag": 0,
+        "scene_match_misses": 0,
+        "scene_held_frames": 0,
+        "pool_pressure": 0
+      },
+      "steady_audio_delta": {
+        "total_flushes": 1391,
+        "dropped_flushes": 0,
+        "turbo_dropped_flushes": 0,
+        "underrun_flushes": 0
+      },
+      "presentmon": {
+        "rows": 4199,
+        "skip_rows": 2800,
+        "present_modes": [
+          "Composed: Flip"
+        ],
+        "MsBetweenPresents": {
+          "n": 1399,
+          "mean_ms": 16.68333423874196,
+          "p50_ms": 16.6833,
+          "p95_ms": 16.685,
+          "p99_ms": 16.8415,
+          "max_ms": 17.3836,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "MsBetweenDisplayChange": {
+          "n": 1312,
+          "mean_ms": 17.78527911585366,
+          "p50_ms": 16.6686,
+          "p95_ms": 33.3192,
+          "p99_ms": 33.34540000000001,
+          "max_ms": 33.4662,
+          "over_20ms": 94,
+          "over_25ms": 94
+        },
+        "MsInPresentAPI": {
+          "n": 1399,
+          "mean_ms": 0.0424867047891351,
+          "p50_ms": 0.0386,
+          "p95_ms": 0.0652,
+          "p99_ms": 0.0798,
+          "max_ms": 0.2352,
+          "over_20ms": 0,
+          "over_25ms": 0
+        },
+        "dropped": 87
+      }
+    }
+  ],
+  "fingerprints": [
+    {
+      "case": "sonic3-off-benchmark",
+      "state_hash": "BF4D64A5B268662A",
+      "audio_hash": "EF81BA9C168DCF68",
+      "identical": true
+    },
+    {
+      "case": "sonic3-16-9-benchmark",
+      "state_hash": "15383D2107C97356",
+      "audio_hash": "CBBBADE81D3B3CDC",
+      "identical": true
+    },
+    {
+      "case": "sonic3-32-9-benchmark",
+      "state_hash": "5D5238021583D15D",
+      "audio_hash": "3DD883768385EE92",
+      "identical": true
+    },
+    {
+      "case": "sonic3k-off-benchmark",
+      "state_hash": "D7711E9B2794F651",
+      "audio_hash": "9EED87280706C276",
+      "identical": true
+    },
+    {
+      "case": "sonic3k-16-9-benchmark",
+      "state_hash": "E064AF2ED79391AD",
+      "audio_hash": "6891D5AF25551CBF",
+      "identical": true
+    },
+    {
+      "case": "sonic3k-32-9-benchmark",
+      "state_hash": "9917EF01E66A556A",
+      "audio_hash": "7B9D6A051826EDB3",
+      "identical": true
+    }
+  ],
+  "ctest": {
+    "passed": 23,
+    "failed": 0,
+    "frame_pacer_regression": "Million-frame fractional cadence, variable work, small delays, stalls, turbo reset and session independence."
+  },
+  "limitations": [
+    "Original reporter supplied no platform, build, stage, settings or hardware.",
+    "This validates the measured Windows presentation jitter on these routes and this host; it does not qualify all stages or slower hardware.",
+    "Background mixed-refresh desktop runs still showed compositor drops, including shipping build. Those drops are not eliminated by the patch.",
+    "The diagnostic 60 Hz monitor test retains the desktop with mixed refresh rates; 87/1399 presents were dropped, display p99 33.3454 ms. Those compositor gaps remain.",
+    "The diagnostic primary run included 338/160/259 ms input/query phase stalls. Guest machine phase remained below 8.7 ms; the trace build is not the production performance measurement.",
+    "No macOS/Linux runtime validation or owner end-to-end acceptance yet."
+  ]
+}
