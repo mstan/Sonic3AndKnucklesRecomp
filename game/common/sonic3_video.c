@@ -58,6 +58,8 @@ static int s_frame_level,s_frame_special,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
 static unsigned s_frame_zone,s_frame_act,s_frame_bg_event;
 static unsigned s_frame_tree_reveal;
 static int s_frame_bg_band[2];
+static int s_bg_draw_at_vblank[2],s_bg_draw_ready;
+static unsigned s_bg_draw_zone;
 static void scene_mode_changed(int was_enabled);
 static void ss_capture(void);
 
@@ -308,6 +310,15 @@ void s3_video_vblank(void)
 {
     if(enabled())ss_capture();
     unsigned tick=ram16(0xFE04),zone=ram16(0xFE10);
+    /* The following V-int uploads this completed tile queue. Main-thread
+     * deformation may advance its RAM counters again before scanline zero,
+     * so retain the draw positions belonging to the displayed VDP cache. */
+    s_bg_draw_ready=enabled() && g_ram[0xF600]==12 && g_ram[0xF711];
+    if(s_bg_draw_ready) {
+        s_bg_draw_at_vblank[0]=(int16_t)ram16(0xA802);
+        s_bg_draw_at_vblank[1]=(int16_t)ram16(0xA806);
+        s_bg_draw_zone=zone;
+    }
     int active=enabled() && g_ram[0xF600]==12 && gameplay() &&
         g_ram[0xF711] && g_ram[0xB005]<6 && !ram16(0xF63A);
     /* Sample at the same IRQ entry, not end-of-wall-frame: native variable
@@ -708,8 +719,15 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
             s_frame_bg_event==0 && ram16(0xEEC6);
         if(!replacing_intro)memcpy(s_background_frame,s_world_frame,sizeof s_background_frame);
         s_frame_fg_x=ram16(0xEE80);s_frame_fg_y=ram16(0xEE84);s_frame_bg_y=ram16(0xEE90);
-        s_frame_bg_band[0]=(int16_t)ram16(0xA800);
-        s_frame_bg_band[1]=(int16_t)ram16(0xA804);
+        /* Draw_BG records each completed coarse draw position in the
+         * second word. The first word can already hold the next deformation
+         * while the game fiber is still preparing its tile-column update. */
+        s_frame_bg_band[0]=(int16_t)ram16(0xA802);
+        s_frame_bg_band[1]=(int16_t)ram16(0xA806);
+        if(s_bg_draw_ready && s_bg_draw_zone==ram16(0xFE10)) {
+            s_frame_bg_band[0]=s_bg_draw_at_vblank[0];
+            s_frame_bg_band[1]=s_bg_draw_at_vblank[1];
+        }
         s_width=width;s_requested_width=width;
         s_terrain_checks=s_terrain_errors=s_bg_checks=s_bg_errors=s_bg_unstreamed=0;
         s_uninitialized_scroll_lines=s_terrain_unstreamed=0;
@@ -833,6 +851,12 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
      * of its layout belongs to the rising pyramid/boss presentation. */
     if(bg_world && s_frame_zone==8 && s_frame_act==0 && s_frame_bg_event==0)
         bg_width=512;
+    /* LBZ1_BGDrawArray splits at Y=$D0. Its lower band is streamed from
+     * the fixed X=0 entry at HScroll_table+$004; LBZ1_Deform moves finer
+     * water bands through that 512px canvas. The upper Death Egg remains
+     * a spatial world layout. */
+    if(bg_world && s_frame_zone==6 && !s_frame_act && by>=0xD0)
+        bg_width=512;
     /* CNZ's normal city parallax is another X=0, 32-block row. Its other
      * layout banks are used as collidable scenery during the act-1 boss. */
     if(bg_world && s_frame_zone==3 &&
@@ -943,7 +967,10 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
          * determines shadow; native operator sprites remain in the center. */
         if(special && (v->reg[12]&8) && !s_priority[x])
             out[x]=shadow[p?p:v->reg[7]&63];
-        if(nx>=0 && nx<nw && !(x&7) && !missing_scroll) {
+        /* With no published scene the final path below copies the native
+         * viewport over this provisional composition. Comparing those
+         * discarded samples would report errors in pixels never displayed. */
+        if(nx>=0 && nx<nw && !(x&7) && !missing_scroll && (!level || s_display)) {
             if(level && !native_terrain_streamed(wy,s_frame_fg_y)) {
                 ++s_terrain_unstreamed;
             } else if(level && !aiz_fire_fg) {
