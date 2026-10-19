@@ -19,6 +19,7 @@ def main():
     for key in ('exe','rom','bank','out'):
         p.add_argument('--'+key,required=True,type=lambda x:Path(x).resolve())
     p.add_argument('--seed',type=lambda x:Path(x).resolve(),help='Reuse a previously generated six-character clear fixture')
+    p.add_argument('--widescreen',default='off',choices=('off','fit','16:9','21:9','32:9'))
     a=p.parse_args();a.out.mkdir(parents=True,exist_ok=True)
     env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','LNG_','MEGAMIX_','SONIC3_'))}
     env.update(SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',SDL_RENDER_DRIVER='software')
@@ -27,7 +28,7 @@ def main():
         rt=rt or case/'runtime';runtime_files(a.exe,a.bank,rt,mighty=True)
         (case/'input.txt').write_text(script)
         with (case/'run.log').open('w') as log:
-            proc=subprocess.run([str(rt/a.exe.name),str(a.rom),'--no-launcher','--turbo',
+            proc=subprocess.run([str(rt/a.exe.name),str(a.rom),'--no-launcher','--turbo','--widescreen',a.widescreen,
                 '--max-frames','7000','--input-script',str(case/'input.txt')],
                 cwd=rt,env=dict(env,**(extra or {})),stdout=log,stderr=log,timeout=180)
         bad=errors((case/'run.log').read_text(errors='replace'))

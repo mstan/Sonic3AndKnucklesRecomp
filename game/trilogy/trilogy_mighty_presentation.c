@@ -6,6 +6,7 @@
 #include "trilogy_obj.h"
 #include "stage_pack.h"
 #include "megamix_geometry_sites.h"
+#include "sonic3_video.h"
 #include "video/genesis_machine.h"
 #include <string.h>
 
@@ -17,10 +18,15 @@ static uint32_t data(void)
 {
     uint32_t desc=tri_rd32(TRI_BANK_BASE+0x24);
     uint32_t p=desc && tri_rd32(desc)==0x4D444931u?tri_rd32(desc+12):0;
-    return p && tri_rd32(p)==0x4D445932u?p:0;
+    return p && tri_rd32(p)==0x4D445933u?p:0;
 }
 static unsigned menu_index(uint32_t p)
 { return (r32(p)&0xFFFFFFu)==0xD30Cu?8:r8(p+0x2E)&7; }
+static unsigned hud_mapping(void)
+{
+    uint32_t d=data();
+    return d && s3_stage_pack_mighty && tri_mighty_active()?tri_rd32(d+84):0;
+}
 static void choose_current(void)
 {
     unsigned mode=r16(PLAYER_OPTION);
@@ -37,7 +43,9 @@ static void choose_current(void)
 int tri_mighty_presentation_hook(uint32_t pc)
 {
     uint32_t p=A(0)&0xFFFFFFu;
-    if(pc==TH_LEVEL_ENTRY) {choose_current();return 0;}
+    if(pc==TH_LEVEL_ENTRY) {
+        choose_current();s3_video_set_hud_mapping(hud_mapping);return 0;
+    }
     if(pc==TH_DS_NOSAVE_START || pc==TH_DS_NEWGAME) {
         int mighty=menu_mighty[menu_index(p)] && s3_stage_pack_mighty && data();
         unsigned mode=r16(PLAYER_OPTION);
@@ -57,6 +65,10 @@ int tri_mighty_presentation_hook(uint32_t pc)
         return 0;
     }
     if(!s3_stage_pack_mighty || !data())return 0;
+    if(pc==MG_PC_MIGHTY_HUD && tri_mighty_active()) {
+        A(1)=tri_rd32(data()+84);
+        return 0; /* native frame selection, positioning and SAT rendering */
+    }
     if(pc==MG_PC_DS_CHARACTER) {
         unsigned index=menu_index(p),mode=D(0)&0xFFFFu;
         if(menu_mighty[index] && mode<2)mode+=4;
@@ -105,7 +117,8 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
     if(player) {
         memset(tiles+0x680,3,32);
         upload(tri_rd32(d+76),0x7D4*32,128);
-        for(unsigned i=0;i<4;i++)upload(tri_rd32(d+80)+i*32,(0x7D8+i*2)*32,32);
+        upload(tri_rd32(d+80),0x7D8*32,160);
+        upload(tri_rd32(d+80)+160,0x7DE*32,32);
         memset(tiles+0x7D4,3,4);
     }
     /* Native fades own the shared CRAM. Match their per-channel envelope

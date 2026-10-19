@@ -13,7 +13,7 @@ target_include_directories(megamix_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game
 add_test(NAME megamix_mighty COMMAND megamix_mighty_test)
 add_executable(megamix_presentation_test runtime/megamix_presentation_test.c)
 target_include_directories(megamix_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
-    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+    "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME megamix_presentation COMMAND megamix_presentation_test)
 add_executable(megamix_sat_test runtime/megamix_sat_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/trilogy_megamix_sprites.c")

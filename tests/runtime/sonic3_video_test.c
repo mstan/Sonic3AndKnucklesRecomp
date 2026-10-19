@@ -143,6 +143,24 @@ static void test_world_snapshot(void)
     scanline(&v,1,native,320,out,398);CHECK(out[0]==0xFFFF0000);
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static unsigned hud_fixture(void) { return 0x3000; }
+static void test_hud_mapping(void)
+{
+    memset(g_ram,0,sizeof g_ram);write32(0xB000,0x123456);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE05]=8;
+    s3_video_set_ring_layout(NULL);word(g_rom,0x1000,65535);
+    longword(g_rom,S3_RINGS,0x1000);
+    const unsigned maps[]={S3_HUD_MAP,0x3000};
+    for(unsigned i=0;i<2;i++) {
+        unsigned p=maps[i];word(g_rom,p,12);word(g_rom,p+12,1);
+        word(g_rom,p+14,i?12:0);word(g_rom,p+16,i?2:1);word(g_rom,p+18,0);
+    }
+    s3_video_set_hud_mapping(hud_fixture);capture_objects();
+    CHECK(s_build.count==1 && s_build.sprites[0].hud==1);
+    CHECK(s_build.sprites[0].size==12 && s_build.sprites[0].attr==0x86CC);
+    s3_video_set_hud_mapping(NULL);capture_objects();
+    CHECK(s_build.count==1 && !s_build.sprites[0].size && s_build.sprites[0].attr==0x86CB);
+}
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -494,7 +512,7 @@ int main(int argc,char **argv)
         }
         ss_count=count;
     }
-    test_sprite_atlas();test_file_select();test_world_snapshot();
+    test_sprite_atlas();test_file_select();test_world_snapshot();test_hud_mapping();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

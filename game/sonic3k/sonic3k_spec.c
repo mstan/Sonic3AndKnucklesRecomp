@@ -248,8 +248,10 @@ const GameSpec g_game_spec = {
     .short_name             = "Sonic3K",
     .boxart                 = "boxart-sonic3k.tga",
 
-    /* S&K+S3 World — skip CRC (combined ROM checksum is non-standard) */
-    .expected_rom_crc32     = 0u,
+    /* Raw supported S&K+S3 lock-on image, also required by the converters.
+     * CRC32 fingerprints the complete file, independently of the cartridge's
+     * internal checksum. Supply it to both the launcher and runtime. */
+    .expected_rom_crc32     = 0x63522553u,
     .expected_rom_size      = 0x400000u,   /* 4 MB combined cart */
 #ifdef GENESIS_Z80_RECOMP
     .z80_step               = s3kz80_step,

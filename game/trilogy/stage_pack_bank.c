@@ -67,9 +67,10 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         if(!range(mighty,64,payload) || !range(music,112,payload) ||
            !range(order,38,payload) || !range(cycles,54*4,payload))goto done;
         const uint8_t *m=data+mighty-0x400000u;
-        int ui=!memcmp(m,"MDY2",4);
-        if(s3_stage_pack_mighty && !ui) {
-            message="Upgrade the converted bank with --upgrade-presentation for selectable Mighty";
+        int native_hud=!memcmp(m,"MDY3",4);
+        int ui=native_hud || !memcmp(m,"MDY2",4);
+        if(s3_stage_pack_mighty && !native_hud) {
+            message="Upgrade the converted bank with --upgrade-presentation for Mighty's native HUD lettering";
             goto done;
         }
         if((memcmp(m,"MDY1",4) && !ui) || m[32]!=0 || m[33]!=176 || m[34]!=0 || m[35]!=38 ||
@@ -78,7 +79,19 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
            !range(be32(m+20),480,payload))goto done;
         if(ui && (!range(mighty,84,payload) || !range(be32(m+64),72,payload) ||
            !range(be32(m+68),be32(m+72),payload) || be32(m+72)>0x400 ||
-           !range(be32(m+76),128,payload) || !range(be32(m+80),128,payload)))goto done;
+           !range(be32(m+76),128,payload) || !range(be32(m+80),native_hud?192:128,payload)))goto done;
+        if(native_hud) {
+            if(!range(mighty,88,payload) || !range(be32(m+84),12,payload))goto done;
+            uint32_t maps=be32(m+84);
+            for(unsigned i=0;i<6;i++) {
+                const uint8_t *entry=data+maps-0x400000u+i*2;
+                uint32_t record=maps+((uint32_t)entry[0]<<8)+entry[1];
+                if(!range(record,2,payload))goto done;
+                const uint8_t *r=data+record-0x400000u;
+                unsigned count=((unsigned)r[0]<<8)|r[1];
+                if(count>14 || !range(record,2+count*6,payload))goto done;
+            }
+        }
         for(unsigned i=0;i<3;i++) {
             uint32_t pal=be32(m+52+i*4);
             if(!range(pal,8,payload))goto done;
