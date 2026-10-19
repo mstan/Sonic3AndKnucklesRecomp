@@ -55,12 +55,25 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         uint32_t payload=(uint32_t)size-12;
         if(p>payload-28 || memcmp(data+p,"MDI1",4) ||
            be32(data+p+4)!=0x66ECB4F4 || data[p+8]!=0 || data[p+9]!=19 ||
-           data[p+10]!=0 || (data[p+11]!=2 && data[p+11]!=3))goto done;
+           data[p+10]!=0 || data[p+11]<2 || data[p+11]>4)goto done;
         if(data[p+11]>=3) {
             if(p>payload-36 || !range(be32(data+p+28),256,payload) ||
                !range(be32(data+p+32),256,payload))goto done;
         } else if(s3_stage_pack_megamix || s3_stage_pack_mighty) {
             message="Upgrade the converted bank with --upgrade-presentation for Megamix visual fixes";
+            goto done;
+        }
+        if(data[p+11]>=4) {
+            if(p>payload-40 || !range(be32(data+p+36),52,payload))goto done;
+            const uint8_t *sign=data+be32(data+p+36)-0x400000u;
+            if(memcmp(sign,"MGS1",4) || !range(be32(sign+4),10,payload) || !range(be32(sign+8),28,payload))goto done;
+            for(unsigned c=0;c<2;c++) {
+                const uint8_t *r=sign+12+c*20;
+                if(be32(r+4)!=58*32 || !range(be32(r),58*32,payload))goto done;
+                for(unsigned k=8;k<20;k+=4)if(!range(be32(r+k),32,payload))goto done;
+            }
+        } else if(s3_stage_pack_megamix) {
+            message="Upgrade the converted bank with --upgrade-presentation for corrected Megamix signposts";
             goto done;
         }
         uint32_t mighty=be32(data+p+12),music=be32(data+p+16),order=be32(data+p+20),cycles=be32(data+p+24);

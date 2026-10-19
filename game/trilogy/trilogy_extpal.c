@@ -138,7 +138,9 @@ void tri_ext_frame(void)
         memcpy(bot, s_cur[1], sizeof s_cur[1]);
     }
     int mighty=tri_mighty_presentation_frame(s_tiles,top+32,bot+32);
-    if(!actors && !mighty){gvdp_set_ext_tiles(NULL);return;}
+    extern int tri_signpost_frame(uint16_t *,uint16_t *);
+    int sign=tri_signpost_frame(top+16,bot+16);
+    if(!actors && !mighty && !sign){gvdp_set_ext_tiles(NULL);return;}
     int split = 1 << 20;
     if (r8(RAM_Water_flag))
         split = (int16_t)(r16(RAM_Water_level) - r16(RAM_Camera_Y_pos_copy));
