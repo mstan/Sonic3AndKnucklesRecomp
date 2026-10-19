@@ -203,6 +203,8 @@ static void dle_lz(int act)
         w16(RAM_Current_zone_and_act, next);
         w16(RAM_Apparent_zone_and_act, tri_apparent(next));
         w8(RAM_Ctrl_1_locked, 1);
+        extern void tri_save_progress(uint16_t next_za);
+        tri_save_progress(next);
     }
 }
 
