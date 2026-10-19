@@ -81,14 +81,22 @@ be recorded separately. ROM-independent tests cover default-off settings,
 invalid-resource rollback, persistence, save selection, bank integrity boundaries,
 palette behavior and the netplay guard.
 
-The 2026-10-18 integration passed all 156 act/player-mode probes, all 26 CTests,
-and 49 mod-off reference image/RAM/VRAM comparisons against v0.5.2. The bank's
-6,757 placed objects all have registered handlers; boot repeats that audit.
-A focused Green Hill signpost/results probe advances to Act 2. The clean
-experimental build also passed checks in Green Hill, Metropolis Act 3 and
-Death Egg with Sonic & Tails and Knuckles. These are bounded probes, and do
-not certify a full campaign clear. The larger reference's quickstates, rewind,
-old prototype save migration and complete boss/special-stage routes remain
+The 2026-10-18 cheat-assisted audit covers all 39 acts at 3,837 sampled
+locations, all 39 normal stage exits, all 17 boss encounters, and checkpoint,
+native death and settled retry in all 33 acts that contain starposts. It found
+and fixed a Z80 bus deadlock, Silver Sonic's missing collision registration,
+and duplicate Spring Yard 2 results that skipped Act 3. Separate source-data
+checks cover all static layouts; all acts produce non-silent, unclipped PCM.
+All 38 sampled enemy families spawn; 26 have confirmed native defeat reactions.
+The other interactions remain unverified.
+
+See [the audit record](STAGE_PACK_AUDIT.md) for the per-act matrix, evidence,
+repeatable commands, fixture bypasses and limits. The earlier 156 act/player
+entry probes, 26 CTests and 49 mod-off image/RAM/VRAM comparisons are separate
+checks. The bank's 6,757 placements have registered handlers, but registration
+alone does not prove behavior. Complete physics/animation/sound fidelity,
+special-stage entrance/return routes, all-character interaction coverage,
+old prototype save migration and reference host-state serialization remain
 follow-up work.
 
 Sonic CD is excluded: the cited stage-port reference has no CD stage layer.

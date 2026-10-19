@@ -522,7 +522,7 @@ static uint32_t mecha_child(uint32_t o, int field, uint8_t sub, uint8_t routine)
     return a1;
 }
 
-static void mecha(uint32_t o)
+static void mecha_step(uint32_t o)
 {
     switch (OB8(o, OBJ_routine)) {
     case 0x00:                                          /* ObjAF_Init */
@@ -692,6 +692,16 @@ static void mecha(uint32_t o)
         gone(o);
         return;
     }
+}
+
+/* S2's touch pass scans object RAM; S3K instead consumes a response list.
+ * The body must join that list as well as the separate back-spike child.
+ * Without this, Silver Sonic animates and attacks but cannot take a hit. */
+static void mecha(uint32_t o)
+{
+    mecha_step(o);
+    if (r32(o) == S2(0xAF) && OB8(o, OBJ_routine) < 0x0C)
+        o_touch(o);
 }
 
 /* ========================================================================
