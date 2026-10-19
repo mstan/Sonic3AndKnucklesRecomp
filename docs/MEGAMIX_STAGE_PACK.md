@@ -39,6 +39,22 @@ python tools/inspect_megamix.py --rom "Sonic 1 Megamix v3.0.bin" --out build/meg
 The ZIP itself can be supplied as `--rom`. Previews require Pillow; captures,
 inventories, ROMs and converted assets remain private under `build/`.
 
+`--check-conversion` additionally converts 256px source chunks into S3K's
+128px format, compacts reachable blocks with equal visuals/collision, and
+checks the resulting visuals, orientations, primary/secondary solidity and
+collision shapes. Background cells reuse visible foreground blocks where
+possible; background loop collision paths are unused. The v3 loop routine
+itself restricts behind-loop selection to Sunny Shores and Starry Night.
+
+Two acts exceed S3K's original 256-chunk format even after equivalent-block
+compaction: **City Outskirts 2 uses 279 chunks (260 foreground)** and **City
+Outskirts 3 uses 258 (239 foreground)**. The converter preserves complete
+16-bit `MGL1` layouts for runtime integration. It never truncates IDs or
+silently omits a route. `--export-geometry-dir build/megamix-geometry` exports
+private converted payloads; `layout.bin` is empty for these two acts, and
+`layout16.bin` holds their complete layouts. These are source-data artifacts,
+not a playable stage bank.
+
 ## Acceptance still in progress
 
 The reader and source previews do not constitute a playable stage/character

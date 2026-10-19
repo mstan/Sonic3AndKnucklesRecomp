@@ -36,6 +36,7 @@ BINDINGS = {
     0x1876E: '217c0002a9d60004', # common Sonic/Mighty mappings
     0x1AC16: '45f90002c3d2',     # common Sonic/Mighty dynamic PLCs
     0x1AC6E: '0681000a9364',     # FFBB=1 selects Mighty's raw tile bank
+    0x1A746: '0c380003fe1067084a38fe106600009e', # Sonic_Loops only zones 0/3
 }
 MIGHTY = dict(selector=1, mappings=0x2A9D6, dplc=0x2C3D2,
               art=0xA9364, palette=0x15, animation=0x1AA1C)
