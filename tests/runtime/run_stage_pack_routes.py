@@ -11,6 +11,8 @@ from run_stage_pack_audit import errors
 ap=argparse.ArgumentParser()
 ap.add_argument('--cases',default='2103,3000,2502')
 ap.add_argument('--mighty',action='store_true')
+ap.add_argument('--pack-mask',type=int,choices=range(8))
+ap.add_argument('--packs',type=lambda s:Path(s).resolve())
 for key in ('exe','rom','bank','out'):
     ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
 args=ap.parse_args();args.character=1;args.kind='routes'
@@ -75,8 +77,9 @@ for stage in args.cases.split(','):
                         rec.update(status='passed' if saved else 'failed',campaign_end='passed',next_mode=4,
                                    saved_completion='passed' if saved else 'failed',
                                    saved_code=ram[slot+3] if slot else None);break
-                    if u16(ram,0xfe10)==0x2800:
-                        finish(run,'2800',rec);break
+                    expected='0000' if args.pack_mask is not None and not args.pack_mask&2 else '2800'
+                    if u16(ram,0xfe10)==int(expected,16):
+                        finish(run,expected,rec);break
                     run.player(ram,0x27d0,0x5b0,freeze=True);run.step(60)
         run.snapshot('after')
         rec['god_revivals']=sum(e.get('god_revive',False) for e in run.events)

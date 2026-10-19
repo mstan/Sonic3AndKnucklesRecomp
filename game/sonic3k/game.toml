@@ -898,4 +898,13 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x00DBA2 # Megamix Render_HUD+5E
 kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C256 # Megamix SRAM_Load+102
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C3E4 # Megamix Write_SaveGame
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C402 # Megamix Write_SaveGame+1E
+kind = "game_hook"
 # END megamix geometry hooks

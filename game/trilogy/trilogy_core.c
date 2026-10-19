@@ -5,6 +5,7 @@
 #include "trilogy.h"
 #include "trilogy_hooks.h"
 #include "stage_pack.h"
+#include "campaign_mighty.h"
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,39 @@
 
 static uint8_t *s_bank;
 static uint32_t s_bank_size;
+static uint8_t *s_banks[3];
+static uint32_t s_sizes[3];
+static int s_selected=-1;
+static uint32_t s_mighty[3];
+uint32_t tri_mighty_descriptor(void)
+{ return s_selected>=0?s_mighty[s_selected]:0; }
+
+int tri_bank_select(int content)
+{
+    int old=s_selected;
+    int i=content-1;
+    if(i<0 || i>2 || !s_banks[i]) {
+        i=s_banks[2]?2:s_banks[0]?0:s_banks[1]?1:-1;
+    }
+    s_selected=i;s_bank=i>=0?s_banks[i]:NULL;s_bank_size=i>=0?s_sizes[i]:0;
+    g_rom_ext=s_bank;g_rom_ext_size=s_bank_size;
+    return old+1;
+}
+int tri_stage_content(uint16_t stage)
+{
+    unsigned z=stage>>8;
+    return z>=0x20&&z<=0x26?1:z>=0x28&&z<=0x32?2:z>=0x34&&z<=0x3A?3:0;
+}
+void tri_bank_level(void)
+{
+    uint16_t stage=r16(RAM_Current_zone_and_act);int c=tri_stage_content(stage);
+    if(c && !s_banks[c-1]) {
+        fprintf(stderr,"[stage-pack] unavailable stage %04X; resuming Angel Island\n",stage);
+        w16(RAM_Current_zone_and_act,0);w16(RAM_Apparent_zone_and_act,0);
+        w8(RAM_Last_star_post_hit,0);c=0;
+    }
+    tri_bank_select(c);
+}
 
 int tri_bank_loaded(void) { return s_bank != NULL; }
 
@@ -20,41 +54,52 @@ void trilogy_init(void)
     if (!s3_stage_pack_enabled) return;
     if (s_bank)
         return;
+    for(int i=0;i<3;i++) {
+    if(!s3_pack_available[i])continue;
     char error[256];
-    if (!s3_stage_pack_validate(s3_stage_pack_path, error, sizeof error)) {
-        fprintf(stderr, "[stage-pack] %s\n", error);
-        exit(EXIT_FAILURE);
+    if (!s3_pack_validate(s3_pack_paths[i],i+1,error,sizeof error)) {
+        fprintf(stderr,"[stage-pack] content %d unavailable: %s\n",i+1,error);s3_pack_available[i]=0;continue;
     }
-    char path[1024];
-    snprintf(path, sizeof path, "%s", s3_stage_pack_path);
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        fprintf(stderr, "[trilogy] %s not found — S1/S2 zones unavailable\n", path);
-        exit(EXIT_FAILURE);
-    }
+    FILE *f = fopen(s3_pack_paths[i], "rb");
+    if (!f) {s3_pack_available[i]=0;continue;}
     fseek(f, 0, SEEK_END);
     long n = ftell(f);
     fseek(f, 0, SEEK_SET);
     if (n <= 0x2040 || n > 0x400000 || (n & 1)) {
         fprintf(stderr, "[trilogy] bad bank size %ld\n", n);
         fclose(f);
-        exit(EXIT_FAILURE);
+        s3_pack_available[i]=0;continue;
     }
-    s_bank = (uint8_t *)malloc((size_t)n);
-    if (!s_bank || fread(s_bank, 1, (size_t)n, f) != (size_t)n || memcmp(s_bank, "TRLG", 4) != 0) {
+    s_banks[i] = (uint8_t *)malloc((size_t)n);
+    if (!s_banks[i] || fread(s_banks[i], 1, (size_t)n, f) != (size_t)n || memcmp(s_banks[i], "TRLG", 4) != 0) {
         fprintf(stderr, "[trilogy] bank read/magic failed\n");
-        free(s_bank);
-        s_bank = NULL;
+        free(s_banks[i]);s_banks[i]=NULL;
         fclose(f);
-        exit(EXIT_FAILURE);
+        s3_pack_available[i]=0;continue;
     }
     fclose(f);
-    s_bank_size = (uint32_t)n;
-    g_rom_ext = s_bank;
-    g_rom_ext_size = s_bank_size;
+    s_sizes[i]=(uint32_t)n;
+    }
+    if(s_banks[2]) {
+        uint32_t info=((uint32_t)s_banks[2][0x24]<<24)|((uint32_t)s_banks[2][0x25]<<16)|((uint32_t)s_banks[2][0x26]<<8)|s_banks[2][0x27];
+        const uint8_t *p=s_banks[2]+info-TRI_BANK_BASE+12;
+        s_mighty[2]=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        for(int i=0;i<2;i++)if(s_banks[i]) {
+            s_mighty[i]=campaign_mighty_copy(&s_banks[i],&s_sizes[i],s_banks[2],s_sizes[2]);
+            if(!s_mighty[i]) {
+                fprintf(stderr,"[stage-pack] content %d cannot attach Mighty resources; pack skipped\n",i+1);
+                free(s_banks[i]);s_banks[i]=NULL;s_sizes[i]=0;s3_pack_available[i]=0;
+            }
+        }
+    }
+    s3_stage_pack_sonic1=s3_pack_available[0];s3_stage_pack_sonic2=s3_pack_available[1];
+    s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
+    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix;
+    if(!s3_stage_pack_enabled)return;
     tri_screen_register();
     extern int tri_obj_audit_bank(void);
-    if (!tri_obj_audit_bank()) exit(EXIT_FAILURE);
+    for(int i=0;i<3;i++)if(s_banks[i]) {tri_bank_select(i+1);if(!tri_obj_audit_bank())exit(EXIT_FAILURE);}
+    tri_bank_select(0);
     fprintf(stderr, "[trilogy] expansion bank mapped at $400000 (%u bytes)\n", s_bank_size);
 }
 
@@ -77,6 +122,8 @@ uint32_t tri_dir_for(int zone, int act)
     uint32_t idx = (uint32_t)(zone - TRI_ZONE_BASE) * 4u + (uint32_t)act;
     if (idx >= TRI_DIR_COUNT)
         return 0;
+    int c=tri_stage_content((uint16_t)(zone<<8));
+    if(!c || !s3_pack_available[c-1] || s_selected!=c-1)return 0;
     uint32_t e = TRI_BANK_BASE + TRI_DIR_OFF + idx * TRI_DIR_ENTRY;
     if(tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX && !s3_stage_pack_megamix)return 0;
     return tri_rd32(e + TD_LLB) ? e : 0;
@@ -166,6 +213,8 @@ int trilogy_instruction(uint32_t pc)
 {
     if (!s_bank)
         return 0;
+    extern int tri_save_journal_hook(uint32_t pc);
+    if(tri_save_journal_hook(pc))return 1;
     if (tri_megamix_geometry_hook(pc))return 1;
     if (tri_megamix_sprite_hook(pc))return 1;
     if (tri_level_hook(pc))

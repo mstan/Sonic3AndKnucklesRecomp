@@ -11,6 +11,8 @@
  * zone is picked. The 70 tiles go to VRAM in the VBlank, with the sprites.
  */
 #include "trilogy_obj.h"
+#include "campaign_save.h"
+#include "stage_pack.h"
 #include "genesis_machine.h"
 #include "megamix_geometry.h"
 #include <stdio.h>
@@ -529,12 +531,12 @@ static int load_frames(int code)
 }
 
 /* the selected file shows a zone card (Load_Icon_Art, every frame; a0 = its slot) */
-void tri_thumb_show(int code)
+static void thumb_show(int code)
 {
     uint32_t slot = A(0) & 0xFFFFFFu;
     s_cx = (int16_t)r16(slot + OBJ_x_pos) - 40 - 128;
     s_cy = (int16_t)r16(slot + OBJ_y_pos) - 120 - 128;
-    if (load_frames(code)) {
+    if (load_frames(campaign_stable(tri_campaign_mask(),code))) {
         s_t++;
         s_live = 2;
         memset(s_tiles, 0x11, sizeof s_tiles);       /* the key colour, everywhere */
@@ -549,6 +551,13 @@ void tri_thumb_show(int code)
     if (s_camx > s_xmax) s_camx = s_xmin;
     render_card();
     for (int k = 0; k < 16; k++) w16(RAM_Normal_palette + 0x60u + (uint32_t)k * 2u, s_cpal[k]);
+}
+
+void tri_thumb_show(int code)
+{
+    int previous=tri_bank_select(tri_stage_content(tri_code_to_za(code)));
+    thumb_show(code);
+    tri_bank_select(previous);
 }
 
 void tri_thumb_vblank(void)

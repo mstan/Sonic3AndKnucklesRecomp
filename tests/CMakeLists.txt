@@ -1,4 +1,12 @@
 # Sonic 3 family implementation tests belong to the game, never the shared engine.
+add_executable(campaign_save_test runtime/campaign_save_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
+target_include_directories(campaign_save_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME campaign_save COMMAND campaign_save_test)
+add_executable(campaign_mighty_test runtime/campaign_mighty_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_mighty.c")
+target_include_directories(campaign_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME campaign_mighty COMMAND campaign_mighty_test)
 set(S3_GAME_COMMON "${CMAKE_CURRENT_LIST_DIR}/../game/common")
 add_executable(megamix_geometry_test runtime/megamix_geometry_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/megamix_geometry.c")

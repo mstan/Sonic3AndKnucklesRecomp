@@ -46,6 +46,10 @@
 
 /* ---- expansion bank ---------------------------------------------------- */
 #define TRI_BANK_BASE   0x400000u
+int tri_bank_select(int content);
+uint32_t tri_mighty_descriptor(void);
+int tri_stage_content(uint16_t stage);
+void tri_bank_level(void);
 #define TRI_DIR_OFF     0x40u          /* directory of zone-act entries */
 #define TRI_DIR_ENTRY   0x40u
 #define TRI_DIR_COUNT   0x80u          /* (zone-$20)*4 + act */

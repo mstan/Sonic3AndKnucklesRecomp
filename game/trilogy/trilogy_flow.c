@@ -177,14 +177,16 @@ void tri_s1_complete(void)
         fprintf(stderr,"[megamix] Final Fight escape complete: campaign finished\n");
         return;
     }
-    fprintf(stderr, "[trilogy] Sonic 1 complete: on to Emerald Hill\n");
+    extern int s3_stage_pack_sonic2;
+    uint16_t next=s3_stage_pack_sonic2?0x2800:0;
+    fprintf(stderr, "[stage-pack] Sonic 1 complete: next campaign %04X\n",next);
     tri_ach_act_clear(0x2502);
-    w16(RAM_Current_zone_and_act, 0x2800);
-    w16(RAM_Apparent_zone_and_act, 0x2800);
+    w16(RAM_Current_zone_and_act, next);
+    w16(RAM_Apparent_zone_and_act, next);
     w8(RAM_Last_star_post_hit, 0);
     w16(RAM_Restart_level_flag, 1);
     extern void tri_save_progress(uint16_t next_za);
-    tri_save_progress(0x2800);
+    tri_save_progress(next);
 }
 
 /* SBZ2: the tally does not end the act (Got_SBZ2 / Got_Boundary). Control

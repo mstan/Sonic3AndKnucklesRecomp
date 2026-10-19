@@ -1,9 +1,11 @@
-# Sonic 1 & 2 Stage Pack
+# Experimental campaign stage mods
 
-This optional campaign adds all 39 retail Sonic 1 and Sonic 2 acts to the
-combined **Sonic 3 & Knuckles** target. Enable **Sonic 1 & 2 Stage Pack** on
-the launcher's Mods page (experimental channel). It starts at Green Hill,
-continues through Sonic 2, then enters the native Sonic 3 & Knuckles campaign.
+Three independent mods extend **Sonic 3 & Knuckles**: **Sonic 1 stages**,
+**Sonic 2 stages**, and **Sonic Megamix + Mighty**. All are experimental and
+disabled by default. Enable any combination on the launcher's Mods page.
+Campaign order is Sonic 1, Sonic 2, native Sonic 3 & Knuckles, then Megamix;
+absent or disabled campaigns are skipped. Sonic 1 supplies 19 acts and
+Sonic 2 supplies 20. Megamix always adds Mighty as a selectable character.
 Sonic & Tails, Sonic, Tails and Knuckles use the S3K player code throughout.
 The standalone Sonic 3 and Sonic & Knuckles targets do not enroll this pack.
 
@@ -21,9 +23,20 @@ run the following from the source checkout, supplying your own ROM paths:
 python tools/build_stage_pack.py --s1 sonic1.bin --s2 sonic2.bin --s3k sonic3k.bin --out sonic1-2-stages.bin
 ```
 
-Select the resulting file under the mod's **Converted Sonic 1 & 2 stage bank**
-resource. The pack is disabled by default. Enabling it without a valid complete
-bank refuses launch; disabling it does not require the bank.
+Export independent packs from that converted bank:
+
+```text
+python tools/split_campaign_packs.py --bank sonic1-2-stages.bin --content sonic1 --out mods
+python tools/split_campaign_packs.py --bank sonic1-2-stages.bin --content sonic2 --out mods
+```
+
+Each mod has its own **Campaign content pack** resource. Default paths are
+`mods/sonic1-stages.pak`, `mods/sonic2-stages.pak`, and
+`mods/megamix-stages.pak`, relative to settings. Legacy combined `.bin` banks
+remain accepted for migration; assigning one never enables another mod.
+Missing or damaged resources are skipped without refusing the base game.
+Their requested settings and progress remain, so putting the file back at
+the same path restores the campaign on the next launch.
 
 The converter requires these exact raw cartridge revisions:
 
@@ -38,17 +51,35 @@ Some upstream comments call the `DEB8` cartridge REV01; the CRC above is the
 identity the converter actually uses. Conversion is atomic and never rewrites
 the supplied cartridges, an existing output on failure, or checked-in headers.
 The bank has a versioned `SPK1` length/CRC footer. Its complete act directory and
-integrity are checked by the picker, again when committing settings, and at boot.
+integrity are checked by the picker and again at boot. CPK1 adds a campaign
+identity and enrolls only that campaign's directory. Each pack retains common
+conversion tables and unused payload bytes so it is self-contained and keeps
+verified guest pointers intact; it has no dependency on another installed pack.
 Settings live in `sonic3k-stage-pack.ini` next to the normal settings file.
 
 ## Saves and local play
 
-The optional campaign uses **sonic3k-stage-pack.srm** beside the executable.
-The normal `<ROM basename>.srm` is never loaded or overwritten while the pack
-is active. Turn the pack off to return to the original campaign and saves.
-The reference's campaign save-slot numbering is incompatible with native S3K,
-so this version deliberately does not silently migrate either format. Existing
-prototype extension saves also remain untouched and need an explicit migration.
+All configurations share the normal **<ROM basename>.srm**. Its on-disk
+records always contain native S3K levels and characters, with the cartridge's
+original checksums and primary/backup copies. Addon progress and preferred
+Mighty identities live in **<ROM basename>.srm.campaign**, using stable
+campaign/zone IDs independent of the installed catalog. Keep this companion
+and its `.bak` with the SRAM when backing up or moving the complete campaign.
+Native SRAM exports alone carry the native campaign and shared stats.
+
+Removing packs parks their progress. The available menu falls back safely,
+and a temporary Sonic fallback retains Mighty's saved identity. Re-adding a
+pack restores its parked resume stage. Native progression, lives and emeralds
+can still advance while addons are absent. Explicit native slot deletion
+clears that slot's parked progress when the journal next reconciles it.
+
+The first addon launch retains an immutable `.pre-campaign.bak` copy of an
+existing native SRAM. Valid old `sonic3k-stage-pack.srm` and
+`sonic3k-megamix.srm` files are imported once into a new journal; their original
+files remain untouched. Atomic writes, CRC validation, a last-valid journal
+backup and pending/confirmed native projections handle interrupted saves.
+With every addon absent or disabled, the base cartridge runs without the
+campaign save hooks; the companion remains parked.
 
 Campaign saving works through the native Data Select and save routines.
 Quickstates and rewind are unavailable while the pack is active: this larger
@@ -96,9 +127,32 @@ entry probes, 26 CTests and 49 mod-off image/RAM/VRAM comparisons are separate
 checks. The bank's 6,757 placements have registered handlers, but registration
 alone does not prove behavior. Complete physics/animation/sound fidelity,
 special-stage entrance/return routes, all-character interaction coverage,
-old prototype save migration and reference host-state serialization remain
+reference host-state serialization remain
 follow-up work.
 
 Sonic CD is excluded: the cited stage-port reference has no CD stage layer.
-Megamix v3 stages and Mighty remain a separate stretch task. A Megamix ROM is
-an input for that work, not a completed S3K stage or character implementation.
+Megamix v3 stages and Mighty are implemented in the third independent mod;
+see [the Megamix guide](MEGAMIX_STAGE_PACK.md) for conversion and audit bounds.
+
+## Independent-pack integration checks (2026-10-19)
+
+The combined changes pass 36 CTests, all eight real-input new-game
+configurations, and 49 byte-identical native image/RAM/VRAM artifacts.
+`run_campaign_permutations.py` checks actual cartridge checksums and native
+stage/character bounds after each save, legacy migration, missing/re-added
+packs and recovery from a truncated companion. The first missing-pack
+fixture omitted the normal replay-zone choice for a completed file; its
+failure is retained and superseded by the corrected second run.
+
+`qa-experimental-s1-native` observes all eight real Final Zone boss hits,
+the escape and the fresh Angel Island start with Sonic 2 absent.
+`qa-experimental-native-megamix` observes actual final-boss damage, chase,
+ending and Sunny Shores with only Megamix enabled; earlier DEZ bosses are
+explicitly bypassed. Ten Megamix signs pass all five real animation frames,
+loaded tally art and real next-act starts (`qa-experimental-signs`).
+
+The bounded MDY3 attachment preserves every mapping/DPLC record, animation,
+art and palette/UI resource, so Mighty can follow the player into S1/S2
+packs converted without Megamix. The save and attachment kernels also pass
+Ubuntu GCC builds with `-Wall -Wextra -Werror`. This establishes the listed
+contracts, not complete donor fidelity or every route's mechanics.

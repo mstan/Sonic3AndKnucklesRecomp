@@ -2,18 +2,21 @@
  * trilogy_save.c — save files across the whole trilogy.
  *
  * A save slot (S3K's 10-byte format, Saved_data) keeps its level code in
- * byte 3. The trilogy numbers every zone in campaign order: Sonic 1's seven
+ * byte 3. The journal gives every zone a stable identity: Sonic 1's seven
  * (0-6), Sonic 2's eleven (7-17), then Sonic 3 & Knuckles' fourteen as S3K
- * numbers them, offset by 18 (18-31). The optional Megamix profile adds
- * codes 32-38 and completion 39; the base profile finishes at 32. S3K's own
+ * numbers them, offset by 18 (18-31), and Megamix's seven (32-38).
+ * Data Select uses a dense catalog containing only available campaigns.
+ * trilogy_save_journal.c translates its RAM view at the native IO boundary;
+ * native SRAM keeps native IDs. S3K's own
  * SaveGame is redone here with that offset; Sonic 1 / Sonic 2 zones save when
  * a zone is cleared (trilogy_flow.c), and the Data Select reads the codes
  * back through its hooks: the zones a cleared file may pick, the level a code
  * starts, the live thumbnail of the zone (trilogy_thumbs.c). A new game
- * starts at Green Hill.
+ * starts with the first enabled prequel, or native Angel Island.
  */
 #include "trilogy_obj.h"
 #include "stage_pack.h"
+#include "campaign_save.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,7 +29,7 @@
 #define CODE_S2         7
 #define CODE_S3K        18
 #define CODE_MM         32
-#define CODE_CLEAR      (s3_stage_pack_megamix?39:32)
+#define CODE_CLEAR      campaign_count(tri_campaign_mask())
 static int mm_after_credits;
 static const uint16_t k_mm_zones[7]={0x3400,0x3600,0x3800,0x3500,0x3700,0x3900,0x3902};
 
@@ -40,12 +43,13 @@ static const uint8_t k_next_level[24][2] = {
 
 uint16_t tri_code_to_za(int code)
 {
-    if (code < 0) return 0x2000;
+    code=campaign_stable(tri_campaign_mask(),code);
+    if (code < 0) return 0;
     if (code < CODE_S2) return k_s1_zones[code];
     if (code < CODE_S3K) return (uint16_t)((0x28 + code - CODE_S2) << 8);
     if (code < CODE_MM) return k_s3k_zones[code - CODE_S3K];
     if(s3_stage_pack_megamix && code<39)return k_mm_zones[code-CODE_MM];
-    return 0x2000;
+    return 0;
 }
 
 /* the code of the zone an (internal) zone/act belongs to */
@@ -55,13 +59,13 @@ int tri_za_to_code(uint16_t za)
     uint16_t ap = tri_apparent(za);
     int z = ap >> 8;
     static const int8_t s1[7] = { 0, 3, 1, 4, 2, 5, 6 };                /* $20 GHZ, $21 LZ, $22 MZ ... $26 FZ */
-    if (z >= 0x20 && z <= 0x26) return s1[z - 0x20];
-    if (z >= 0x28 && z <= 0x32) return CODE_S2 + z - 0x28;
+    if (z >= 0x20 && z <= 0x26) return campaign_display(tri_campaign_mask(),s1[z - 0x20]);
+    if (z >= 0x28 && z <= 0x32) return campaign_display(tri_campaign_mask(),CODE_S2 + z - 0x28);
     if(s3_stage_pack_megamix && z>=0x34 && z<=0x3A) {
         static const uint8_t order[7]={0,3,1,4,2,5,6};
-        return CODE_MM+order[z-0x34];
+        return campaign_display(tri_campaign_mask(),CODE_MM+order[z-0x34]);
     }
-    for (int i = 0; i < 14; i++) if ((k_s3k_zones[i] >> 8) == z) return CODE_S3K + i;
+    for (int i = 0; i < 14; i++) if ((k_s3k_zones[i] >> 8) == z) return campaign_display(tri_campaign_mask(),CODE_S3K + i);
     return 0;
 }
 
@@ -130,6 +134,8 @@ static void save_game_s3k(void)
         else if (pm == 2) completed = d0 >= CODE_S3K + 0xD;
         else completed = d0 > CODE_S3K + 0xD || (d0 == CODE_S3K + 0xD && r8(RAM_Chaos_emerald_count) < 7);
         if(completed && s3_stage_pack_megamix) {mm_after_credits=1;d0=CODE_MM;completed=0;}
+        d0=completed?CODE_CLEAR:campaign_display(tri_campaign_mask(),d0);
+        if(d0<0)d0=tri_za_to_code(0);
         if(r16(RAM_SK_alone_flag)||!a1)goto done;
         if ((r8(a1) & 3) && d0 < r8(a1 + 3)) { save_lives(a1); goto done; }
         w8(a1, (uint8_t)(r8(a1) & 0xFC));
@@ -152,7 +158,7 @@ void tri_save_megamix_complete(void)
     if(!a1 || r16(RAM_SK_alone_flag))return;
     uint8_t c=1;
     if(r8(RAM_Chaos_emerald_count)>=7){c++;if(r8(RAM_Super_emerald_count)>=7)c++;}
-    w8(a1,c);w8(a1+3,39);w16(a1+4,0);save_lives(a1);
+    w8(a1,c);w8(a1+3,(uint8_t)CODE_CLEAR);w16(a1+4,0);save_lives(a1);
 }
 
 void tri_thumb_show(int code);
@@ -174,20 +180,16 @@ int tri_save_hook(uint32_t pc)
         return 1;                                    /* (S1/S2 zones save on their own zone clears) */
     case TH_DS_NOSAVE_START:
     case TH_DS_NEWGAME:                              /* a new game starts with Sonic 1 */
-        w16(RAM_Current_zone_and_act, 0x2000);
-        w16(RAM_Apparent_zone_and_act, 0x2000);
+        w16(RAM_Current_zone_and_act, tri_code_to_za(0));
+        w16(RAM_Apparent_zone_and_act, tri_code_to_za(0));
         return 0;
     case TH_DS_ZONE_MAX:                             /* a finished file picks from every zone before */
-        D(6) = (D(6) & 0xFFFF0000u) | (s3_stage_pack_megamix?38:(uint16_t)(D(6)+CODE_S3K));
+        D(6) = (D(6) & 0xFFFF0000u) | (uint16_t)(CODE_CLEAR-1);
         return 0;
     case TH_DS_CODE_TO_ZONE: {
         int code = D(0) & 0xFF;
-        if (code < CODE_S3K || (s3_stage_pack_megamix && code>=CODE_MM)) {
-            D(0) = (D(0) & 0xFFFF0000u) | tri_code_to_za(code);
-            return 1;
-        }
-        D(0) = (D(0) & 0xFFFFFF00u) | (uint8_t)(code - CODE_S3K);
-        return 0;
+        D(0) = (D(0) & 0xFFFF0000u) | tri_code_to_za(code);
+        return 1;
     }
     case TH_DS_ZONE_TENS: {                          /* "ZONE n": the trilogy's own numbering, 1-32 */
         int n = (int)((D(0) & 0xFFFF) >> 1) + 1;

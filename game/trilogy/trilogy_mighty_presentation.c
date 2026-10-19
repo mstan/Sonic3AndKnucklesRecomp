@@ -16,8 +16,7 @@ static uint8_t menu_mighty[9];
 static uint8_t menu_palette_lines[32];
 static uint32_t data(void)
 {
-    uint32_t desc=tri_rd32(TRI_BANK_BASE+0x24);
-    uint32_t p=desc && tri_rd32(desc)==0x4D444931u?tri_rd32(desc+12):0;
+    uint32_t p=tri_mighty_descriptor();
     return p && tri_rd32(p)==0x4D445933u?p:0;
 }
 static unsigned menu_index(uint32_t p)

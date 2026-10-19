@@ -18,8 +18,7 @@ static uint16_t super_colors[2][4];
 static int palette_cycling;
 static uint32_t descriptor(void)
 {
-    uint32_t d=tri_rd32(TRI_BANK_BASE+0x24);
-    return d && tri_rd32(d)==0x4D444931u ? tri_rd32(d+12):0;
+    return tri_mighty_descriptor();
 }
 static int active(void)
 {

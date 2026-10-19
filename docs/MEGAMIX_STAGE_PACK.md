@@ -1,7 +1,7 @@
 # Optional Megamix v3 stages and Mighty
 
 `feature/megamix-after-s3k` extends the audited Sonic 1/2 pack with all
-**19 Mega Drive Megamix v3 acts** and optional **Mighty**. Campaign order:
+**19 Mega Drive Megamix v3 acts** and selectable **Mighty**. Campaign order:
 **Sonic 1 → Sonic 2 → Sonic 3 & Knuckles → Megamix**. The game keeps its
 existing name; the additions are disabled by default.
 
@@ -12,9 +12,9 @@ This child starts from `c2d9f37eaec2e1befd025d8fcb637b8057e24de9` on
 
 ## Enable and convert
 
-On recomp-ui's Mods page, enable **Sonic Megamix v3 stages** and optionally
-**Mighty from Megamix v3** under Sonic Campaign Stage Packs. Either addition
-enables the base feature. Disabling the base disables both additions.
+On recomp-ui's Mods page, enable **Sonic Megamix + Mighty (Experimental)**.
+Mighty and Mighty & Tails are always included with this mod. Sonic 1 and
+Sonic 2 are separate independent mods; either, both or neither may be active.
 
 No ROM or converted donor graphics/music is distributed. First build the
 base bank with `tools/build_stage_pack.py`, then extend it:
@@ -23,8 +23,11 @@ base bank with `tools/build_stage_pack.py`, then extend it:
 python tools/build_megamix_pack.py --base-bank sonic1-2-stages.bin --s1 sonic1.bin --s3k sonic3k.bin --megamix "sonic-1-megamix-v3.0 (1).zip" --out sonic-megamix-stages.bin
 ```
 
-Select that extended bank as the mod's required resource. The ZIP or raw BIN
-is accepted. The donor is 1,283,224 bytes, CRC32 `66ECB4F4`, SHA256
+Export `mods/megamix-stages.pak` with
+`python tools/split_campaign_packs.py --bank sonic-megamix-stages.bin --content megamix --out mods`
+and select it as this mod's resource. Use `--content all` to export all three
+self-contained packs from the extended bank. The converter accepts a ZIP or
+raw BIN donor. The donor is 1,283,224 bytes, CRC32 `66ECB4F4`, SHA256
 `85d9e9ba79f0035d5854618666ff198871abe1931558496e6563b1cd90e5cdbe`, matching
 the [official v3 download](https://www.headcannon.com/TeamMegamix/builds/S1MM%20v30.zip).
 Supported S3K CRC32: `63522553`. Inputs are never changed.
@@ -39,8 +42,9 @@ python tools/build_megamix_pack.py --upgrade-presentation --base-bank sonic-mega
 
 SPK2 checks length, CRC, complete directory, geometry, sprites and versioned
 MDI/MDY metadata. SPK1 remains supported for the base campaign, but cannot
-enable Megamix or Mighty. Invalid resources refuse launch.
-The visual fixes require MDI version 3; older extended banks must be upgraded.
+enable Megamix or Mighty on its own. Invalid/missing resources are skipped,
+retaining their configuration and progress. The visual fixes require MDI
+version 4 and MDY3; older extended banks must be upgraded before exporting.
 
 ## Gameplay and controls
 
@@ -74,10 +78,12 @@ Later CD abilities are outside this v3 port.
 Blue Spheres remains the special-stage system. Corresponding native
 S3K sound effects are reused.
 
-Megamix saves use **sonic3k-megamix.srm**; the base uses
-`sonic3k-stage-pack.srm`. Native saves remain separate. The native S3K
+Saves use native SRAM plus a recoverable campaign companion; see
+[save compatibility](STAGE_PACKS.md#saves-and-local-play). Old profile SRAM
+files migrate once without overwriting their originals. The native S3K
 ending finishes before Sunny Shores loads. Final Fight's escape completes
-the campaign. Zone codes 32–38 represent Megamix; 39 means completion.
+the campaign. Stable journal codes 32–38 represent Megamix; 39 means
+completion. Data Select presents a dense list of the currently available zones.
 Quickstates, rewind and netplay remain unavailable until all additional
 host state has a complete serialization contract.
 
@@ -94,7 +100,7 @@ Outskirts 2/3 exceed native chunk limits; bounded MGL1 readers retain full
 16-bit layouts. Collision, native streaming and adaptive rendering share
 that reader. Explicitly marked actor sprites use an immutable texture bank
 in both renderers; unmarked sprites and planes retain VRAM. All paths use
-portable C. All 22 retail hook sites are instruction/annotation-verified by
+portable C. All 25 retail hook sites are instruction/annotation-verified by
 `tools/gen_megamix_geometry_sites.py`. Interior labels are not assumed
 callable function entries.
 
