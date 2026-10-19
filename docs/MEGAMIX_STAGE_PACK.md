@@ -55,6 +55,40 @@ private converted payloads; `layout.bin` is empty for these two acts, and
 `layout16.bin` holds their complete layouts. These are source-data artifacts,
 not a playable stage bank.
 
+## Extended geometry runtime milestone
+
+The child branch now has a portable, bounded `MGL1` reader and an `MGI1`
+bank descriptor adapter for directory entries with `TD_GAME=3`. Both retail
+collision lookups and the native row streamer return full expansion-bank
+cell pointers. The custom background writer and adaptive renderer use the
+same geometry. The renderer checks the published frame's stage identity.
+The parent campaign remains on its existing RAM path.
+
+`tools/gen_megamix_geometry_sites.py --rom game/sonic3k/sonic3k.bin --check`
+verifies all six hook sites against complete retail instruction sequences
+and the pinned annotation labels. No engine fork or assembly is required.
+
+Validation on 2026-10-19:
+
+- Both new C tests and both existing cartridge renderer tests passed.
+- Every exported act passed the compiled reader and hook adapters; native
+  collision, tile streaming and the published renderer agree on every
+  converted cell, including both oversized City Outskirts acts.
+- The combined game built successfully. With the pack off, all 49 native
+  PNG/RAM/VRAM captures match v0.5.2 exactly.
+- Existing pack signpost/audio probes passed GHZ1, SYZ2 and MTZ2; each loaded
+  the expected next act at its actual start. These are regression probes,
+  not Megamix gameplay coverage.
+
+Reproduce the private corpus check after exporting geometry:
+
+```text
+python tests/runtime/check_megamix_geometry.py --inventory build/megamix-v3-conversion.json --geometry-dir build/megamix-geometry --reader build/tests/Release/megamix_geometry_test.exe --hooks build/tests/Release/megamix_hooks_test.exe --out build/megamix-runtime-geometry-checks.json
+```
+
+The descriptor reader does not enroll a stage or expose an enabled package.
+Actual Megamix terrain interactions, stage events and exits remain unverified.
+
 ## Acceptance still in progress
 
 The reader and source previews do not constitute a playable stage/character

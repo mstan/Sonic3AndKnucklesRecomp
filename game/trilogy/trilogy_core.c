@@ -135,6 +135,7 @@ int trilogy_dispatch(uint32_t addr)
  * range check and rewrites D0, so our sites must never reach it. */
 int trilogy_owns(uint32_t pc)
 {
+    if(tri_megamix_geometry_owns(pc))return 1;
     switch (pc) {
     TH_ALL_CASES return 1;
     default: return 0;
@@ -145,6 +146,7 @@ int trilogy_instruction(uint32_t pc)
 {
     if (!s_bank)
         return 0;
+    if (tri_megamix_geometry_hook(pc))return 1;
     if (tri_level_hook(pc))
         return 1;
     if (tri_screen_hook(pc))

@@ -192,6 +192,7 @@ int tri_level_hook(uint32_t pc)
         tri_obj_level_entry();
         s3_video_set_ring_layout(ring_layout);
         dev_force_zone();
+        tri_megamix_geometry_begin();
         tri_flow_level_entry();
         s1_obj_syz_reset();
         s1_obj_lz_reset();

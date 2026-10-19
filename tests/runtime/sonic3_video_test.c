@@ -72,6 +72,13 @@ static void test_file_select(void)
     }
     CHECK(!memcmp(before,g_ram,sizeof before));
 }
+static int extended_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    if(ram[0xFE10]!=0x34)return 0;
+    CHECK(x==4096 && y==128 && background==1);
+    *cell=0xC03;
+    return 1;
+}
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -125,6 +132,12 @@ int main(int argc,char **argv)
     g_ram[0x813F]=1;word(g_ram,128+14,3);
     CHECK(world_attr(g_ram,-1,0,1)==101);CHECK(world_attr(g_ram,-1,0,0)==0);
     word(g_ram,128,0xC03);CHECK(world_attr(g_ram,0,0,0)==(103^0x1800));
+    /* Expansion terrain uses the same block flips and palette/priority bits
+     * as native cells, and checks the published frame's stage identity. */
+    s3_video_set_world_cell(extended_cell);g_ram[0xFE10]=0x34;
+    CHECK(world_attr(g_ram,4096,128,1)==(103^0x1800));
+    g_ram[0xFE10]=0x20;CHECK(world_attr(g_ram,0,0,0)==(103^0x1800));
+    s3_video_set_world_cell(NULL);g_ram[0xFE10]=0;
     /* Sorted placements, native respawn pointers and matching activation cells. */
     longword(g_rom,S3_PLACEMENTS,0x100000);word(g_rom,0x100000,640);word(g_rom,0x100002,0x8060);
     g_rom[0x100004]=1;word(g_rom,0x100006,1000);word(g_rom,0x100008,0xE060);

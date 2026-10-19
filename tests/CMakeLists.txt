@@ -1,5 +1,15 @@
 # Sonic 3 family implementation tests belong to the game, never the shared engine.
 set(S3_GAME_COMMON "${CMAKE_CURRENT_LIST_DIR}/../game/common")
+add_executable(megamix_geometry_test runtime/megamix_geometry_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/megamix_geometry.c")
+target_include_directories(megamix_geometry_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME megamix_geometry COMMAND megamix_geometry_test)
+add_executable(megamix_hooks_test runtime/megamix_hooks_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/megamix_geometry.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/trilogy_megamix_geometry.c")
+target_include_directories(megamix_hooks_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
+add_test(NAME megamix_hooks COMMAND megamix_hooks_test)
 add_executable(stage_pack_test runtime/stage_pack_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_mods.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_bank.c")

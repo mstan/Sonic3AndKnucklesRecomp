@@ -234,25 +234,30 @@ static int native_terrain_streamed(int wy, int copied_camera_y)
     int top = (copied_camera_y & ~15) - 16;
     return wy >= top && wy < top + 256;
 }
+static S3VideoWorldCell s_world_cell;
+void s3_video_set_world_cell(S3VideoWorldCell read) { s_world_cell=read; }
 static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background)
 {
-    unsigned header=background?0x8002u:0x8000u;
-    int width=((ram[header]<<8)|ram[header+1])*128;
-    if(width<=0 || (!background && (wx<0 || wx>=width)))return 0;
-    unsigned row=((unsigned)wy>>5)&0x7Cu;
-    unsigned p=0x8008u+row+(background?2u:0u);
-    unsigned rowaddr=(ram[p]<<8)|ram[p+1];
-    /* Get_ChunkRow uses a signed chunk offset. A moving background can
-     * expose the guard chunks preceding its row (HCZ wall/HPZ/LRZ3);
-     * wrapping that offset to the row's far end selects different art. */
-    int cell=(int)rowaddr+(wx>>7);
-    if(cell<0x8088 || cell>=0x9000)return 0;
-    unsigned address=ram[cell]*128u+((unsigned)wy&112u)+((unsigned)wx&112u)/8u;
-    uint16_t block=(uint16_t)((ram[address]<<8)|ram[address+1]);
+    uint16_t block;
+    if (!(s_world_cell && s_world_cell(ram,wx,wy,background,&block))) {
+        unsigned header=background?0x8002u:0x8000u;
+        int width=((ram[header]<<8)|ram[header+1])*128;
+        if(width<=0 || (!background && (wx<0 || wx>=width)))return 0;
+        unsigned row=((unsigned)wy>>5)&0x7Cu;
+        unsigned p=0x8008u+row+(background?2u:0u);
+        unsigned rowaddr=(ram[p]<<8)|ram[p+1];
+        /* Get_ChunkRow uses a signed chunk offset. A moving background can
+         * expose the guard chunks preceding its row (HCZ wall/HPZ/LRZ3);
+         * wrapping that offset to the row's far end selects different art. */
+        int cell=(int)rowaddr+(wx>>7);
+        if(cell<0x8088 || cell>=0x9000)return 0;
+        unsigned address=ram[cell]*128u+((unsigned)wy&112u)+((unsigned)wx&112u)/8u;
+        block=(uint16_t)((ram[address]<<8)|ram[address+1]);
+    }
     int tx=(wx>>3)&1,ty=(wy>>3)&1;
     if(block&0x400)tx^=1;
     if(block&0x800)ty^=1;
-    address=0x9000u+(block&1023u)*8u+(unsigned)(ty*2+tx)*2u;
+    unsigned address=0x9000u+(block&1023u)*8u+(unsigned)(ty*2+tx)*2u;
     if(address+1>=0xA800)return 0;
     address-=0x9000;
     return (uint16_t)(((blocks[address]<<8)|blocks[address+1])^((block&0xC00u)<<1));
