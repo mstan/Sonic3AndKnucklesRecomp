@@ -63,7 +63,12 @@ v3 animations, mappings, DPLCs, palettes and shield behavior.
   up after halving. Hurt preserves storage; death clears it.
 
 Mighty has a donor-derived standing menu portrait, a donor-derived life
-head and a MIGHTY HUD label. His sprite palette is isolated from Tails,
+head and a MIGHTY HUD label using the native capital height, two-pixel
+strokes, white/yellow face and dark shadow. The 40px name uses split native
+HUD sprites; the multiplication sign and live life digits keep their native
+positions. Both the hardware renderer and adaptive renderer use this mapping.
+`MDY3` banks include this artwork; rerun `--upgrade-presentation` for older
+banks. His sprite palette is isolated from Tails,
 Sonic, monitors, checkpoints and stage art, including Super and water colors.
 Later CD abilities are outside this v3 port.
 Blue Spheres remains the special-stage system. Corresponding native
@@ -89,7 +94,7 @@ Outskirts 2/3 exceed native chunk limits; bounded MGL1 readers retain full
 16-bit layouts. Collision, native streaming and adaptive rendering share
 that reader. Explicitly marked actor sprites use an immutable texture bank
 in both renderers; unmarked sprites and planes retain VRAM. All paths use
-portable C. All 21 retail hook sites are instruction/annotation-verified by
+portable C. All 22 retail hook sites are instruction/annotation-verified by
 `tools/gen_megamix_geometry_sites.py`. Interior labels are not assumed
 callable function entries.
 

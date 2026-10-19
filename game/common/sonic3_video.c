@@ -472,6 +472,8 @@ static void spawn_scene(void)
 }
 static S3VideoRingLayout s_ring_layout;
 void s3_video_set_ring_layout(S3VideoRingLayout fn) { s_ring_layout = fn; }
+static S3VideoHudMapping s_hud_mapping;
+void s3_video_set_hud_mapping(S3VideoHudMapping fn) { s_hud_mapping = fn; }
 static unsigned rings_base(void)
 {
     unsigned own=s_ring_layout?s_ring_layout():0;
@@ -499,7 +501,8 @@ static void capture_objects(void)
         unsigned blink=(g_ram[0xFE05]&8)==0;
         unsigned frame=blink*((ram16(0xFE20)==0?1:0)+(g_ram[0xFE23]==9?2:0));
         int hudx=(int8_t)g_ram[0xF711];if(hudx<0)hudx+=8;
-        add_mapping(S3_HUD_MAP,frame,0x86CA,0,15+hudx,136,1,0);
+        unsigned hud=s_hud_mapping?s_hud_mapping():0;
+        add_mapping(hud?hud:S3_HUD_MAP,frame,0x86CA,0,15+hudx,136,1,0);
         unsigned base=rings_base(),end=rings_end();
         for(unsigned p=base+4;p<end;p+=4) {
             unsigned status=0xE700+(p-base)/2;

@@ -895,4 +895,7 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x01ABC6 # Megamix Draw_Sprite
 kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00DBA2 # Megamix Render_HUD+5E
+kind = "game_hook"
 # END megamix geometry hooks

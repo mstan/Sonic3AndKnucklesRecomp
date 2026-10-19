@@ -220,15 +220,15 @@ def extend(source,donor,retail,s3k):
     music_ptr=bank.add(music)
     mighty,report=convert_mighty(donor)
     ui=presentation(donor,s3k)
-    mighty_ptr=bank.add(struct.pack('>4s7I2H',b'MDY2',bank.add(mighty['mappings']),bank.add(mighty['dplc']),
+    mighty_ptr=bank.add(struct.pack('>4s7I2H',b'MDY3',bank.add(mighty['mappings']),bank.add(mighty['dplc']),
         bank.add(mighty['art']),bank.add(mighty['palette']),bank.add(mighty['animation_source']),
         len(mighty['art']),len(mighty['animation_source']),report['frames'],report['animation_entries'])+
         struct.pack('>4I',bank.add(donor.palette(0x19)[1]),bank.add(donor.palette(0x1B)[1]),
                      bank.add(donor.blob(0x11CAFC,128)),bank.add(donor.blob(0x11CC7C,128)))+
         struct.pack('>3I',*(bank.add(struct.pack('>IHH',bank.add(pal),dest,7)) for pal,dest in
                           [(mighty['palette'],0xFC00),(donor.palette(0x19)[1],0xFC00),(donor.palette(0x1B)[1],0xFC00)]))+
-        struct.pack('>5I',bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
-                    bank.add(ui['hud_head']),bank.add(ui['hud_name'])))
+        struct.pack('>6I',bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
+                    bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings'])))
     order=bank.add(b''.join(struct.pack('>H',int(s['stage'],16)) for s in stages))
     # v3 keeps Original-mode cycles beside the Megamix cycles. Select the
     # actual Megamix branch, including the noncontiguous LZ conveyor tables.
@@ -278,11 +278,11 @@ def upgrade_presentation(source,donor,s3k):
     info=bb.be32(source,0x24)-bb.BANK_BASE
     if source[info:info+4]!=b'MDI1' or bb.be32(source,info+4)!=CRC32:raise ValueError('Unsupported donor bank')
     mighty=bb.be32(source,info+12)-bb.BANK_BASE
-    if source[mighty:mighty+4] not in (b'MDY1',b'MDY2'):raise ValueError('Missing Mighty descriptor')
+    if source[mighty:mighty+4] not in (b'MDY1',b'MDY2',b'MDY3'):raise ValueError('Missing Mighty descriptor')
     ui=presentation(donor,s3k)
-    record=b'MDY2'+source[mighty+4:mighty+64]+struct.pack('>5I',
+    record=b'MDY3'+source[mighty+4:mighty+64]+struct.pack('>6I',
         bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
-        bank.add(ui['hud_head']),bank.add(ui['hud_name']))
+        bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings']))
     new=bank.add(record)
     metadata=bytearray(source[info:info+28])
     struct.pack_into('>H',metadata,10,3)

@@ -3,6 +3,7 @@
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
 #include "video/genesis_machine.h"
+#include "sonic3_video.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,8 @@ uint8_t tri_rd8(uint32_t a) { CHECK(a>=0x400000 && a<0x401000);return bank[a-0x4
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1)); }
 uint32_t tri_rd32(uint32_t a) { return ((uint32_t)tri_rd16(a)<<16)|tri_rd16(a+2); }
 int tri_mighty_active(void) { return player_active; }
+static S3VideoHudMapping custom_hud;
+void s3_video_set_hud_mapping(S3VideoHudMapping fn) { custom_hud=fn; }
 uint16_t tri_mighty_color(int wet,unsigned color) { return color==2?(wet?0xE00:0x00E):0; }
 void o_sfx(int sound) { CHECK(sound==0x5B); }
 int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
@@ -28,10 +31,11 @@ static void longword(unsigned p,unsigned v) { word(p,v>>16);word(p+2,v); }
 int main(void)
 {
     longword(0x24,0x400100);longword(0x100,0x4D444931);longword(0x10C,0x400200);
-    longword(0x200,0x4D445932);longword(0x240,0x400800);
+    longword(0x200,0x4D445933);longword(0x240,0x400800);
     longword(0x244,0x400600);longword(0x248,128);
     longword(0x24C,0x400900);longword(0x250,0x400A00);
-    memset(bank+0x900,0x99,128);memset(bank+0xA00,0xAA,128);
+    longword(0x254,0x400B00);
+    memset(bank+0x900,0x99,128);memset(bank+0xA00,0xAA,192);
     A(0)=0xFFB128;w32(A(0),0xD42C);w8(A(0)+0x2E,0);
     D(0)=0;w8(RAM_Ctrl_1_pressed,1);
     for(unsigned choice=1;choice<=6;choice++) {
@@ -60,6 +64,11 @@ int main(void)
     CHECK(!tri_mighty_presentation_hook(TH_DS_NEWGAME));CHECK(r8(0xFFE6AE)==0x50);
     CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));
     CHECK(tri_mighty_selected && r16(RAM_Player_mode)==1 && r16(PLAYER_OPTION)==1);
+    CHECK(custom_hud && custom_hud()==0x400B00);
+    A(1)=0xDBB6;CHECK(!tri_mighty_presentation_hook(MG_PC_MIGHTY_HUD));
+    CHECK(A(1)==0x400B00);
+    player_active=0;A(1)=0xDBB6;CHECK(!tri_mighty_presentation_hook(MG_PC_MIGHTY_HUD));
+    CHECK(A(1)==0xDBB6 && !custom_hud());player_active=1;
     /* Menu art is wholly separate from native VRAM. Gameplay writes only
      * Mighty's head/name tiles, preserving the stock lives digits. */
     uint8_t tiles[2048]={0};uint16_t top[16],bottom[16];
@@ -74,6 +83,7 @@ int main(void)
     CHECK(tiles[0x680]==3 && tiles[0x69F]==3 && !tiles[0x6A0]);
     CHECK(tiles[0x7D4]==3 && tiles[0x7D7]==3 && !tiles[0x7D8]);
     CHECK(g_machine.vdp.vram[0x7D4*32]==0x99 && g_machine.vdp.vram[0x7D8*32]==0xAA);
+    CHECK(g_machine.vdp.vram[0x7DC*32]==0xAA && g_machine.vdp.vram[0x7DE*32]==0xAA);
     CHECK(g_machine.vdp.vram[0x7DD*32]==0x5A && g_machine.vdp.vram[0x7DF*32]==0x5A);
     CHECK(!memcmp(before,g_ram,sizeof before));
     for(unsigned i=0;i<64;i++)w16(RAM_Normal_palette+i*2,0xEEE);

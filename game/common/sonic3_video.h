@@ -19,6 +19,10 @@ void s3_video_set_actor_overlay(S3VideoActorOverlay draw);
 /* Game-owned expansion-stage ring layouts and Data Select previews. */
 typedef unsigned (*S3VideoRingLayout)(void);
 void s3_video_set_ring_layout(S3VideoRingLayout fn);
+/* A game-owned HUD may widen its name while retaining native positioning.
+ * Return zero to use the cartridge's ordinary mapping table. */
+typedef unsigned (*S3VideoHudMapping)(void);
+void s3_video_set_hud_mapping(S3VideoHudMapping fn);
 typedef void (*S3VideoFrameOverlay)(int line, uint32_t *out, int width);
 void s3_video_set_frame_overlay(S3VideoFrameOverlay draw);
 
