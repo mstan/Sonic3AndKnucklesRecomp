@@ -86,6 +86,10 @@ a chunk pager, water/palette/scenery support, time travel, a UFO special-stage
 scene, a warp scene, CD-DA streaming, and a transcribed SMPS-PCM/RF5C164 path.
 Their correctness still needs validation in our integration.
 
+This investigation reviewed integration contracts, formats/loaders, flow,
+saving, audio, geometry paging and representative source. It did not establish
+line-by-line equivalence of every object transcription or run any CD gameplay.
+
 The source menu enumerates **70 playable stage/time-period variants** in
 28 rows: seven rounds, acts 1/2 in Present, Past, Good Future and Bad Future,
 and act 3 in Good/Bad Future only. Do not fabricate Present/Past act 3.
@@ -461,6 +465,9 @@ must contain no copyrighted input/converted content or private owner settings,
 and no CD Speed/Fast Loading packages. The private owner folder should have
 resources prefilled, all-stage seeded clear fixtures with migration verified,
 normal audio and adaptive Fit. State tested limits and outstanding failures.
+Verify actual completed-file/replay navigation, including access to the intended
+CD acts and time periods; a save that only opens Present act 1 does not by itself
+establish that the owner can navigate all converted content.
 
 Tracking is central Beads `beads-ritf`, under game epic `beads-tdq.3`.
 Use `F:/Software/beads/issues`, update meaningful findings and source/build
