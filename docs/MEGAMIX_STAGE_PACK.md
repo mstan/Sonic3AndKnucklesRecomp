@@ -196,4 +196,20 @@ The 140-location/38-reference review covers representative graphics and
 palette anomalies; it does not certify all donor pixels or every camera
 alignment. The initial failed reference/pacing fixtures remain retained.
 
+Signpost correction (2026-10-19): the donor's late loader at `$621C`
+selects PLC `$12` (Sonic) or `$24` (Mighty), with Nemesis art at
+`$3D42E` / `$3D8F2`, 58 tiles at VRAM `$D000`. The previous binding
+mistakenly selected PLC 1, the monitor graphics. The third donor choice,
+PLC `$25`, belongs to Shadow and is outside this port's scope. MGS1 stores
+the two verified graphics/palette sets, five mappings from `$146C2` and
+animation from `$146A6`. A separate immutable sprite bank and palette line
+keep the sign valid while the results objects load their own graphics.
+
+Independent original-ROM captures (`qa-sign-source-3`) observe all five
+frames and match all 1,856 sign-art bytes for each source variant. The
+corrected Mighty runtime capture (`qa-sign-fixed-mighty`) observes all
+five real frames, the results tally, and the actual next-act transition.
+Only player placement/protection is cheated; sign state and completion
+flags are not injected. Earlier failed reference fixtures are retained.
+
 Tracking: central Beads `beads-tdq.3.20`, engine `beads-3vb.23`.

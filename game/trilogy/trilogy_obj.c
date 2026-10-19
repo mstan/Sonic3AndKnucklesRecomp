@@ -499,9 +499,20 @@ static uint32_t asset_rec(int asset)
     uint32_t t = tri_rd32(e + TD_ANIM);
     return t ? t + (uint32_t)asset * 16u : 0;
 }
-uint32_t o_asset_maps(int asset) { uint32_t r = asset_rec(asset); return r ? tri_rd32(r) : 0; }
-uint16_t o_asset_tile(int asset) { uint32_t r = asset_rec(asset); return r ? tri_rd16(r + 4) : 0; }
-uint32_t o_asset_anim(int asset) { uint32_t r = asset_rec(asset); return r ? tri_rd32(r + 8) : 0; }
+uint32_t tri_signpost_mapping(void);
+uint32_t tri_signpost_animation(void);
+uint32_t o_asset_maps(int asset) {
+    uint32_t p=asset==S1A_SIGN?tri_signpost_mapping():0;
+    uint32_t r=asset_rec(asset);return p?p:r?tri_rd32(r):0;
+}
+uint16_t o_asset_tile(int asset) {
+    if(asset==S1A_SIGN && tri_signpost_mapping())return 0;
+    uint32_t r=asset_rec(asset);return r?tri_rd16(r+4):0;
+}
+uint32_t o_asset_anim(int asset) {
+    uint32_t p=asset==S1A_SIGN?tri_signpost_animation():0;
+    uint32_t r=asset_rec(asset);return p?p:r?tri_rd32(r+8):0;
+}
 void o_asset(uint32_t o, int asset)
 {
     SET32(o, OBJ_mappings, o_asset_maps(asset));

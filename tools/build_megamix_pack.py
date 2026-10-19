@@ -23,6 +23,7 @@ from megamix.v3_rom import MegamixV3,load_rom,ORDER,CRC32
 from megamix.geometry import convert_geometry
 from megamix.mighty import convert_mighty
 from megamix.presentation import presentation
+from megamix.signpost import signpost
 from megamix.objects import MegamixObjects,ZONE_NAMES
 from build_stage_pack import verify
 from s1_music import build_music
@@ -245,9 +246,9 @@ def extend(source,donor,retail,s3k):
             pos=table+2+i*6+2
             struct.pack_into('>H',sbz,pos,bb.be16(sbz,pos)-0x130)
     overrides[31]=bank.add(sbz)
-    descriptor=bank.add(struct.pack('>4sIHHIIIIII',b'MDI1',CRC32,len(stages),3,mighty_ptr,music_ptr,order,
+    descriptor=bank.add(struct.pack('>4sIHHIIIIIII',b'MDI1',CRC32,len(stages),4,mighty_ptr,music_ptr,order,
                         bank.add(b''.join(struct.pack('>I',p) for p in overrides)),
-                        bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256))))
+                        bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),signpost(bank,donor)))
     struct.pack_into('>I',bank.data,0x24,descriptor)
     blobs[39]=bank.add(extpal);blobs[1]=bank.add(animals);blobs[2]=bank.add(animal_plcs)
     struct.pack_into('>I',bank.data,0x20,bank.add(b''.join(struct.pack('>I',p) for p in blobs)))
@@ -285,9 +286,9 @@ def upgrade_presentation(source,donor,s3k):
         bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings']))
     new=bank.add(record)
     metadata=bytearray(source[info:info+28])
-    struct.pack_into('>H',metadata,10,3)
+    struct.pack_into('>H',metadata,10,4)
     struct.pack_into('>I',metadata,12,new)
-    metadata+=struct.pack('>II',bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)))
+    metadata+=struct.pack('>III',bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),signpost(bank,donor))
     struct.pack_into('>I',bank.data,0x24,bank.add(metadata))
     data=bytes(bank.data)
     return data+struct.pack('>4sII',b'SPK2',len(data),zlib.crc32(data))

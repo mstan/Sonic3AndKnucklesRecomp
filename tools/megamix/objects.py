@@ -14,7 +14,7 @@ from mdcodecs import nemesis_decode
 CHANGED_ART={
     'Nem_Buzz':(4,0x8880),'Nem_Chopper':(4,0x8F60),
     'Nem_Motobug':(4,0x9E00),'Nem_Eggman':(0x11,0x8000),
-    'Nem_SignPost':(1,0xD000),'Nem_Bumper':(0xD,0x7000),
+    'Nem_SignPost':(0x12,0xD000),'Nem_Bumper':(0xD,0x7000),
     'Nem_Roller':(0xC,0x9700),'Nem_Water':(0x28,0x6000),
     'Nem_Burrobot':(6,0x94C0),'Nem_Orbinaut':(7,0x8CE0),
     'Nem_Bomb':(0xA,0x8000),'Nem_Electric':(0xF,0x8FC0),
