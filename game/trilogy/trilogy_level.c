@@ -9,6 +9,7 @@
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
 #include "sonic3_video.h"
+#include "genesis_machine.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -63,6 +64,11 @@ static void dev_force_zone(void)
  * routine, subtype, status) with a screenshot beside it. Exits after the last. */
 void tri_audit_frame(void)
 {
+    /* The menu boot script must finish before the survey can restart acts.
+     * Otherwise its pending Start presses act on a later survey screen. */
+    const char *delay = getenv("TRILOGY_AUDIT_START_FRAME");
+    extern uint64_t g_frame_count;
+    if (delay && g_frame_count < strtoull(delay, NULL, 10)) return;
     static int n = -1, idx, pts[256][2];
     static const char *out;
     if (n == 0) return;
@@ -79,8 +85,33 @@ void tri_audit_frame(void)
     }
     uint16_t fc = r16(RAM_Level_frame_counter);
     extern int tri_obj_card_done(void);
-    static int since, pending;                 /* (S3K counts level frames under the title card; S2 doesn't) */
-    if (pending && fc < 10) pending = 0;       /* (the restart has happened) */
+    static int since, pending;
+    static uint16_t last_fc;
+    /* Optional survey protection: hold the player at the requested point,
+     * including in void/water, without changing objects or completion flags.
+     * Interaction/exit probes must leave this OFF. */
+    if (pending && (fc < 10 || fc < last_fc)) pending = 0;
+    last_fc = fc;
+    if (idx >= 0 && getenv("TRILOGY_AUDIT_FREEZE")) {
+        /* A checkpoint fixture can initially overlap a crushing solid.
+         * Restore only the survey player; damage/death tests never enable
+         * this mode and must observe their normal consequences. */
+        w8(RAM_Player_1 + OBJ_routine, 2);
+        w16(RAM_Player_1 + OBJ_x_pos, (uint16_t)pts[idx][0]);
+        w16(RAM_Player_1 + OBJ_y_pos, (uint16_t)pts[idx][1]);
+        w16(RAM_Player_1 + OBJ_x_vel, 0);
+        w16(RAM_Player_1 + OBJ_y_vel, 0);
+        w16(RAM_Player_1 + OBJ_ground_vel, 0);
+        w8(RAM_Player_1 + 0x2E, 0x81); /* object_control: no player physics */
+        w8(RAM_Player_1 + 0x34, 0x1C); /* hurt immunity */
+        w8(RAM_Player_1 + 0x2C, 30);   /* air timer */
+        w16(RAM_Debug_placement_mode, 1); /* survey void/solids safely */
+        if (!pending && fc >= 90 && !tri_obj_card_done()) {
+            extern void tri_obj_titlecard_done(void);
+            tri_obj_titlecard_done();
+            fprintf(stderr, "[trilogy] survey: restored art after unsafe checkpoint spawn\n");
+        }
+    }
     since = !pending && tri_obj_card_done() ? since + 1 : 0;
     if (idx >= 0 && since == 90) {
         char path[512];
@@ -89,6 +120,10 @@ void tri_audit_frame(void)
         if (fp) {
             fprintf(fp, "point %X %X camera %X %X\n", pts[idx][0], pts[idx][1],
                     r16(RAM_Camera_X_pos), r16(RAM_Camera_X_pos + 4));
+            fprintf(fp, "# stage %04X frame %u player %X %X mode %02X dle %02X\n",
+                    r16(RAM_Current_zone_and_act), fc,
+                    r16(RAM_Player_1 + OBJ_x_pos), r16(RAM_Player_1 + OBJ_y_pos),
+                    r8(RAM_Game_mode), r8(RAM_Dynamic_resize_routine));
             for (uint32_t s = 0; s < 110; s++) {
                 uint32_t o = RAM_Object_RAM + s * OBJ_SIZE;
                 if (!r32(o)) continue;
@@ -98,11 +133,20 @@ void tri_audit_frame(void)
             }
             fclose(fp);
         }
+        if (idx == 0) { /* One complete geometry/art snapshot per act. */
+            extern uint8_t g_ram[0x10000];
+            snprintf(path, sizeof path, "%s.ram.bin", out);
+            FILE *dump = fopen(path, "wb");
+            if (dump) { fwrite(g_ram, 1, 0x10000, dump); fclose(dump); }
+            snprintf(path, sizeof path, "%s.vram.bin", out);
+            dump = fopen(path, "wb");
+            if (dump) { fwrite(g_machine.vdp.vram, 1, 0x10000, dump); fclose(dump); }
+        }
         extern int runner_write_screenshot_file(const char *path);
         snprintf(path, sizeof path, "%s_%02d.png", out, idx);
         runner_write_screenshot_file(path);
     }
-    if ((idx < 0 && fc == 2) || (idx >= 0 && since == 91)) {
+    if ((idx < 0 && fc >= 2) || (idx >= 0 && since == 91)) {
         if (++idx >= n) { fprintf(stderr, "[trilogy] audit: %d points\n", n); exit(0); }
         uint16_t za = r16(RAM_Current_zone_and_act), x = (uint16_t)pts[idx][0], y = (uint16_t)pts[idx][1];
         w8(0xFFFE2B, 1);                       /* Saved_last_star_post_hit */

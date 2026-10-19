@@ -49,6 +49,7 @@ static int s_ss_pending;          /* tally running, special stage queued */
 static int s_ss_advance;          /* back from the special stage: next act */
 int tri_sbz2_open;                /* SBZ2 tally done: boundary opening (s1dle) */
 static int s_sbz2_ss;             /* SBZ2's giant ring entered: its stage before SBZ3 */
+static int s_results_started, s_results_finished;
 
 static uint32_t find_obj(uint32_t code)
 {
@@ -61,6 +62,7 @@ static uint32_t find_obj(uint32_t code)
 
 static void start_act_clear(void)
 {
+    if (s_results_started) return;
     if (find_obj(S3K_Obj_LevelResults)) return;      /* tally already running */
     uint32_t sign = find_obj(NATIVE_S1_BASE + 0x0D * 4);
     if (sign && OB8(sign, OBJ_routine) >= 8) return; /* sign spawned it */
@@ -70,7 +72,7 @@ static void start_act_clear(void)
     w8(RAM__unkFABE, 0xFF);
     w8(RAM_Ctrl_2_locked, 0xFF);
     uint32_t a1 = o_alloc();
-    if (a1) SET32(a1, OBJ_code, S3K_Obj_LevelResults);
+    if (a1) { s_results_started = 1; SET32(a1, OBJ_code, S3K_Obj_LevelResults); }
 }
 
 /* SSEntryFlash_GoSS, trilogy act: queue the stage instead of entering it */
@@ -120,6 +122,7 @@ static void ss_enter(uint16_t next)
 /* Level entry: back from a queued special stage, start the next act fresh */
 void tri_flow_level_entry(void)
 {
+    s_results_started = s_results_finished = 0;
     /* Each act has its own giant/big rings (subtypes from 0 per act): S3K
      * clears Collected_special_ring_array only in its own act transitions, and
      * the special stage's return restores it, so a new act clears it here;
@@ -208,6 +211,10 @@ int tri_sbz2_fall(void)
 /* Results finished (loc_2DCE2): go to the next act as a fresh level. */
 static int results_done(void)
 {
+    /* Multiple signposts can share an X coordinate (SYZ2's two routes).
+     * A second tally must never advance the next, still-unloaded act. */
+    if (s_results_finished) { o_delete(A(0) & 0xFFFFFF); return 1; }
+    s_results_finished = 1;
     uint16_t za = r16(RAM_Current_zone_and_act);
     tri_ach_act_clear(za);
     if (za == 0x2501) {                          /* SBZ2: Eggman's scene first; a ring's stage */
@@ -356,11 +363,14 @@ static void s1_signpost(uint32_t o)
     case 6:                                     /* -> Obj_EndSignResults */
         if (!(r8(RAM_Player_1 + OBJ_status) & 2)) {
             SET8(o, OBJ_routine, 8);
+            if (s_results_started) break;
+            uint32_t a1 = o_alloc();
+            if (!a1) { SET8(o, OBJ_routine, 6); break; }
+            s_results_started = 1;
+            SET32(a1, OBJ_code, S3K_Obj_LevelResults);
             A(1) = RAMPTR(RAM_Player_1);
             A(0) = RAMPTR(o);
             tri_jsr(S3K_Set_PlayerEndingPose);
-            uint32_t a1 = o_alloc();
-            if (a1) SET32(a1, OBJ_code, S3K_Obj_LevelResults);
         }
         break;
     case 8:                                     /* Obj_EndSignAfter */
