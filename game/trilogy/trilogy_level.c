@@ -105,7 +105,11 @@ void tri_audit_frame(void)
         w8(RAM_Player_1 + 0x2E, 0x81); /* object_control: no player physics */
         w8(RAM_Player_1 + 0x34, 0x1C); /* hurt immunity */
         w8(RAM_Player_1 + 0x2C, 30);   /* air timer */
-        w16(RAM_Debug_placement_mode, 1); /* survey void/solids safely */
+        if(tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX) {
+            /* Retail debug placement indexes native-zone tables. Protection
+             * uses only player control/death-plane state in imported v3 acts. */
+            w16(RAM_Debug_placement_mode,0);w8(RAM_Disable_death_plane,1);
+        } else w16(RAM_Debug_placement_mode,1);
         if (!pending && fc >= 90 && !tri_obj_card_done()) {
             extern void tri_obj_titlecard_done(void);
             tri_obj_titlecard_done();
@@ -153,6 +157,7 @@ void tri_audit_frame(void)
         w8(RAM_Last_star_post_hit, 1);
         w16(0xFFFE2C, za);                     /* Saved_zone_and_act */
         w16(0xFFFE2E, x);                      /* Saved_X_pos */
+        w16(0xFFFF9A,tri_apparent(za));          /* Saved_apparent_zone_and_act */
         w16(0xFFFE30, y);                      /* Saved_Y_pos */
         w16(0xFFFE32, 0);                      /* Saved_ring_count */
         w32(0xFFFE34, 0);                      /* Saved_timer */
@@ -322,7 +327,8 @@ int tri_level_hook(uint32_t pc)
     case TH_OSC_DO: {               /* after lea (Osc_Data2).l,a2 */
         uint32_t e = tri_dir();
         uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
-        if (e && t && tri_rd8(e + TD_GAME) == TRI_GAME_S1)
+        /* Exact v3 oscillator tables at $609E/$6138 equal S1's tables. */
+        if (e && t && (tri_rd8(e + TD_GAME) == TRI_GAME_S1 || tri_rd8(e + TD_GAME) == TRI_GAME_MEGAMIX))
             A(2) = tri_rd32(t + (pc == TH_OSC_INIT ? TRI_BLOB_S1_OSC_INIT : TRI_BLOB_S1_OSC_DATA) * 4u);
         return 0;
     }

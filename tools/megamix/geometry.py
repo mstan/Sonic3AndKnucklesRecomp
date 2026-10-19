@@ -135,6 +135,9 @@ def convert_geometry(rom,zone,act):
 
     front=layout(0);foreground_chunks=len(chunks)
     back=layout(1)
+    swaps=[]
+    if (zone,act)==(1,2):
+        swaps=[quad(source-1,x,y) for source in (0x4B,7) for y in range(2) for x in range(2)]
     solids=bytearray(0xC00)
     for i in range(len(primary)):
         solids[i*2]=primary[i];solids[0x600+i*2]=secondary[i]
@@ -160,6 +163,7 @@ def convert_geometry(rom,zone,act):
         for row in plane:layout16+=struct.pack('>'+str(len(row))+'H',*row)
     native_layout=s3k_layout(front,back) if len(chunks)<=256 else b''
     return dict(layout=native_layout,layout16=layout16,chunks=b''.join(chunks),blocks=bytes(blocks),
+                swaps=struct.pack('>8H',*swaps) if swaps else bytes(16),
                 solids=bytes(solids),angles=bytes(angles),heights=bytes(heights),rotated=bytes(rotated),
                 checked_cells=len(checks),source_blocks=source_count,
                 native_blocks=len(blocks)//8,native_chunks=len(chunks),

@@ -12,6 +12,7 @@
  */
 #include "trilogy_obj.h"
 #include "genesis_machine.h"
+#include "megamix_geometry.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,7 @@ static uint8_t s_lut[512];
 static uint16_t s_cpal[16];
 static uint8_t s_tiles[70 * 32];
 static int s_pending;
+static MegamixGeometry s_mm;
 
 /* ---- Kosinski (S3K Kos_Decomp) from the 68K address space ---------------- */
 static uint32_t kos_end;                             /* where the last stream ended */
@@ -115,6 +117,7 @@ static int chunk_at(int bg, int x, int y)
 }
 static uint16_t chunk_word(int bg, int x, int y)
 {
+    if(s_mm.layout)return megamix_geometry_cell(&s_mm,bg,x,y,bg);
     int ch = chunk_at(bg, x, y);
     uint32_t o = (uint32_t)ch * 128u + (uint32_t)(((y >> 4) & 7) * 16 + ((x >> 4) & 7) * 2);
     return (uint16_t)(s_chunks[o & 0xFFFF] << 8 | s_chunks[(o + 1) & 0xFFFF]);
@@ -250,6 +253,7 @@ static void load_zone(int code)
 {
     s_code = code;
     s_ok = 0;
+    memset(&s_mm,0,sizeof s_mm);
     uint16_t za = tri_code_to_za(code);
     int zone = za >> 8, act = za & 0xFF;
     uint32_t llb, lay, sizes, start;
@@ -260,6 +264,14 @@ static void load_zone(int code)
         lay = tri_rd32(dir + TD_LAYOUT);
         sizes = dir + TD_SIZES;
         start = dir + TD_START_S;
+        if(tri_rd8(dir+TD_GAME)==TRI_GAME_MEGAMIX) {
+            uint32_t info=tri_rd32(dir+TD_EXTRA);
+            uint32_t layout=tri_rd32(info+4)-TRI_BANK_BASE,chunks=tri_rd32(info+12)-TRI_BANK_BASE;
+            if(layout>=g_rom_ext_size || chunks>=g_rom_ext_size ||
+               tri_rd32(info+8)>g_rom_ext_size-layout || tri_rd32(info+16)>g_rom_ext_size-chunks ||
+               !megamix_geometry_open(&s_mm,g_rom_ext+layout,tri_rd32(info+8),g_rom_ext+chunks,
+                                      tri_rd32(info+16),tri_rd16(info+20)))return;
+        }
     } else {
         uint32_t i = (uint32_t)zone * 2u + (uint32_t)act;
         llb = S3K_LevelLoadBlock + i * 24u;

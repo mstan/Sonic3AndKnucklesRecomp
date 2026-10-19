@@ -107,7 +107,7 @@ static void platform(uint32_t o)
     case 0:
         SET8(o, OBJ_routine, 2);
         o_init(o, S1A_PLAT, 4, 4, 0x20, 0x10);
-        if (tri_zone() == TRI_S1_SLZ) SET8(o, OBJ_subtype, 3);   /* SLZ: all fall when stood on */
+        if (tri_source_zone() == TRI_S1_SLZ) SET8(o, OBJ_subtype, 3);   /* SLZ: all fall when stood on */
         SET16(o, PL_Y, OB16(o, OBJ_y_pos));
         SET16(o, PL_BASEY, OB16(o, OBJ_y_pos));
         SET16(o, PL_BASEX, OB16(o, OBJ_x_pos));
@@ -172,12 +172,12 @@ static void swing(uint32_t o)
         SET8(o, OBJ_routine, 2);
         o_init(o, S1A_SWING, 4, 3, 0x18, 0x10);
         SET8(o, OBJ_y_radius, 8);
-        if (tri_zone() == TRI_S1_SBZ) {      /* SBZ: a swinging spiked ball */
+        if (tri_source_zone() == TRI_S1_SBZ) {      /* SBZ: a swinging spiked ball */
             SET8(o, OBJ_width_px, 0x18);
             SET8(o, OBJ_y_radius, 0x18);
             SET8(o, OBJ_coll_flags, 0x86);
         }
-        if (tri_zone() == TRI_S1_SLZ) {      /* SLZ: wider, hurts from below */
+        if (tri_source_zone() == TRI_S1_SLZ) {      /* SLZ: wider, hurts from below */
             SET8(o, OBJ_width_px, 0x20);
             SET8(o, OBJ_y_radius, 0x10);
             SET8(o, OBJ_coll_flags, 0x99);
@@ -202,7 +202,7 @@ static void swing(uint32_t o)
             SET8(a1, SW_RADIUS, d3);
             d3 -= 0x10;
             if (d3 < 0) {                    /* anchor */
-                o_asset(a1, tri_zone() == TRI_S1_SBZ ? S1A_SWINGANCH_SBZ : S1A_SWING);
+                o_asset(a1, tri_source_zone() == TRI_S1_SBZ ? S1A_SWINGANCH_SBZ : S1A_SWING);
                 SET8(a1, OBJ_frame, 2);
                 SET16(a1, OBJ_priority, 3 << 7);
             }

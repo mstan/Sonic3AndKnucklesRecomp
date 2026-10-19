@@ -247,6 +247,7 @@ ASSETS = [
     (109, 'FZDMG',  'Nem_FzEggman',  'ArtTile_FZ_Eggman_Fleeing', 0, 'Map_FZDamaged', 'Ani_FZEgg', 'SBZ'),
     (110, 'PLAUNCH', 'Nem_FzBoss',   'ArtTile_FZ_Boss',           0, 'Map_PLaunch',   'Ani_PLaunch', 'SBZ'),
     (111, 'PLASMA', 'Nem_FzBoss',    'ArtTile_FZ_Boss',           1, 'Map_Plasma',    'Ani_Plasma', 'SBZ'),
+    (112, 'SIDESTOMP', 'Nem_MzMetal', 'ArtTile_MZ_Spike_Stomper', 0, 'Map_SStom',     None,       'MZ'),
 ]
 ASSET_COUNT = 256
 ASSET_NAME = {a[0]: a[1] for a in ASSETS}
@@ -294,6 +295,7 @@ ASSET_EXTRA_ART = {'EGGMAN': [(0x12A, 'Nem_Exhaust')],
                    # LZ blocks: rising platform, cork, block 1 (ArtTile_LZ_Blocks-relative)
                    'LBLOCK': [(0x69, 'Nem_LzPlatfm'), (0x11A, 'Nem_Cork'), (0x5FA, 'Nem_LzBlock1')],
                    'METAL': [(0x21B, 'Nem_Spikes')],      # stomper spikes = ArtTile_Spikes
+                   'SIDESTOMP': [(0x21B, 'Nem_Spikes')],
                    # lava wall/geyser pieces draw the animated magma level tiles
                    # ($2D2, pinned in place): 'LEVEL' = absolute tile base+t
                    'GEYSER': [(0x700, 'LEVEL')], 'LWALL': [(0x700, 'LEVEL')]}
@@ -367,6 +369,7 @@ OBJ_ASSETS = {
     0x2B: ['CHOP'], 0x3B: ['PROCK'], 0x3C: ['SMASH'], 0x40: ['MOTO'], 0x44: ['EDGE'],
     0x36: ['SPIKES'], 0x3E: ['PRISON'], 0x0D: ['SIGN'], 0x7D: ['BONUS'],
     0x13: ['FIRE'], 0x14: ['FIRE'], 0x2F: ['LGRASS', 'GFIRE'], 0x30: ['GLASS'], 0x31: ['METAL'],
+    0x45: ['SIDESTOMP'],
     0x32: ['BUTTON_MZ', 'BUTTON'], 0x33: ['PUSH'], 0x46: ['BRICK'], 0x4C: ['GEYSER'],
     0x4E: ['LWALL'], 0x51: ['SMAB'], 0x52: ['MBLOCK'], 0x53: ['CFLO'], 0x55: ['BASARAN'],
     0x78: ['CATER'], 0x12: ['LIGHT'], 0x43: ['ROLLER'], 0x47: ['BUMPER'], 0x50: ['YADRIN'],

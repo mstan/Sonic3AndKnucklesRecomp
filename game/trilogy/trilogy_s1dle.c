@@ -12,6 +12,7 @@
 
 static uint16_t camx(void) { return r16(RAM_Camera_X_pos); }
 static uint16_t camy(void) { return r16(RAM_Camera_Y_pos); }
+static int megamix(void) { uint32_t e=tri_dir();return e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX; }
 static void btm1(uint16_t v) { w16(RAM_Camera_target_max_Y_pos, v); }
 static uint8_t rt(void) { return r8(RAM_Dynamic_resize_routine); }
 static void rt_add(int d) { w8(RAM_Dynamic_resize_routine, (uint8_t)(rt() + d)); }
@@ -30,6 +31,16 @@ static void spawn_boss(int id, int x, int y)
  * freeze the camera (fatal for the LZ chase up the shaft), so it isn't set. */
 static void boss_start(void)
 {
+    if(megamix()) {
+        int song=0x8C;
+        switch(tri_source_zone()) {
+        case TRI_S1_MZ:song=0x97;break;
+        case TRI_S1_LZ:song=0x96;break;
+        case TRI_S1_SLZ:song=0x94;break;
+        case TRI_S1_SYZ:song=0x95;break;
+        }
+        tri_music_play(TRI_SLOT_BOSS,song);return;
+    }
     D(0) = MUS_BOSS;
     tri_jsr(S3K_Play_Music);
 }
@@ -44,6 +55,14 @@ static void dle_ghz(int act)
         if (camx() >= 0x1780) btm1(0x400);
         return;
     case 1:
+        if(megamix()) {
+            btm1(0x300);
+            if(camx()>=0x400)btm1(0x400);
+            if(camx()>=0xFA0)btm1(0x200);
+            if(camx()>=0x1600)btm1(0x400);
+            if(camx()>=0x3E00)btm1(0x200);
+            return;
+        }
         btm1(0x300);
         if (camx() < 0xED0) return;
         btm1(0x200);
@@ -88,19 +107,26 @@ static void dle_mz(int act)
 {
     if (act == 1) {
         btm1(0x520);
-        if (camx() >= 0x1700) btm1(0x200);
+        if (camx() >= (megamix()?0x4700:0x1700)) btm1(0x200);
         return;
     }
     if (act == 2) {
         if (rt() == 0) {
             btm1(0x720);
-            if (camx() < 0x1800 - 0x2A0) return;
-            btm1(0x210);
+            if (camx() < (megamix()?0x1628:0x1800-0x2A0)) return;
+            btm1(megamix()?0x510:0x210);
             if (camx() < 0x1800 - 0x10) return;
-            spawn_boss(0x73, 0x1800 + 0x1F0, 0x210 + 0x1C);
+            spawn_boss(0x73, 0x1800 + 0x1F0, megamix()?0x560:0x210+0x1C);
             boss_start();
             rt_add(2);
         } else lock_left();
+        return;
+    }
+    if(megamix() && camx()>=0xE70 && rt()<6){w8(RAM_Dynamic_resize_routine,6);return;}
+    if(megamix() && rt()>=6) {
+        if(camx()>=0xE70) {
+            w16(RAM_Camera_min_Y_pos,0);btm1(camx()>=0x3C00?0x120:0x520);
+        }
         return;
     }
     switch (rt()) {                           /* MZ1 */
@@ -173,8 +199,9 @@ static void dle_lz(int act)
         tri_ach_act_clear(0x2103);           /* SBZ3 ends here, without a tally */
         w8(RAM_Last_star_post_hit, 0);
         w16(RAM_Restart_level_flag, 1);
-        w16(RAM_Current_zone_and_act, 0x2502);
-        w16(RAM_Apparent_zone_and_act, tri_apparent(0x2502));
+        uint16_t next=tri_source_stage(0x2502);
+        w16(RAM_Current_zone_and_act, next);
+        w16(RAM_Apparent_zone_and_act, tri_apparent(next));
         w8(RAM_Ctrl_1_locked, 1);
     }
 }
@@ -189,6 +216,7 @@ static void dle_slz(int act)
         rt_add(2);
         return;
     case 2:
+        if(megamix())w16(RAM_Camera_min_X_pos,0x1E70);
         if (camx() < 0x2000) return;
         spawn_boss(0x7A, -1, 0);
         boss_start();
@@ -204,7 +232,7 @@ static void dle_syz(int act)
     if (act == 1) {
         btm1(0x520);
         if (camx() < 0x25A0) return;
-        btm1(0x420);
+        btm1(megamix()?0x520:0x420);
         if (r16(RAM_Player_1 + OBJ_y_pos) >= 0x4D0) btm1(0x520);
         return;
     }
@@ -234,7 +262,7 @@ static void dle_sbz(int act)
         if (camx() < 0x1880) return;
         btm1(0x620);
         if (camx() < 0x2000) return;
-        btm1(0x2A0);
+        btm1(megamix()?0x720:0x2A0);
         return;
     }
     if (act == 1) {
@@ -250,8 +278,9 @@ static void dle_sbz(int act)
             if (tri_sbz2_fall()) return;              /* (its giant ring's special stage first) */
             w8(RAM_Last_star_post_hit, 0);
             w16(RAM_Restart_level_flag, 1);
-            w16(RAM_Current_zone_and_act, 0x2103);
-            w16(RAM_Apparent_zone_and_act, tri_apparent(0x2103));
+            uint16_t next=tri_source_stage(0x2103);
+            w16(RAM_Current_zone_and_act, next);
+            w16(RAM_Apparent_zone_and_act, tri_apparent(next));
             return;
         }
         switch (rt()) {
@@ -304,7 +333,7 @@ static void dle_sbz(int act)
 
 void s1_dynamic_level_events(void)
 {
-    int z = tri_zone(), act = tri_act();
+    int z = tri_source_zone(), act = tri_act();
     switch (z) {
     case TRI_S1_GHZ: dle_ghz(act); break;
     case TRI_S1_LZ:  dle_lz(act); break;

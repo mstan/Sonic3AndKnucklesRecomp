@@ -18,6 +18,8 @@ int *g_rte_pending_ptr=&rte;
 static int active=1;
 static S3VideoWorldCell video;
 void s3_video_set_world_cell(S3VideoWorldCell fn){video=fn;}
+int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
+{ (void)pixels;(void)bytes;(void)lines;return 1; }
 uint32_t tri_dir(void){return active?0x400040:0;}
 uint8_t tri_rd8(uint32_t a){CHECK(a>=0x400000 && a<0x410000);return bank[a-0x400000];}
 uint16_t tri_rd16(uint32_t a){return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1));}

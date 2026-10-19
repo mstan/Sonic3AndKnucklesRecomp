@@ -12,7 +12,8 @@ int main(int argc,char **argv)
     CHECK(!s3_stage_pack_enabled && !s3_stage_pack_path[0]);
     CHECK(!s3_stage_pack_sram() && !s3_stage_pack_state_reason());
     const RecompLauncherCModProvider *p=s3_stage_pack_mods(NULL);
-    CHECK(p->package_count(NULL)==1 && p->feature_count(NULL)==1);
+    CHECK(p->package_count(NULL)==1 && p->feature_count(NULL)==3);
+    CHECK(!s3_stage_pack_megamix && !s3_stage_pack_mighty);
     RecompLauncherCModFeature f;CHECK(p->feature_get(NULL,0,&f));
     CHECK(!f.enabled && f.channel==RECOMP_MOD_CHANNEL_EXPERIMENTAL);
     CHECK(p->feature_enable(NULL,package,feature,1));

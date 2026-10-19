@@ -516,7 +516,7 @@ static void prison(uint32_t o)
  * Object 73 - Marble Zone boss; Object 74 - the lava it drops
  * ---------------------------------------------------------------------- */
 #define MZ_X    0x1800
-#define MZ_Y    0x210
+#define MZ_Y    (tri_zone()==0x36?0x52E:0x210) /* v3 BMZ target $54A, recover $58E */
 #define MZ_END  (MZ_X + 0x160)
 #define BLAVA   0x34              /* ship: lava-ball timer (byte) */
 #define SHIELD_FIRE_BIT 0x10

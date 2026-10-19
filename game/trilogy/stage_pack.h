@@ -1,6 +1,7 @@
 #pragma once
 struct RecompLauncherCModProvider;
 extern int s3_stage_pack_enabled;
+extern int s3_stage_pack_megamix, s3_stage_pack_mighty;
 extern char s3_stage_pack_path[1024];
 void s3_stage_pack_load(const char *settings);
 int s3_stage_pack_validate(const char *path, char *error, unsigned capacity);

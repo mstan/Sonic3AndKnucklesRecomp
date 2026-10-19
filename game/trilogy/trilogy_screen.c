@@ -190,6 +190,12 @@ static void ghz_event(void)
 /* ---- S1 animated level art + palette cycling ----------------------------- */
 static uint32_t blob(int id)
 {
+    uint32_t e=tri_dir();
+    if(e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX) {
+        uint32_t t=tri_rd32(tri_rd32(TRI_BANK_BASE+0x24)+24);
+        uint32_t p=t?tri_rd32(t+(uint32_t)id*4):0;
+        if(p)return p;
+    }
     uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
     return t ? tri_rd32(t + (uint32_t)id * 4u) : 0;
 }
@@ -715,7 +721,7 @@ static const ZoneScreen *zone_screen(void)
     static const ZoneScreen scz = { s2_scz_init2, s2_scz_event, s2_scz_camera, s2_anim, s2_wfz_palcycle };
     static const ZoneScreen wfz = { s2_wfz_init2, s2_wfz_event, NULL, s2_anim, s2_wfz_palcycle };
     static const ZoneScreen dez = { s2_dez_init2, s2_dez_event, NULL, s2_anim, s2_cpz_palcycle };   /* PalCycle_CPZ */
-    switch (tri_zone()) {
+    switch (tri_source_zone()) {
     case TRI_S1_GHZ: return &ghz;
     case TRI_S1_LZ:  return &lz;
     case TRI_S1_MZ:  return &mz;
@@ -837,7 +843,7 @@ int tri_screen_hook(uint32_t pc)
     case TH_RESIZE:
         if (!tri_dir()) return 0;
         { const ZoneScreen *z = zone_screen(); if (z->resize) z->resize(); }
-        if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1) {
+        if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 || tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX) {
             extern void s1_dynamic_level_events(void);
             s1_dynamic_level_events();
         } else if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S2) {

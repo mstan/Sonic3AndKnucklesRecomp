@@ -231,6 +231,9 @@ void tri_music_restore(void);
 uint32_t tri_dir(void);                   /* bank address of the current entry, 0 if none */
 uint32_t tri_dir_for(int zone, int act);
 int      tri_bank_loaded(void);
+int tri_source_zone(void);
+uint32_t tri_s1_info(void);
+uint16_t tri_source_stage(uint16_t stage);
 
 /* ---- module entry points ------------------------------------------------ */
 void trilogy_init(void);
@@ -248,6 +251,8 @@ int  tri_level_hook(uint32_t pc);         /* trilogy_level.c */
 void tri_megamix_geometry_begin(void);
 int  tri_megamix_geometry_owns(uint32_t pc);
 int  tri_megamix_geometry_hook(uint32_t pc);
+int  tri_megamix_sprite_hook(uint32_t pc);
+int  tri_mighty_hook(uint32_t pc);
 int  tri_megamix_geometry_cell(int x,int y,int background,int wrap,uint16_t *cell);
 int  tri_screen_hook(uint32_t pc);        /* trilogy_screen.c */
 int  tri_titlecard_hook(uint32_t pc);     /* trilogy_titlecard.c */

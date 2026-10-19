@@ -78,10 +78,12 @@ void tri_player_frame(void)
         return;
     extern void tri_obj_frame(void);
     tri_obj_frame();
-    if (tri_rd8(e + TD_GAME) == TRI_GAME_S1) {
+    if (tri_rd8(e + TD_GAME) == TRI_GAME_S1 || tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX) {
         extern void s1_synchro_animate(void);
         s1_synchro_animate();
-        uint32_t info = tri_rd32(e + TD_EXTRA);
+        if (tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX &&
+            tri_source_zone()!=TRI_S1_GHZ && tri_source_zone()!=TRI_S1_SLZ) return;
+        uint32_t info = tri_s1_info();
         if (!info)
             return;
         for (uint32_t p = RAM_Player_1; p <= RAM_Player_2; p += OBJ_SIZE)

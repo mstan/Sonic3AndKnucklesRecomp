@@ -12,11 +12,13 @@
 #include "megamix_geometry.h"
 #include "megamix_geometry_sites.h"
 #include "sonic3_video.h"
+#include "video/genesis_vdp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static MegamixGeometry s_geometry;
+static uint8_t s_layout[12+128*16*4];
 static uint16_t s_stage;
 static uint32_t s_chunks_address;
 
@@ -28,12 +30,13 @@ static const uint8_t *bank_range(uint32_t address,uint32_t bytes)
 }
 static int current(void)
 {
-    return s_geometry.layout && s_stage==r16(RAM_Current_zone_and_act);
+    return s_geometry.layout && (s_stage==r16(RAM_Current_zone_and_act) || r16(RAM_Restart_level_flag));
 }
 static int video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     unsigned a=RAM_Current_zone_and_act&0xFFFF;
-    if(!s_geometry.layout || s_stage!=((ram[a]<<8)|ram[a+1]))return 0;
+    unsigned restart=RAM_Restart_level_flag&0xFFFF;
+    if(!s_geometry.layout || (s_stage!=((ram[a]<<8)|ram[a+1]) && !ram[restart] && !ram[restart+1]))return 0;
     *cell=megamix_geometry_cell(&s_geometry,background,x,y,background);
     return 1;
 }
@@ -42,6 +45,7 @@ void tri_megamix_geometry_begin(void)
 {
     memset(&s_geometry,0,sizeof s_geometry);
     s_chunks_address=0;
+    gvdp_set_sprite_patterns(NULL,0,NULL);
     s3_video_set_world_cell(video_cell);
     uint32_t e=tri_dir();
     if(!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX)return;
@@ -49,14 +53,38 @@ void tri_megamix_geometry_begin(void)
     if(!bank_range(info,24) || tri_rd32(info)!=0x4D474931u)goto invalid;
     uint32_t layout=tri_rd32(info+4),layout_size=tri_rd32(info+8);
     uint32_t chunks=tri_rd32(info+12),chunks_size=tri_rd32(info+16);
+    const uint8_t *layout_data=bank_range(layout,layout_size);
+    if(!layout_data || layout_size>sizeof s_layout)goto invalid;
+    memcpy(s_layout,layout_data,layout_size);
     if(tri_rd16(info+22) || !megamix_geometry_open(&s_geometry,
-            bank_range(layout,layout_size),layout_size,
+            s_layout,layout_size,
             bank_range(chunks,chunks_size),chunks_size,tri_rd16(info+20)))goto invalid;
     s_stage=r16(RAM_Current_zone_and_act);s_chunks_address=chunks;
+    if(bank_range(info,52)) {
+        uint32_t pixels=tri_rd32(info+40),bytes=tri_rd32(info+44),lines=tri_rd32(info+48);
+        if(bytes && (!bank_range(pixels,bytes) || !bank_range(lines,bytes/32) ||
+           !gvdp_set_sprite_patterns(bank_range(pixels,bytes),bytes,bank_range(lines,bytes/32))))goto invalid;
+    }
     return;
 invalid:
     fprintf(stderr,"[megamix] invalid converted geometry for stage %04X\n",r16(RAM_Current_zone_and_act));
     exit(EXIT_FAILURE);
+}
+
+int tri_megamix_lz_patch(uint8_t chunk)
+{
+    if(!current())return 0;
+    uint32_t e=tri_dir(),info=tri_rd32(e+TD_EXTRA);
+    if(tri_rd8(info+24)!=1 || tri_rd8(info+25)!=2)return 0;
+    uint32_t swaps=tri_rd32(info+52)+(chunk==7?8u:0u);
+    if(!bank_range(swaps,8))return 0;
+    for(unsigned q=0;q<4;q++) {
+        unsigned offset=12u+2u*((4u+(q>>1))*s_geometry.width[0]+12u+(q&1));
+        uint16_t id=tri_rd16(swaps+q*2);
+        if(id>=s_geometry.chunk_count || offset+1>=s_geometry.layout_size)return 0;
+        s_layout[offset]=(uint8_t)(id>>8);s_layout[offset+1]=(uint8_t)id;
+    }
+    return 1;
 }
 
 int tri_megamix_geometry_cell(int x,int y,int background,int wrap,uint16_t *cell)

@@ -517,7 +517,7 @@ static void stomper(uint32_t o)
         o_init(o, S1A_STOMP, OB8(o, OBJ_render) | 4, 4, var[k][0], var[k][1]);
         SET8(o, OBJ_y_radius, var[k][1]);
         SET8(o, OBJ_frame, k);
-        if (tri_zone() == TRI_S1_LZ) {         /* SBZ3 */
+        if (tri_source_zone() == TRI_S1_LZ) {         /* SBZ3 */
             uint8_t was = s_obj6B;
             s_obj6B |= 1;
             int gone = (was & 1);
@@ -617,7 +617,7 @@ static void stomper(uint32_t o)
         o_solid(o, OB8(o, OBJ_width_px) + 0x0B, d2, d2 + 1, oldx);
     }
     if (o_out_of_range(o, OB16(o, STO_ORIGX))) {
-        if (tri_zone() == TRI_S1_LZ) {
+        if (tri_source_zone() == TRI_S1_LZ) {
             s_obj6B = 0;
             o_delete_respawnable(o);
         } else {

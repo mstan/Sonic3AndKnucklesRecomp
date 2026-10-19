@@ -38,6 +38,9 @@ static uint32_t music_table(int *last, int *game)
     if (!t || (!e && !s_game_override)) return 0;
     *game = s_game_override ? s_game_override : tri_rd8(e + TD_GAME);
     if (*game == TRI_GAME_S2) { *last = 0x9F; return tri_rd32(t + TRI_BLOB_S2_MUSIC * 4u); }
+    if (*game == TRI_GAME_MEGAMIX) {
+        *last=0x97;return tri_rd32(tri_rd32(TRI_BANK_BASE+0x24)+16);
+    }
     *last = 0x93;
     return tri_rd32(t + TRI_BLOB_S1_MUSIC * 4u);
 }

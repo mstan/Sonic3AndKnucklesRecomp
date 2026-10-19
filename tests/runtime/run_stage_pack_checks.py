@@ -70,15 +70,17 @@ def main():
     ap.add_argument('--sfx-start',default='A0',help='original S2 sound ID, hexadecimal')
     ap.add_argument('--stages',default='all');ap.add_argument('--workers',type=int,default=2)
     ap.add_argument('--character',type=int,default=1)
+    ap.add_argument('--mighty',action='store_true')
     args=ap.parse_args(); args.out.mkdir(parents=True,exist_ok=True)
     stages=manifest(args.bank)
     if args.stages!='all': stages=[s for s in stages if s['stage'] in args.stages.split(',')]
     if args.kind=='signposts':
         stages=[s for s in stages if any(o['id']==13 for o in s['objects'])
-                and (s['stage'].endswith('00') or int(s['stage'][:2],16)<0x28 or s['stage']=='2f01')]
+                and (s['stage'].endswith('00') or int(s['stage'][:2],16)<0x28 or s['stage']=='2f01'
+                     or int(s['stage'][:2],16)>=0x34)]
     def run(stage):
         case=args.out/stage['stage'];case.mkdir(exist_ok=True)
-        runtime=case/'runtime'; runtime_files(args.exe,args.bank,runtime)
+        runtime=case/'runtime'; runtime_files(args.exe,args.bank,runtime,mighty=args.mighty)
         env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage['stage'],
                  TRILOGY_CHAR=str(args.character),TRILOGY_GOD='1')
@@ -90,8 +92,13 @@ def main():
         script=BOOT+'WAIT 180\n'
         script+=f'DUMP_RAM {(case/"initial.ram").as_posix()}\nSCREENSHOT {(case/"initial.png").as_posix()}\n'
         if args.kind=='signposts':
-            script+='HOLD RIGHT\n'
+            # Position across the real trigger; do not require a short walk
+            # through nearby walls/ledges to establish an exit check.
+            script+=f'WRITE_RAM16 FFB010 {sign["x"]+0x18:04X}\nWRITE_RAM16 FFB014 {max(0,sign["y"]-0x10):04X}\nRELEASE\n'
             expected='2103' if stage['stage']=='2501' else f"{int(stage['stage'],16)+1:04x}"
+            mm_order=['3400','3401','3402','3600','3601','3602','3800','3801','3802','3500','3501','3502',
+                      '3700','3701','3702','3900','3901','3503','3902']
+            if stage['stage'] in mm_order:expected=mm_order[mm_order.index(stage['stage'])+1]
             script+=f'WAIT_RAM16 FFFE10 {expected}\nRELEASE\nWAIT_RAM8 FFF600 0C\nWAIT 180\n'
             script+=f'DUMP_RAM {(case/"next.ram").as_posix()}\nSCREENSHOT {(case/"next.png").as_posix()}\n'
         elif args.kind=='sfx':

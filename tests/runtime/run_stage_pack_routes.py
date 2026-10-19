@@ -10,6 +10,7 @@ from run_stage_pack_encounters import Native,u16,objects,verify_next
 from run_stage_pack_audit import errors
 ap=argparse.ArgumentParser()
 ap.add_argument('--cases',default='2103,3000,2502')
+ap.add_argument('--mighty',action='store_true')
 for key in ('exe','rom','bank','out'):
     ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
 args=ap.parse_args();args.character=1;args.kind='routes'
@@ -25,15 +26,16 @@ def finish(run,expected,rec):
 for stage in args.cases.split(','):
     case=args.out/stage;run=None;rec=dict(stage=stage,status='unverified',hits=[])
     try:
-        args.kind='bosses' if stage=='2502' else 'routes'
-        run=Native(args,stage,(0x2510,0x5b0,0) if stage=='2502' else None,case,0)
+        final=stage in ('2502','3902')
+        args.kind='bosses' if final else 'routes'
+        run=Native(args,stage,(0x2510,0x5b0,0) if final else None,case,0)
         ram,frame=run.snapshot('before')
-        if stage in ('2103','3000'):
-            x,y=(0xe40,0x10) if stage=='2103' else (0x1570,0x580)
+        if stage in ('2103','3503','3000'):
+            x,y=(0xe40,0x10) if stage in ('2103','3503') else (0x1570,0x580)
             run.player(ram,x,y,freeze=True)
             camera=struct.pack('>II',max(0,x-0xa0)<<16,max(0,y-0x60)<<16)
             run.write(0xee78,camera);run.write(0xee80,camera)
-            expected='2502' if stage=='2103' else '3100'
+            expected='3902' if stage=='3503' else '2502' if stage=='2103' else '3100'
             for n in range(20):
                 run.step(30);ram,frame=run.snapshot()
                 run.events.append(dict(frame=frame,stage=f'{u16(ram,0xfe10):04x}',mode=ram[0xf600]))
@@ -67,6 +69,12 @@ for stage in args.cases.split(','):
             if defeated:
                 for n in range(60):
                     ram,frame=run.snapshot()
+                    if stage=='3902' and ram[0xf600]==4:
+                        slot=int.from_bytes(ram[0xe660:0xe664],'big')&0xffff
+                        saved=bool(slot and ram[slot]&3 and ram[slot+3]==39)
+                        rec.update(status='passed' if saved else 'failed',campaign_end='passed',next_mode=4,
+                                   saved_completion='passed' if saved else 'failed',
+                                   saved_code=ram[slot+3] if slot else None);break
                     if u16(ram,0xfe10)==0x2800:
                         finish(run,'2800',rec);break
                     run.player(ram,0x27d0,0x5b0,freeze=True);run.step(60)

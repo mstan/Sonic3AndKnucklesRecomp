@@ -381,7 +381,7 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
     }
     if(count>1024)return;
     for(int n=0;n<count && s_build.count<SCENE_SPRITES;++n,p+=6) {
-        int dy=(int8_t)scene_read8(p),size=scene_read8(p+1)&15;
+        int dy=(int8_t)scene_read8(p),size=scene_read8(p+1);
         int dx=(int16_t)scene_read16(p+4);
         uint16_t attr=(uint16_t)(scene_read16(p+2)+gfx);
         if(flags&1){dx=-dx-(((size>>2)&3)+1)*8;attr^=0x800;}
@@ -637,6 +637,8 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int menu=s_display->scene==0;
         if(menu && s->hud!=(file_select_layout(v)?4:3))continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
+        unsigned pattern_bytes;
+        const uint8_t *patterns=gvdp_sprite_patterns(s->size,&pattern_bytes);
         int world=!s->hud && s_display->scene==1;
         int y=s->y+(world?s_display->camera_y-s_camera_y:0);
         if(line<y || line>=y+ch*8)continue;
@@ -654,11 +656,17 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             int ix=(s->attr&0x800)?cw*8-1-i:i;
             uint16_t cell=(uint16_t)((s->attr&0xE000u)|
                 (((s->attr&2047u)+(unsigned)(ix/8*ch+iy/8))&2047u));
-            uint8_t p=pattern_pixel(v,cell,ix,iy);
+            uint8_t p;
+            if(patterns) {
+                unsigned a=(cell&2047u)*32u+(unsigned)(iy&7)*4u+(unsigned)(ix&7)/2u;
+                unsigned byte=a<pattern_bytes?patterns[a]:0;
+                p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
+                if(!(p&15))continue;
+            } else p=pattern_pixel(v,cell,ix,iy);
             if(!p)continue;
             s_priority[x]|=2;
             /* extended sprite lines (game-added art keeping its own colours) */
-            int ext=p<16?gvdp_ext_line(cell&2047u):0;
+            int ext=p<16?gvdp_sprite_pattern_line(s->size,cell&2047u):0;
             uint32_t c=ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,p),GENESIS_DAC_NORMAL):palette[p];
             if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
         }
