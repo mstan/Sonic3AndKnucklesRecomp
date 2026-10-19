@@ -19,11 +19,11 @@
 
 enum { COMMON=0,NATIVE=10,PROJECTED=20,RESUME=30,DONE=31,USED=32,PREVIOUS=38,
        CD_ACT=48,CD_STONES=49,CD_GENERATORS=50,CD_PROJECTORS=52 };
-static const unsigned counts[]={7,11,14,7,28},starts[]={0,7,18,32,40};
+static const unsigned counts[]={7,11,14,7,70},starts[]={0,7,18,32,40};
 static const unsigned order[]={0,1,4,2,3};
 static unsigned present(unsigned mask,unsigned c) { return c==2 || (mask&(1u<<(c==4?3:c==3?2:c))); }
 static unsigned content(int code) { return code<7?0:code<18?1:code<32?2:code<39?3:4; }
-static int stable_valid(int code) { return code>=0 && code<=67; }
+static int stable_valid(int code) { return code>=0 && code<=109; }
 static int empty(const uint8_t *p) { return (p[0]&128)!=0; }
 static uint32_t crc32(const uint8_t *p,unsigned n)
 { uint32_t c=~0u;while(n--){c^=*p++;for(int i=0;i<8;i++)c=(c>>1)^(0xEDB88320u&(0u-(c&1)));}return ~c; }
@@ -60,7 +60,7 @@ static void from_native(uint8_t *r,const uint8_t *p)
     memset(r,0,64);memcpy(r+COMMON,p,10);native_sanitize(r+COMMON);memcpy(r+NATIVE,p,10);
     native_sanitize(r+NATIVE);memcpy(r+PROJECTED,r+NATIVE,10);memcpy(r+PREVIOUS,r+NATIVE,10);
     r[RESUME]=(uint8_t)(18+(p[3]<14?p[3]:0));r[USED]=!empty(p);
-    if(!empty(p) && (p[0]&3))r[DONE]=4;
+    if(!empty(p) && (p[0]&3)){r[DONE]=4;r[RESUME]=39;}
 }
 void campaign_view(CampaignSave *s,uint8_t out[80])
 {
@@ -72,6 +72,7 @@ void campaign_view(CampaignSave *s,uint8_t out[80])
         if(stable==39 || display<0) {
             stable=18+(r[NATIVE+3]<14?r[NATIVE+3]:0);
             if((r[DONE]&4) && present(s->mask,3) && !(r[DONE]&8))stable=32;
+            if(r[RESUME]==39 && present(s->mask,4) && !(r[DONE]&16))stable=40;
             display=campaign_display(s->mask,stable);
         }
         unsigned complete=(r[DONE]&active_bits(s->mask))==active_bits(s->mask);
@@ -90,7 +91,8 @@ void campaign_capture(CampaignSave *s,const uint8_t view[80],uint8_t native[80])
         int code=campaign_stable(s->mask,p[3]);
         if(code<0)code=18;
         int changed=empty(old)||p[3]!=old[3]||((p[0]^old[0])&3);
-        if(changed)r[RESUME]=(uint8_t)code;
+        int parked=r[USED] && r[RESUME]!=39 && campaign_display(s->mask,r[RESUME])<0;
+        if(changed && !parked)r[RESUME]=(uint8_t)code;
         unsigned ch=r[COMMON+2]>>4;
         memcpy(r+COMMON,p,10);
         /* A temporary Sonic fallback must not erase parked Mighty identity. */

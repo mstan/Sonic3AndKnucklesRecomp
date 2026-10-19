@@ -39,8 +39,15 @@ void tri_ext_level(void)
     s_have = 0;
     uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
     uint32_t b = t ? tri_rd32(t + TRI_BLOB_EXTPAL * 4u) : 0;
-    if (!b || !tri_dir()) return;
-    uint32_t e = b + (uint32_t)((tri_zone() - TRI_ZONE_BASE) * 4 + tri_act()) * 64u;
+    uint32_t e;
+    if (!tri_dir()) return;
+    if (tri_cd_zone(tri_zone())) {                  /* (Sonic CD: in the level's window) */
+        extern uint32_t tri_scd_extpal(void);
+        if (!(e = tri_scd_extpal())) return;
+    } else if (b)
+        e = b + (uint32_t)((tri_zone() - TRI_ZONE_BASE) * 4 + tri_act()) * 64u;
+    else
+        return;
     for (int k = 0; k < 32; k++) {
         uint16_t c = tri_rd16(e + (uint32_t)k * 2u);
         s_tgt[k >> 4][k & 15] = c;

@@ -1145,14 +1145,15 @@ static void s2end_finish(void)                       /* on to Sonic 3 */
     set_reg(16, 0x01);
     set_reg(4, PLANE_B >> 13);
     set_reg(11, 0x03);
-    fprintf(stderr, "[trilogy] Sonic 2 ending done: on to Angel Island\n");
-    w16(RAM_Current_zone_and_act, 0x0000);
-    w16(RAM_Apparent_zone_and_act, 0x0000);
+    extern int s3_stage_pack_cd;uint16_t next=s3_stage_pack_cd?0x4000:0;
+    fprintf(stderr, "[trilogy] Sonic 2 ending done: next campaign $%04X\n",next);
+    w16(RAM_Current_zone_and_act,next);
+    w16(RAM_Apparent_zone_and_act,next);
     w8(RAM_Last_star_post_hit, 0);
     w8(RAM_Ctrl_1_locked, 0);
     w8(RAM_Game_mode, 0x0C);
     extern void tri_save_progress(uint16_t next_za);
-    tri_save_progress(0x0000);                        /* the file resumes at Angel Island */
+    tri_save_progress(next);
 }
 
 static void s2end_frame(void)

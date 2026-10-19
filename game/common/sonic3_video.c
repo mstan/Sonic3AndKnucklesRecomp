@@ -240,6 +240,8 @@ static int native_terrain_streamed(int wy, int copied_camera_y)
 }
 static S3VideoWorldCell s_world_cell;
 void s3_video_set_world_cell(S3VideoWorldCell read) { s_world_cell=read; }
+static S3VideoWorldPublish s_world_publish;
+void s3_video_set_world_publish(S3VideoWorldPublish publish) { s_world_publish=publish; }
 static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background)
 {
     uint16_t block;
@@ -728,6 +730,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     if(line==0) {
         memcpy(&s_video_frame,v,sizeof s_video_frame);
         memcpy(s_world_frame,g_ram,sizeof s_world_frame);
+        if(s_world_publish)s_world_publish(s_world_frame);
         /* HUD visibility is not level readiness: AIZ hides it for the whole
          * landing/emerald cutscene while displaying the real stage planes. */
         s_frame_level=level_ready();

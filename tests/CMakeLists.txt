@@ -3,6 +3,20 @@ add_executable(campaign_save_test runtime/campaign_save_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
 target_include_directories(campaign_save_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME campaign_save COMMAND campaign_save_test)
+add_executable(scd_geometry_test runtime/scd_geometry_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_geometry.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c")
+target_include_directories(scd_geometry_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME scd_geometry COMMAND scd_geometry_test)
+add_executable(scd_pack_validate "${CMAKE_SOURCE_DIR}/tools/scd_pack_validate.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c")
+target_include_directories(scd_pack_validate PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_executable(scd_pack_graph_test runtime/scd_pack_graph_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c")
+target_include_directories(scd_pack_graph_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME scd_pack_graph COMMAND scd_pack_graph_test)
 add_executable(scd_resource_test runtime/scd_resource_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c")
 target_include_directories(scd_resource_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
@@ -39,6 +53,8 @@ target_include_directories(megamix_hooks_test PRIVATE "${CMAKE_SOURCE_DIR}/game/
 add_test(NAME megamix_hooks COMMAND megamix_hooks_test)
 add_executable(stage_pack_test runtime/stage_pack_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_mods.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_bank.c")
 target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${CMAKE_SOURCE_DIR}/recomp-ui/src")
@@ -93,6 +109,9 @@ if(Python3_Interpreter_FOUND)
     if(EXISTS "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin")
         add_test(NAME megamix_geometry_sites COMMAND "${Python3_EXECUTABLE}"
             "${CMAKE_CURRENT_LIST_DIR}/../tools/gen_megamix_geometry_sites.py"
+            --rom "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin" --check)
+        add_test(NAME sonic_cd_sites COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_LIST_DIR}/../tools/gen_sonic_cd_sites.py"
             --rom "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin" --check)
     endif()
 endif()

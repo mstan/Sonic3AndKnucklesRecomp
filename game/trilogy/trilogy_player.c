@@ -78,7 +78,7 @@ void tri_player_frame(void)
         return;
     extern void tri_obj_frame(void);
     tri_obj_frame();
-    if (tri_rd8(e + TD_GAME) == TRI_GAME_S1 || tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX) {
+    if (tri_rd8(e + TD_GAME) == TRI_GAME_S1 || tri_rd8(e+TD_GAME)==TRI_GAME_CD || tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX) {
         extern void s1_synchro_animate(void);
         s1_synchro_animate();
         if (tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX &&

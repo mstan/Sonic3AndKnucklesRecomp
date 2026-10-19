@@ -32,3 +32,6 @@ void s3_video_set_frame_overlay(S3VideoFrameOverlay draw);
 typedef int (*S3VideoWorldCell)(const uint8_t *ram, int x, int y, int background,
                               uint16_t *cell);
 void s3_video_set_world_cell(S3VideoWorldCell read);
+/* Freeze optional game-owned geometry alongside the RAM used for this image. */
+typedef void (*S3VideoWorldPublish)(const uint8_t *ram);
+void s3_video_set_world_publish(S3VideoWorldPublish publish);

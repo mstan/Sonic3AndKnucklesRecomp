@@ -34,6 +34,7 @@ static int current(void)
 }
 static int video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
+    if(tri_scd_video_cell(ram,x,y,background,cell))return 1;
     unsigned a=RAM_Current_zone_and_act&0xFFFF;
     unsigned restart=RAM_Restart_level_flag&0xFFFF;
     if(!s_geometry.layout || (s_stage!=((ram[a]<<8)|ram[a+1]) && !ram[restart] && !ram[restart+1]))return 0;
@@ -47,6 +48,7 @@ void tri_megamix_geometry_begin(void)
     s_chunks_address=0;
     gvdp_set_sprite_patterns(NULL,0,NULL);
     s3_video_set_world_cell(video_cell);
+    s3_video_set_world_publish(tri_cd_zone(tri_zone())?tri_scd_publish:NULL);
     uint32_t e=tri_dir();
     if(!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX)return;
     uint32_t info=tri_rd32(e+TD_EXTRA);
@@ -117,11 +119,14 @@ static unsigned chunk(int plane,int x,int y)
     /* The row mask belongs to the live guest layout. It can select empty
      * guard rows beyond the donor's height; those must stay empty. */
     unsigned row=(((unsigned)(uint16_t)y>>5)&r16(RAM_Layout_row_index_mask))>>2;
+    unsigned id;uint32_t definitions;
+    if(tri_scd_chunk(plane,x,(int)row,&definitions,&id)){s_chunks_address=definitions;return id;}
     return megamix_geometry_chunk(&s_geometry,plane,x,(int)row,0);
 }
 int tri_megamix_geometry_hook(uint32_t pc)
 {
-    if(!current())return 0;
+    unsigned cd_id;uint32_t cd_definitions;
+    if(!current() && !tri_scd_chunk(0,-1,-1,&cd_definitions,&cd_id))return 0;
     switch(pc) {
     case MG_PC_SK_FG:case MG_PC_S3_FG:
     case MG_PC_SK_BG:case MG_PC_S3_BG: {

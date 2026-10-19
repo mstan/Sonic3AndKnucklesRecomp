@@ -27,7 +27,7 @@ Converter/runtime reference: `sonsegajp/SonicAnthology` at
 adapted under [the retained upstream license](../game/trilogy/LICENSE.md).
 The original renderer, launcher and existing pack converters are retained.
 
-The combined game/engine foundations pass 42 CTests with MSVC. The disc
+The current development runtime passes 46 combined CTests with MSVC. The disc
 reader passes 13 synthetic tests. The resource directory contract passes seven
 fixture groups against the Python and C loaders under Windows and Ubuntu GCC
 with `-Wall -Wextra -Werror`. The journal's 16 catalogs, v1 migration,
@@ -71,7 +71,9 @@ guest pointers. Synthetic dispatch remains at `$7E0000` and above.
 ## SCS1 v2 journal
 
 Stable IDs remain S1 0..6, S2 7..17, native 18..31, Megamix 32..38 and
-completion 39. CD receives period-row IDs 40..67. Display order is separate:
+completion 39. CD receives exact act/period IDs 40..109. Each round uses ten
+entries: Present acts 1/2, Past acts 1/2, Good Future acts 1/2/3 and Bad Future
+acts 1/2/3. Display order is separate:
 S1 -> S2 -> CD -> native -> Megamix. Mask bits 0/1/2/3 mean S1/S2/MM/CD;
 completion bits 0/1/2/3/4 mean S1/S2/native/MM/CD.
 
@@ -80,7 +82,7 @@ big-endian CRC32. Version is header byte 4, pending projection byte 5;
 version 2 requires CD capability byte 6 equal to 1. Other header fields stay
 reserved. Each slot retains the v1 layout. Bytes 48/49 hold CD act and unique
 seven-stone mask; bytes 50..51/52..53 hold big-endian generator/projector
-masks (bit `round*2+act`, for acts 1/2). The stable cursor holds the period.
+masks (bit `round*2+act`, for acts 1/2). The stable cursor holds the act/period.
 Native emeralds are separate from Time Stones.
 
 Existing journals remain v1 until CD is enrolled or CD state is written.
@@ -97,8 +99,69 @@ unrecognized companion; downgrading readers are not promised compatibility.
 
 ## Outstanding acceptance
 
-Runtime resource enrollment, CD bank ownership, gameplay hooks, campaign
-transitions, UI/replay navigation and durable runtime CD state remain to be
-integrated. All mechanics, process-level removal/reinstallation, screenshot
+Development executable SHA256
+`07850a2af6ba5b862d531a88f576c307fde97f140edccd36ed29e7fbe7f4b449`
+passes all 49 existing native screenshot/RAM/VRAM artifacts byte for byte
+(`build/qa-cd-native-parity-dev5`). All 16 actual private resource/settings
+combinations pass the C provider test (`build/qa-cd-pack-matrix-dev5`). Actual
+new-game permutations are running separately; these are distinct checks.
+Portable geometry and malformed graph tests pass strict Windows/Ubuntu GCC;
+the private corpus validates 3,163,648 cells across all 41 larger layouts.
+
+The CD-only real-menu bringup succeeds at `$4000`, with movement and rings
+observed; its initial two images were inspected. A multi-stage debug survey
+reached 21 variants before a watchdog on `$4801`. That stage passes a fresh
+isolated launch. The original survey used separate zone/restart writes across
+live frames, exposing a new stage ID while its old window remained mapped;
+an atomic selection fixture is now under validation. The failed logs remain
+under `build/qa-cd-entries-dev5`. Do not treat stage entry or handler coverage
+as a mechanics pass.
+
+The corrected atomic fixture passes entry and real movement input for all 70
+variants (`build/qa-cd-entries-atomic-dev5/results.json`), with no crash errors.
+Dispatch telemetry retains eight fallback events at four addresses; their
+classification remains to be reviewed. The multi-stage fixture resets its
+checkpoint and supplies 63 lives, explicitly bypassing those prerequisites.
+All real exits, warp transitions and deeper mechanics remain separate checks.
+
+Runtime resource enrollment, independent CD bank ownership, gameplay hooks,
+campaign transitions, 70-entry replay navigation and durable CD state now
+compile in the development runtime. These remain subject to gameplay QA.
+The first real-menu CD-only probe safely fell back to native S3K after its
+object audit found three PPZ act-3 shared IDs mapped to unregistered slots.
+The converter now shares their existing acts 1/2 implementations; the failed
+probe is retained under `build/qa-cd-bringup-1` and is not CD entry evidence.
+The combined run passed 42/43 tests; the failing new save assertion incorrectly
+expected replay to revoke an earned native clear. Its corrected check and a
+separate pre-clear CD parking/native-progress fixture pass strict GCC.
+
+An independent Sonic Retro original disassembly at
+`f8cf3f0af7bf419d18182ba98554f09307ad3cc6` matches all 104 comparison checks
+across R11A-D and R61A. Its demo chunk comparison remains discrepant and is
+excluded from playable coverage. Original code confirms seven Time Stones
+force good futures, independently of native emeralds. The eighth UFO dataset
+is an original sound-test secret (07/07/07). The CD mod exposes a default
+Normal campaign / UFO practice 1..8 choice: starting No Save with a practice
+stage chosen enters CD directly and then that UFO stage. Practice returns to
+Palmtree Panic without awarding stones or changing saved campaign progress.
+Runtime entry, outcomes and return behavior still require validation.
+
+Content conversion now requires the `scd_pack_validate` executable (build that
+CMake target or supply `tools/build_sonic_cd_pack.py --validator <path>`). It
+validates the nested runtime graph before replacing a previous output. Music
+conversion continues to validate every normalized track against the enrolled
+source hashes. The raw BIN little-endian stereo interpretation also agrees
+with the independent [Genesis Plus GX drive implementation](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/core/cd_hw/cdd.c#L1554).
+
+All mechanics, process-level removal/reinstallation, screenshot
 review, original-reference comparisons, 49 native artifacts, portability of
 the full runtime and the final owner playtest delivery remain outstanding.
+
+## Follow-up after CD
+
+The owner requested Shadow from Sonic Megamix using the Mighty integration
+as the model. This is queued in `beads-8y9v`, dependent on CD validation.
+The final combined build must receive regression checks and mandatory visual
+comparisons against independent original-game or verified asset references
+before the owner's playtest handoff. Earlier development captures do not
+satisfy that final comparison gate.

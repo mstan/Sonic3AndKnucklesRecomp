@@ -1,5 +1,5 @@
 /*
- * trilogy.h — Sonic Trilogy layer: Sonic 1 / Sonic 2 zones on the retail
+ * trilogy.h — Sonic Anthology layer: Sonic 1 / Sonic 2 zones on the retail
  * Sonic 3 & Knuckles engine.
  *
  * The cartridge is recompiled UNMODIFIED. Everything here is game-owned
@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include "trilogy_syms.h"
 #include "trilogy_hooks.h"
+#include "scd_geometry_sites.h"
 
 
 /* ---- zone ids ---------------------------------------------------------- */
@@ -38,6 +39,21 @@
 #define TRI_S2_WFZ      0x31
 #define TRI_S2_DEZ      0x32
 #define TRI_ZONE_END    0x40
+/* Sonic CD: zone = $40 + round * 4 + time period (round 0 Palmtree Panic,
+ * 1 Collision Chaos, 2 Tidal Tempest, 3 Quartz Quadrant, 4 Wacky Workbench,
+ * 5 Stardust Speedway, 6 Metallic Madness; period 0 present, 1 past, 2 good
+ * future, 3 bad future), act 0-2. Each level lives in scd.bin and is copied
+ * into the bank's CD window when it starts (trilogy_core.c). */
+#define TRI_CD_BASE     0x40
+#define TRI_CD_END      0x5C
+#define TRI_CD_PRESENT  0
+#define TRI_CD_PAST     1
+#define TRI_CD_GOOD     2
+#define TRI_CD_BAD      3
+#define TRI_CD_ZONE(round, period) (TRI_CD_BASE + (round) * 4 + (period))
+#define TRI_GAME_CD     4
+#define TRI_PAL_CD      0xF0           /* palette ids $F0-$FF: the mapped CD level's own */
+#define TRI_PLC_CD      0xF0           /* PLC ids likewise */
 
 #define TRI_GAME_S3K    0
 #define TRI_GAME_S1     1
@@ -47,6 +63,10 @@
 /* ---- expansion bank ---------------------------------------------------- */
 #define TRI_BANK_BASE   0x400000u
 int tri_bank_select(int content);
+int tri_bank_current(void);
+int tri_scd_chunk(int plane,int column,int row,uint32_t *definitions,unsigned *id);
+int tri_scd_video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell);
+void tri_scd_publish(const uint8_t *ram);
 uint32_t tri_mighty_descriptor(void);
 int tri_stage_content(uint16_t stage);
 void tri_bank_level(void);
@@ -225,7 +245,8 @@ void tri_jsr(uint32_t addr);
 #ifdef TRILOGY_INTERNAL
 static inline int tri_zone(void) { return r8(RAM_Current_zone); }
 static inline int tri_act(void)  { return r8(RAM_Current_act); }
-static inline int tri_active(void) { int z = tri_zone(); return z >= TRI_ZONE_BASE && z < TRI_ZONE_END; }
+static inline int tri_active(void) { int z = tri_zone(); return z >= TRI_ZONE_BASE && z < TRI_CD_END; }
+static inline int tri_cd_zone(int z) { return z >= TRI_CD_BASE && z < TRI_CD_END; }
 #endif
 void tri_music_patch(int slot, int song);  /* trilogy_music.c */
 void tri_music_play(int slot, int song);
@@ -238,6 +259,17 @@ int      tri_bank_loaded(void);
 int tri_source_zone(void);
 uint32_t tri_s1_info(void);
 uint16_t tri_source_stage(uint16_t stage);
+int      tri_scd_map(uint16_t zone_and_act);  /* copy a Sonic CD level into the window; 0 if absent */
+int      tri_scd_available(void);
+uint32_t tri_scd_sound(void);             /* Sonic CD's FM sound set: its table (68k), 0 if none */
+/* sound sets (trilogy_music.c): the driver's SFX bank and table for a game */
+void     tri_s2_sound_set(int on);        /* Sonic 2's (a Sonic 2 zone or scene) */
+void     tri_scd_sound_set(int on);       /* Sonic CD's (a Sonic CD level or scene) */
+void     tri_sound_set_for_zone(void);    /* the current zone's game's */
+int      tri_sound_set_foreign(void);     /* 1: not S3K's own set in the driver */
+int      tri_scd_sound_set_on(void);      /* 1: Sonic CD's set in the driver */
+int      tri_s2_sfx_id(int sndid);        /* S2 SndID -> S3K id in the S2 set (0: none) */
+int      tri_scd_sfx_id(int fm);          /* Sonic CD FM id -> S3K id in the CD set (0: none) */
 
 /* ---- module entry points ------------------------------------------------ */
 void trilogy_init(void);

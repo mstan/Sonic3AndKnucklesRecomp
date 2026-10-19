@@ -2,7 +2,7 @@
 #include <stdint.h>
 
 /* Stable IDs never depend on installed packs: S1 0..6, S2 7..17,
- * S3K 18..31, Megamix 32..38, complete 39, CD period rows 40..67.
+ * S3K 18..31, Megamix 32..38, complete 39, CD act/period variants 40..109.
  * Catalog order is S1 -> S2 -> CD -> S3K -> Megamix. Mask bits 0/1/2/3
  * enable S1/S2/Megamix/CD. Only the menu is dense. */
 int campaign_count(unsigned mask);
@@ -23,7 +23,8 @@ void campaign_import(CampaignSave *s,const uint8_t legacy[80],int megamix);
 int campaign_native_block(const uint8_t *raw,unsigned size,uint8_t out[80]);
 /* CD collectibles are independent of native Chaos/Super Emeralds. Bits 0..13
  * in generators/projectors are round*2+act; act 3 has no such objects.
- * Stones are seven unique UFO rewards. The cursor's period is the stable ID. */
+ * Stones are seven unique UFO rewards. The stable cursor names an exact
+ * act/period variant; act is retained as observed runtime state. */
 typedef struct CampaignCdState {
     uint16_t generators,projectors;
     uint8_t act,stones;
