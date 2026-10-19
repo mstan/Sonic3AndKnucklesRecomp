@@ -18,6 +18,7 @@ int tri_mighty_selected;static int player_active=1,atlas_calls;
 uint8_t tri_rd8(uint32_t a) { CHECK(a>=0x400000 && a<0x401000);return bank[a-0x400000]; }
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1)); }
 uint32_t tri_rd32(uint32_t a) { return ((uint32_t)tri_rd16(a)<<16)|tri_rd16(a+2); }
+uint32_t tri_mighty_descriptor(void){uint32_t d=tri_rd32(0x400024);return d?tri_rd32(d+12):0;}
 int tri_mighty_active(void) { return player_active; }
 static S3VideoHudMapping custom_hud;
 void s3_video_set_hud_mapping(S3VideoHudMapping fn) { custom_hud=fn; }

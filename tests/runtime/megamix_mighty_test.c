@@ -26,6 +26,7 @@ uint8_t tri_rd8(uint32_t a)
 }
 uint16_t tri_rd16(uint32_t a){return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1));}
 uint32_t tri_rd32(uint32_t a){return ((uint32_t)tri_rd16(a)<<16)|tri_rd16(a+2);}
+uint32_t tri_mighty_descriptor(void){uint32_t d=tri_rd32(0x400024);return d?tri_rd32(d+12):0;}
 void tri_jsr(uint32_t pc)
 {
     if(call_count<16)calls[call_count++]=pc;

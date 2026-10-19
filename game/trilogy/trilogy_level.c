@@ -29,6 +29,7 @@ static void dev_force_zone(void)
     uint16_t za = (uint16_t)strtoul(z, NULL, 16);
     w16(RAM_Current_zone_and_act, za);
     w16(RAM_Apparent_zone_and_act, tri_apparent(za));
+    tri_bank_level(); /* select before the checkpoint fixture reads water */
     fprintf(stderr, "[trilogy] dev: level forced to $%04X\n", za);
     const char *ch = getenv("TRILOGY_CHAR"); /* native modes 0-3; 4 Mighty+Tails, 5 Mighty */
     if (ch && *ch) {
@@ -201,9 +202,10 @@ int tri_level_hook(uint32_t pc)
         extern void s2_cnz_reset(void);
         extern void s2_obj_htz_reset(void);
         extern void tri_obj_level_entry(void);
+        dev_force_zone();
+        tri_bank_level();
         tri_obj_level_entry();
         s3_video_set_ring_layout(ring_layout);
-        dev_force_zone();
         tri_megamix_geometry_begin();
         tri_flow_level_entry();
         s1_obj_syz_reset();

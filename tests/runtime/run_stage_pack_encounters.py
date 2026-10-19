@@ -73,6 +73,10 @@ class Native:
         self.args,self.case,self.port=args,case,port
         self.case.mkdir(parents=True,exist_ok=True)
         self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False))
+        if getattr(args,'pack_mask',None) is not None:
+            names=('sonic1','sonic2','megamix');paths=args.packs
+            (self.runtime/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(
+                f'{name}={(args.pack_mask>>i)&1}\n{name}_bank={(paths/(name+"-stages.pak")).as_posix()}\n' for i,name in enumerate(names)))
         (case/'input.txt').write_text(BOOT+'WAIT 500000\nEXIT\n')
         env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage,

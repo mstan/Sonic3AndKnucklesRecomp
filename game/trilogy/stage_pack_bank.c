@@ -16,7 +16,7 @@ static uint32_t crc32(const uint8_t *p, size_t n)
     while (n--) { c ^= *p++; for (int i=0;i<8;i++) c=(c>>1)^(0xEDB88320u & (0u-(c&1))); }
     return ~c;
 }
-int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
+int s3_pack_validate(const char *path, int content, char *error, unsigned capacity)
 {
     const char *message = "Choose a Sonic 1 & 2 stage bank built with tools/build_stage_pack.py";
     uint8_t *data = NULL;
@@ -31,18 +31,26 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
     const uint8_t *footer=data+size-12;
     message = "Invalid or damaged stage bank; rebuild it from your source ROMs";
     int megamix=!memcmp(footer,"SPK2",4);
-    if(!megamix && (s3_stage_pack_megamix||s3_stage_pack_mighty)) {
+    if(content<0 || content>3)goto done;
+    if(!megamix && content==3) {
         message="Megamix stages and Mighty require an extended bank built with tools/build_megamix_pack.py";
         goto done;
     }
     if (memcmp(data,"TRLG\0\1",6) || (!megamix && memcmp(footer,"SPK1",4)) ||
         be32(footer+4)!=(uint32_t)size-12 || crc32(data,(size_t)size-12)!=be32(footer+8)) goto done;
+    /* CPK1 tags an independently installable campaign. Legacy combined
+     * banks remain accepted for migration, but never imply another toggle. */
+    if(!memcmp(data+0x28,"CPK1",4) && (data[0x2C]!=content || !content || data[0x2D]!=1 || data[0x2E] || data[0x2F])) {
+        message="This content pack belongs to a different campaign";goto done;
+    }
     /* All 39 acts must be present. This pack is a complete combined campaign. */
     static const uint8_t zones[][2]={{0x20,3},{0x21,4},{0x22,3},{0x23,3},{0x24,3},{0x25,3},
         {0x28,2},{0x29,2},{0x2a,2},{0x2b,2},{0x2c,2},{0x2d,2},{0x2e,2},{0x2f,3},
         {0x30,1},{0x31,1},{0x32,1}};
     for (unsigned z=0;z<sizeof zones/sizeof zones[0];z++)
         for(unsigned a=0;a<zones[z][1];a++) {
+            if(content==3 || (content==1 && zones[z][0]>=0x28) ||
+               (content==2 && zones[z][0]<0x28))continue;
             const uint8_t *e=data+0x40+((zones[z][0]-0x20)*4+a)*0x40;
             static const uint8_t ptrs[]={0,4,8,0x1c,0x20,0x28,0x2c,0x30,0x34};
             for(unsigned k=0;k<sizeof ptrs;k++) {
@@ -59,7 +67,7 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         if(data[p+11]>=3) {
             if(p>payload-36 || !range(be32(data+p+28),256,payload) ||
                !range(be32(data+p+32),256,payload))goto done;
-        } else if(s3_stage_pack_megamix || s3_stage_pack_mighty) {
+        } else if(content==3) {
             message="Upgrade the converted bank with --upgrade-presentation for Megamix visual fixes";
             goto done;
         }
@@ -72,7 +80,7 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
                 if(be32(r+4)!=58*32 || !range(be32(r),58*32,payload))goto done;
                 for(unsigned k=8;k<20;k+=4)if(!range(be32(r+k),32,payload))goto done;
             }
-        } else if(s3_stage_pack_megamix) {
+        } else if(content==3) {
             message="Upgrade the converted bank with --upgrade-presentation for corrected Megamix signposts";
             goto done;
         }
@@ -82,7 +90,7 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         const uint8_t *m=data+mighty-0x400000u;
         int native_hud=!memcmp(m,"MDY3",4);
         int ui=native_hud || !memcmp(m,"MDY2",4);
-        if(s3_stage_pack_mighty && !native_hud) {
+        if(content==3 && !native_hud) {
             message="Upgrade the converted bank with --upgrade-presentation for Mighty's native HUD lettering";
             goto done;
         }
@@ -114,7 +122,7 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         static const uint16_t acts[]={0x3400,0x3401,0x3402,0x3600,0x3601,0x3602,
             0x3800,0x3801,0x3802,0x3500,0x3501,0x3502,0x3700,0x3701,0x3702,
             0x3900,0x3901,0x3503,0x3902};
-        for(unsigned i=0;i<19;i++) {
+        for(unsigned i=0;content==3 && i<19;i++) {
             const uint8_t *e=data+0x40+(((acts[i]>>8)-0x20)*4+(acts[i]&3))*0x40;
             if(e[0x25]!=3 || !be32(e))goto done;
             uint32_t info=be32(e+0x3C)-0x400000u;
@@ -128,3 +136,5 @@ done:
     if(error && capacity) snprintf(error,capacity,"%s",message?message:"");
     return !message;
 }
+int s3_stage_pack_validate(const char *path,char *error,unsigned capacity)
+{ return s3_pack_validate(path,0,error,capacity); }
