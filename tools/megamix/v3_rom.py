@@ -36,6 +36,12 @@ BINDINGS = {
     0x1876E: '217c0002a9d60004', # common Sonic/Mighty mappings
     0x1AC16: '45f90002c3d2',     # common Sonic/Mighty dynamic PLCs
     0x1AC6E: '0681000a9364',     # FFBB=1 selects Mighty's raw tile bank
+    0x1A7F4: '43f90001aa1c0c380001ffbb670c4a38fe19670643f90001ab5e',
+    0x1ABFC: '70001028001ab038', # load-gfx entry after both animation data sets
+    0x19950: '0c380041f602',     # Up+A stores; ordinary A selects a stored shield
+    0x1999A: '0c780005fe206d98', # ordinary shield swap requires five rings
+    0x199A2: '04780005fe20',     # and actually spends them
+    0x19AAA: '2038ffb0e1881038fe2c21c0ffb0', # normal shield storage shifts four byte slots
     0x1A746: '0c380003fe1067084a38fe106600009e', # Sonic_Loops only zones 0/3
 }
 MIGHTY = dict(selector=1, mappings=0x2A9D6, dplc=0x2C3D2,
@@ -154,7 +160,8 @@ class MegamixV3:
             for i in range(n):
                 y,size,tile,x=struct.unpack('>bBHb',self.blob(p+1+i*5,5))
                 pieces.append(dict(x=x,y=y,width=((size>>2)&3)+1,height=(size&3)+1,
-                                   tile=tile&0x7FF,x_flip=bool(tile&0x800),y_flip=bool(tile&0x1000)))
+                                   tile=tile&0x7FF,x_flip=bool(tile&0x800),y_flip=bool(tile&0x1000),
+                                   attributes=tile&0xE000))
             p=dplc+self.word(dplc+frame*2);n=self.blob(p,1)[0]
             tiles=bytearray()
             for i in range(n):
@@ -164,3 +171,14 @@ class MegamixV3:
                 raise ValueError(f'Mighty frame {frame} references missing dynamic tiles')
             result.append((pieces,bytes(tiles)))
         return result
+
+    def mighty_animations(self):
+        base=MIGHTY['animation'];limit=self.word(base);offsets=[]
+        # The idle script precedes walk data. The first offset alone would
+        # misclassify six script bytes as three additional table entries.
+        while len(offsets)*2<limit:
+            offset=self.word(base+len(offsets)*2)
+            if offset<2 or offset>=0x1ABFC-base:raise ValueError('Invalid Mighty animation pointer')
+            offsets.append(offset);limit=min(limit,offset)
+        if len(offsets)*2!=limit:raise ValueError('Invalid Mighty animation table boundary')
+        return offsets,self.blob(base,0x1ABFC-base)
