@@ -18,4 +18,7 @@
 #define MG_PC_MONITOR_FIRE 0x01D954u
 #define MG_PC_MONITOR_LIGHTNING 0x01D992u
 #define MG_PC_MONITOR_BUBBLE 0x01D9D0u
-#define MG_GEOMETRY_CASES case 0x00EFB6u: case 0x00EFF0u: case 0x04EC54u: case 0x21032Cu: case 0x210366u: case 0x239B0Au: case 0x01AF6Cu: case 0x01B070u: case 0x012600u: case 0x012CB4u: case 0x012CBAu: case 0x003750u: case 0x011900u: case 0x01222Au: case 0x01D75Eu: case 0x01D954u: case 0x01D992u: case 0x01D9D0u:
+#define MG_PC_DS_SLOT_CHARACTER 0x00D3CCu
+#define MG_PC_DS_CHARACTER 0x00D6D0u
+#define MG_PC_DS_DRAW 0x01ABC6u
+#define MG_GEOMETRY_CASES case 0x00EFB6u: case 0x00EFF0u: case 0x04EC54u: case 0x21032Cu: case 0x210366u: case 0x239B0Au: case 0x01AF6Cu: case 0x01B070u: case 0x012600u: case 0x012CB4u: case 0x012CBAu: case 0x003750u: case 0x011900u: case 0x01222Au: case 0x01D75Eu: case 0x01D954u: case 0x01D992u: case 0x01D9D0u: case 0x00D3CCu: case 0x00D6D0u: case 0x01ABC6u:

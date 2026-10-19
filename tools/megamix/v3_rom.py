@@ -43,6 +43,19 @@ BINDINGS = {
     0x199A2: '04780005fe20',     # and actually spends them
     0x19AAA: '2038ffb0e1881038fe2c21c0ffb0', # normal shield storage shifts four byte slots
     0x1A746: '0c380003fe1067084a38fe106600009e', # Sonic_Loops only zones 0/3
+    0x98A0: 'e2800c380001ffbd670831fc0020f70c4e75', # MM fixed BG height; original/MB3 use half Y
+    0x9DEC: '31f8f70cf61847f900009ef245f900009ff2', # distinct MM foreground/background waves
+    0x9C74: '47f900009cec45f90001ae1c', # original/MB3 wave tables
+    0x9C46: '0c780103fe106700000c', # MB3 original scroll branch (MM height still $20)
+    0x5882: '0c380001ffbd6700019c', # MM water differs from Original mode $5A26
+    0x58BE: '3038f7001438f64d66000060', # MM act1 water event
+    0x594C: '3038f7001438f64d6646', # MM act3 skips retail initial $900/door state
+    0x5872: '0318032804c8022800b8032809000228', # MM starts, then Original starts
+    0x5D32: '089b06330b070673', # changed MM Metallic Base 3 water tunnel rectangle
+    0x5E04: '0207034cff0804', # v3 slide chunks; retail's $4B entry is disabled/replaced
+    0x5114: '0c780103fe1067026004103c0028', # MB3 overlays its distinct level graphics via PLC $28
+    0x1D0B4: '317c41f00002', # MB3 level-art door/stomper uses source tile $1F0
+    0x1D07E: '217c0001d38c0004', # actual v3 stomper mapping table
 }
 MIGHTY = dict(selector=1, mappings=0x2A9D6, dplc=0x2C3D2,
               art=0xA9364, palette=0x15, animation=0x1AA1C)

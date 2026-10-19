@@ -15,7 +15,8 @@ int tri_megamix_sprite_hook(uint32_t pc)
 {
     if(pc!=MG_PC_SK_SPRITE_RAW && pc!=MG_PC_SK_SPRITE_CLIP)return 0;
     uint32_t e=tri_dir(),map=A(1)&0xFFFFFFu;
-    if(!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX || map<TRI_BANK_BASE ||
+    int menu=(r8(RAM_Game_mode)&127)==0x4C;
+    if(((!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX) && !menu) || map<TRI_BANK_BASE ||
        map-TRI_BANK_BASE>=g_rom_ext_size)return 0;
     uint32_t p=A(1),out=A(6);
     uint16_t count=(uint16_t)D(4),remaining=(uint16_t)D(7),last=0;
@@ -25,7 +26,9 @@ int tri_megamix_sprite_hook(uint32_t pc)
         int dy=(int8_t)tri_rd8(p),size=tri_rd8(p+1);
         unsigned width=(((unsigned)size>>2)&3u)+1u,height=((unsigned)size&3u)+1u;
         int dx=(int16_t)tri_rd16(p+4);
-        uint16_t tile=(uint16_t)(tri_rd16(p+2)+(uint16_t)D(5));
+        uint16_t base=(uint16_t)D(5);
+        if(menu && (size&0x80))base&=0xE000u;
+        uint16_t tile=(uint16_t)(tri_rd16(p+2)+base);
         if(flags&1u){dx=-dx-(int)width*8;tile^=0x800;}
         if(flags&2u){dy=-dy-(int)height*8;tile^=0x1000;}
         uint16_t x=(uint16_t)(dx+(uint16_t)D(0)),y=(uint16_t)(dy+(uint16_t)D(1));

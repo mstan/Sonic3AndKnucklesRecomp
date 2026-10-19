@@ -76,7 +76,7 @@ class Native:
         (case/'input.txt').write_text(BOOT+'WAIT 500000\nEXIT\n')
         env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage,
-                 TRILOGY_CHAR=str(args.character),TRILOGY_GOD='1')
+                 TRILOGY_CHAR=str(args.character+4 if getattr(args,'mighty',False) and args.character<2 else args.character),TRILOGY_GOD='1')
         if not getattr(args,'god',True):env.pop('TRILOGY_GOD',None)
         if start:
             x,y,rt=start

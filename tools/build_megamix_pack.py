@@ -22,12 +22,58 @@ from tilepack import Packer
 from megamix.v3_rom import MegamixV3,load_rom,ORDER,CRC32
 from megamix.geometry import convert_geometry
 from megamix.mighty import convert_mighty
+from megamix.presentation import presentation
 from megamix.objects import MegamixObjects,ZONE_NAMES
 from build_stage_pack import verify
 from s1_music import build_music
+from s1_objects import asset_mappings,_piece_ranges,_retile,ASSET_COUNT,ASSET_REC
 
 NAMES={0x34:'SUNNY SHORES',0x35:'MISTY MAZE',0x36:'DARK FORTRESS',
        0x37:'STARRY NIGHT',0x38:'CITY OUTSKIRTS',0x39:'METALLIC BASE',0x3A:'FINAL FIGHT'}
+
+def level_vram(donor,zone,act):
+    header=donor.header(zone,act);vram=bytearray(65536)
+    # $5114 overlays MB3's first 454 tiles using PLC $28. Its ordinary LZ
+    # art remains the backing for level-art objects above that range.
+    plcs=[header['plc1']]+([0x28] if (zone,act)==(1,3) else [])+[header['plc2']]
+    for plc in plcs:
+        for address,dest in donor.plc(plc):
+            art,_=nemesis_decode(donor.data,address)
+            vram[dest:dest+len(art)]=art[:65536-dest]
+    return vram
+
+
+def upgrade_mb3_art(bank,source,donor):
+    """Repack only MB3 terrain and its native level-art door. No S1 input.
+
+    The existing layout/chunk IDs, collisions, placements, music and imported
+    sprite atlas are retained. Never replace tile pixels in place: old pixel
+    deduplication can merge tiles that the corrected graphics distinguish.
+    """
+    entry=0x40+((0x35-0x20)*4+3)*0x40
+    old_info=bb.be32(source,entry+0x3C)-bb.BANK_BASE
+    converted=convert_geometry(donor,1,3)
+    for offset,data_key in ((4,'layout16'),(12,'chunks')):
+        pointer=bb.be32(source,old_info+offset)-bb.BANK_BASE
+        size=bb.be32(source,old_info+offset+4)
+        if source[pointer:pointer+size]!=converted[data_key]:
+            raise ValueError('MB3 geometry differs; presentation upgrade cannot change collision/layout data')
+    symbols={'Map_Stomp':0x1D38C,'ArtTile_LZ_Block_2':0x1F0}
+    maps=asset_mappings(donor.data,symbols,'STOMP_SBZ3','Map_Stomp','ArtTile_LZ_Block_2',2)
+    tables={0:bb.L0_MAP,1:bb.L1_PERM,2:list(range(16)),3:list(range(16))}
+    pack=Packer(level_vram(donor,1,3),tables,bb.S3K_LEVEL_TILE_LIMIT,[])
+    for start,count in _piece_ranges(maps):pack.place_group(0x1F0+start,count,2)
+    blocks=bytearray(converted['blocks']);pack_blocks(pack,blocks,set())
+    art1,art2=bb.level_art_modules(bank,pack.art({}));blockptr=bank.add(kosinski_encode(blocks))
+    old_llb=bb.be32(source,entry)-bb.BANK_BASE
+    llb=bytearray(source[old_llb:old_llb+24]);struct.pack_into('>II',llb,0,art1,art2)
+    for offset in (8,12):struct.pack_into('>I',llb,offset,(bb.be32(llb,offset)&0xFF000000)|blockptr)
+    struct.pack_into('>I',bank.data,entry,bank.add(llb))
+    native_maps=_retile(maps,lambda tile:pack.slot[(0x1F0+tile,2)])
+    assets=bb.be32(source,entry+0x38)-bb.BANK_BASE
+    records=bytearray(source[assets:assets+ASSET_COUNT*ASSET_REC])
+    struct.pack_into('>I',records,92*ASSET_REC,bank.add(native_maps))
+    struct.pack_into('>I',bank.data,entry+0x38,bank.add(records))
 
 def flip_tile(pixels,flags):
     rows=[pixels[i:i+4] for i in range(0,32,4)]
@@ -85,11 +131,7 @@ def extend(source,donor,retail,s3k):
     for z,a in ORDER:
         native_zone=0x34+z;stage=donor.stage(z,a);header=stage['header'];name=ZONE_NAMES[z]
         converted=convert_geometry(donor,z,a);blocks=bytearray(converted['blocks'])
-        vram=bytearray(65536)
-        for plc in (header['plc1'],header['plc2']):
-            for address,dest in donor.plc(plc):
-                art,_=nemesis_decode(donor.data,address)
-                vram[dest:dest+len(art)]=art[:65536-dest]
+        vram=level_vram(donor,z,a)
         need=objects.act_assets(z,a)
         pinned=bb.S1_ANIMATED.get(name,[])
         pack=Packer(vram,tables,bb.S3K_LEVEL_TILE_LIMIT,pinned)
@@ -128,7 +170,7 @@ def extend(source,donor,retail,s3k):
             original=bytes(wet[32:64])
             for i in range(16):wet[32+bb.L1_PERM[i]*2:34+bb.L1_PERM[i]*2]=original[i*2:i*2+2]
             water_pal=bank.add_palette(wet,0xFC00)
-            water_y=donor.word(0x587A+a*2)
+            water_y=donor.word(0x5872+a*2)
         raw+=donor.blob(0x97E2+z*4,4)+struct.pack('>BBH',water_pal,0,water_y)+bytes(8)
         rawptr=bank.add(raw)
         info=bytearray(struct.pack('>4s4I2H',b'MGI1',bank.add(converted['layout16']),len(converted['layout16']),
@@ -177,13 +219,16 @@ def extend(source,donor,retail,s3k):
     music,converted_songs=build_music(donor.data,bank,index,envs,starts=songs)
     music_ptr=bank.add(music)
     mighty,report=convert_mighty(donor)
-    mighty_ptr=bank.add(struct.pack('>4s7I2H',b'MDY1',bank.add(mighty['mappings']),bank.add(mighty['dplc']),
+    ui=presentation(donor,s3k)
+    mighty_ptr=bank.add(struct.pack('>4s7I2H',b'MDY2',bank.add(mighty['mappings']),bank.add(mighty['dplc']),
         bank.add(mighty['art']),bank.add(mighty['palette']),bank.add(mighty['animation_source']),
         len(mighty['art']),len(mighty['animation_source']),report['frames'],report['animation_entries'])+
         struct.pack('>4I',bank.add(donor.palette(0x19)[1]),bank.add(donor.palette(0x1B)[1]),
                      bank.add(donor.blob(0x11CAFC,128)),bank.add(donor.blob(0x11CC7C,128)))+
         struct.pack('>3I',*(bank.add(struct.pack('>IHH',bank.add(pal),dest,7)) for pal,dest in
-                          [(mighty['palette'],0xFC00),(donor.palette(0x19)[1],0xFC00),(donor.palette(0x1B)[1],0xFC00)])))
+                          [(mighty['palette'],0xFC00),(donor.palette(0x19)[1],0xFC00),(donor.palette(0x1B)[1],0xFC00)]))+
+        struct.pack('>5I',bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
+                    bank.add(ui['hud_head']),bank.add(ui['hud_name'])))
     order=bank.add(b''.join(struct.pack('>H',int(s['stage'],16)) for s in stages))
     # v3 keeps Original-mode cycles beside the Megamix cycles. Select the
     # actual Megamix branch, including the noncontiguous LZ conveyor tables.
@@ -200,8 +245,9 @@ def extend(source,donor,retail,s3k):
             pos=table+2+i*6+2
             struct.pack_into('>H',sbz,pos,bb.be16(sbz,pos)-0x130)
     overrides[31]=bank.add(sbz)
-    descriptor=bank.add(struct.pack('>4sIHHIIII',b'MDI1',CRC32,len(stages),2,mighty_ptr,music_ptr,order,
-                        bank.add(b''.join(struct.pack('>I',p) for p in overrides))))
+    descriptor=bank.add(struct.pack('>4sIHHIIIIII',b'MDI1',CRC32,len(stages),3,mighty_ptr,music_ptr,order,
+                        bank.add(b''.join(struct.pack('>I',p) for p in overrides)),
+                        bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256))))
     struct.pack_into('>I',bank.data,0x24,descriptor)
     blobs[39]=bank.add(extpal);blobs[1]=bank.add(animals);blobs[2]=bank.add(animal_plcs)
     struct.pack_into('>I',bank.data,0x20,bank.add(b''.join(struct.pack('>I',p) for p in blobs)))
@@ -209,14 +255,58 @@ def extend(source,donor,retail,s3k):
     data=bank.finish()
     return data+struct.pack('>4sII',b'SPK2',len(data),zlib.crc32(data)),stages,report
 
+def upgrade_presentation(source,donor,s3k):
+    """Preserve an existing verified SPK2 payload and add independent UI data."""
+    if len(source)<0x204C or source[-12:-8]!=b'SPK2':raise ValueError('Expected a complete SPK2 bank')
+    size,crc=struct.unpack_from('>II',source,len(source)-8)
+    if size!=len(source)-12 or zlib.crc32(source[:-12])!=crc:raise ValueError('Damaged SPK2 bank')
+    bank=bb.Bank();bank.data=bytearray(source[:-12])
+    # Old conversions accidentally selected the adjacent Original-mode
+    # starting water table. Copy only these versioned act records.
+    for act in range(4):
+        entry=0x40+((0x35-0x20)*4+act)*0x40
+        old_info=bb.be32(source,entry+0x3C)-bb.BANK_BASE
+        info_record=bytearray(source[old_info:old_info+64])
+        raw=bb.be32(info_record,28)-bb.BANK_BASE
+        raw_record=bytearray(source[raw:raw+528])
+        if len(info_record)!=64 or info_record[:4]!=b'MGI1' or len(raw_record)!=528:
+            raise ValueError('Incomplete Megamix water record')
+        struct.pack_into('>H',raw_record,0x206,donor.word(0x5872+act*2))
+        struct.pack_into('>I',info_record,28,bank.add(raw_record))
+        struct.pack_into('>I',bank.data,entry+0x3C,bank.add(info_record))
+    upgrade_mb3_art(bank,source,donor)
+    info=bb.be32(source,0x24)-bb.BANK_BASE
+    if source[info:info+4]!=b'MDI1' or bb.be32(source,info+4)!=CRC32:raise ValueError('Unsupported donor bank')
+    mighty=bb.be32(source,info+12)-bb.BANK_BASE
+    if source[mighty:mighty+4] not in (b'MDY1',b'MDY2'):raise ValueError('Missing Mighty descriptor')
+    ui=presentation(donor,s3k)
+    record=b'MDY2'+source[mighty+4:mighty+64]+struct.pack('>5I',
+        bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
+        bank.add(ui['hud_head']),bank.add(ui['hud_name']))
+    new=bank.add(record)
+    metadata=bytearray(source[info:info+28])
+    struct.pack_into('>H',metadata,10,3)
+    struct.pack_into('>I',metadata,12,new)
+    metadata+=struct.pack('>II',bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)))
+    struct.pack_into('>I',bank.data,0x24,bank.add(metadata))
+    data=bytes(bank.data)
+    return data+struct.pack('>4sII',b'SPK2',len(data),zlib.crc32(data))
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
-    for key in ('base-bank','s1','s3k','megamix','out'):ap.add_argument('--'+key,required=True,type=Path)
+    for key in ('base-bank','s3k','megamix','out'):ap.add_argument('--'+key,required=True,type=Path)
+    ap.add_argument('--s1',type=Path)
+    ap.add_argument('--upgrade-presentation',action='store_true',help='Upgrade existing SPK2 character/background resources without reconverting stages')
     args=ap.parse_args()
-    inputs=[args.base_bank,args.s1,args.s3k,args.megamix]
+    inputs=[p for p in (args.base_bank,args.s1,args.s3k,args.megamix) if p]
     if args.out.resolve() in {p.resolve() for p in inputs}:raise ValueError('Output must differ from every input')
-    data,stages,mighty=extend(args.base_bank.read_bytes(),MegamixV3(load_rom(args.megamix)),
-                             verify(args.s1,'s1'),verify(args.s3k,'s3k'))
+    donor=MegamixV3(load_rom(args.megamix));s3k=verify(args.s3k,'s3k')
+    if args.upgrade_presentation:
+        data=upgrade_presentation(args.base_bank.read_bytes(),donor,s3k)
+        stages=[];mighty=dict(status='existing verified stages retained; independent character UI and source background resources added')
+    else:
+        if not args.s1:ap.error('--s1 is required for a full stage conversion')
+        data,stages,mighty=extend(args.base_bank.read_bytes(),donor,verify(args.s1,'s1'),s3k)
     args.out.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=args.out.parent,delete=False) as f:
         temporary=Path(f.name);f.write(data)

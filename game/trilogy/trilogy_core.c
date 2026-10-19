@@ -170,6 +170,7 @@ int trilogy_instruction(uint32_t pc)
     if (tri_megamix_sprite_hook(pc))return 1;
     if (tri_level_hook(pc))
         return 1;
+    if (tri_mighty_presentation_hook(pc))return 1;
     if (tri_mighty_hook(pc))return 1;
     if (tri_screen_hook(pc))
         return 1;

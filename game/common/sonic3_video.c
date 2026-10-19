@@ -52,8 +52,10 @@ static unsigned s_bad_attr,s_bad_expected;
 static int s_bad_world_y,s_bad_hscroll;
 static int s_bg_bad_x,s_bg_bad_y,s_bg_bad_a,s_bg_bad_expected;
 static GVDP s_video_frame;
-static uint8_t s_world_frame[0xA800];
-static uint8_t s_background_frame[0xA800];
+/* Game-owned world callbacks also inspect the stage/restart words near the
+ * top of work RAM. Publish the full address space with the terrain snapshot. */
+static uint8_t s_world_frame[0x10000];
+static uint8_t s_background_frame[0x10000];
 static int s_frame_level,s_frame_special,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
 static unsigned s_frame_zone,s_frame_act,s_frame_bg_event;
 static unsigned s_frame_tree_reveal;

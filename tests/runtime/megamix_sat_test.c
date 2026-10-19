@@ -40,5 +40,14 @@ int main(void)
     CHECK(g_cpu.A[6]==0xFFFFD800 && g_cpu.D[7]==7 && r8(0xFFD803)==0x37);
     enabled=0;g_cpu.A[1]=0x400100;CHECK(!tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
     enabled=1;g_cpu.A[1]=0x120000;CHECK(!tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
+    /* Menu avatars use host patterns without adding the native menu's tile
+     * base. The original Tails pieces in the same mapping keep that base. */
+    enabled=0;g_ram[RAM_Game_mode&65535]=0x4C;
+    g_cpu.A[1]=0x400100;g_cpu.A[6]=0xFFFFD800;
+    g_cpu.D[0]=160;g_cpu.D[1]=170;g_cpu.D[4]=0;g_cpu.D[5]=0x829F;
+    g_cpu.D[6]=0;g_cpu.D[7]=7;
+    CHECK(tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
+    CHECK(r16(0xFFD804)==0x0010); /* source priority 8000 + base priority 8000 wraps */
+    CHECK(r8(0xFFD802)==0x86);
     puts("Megamix SAT marker, all flips, clipping, budget, links and native opt-out passed");return 0;
 }

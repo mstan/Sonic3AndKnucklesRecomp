@@ -55,15 +55,30 @@ int s3_stage_pack_validate(const char *path, char *error, unsigned capacity)
         uint32_t payload=(uint32_t)size-12;
         if(p>payload-28 || memcmp(data+p,"MDI1",4) ||
            be32(data+p+4)!=0x66ECB4F4 || data[p+8]!=0 || data[p+9]!=19 ||
-           data[p+10]!=0 || data[p+11]!=2)goto done;
+           data[p+10]!=0 || (data[p+11]!=2 && data[p+11]!=3))goto done;
+        if(data[p+11]>=3) {
+            if(p>payload-36 || !range(be32(data+p+28),256,payload) ||
+               !range(be32(data+p+32),256,payload))goto done;
+        } else if(s3_stage_pack_megamix || s3_stage_pack_mighty) {
+            message="Upgrade the converted bank with --upgrade-presentation for Megamix visual fixes";
+            goto done;
+        }
         uint32_t mighty=be32(data+p+12),music=be32(data+p+16),order=be32(data+p+20),cycles=be32(data+p+24);
         if(!range(mighty,64,payload) || !range(music,112,payload) ||
            !range(order,38,payload) || !range(cycles,54*4,payload))goto done;
         const uint8_t *m=data+mighty-0x400000u;
-        if(memcmp(m,"MDY1",4) || m[32]!=0 || m[33]!=176 || m[34]!=0 || m[35]!=38 ||
+        int ui=!memcmp(m,"MDY2",4);
+        if(s3_stage_pack_mighty && !ui) {
+            message="Upgrade the converted bank with --upgrade-presentation for selectable Mighty";
+            goto done;
+        }
+        if((memcmp(m,"MDY1",4) && !ui) || m[32]!=0 || m[33]!=176 || m[34]!=0 || m[35]!=38 ||
            be32(m+28)!=480 || !range(be32(m+4),352,payload) || !range(be32(m+8),352,payload) ||
            !range(be32(m+12),be32(m+24),payload) || !range(be32(m+16),32,payload) ||
            !range(be32(m+20),480,payload))goto done;
+        if(ui && (!range(mighty,84,payload) || !range(be32(m+64),72,payload) ||
+           !range(be32(m+68),be32(m+72),payload) || be32(m+72)>0x400 ||
+           !range(be32(m+76),128,payload) || !range(be32(m+80),128,payload)))goto done;
         for(unsigned i=0;i<3;i++) {
             uint32_t pal=be32(m+52+i*4);
             if(!range(pal,8,payload))goto done;

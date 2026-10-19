@@ -111,6 +111,38 @@ static int extended_cell(const uint8_t *ram,int x,int y,int background,uint16_t 
     *cell=0xC03;
     return 1;
 }
+static unsigned snapshot_calls;
+static int snapshot_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)x;(void)y;
+    /* These addresses are outside the old, truncated terrain-only copy.
+     * Check a distinct byte near its far end as well as the stage identity. */
+    CHECK(ram[0xFE10]==0x34 && ram[0xFFF0]==0xA5);
+    ++snapshot_calls;*cell=background?1:0;return 1;
+}
+static void test_world_snapshot(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[398];
+    CHECK(configure("off"));CHECK(configure("fit"));width(398,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    g_ram[0xFE10]=0x34;g_ram[0xFFF0]=0xA5;
+    word(g_ram,0x8000,16);word(g_ram,0x8002,4);
+    word(g_ram,0x8008,0x8100);word(g_ram,0x800A,0x8140);
+    for(unsigned i=0;i<4;i++)word(g_ram,0x9008+i*2,1);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;
+    memset(v.vram+32,0x11,32);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(snapshot_cell);snapshot_calls=0;
+    scanline(&v,0,native,320,out,398);
+    CHECK(snapshot_calls && out[0]==0xFFFF0000);
+    /* A later scanline uses the same published RAM, even if live RAM moves
+     * into another act while that frame is being displayed. */
+    g_ram[0xFE10]=0x20;g_ram[0xFFF0]=0;
+    scanline(&v,1,native,320,out,398);CHECK(out[0]==0xFFFF0000);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -462,7 +494,7 @@ int main(int argc,char **argv)
         }
         ss_count=count;
     }
-    test_sprite_atlas();test_file_select();
+    test_sprite_atlas();test_file_select();test_world_snapshot();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

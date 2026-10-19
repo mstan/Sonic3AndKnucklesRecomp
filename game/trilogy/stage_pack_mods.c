@@ -59,7 +59,7 @@ static int *feature_flags[]={&s3_stage_pack_enabled,&s3_stage_pack_megamix,&s3_s
 static const char *feature_desc[]={
     "Play Sonic 1, Sonic 2, then Sonic 3 & Knuckles in one campaign, with separate saves.",
     "Continue after Sonic 3 & Knuckles with all 19 Megamix v3 acts. Requires the extended bank converted from your own Megamix v3 ROM.",
-    "Replace Sonic with Mighty: shield storage with Up+A, five-ring swaps with A in the air, elemental jump moves and combined Super shields. Requires the extended bank."};
+    "Add Mighty and Mighty & Tails to Data Select without replacing Sonic. Shield storage with Up+A, five-ring swaps with A in the air, elemental jump moves and combined Super shields. Requires an updated extended bank."};
 static const char DESC[]="Play Sonic 1, Sonic 2 and Sonic 3 & Knuckles in one campaign, with optional Megamix v3 stages and Mighty. Requires a bank converted from your own ROMs. Separate saves; local play. Experimental.";
 static const RecompLauncherCModProvider *base;
 static int mine(const char *p) { return p&&!strcmp(p,PACKAGE); }

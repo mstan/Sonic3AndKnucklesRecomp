@@ -131,13 +131,14 @@ void tri_ext_frame(void)
     extern int tri_s2end_active(void);
     if (tri_s2end_active()) return;                 /* Sonic 2's ending sets its own */
     int level = (r8(RAM_Game_mode) & 0x7F) == 0x0C;
-    if (!level || !s_have || !tri_dir()) {
-        gvdp_set_ext_tiles(NULL);
-        return;
-    }
     uint16_t top[GVDP_EXT_LINES * 16] = { 0 }, bot[GVDP_EXT_LINES * 16] = { 0 };
-    memcpy(top, s_cur[0], sizeof s_cur[0]);
-    memcpy(bot, s_cur[1], sizeof s_cur[1]);
+    int actors=level && s_have && tri_dir();
+    if(actors) {
+        memcpy(top, s_cur[0], sizeof s_cur[0]);
+        memcpy(bot, s_cur[1], sizeof s_cur[1]);
+    }
+    int mighty=tri_mighty_presentation_frame(s_tiles,top+32,bot+32);
+    if(!actors && !mighty){gvdp_set_ext_tiles(NULL);return;}
     int split = 1 << 20;
     if (r8(RAM_Water_flag))
         split = (int16_t)(r16(RAM_Water_level) - r16(RAM_Camera_Y_pos_copy));

@@ -68,27 +68,43 @@ static int32_t s1_step(int d0, int div, int sh1)
     return (int32_t)(int16_t)v << 12;
 }
 
-static void s1_lz_init(void)  { s1_anim_reset(); s1_bg_reset((int16_t)r16(RAM_Camera_Y_pos_copy) >> 1); }
+static int megamix_misty(void)
+{ uint32_t e=tri_dir();return e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX && tri_act()!=3; }
+static void s1_lz_init(void)
+{
+    s1_anim_reset();
+    uint32_t e=tri_dir();
+    s1_bg_reset(e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX?0x20:(int16_t)r16(RAM_Camera_Y_pos_copy)>>1);
+}
 static void s1_lz_event(void)
 {
     int32_t sx, sy;
     s1_shift(&sx, &sy);
-    s1.bg1x += sx << 7;
-    s1.bgy += sy << 7;
+    int misty=megamix_misty();
+    if(!misty) {s1.bg1x += sx << 7;s1.bgy += sy << 7;}
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy), camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
     int bgx = (int16_t)(s1.bg1x >> 16), bgy = (int16_t)(s1.bgy >> 16);
     uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
     uint32_t wob = t ? tri_rd32(t + TRI_BLOB_S1_LZ_WOBBLE * 4) : 0;
     uint32_t scr = t ? tri_rd32(t + TRI_BLOB_S1_LZ_SCROLL * 4) : 0;
+    uint32_t stage=tri_dir();
+    if(stage && tri_rd8(stage+TD_GAME)==TRI_GAME_MEGAMIX) {
+        uint32_t info=tri_rd32(TRI_BANK_BASE+0x24);
+        if(tri_rd16(info+10)>=3)wob=tri_rd32(info+(misty?28:32));
+    }
     uint8_t d2 = (uint8_t)(s1.lz_deform >> 8), d3 = d2;
     s1.lz_deform += 0x80;
     d2 = (uint8_t)(d2 + bgy);
     d3 = (uint8_t)(d3 + camy);
     int water = (int16_t)r16(RAM_Water_level);
     int y = camy;
-    for (int y0 = bgy & ~15; y0 < bgy + 240; y0 += 16) bg_band(y0, y0 + 16, bgx);
+    for (int y0 = bgy & ~15; y0 < bgy + 240; y0 += 16) {
+        int line=y0-bgy;
+        int camera=misty?-tri_megamix_lz_scroll(camx,(unsigned)(line<0?0:line)):bgx;
+        bg_band(y0,y0+16,camera);
+    }
     for (int l = 0; l < 224; l++, y++, d2++, d3++) {
-        int fg = -camx, bg = -bgx;
+        int fg = -camx, bg = misty?tri_megamix_lz_scroll(camx,(unsigned)l):-bgx;
         if (y >= water && wob && scr) {
             fg += (int8_t)tri_rd8(scr + d3);
             bg += (int8_t)tri_rd8(wob + d2);

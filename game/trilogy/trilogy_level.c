@@ -30,8 +30,15 @@ static void dev_force_zone(void)
     w16(RAM_Current_zone_and_act, za);
     w16(RAM_Apparent_zone_and_act, tri_apparent(za));
     fprintf(stderr, "[trilogy] dev: level forced to $%04X\n", za);
-    const char *ch = getenv("TRILOGY_CHAR");           /* development: Player_mode (0 S+T, 1 S, 2 T, 3 K) */
-    if (ch && *ch) { w16(RAM_Player_mode, (uint16_t)atoi(ch)); w16(0xFFFF0Au, (uint16_t)atoi(ch)); }   /* (+ Player_option, which S3K copies over) */
+    const char *ch = getenv("TRILOGY_CHAR"); /* native modes 0-3; 4 Mighty+Tails, 5 Mighty */
+    if (ch && *ch) {
+        unsigned mode=(unsigned)atoi(ch);
+        if(mode<=5) {
+            w16(RAM_Player_mode,(uint16_t)mode);w16(0xFFFF0Au,(uint16_t)mode);
+            uint32_t save=r32(0xFFE660u)&0xFFFFFFu;
+            if(save>=0xFFE6AC && save<0xFFE6FC)w8(save+2,(uint8_t)((r8(save+2)&15)|(mode<<4)));
+        }
+    }
     /* TRILOGY_START=x,y[,maxy[,dle routine]]: begin as if respawning at a star post there */
     const char *st = getenv("TRILOGY_START");
     unsigned x = 0, y = 0, my = 0x1000, rt = 0;
