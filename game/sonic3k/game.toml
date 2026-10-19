@@ -886,4 +886,13 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x01D9D0 # Megamix Monitor_Give_BubbleShield
 kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00D3CC # Megamix Obj_SaveScreen_Save_Slot+2E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00D6D0 # Megamix Set_ChildSprites+32
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x01ABC6 # Megamix Draw_Sprite
+kind = "game_hook"
 # END megamix geometry hooks

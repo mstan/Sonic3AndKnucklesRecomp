@@ -253,6 +253,14 @@ int  tri_megamix_geometry_owns(uint32_t pc);
 int  tri_megamix_geometry_hook(uint32_t pc);
 int  tri_megamix_sprite_hook(uint32_t pc);
 int  tri_mighty_hook(uint32_t pc);
+extern int tri_mighty_selected;
+int tri_mighty_active(void);
+uint16_t tri_mighty_color(int wet,unsigned color);
+int tri_mighty_presentation_hook(uint32_t pc);
+int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom);
+int tri_megamix_lz_scroll(int camera_x,unsigned line);
+int tri_megamix_water_event(unsigned act,uint16_t x,uint16_t y,
+    uint16_t *mean,uint16_t *target,uint8_t *routine);
 int  tri_megamix_geometry_cell(int x,int y,int background,int wrap,uint16_t *cell);
 int  tri_screen_hook(uint32_t pc);        /* trilogy_screen.c */
 int  tri_titlecard_hook(uint32_t pc);     /* trilogy_titlecard.c */

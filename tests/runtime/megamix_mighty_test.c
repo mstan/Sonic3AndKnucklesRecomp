@@ -45,6 +45,7 @@ int tri_obj_boss_hit(void){return 0;}
 #include "../../game/trilogy/trilogy_mighty.c"
 static void clear(void)
 {
+    tri_mighty_selected=1;
     memset(g_ram,0,sizeof g_ram);memset(inventory,0,sizeof inventory);
     old_super=super_mask=super_saved=0;call_count=0;
 }

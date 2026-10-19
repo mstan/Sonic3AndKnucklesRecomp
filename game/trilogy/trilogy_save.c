@@ -225,7 +225,10 @@ void tri_save_dev_clear(void)
     uint32_t a1 = RAM_Saved_data + (uint32_t)(n - 1) * 10u;
     w8(a1, 3);                                       /* finished, all Super Emeralds */
     w8(a1 + 1, 0);
-    w8(a1 + 2, 0x00);                                /* Sonic & Tails */
+    const char *ch=getenv("TRILOGY_CLEAR_CHAR");
+    unsigned character=ch?(unsigned)atoi(ch):0;
+    if(character>5)character=0;
+    w8(a1 + 2, (uint8_t)(character<<4));             /* independent saved selection */
     w8(a1 + 3, CODE_CLEAR);
     w16(a1 + 4, 0);
     w16(a1 + 6, 0xFFFC);                             /* seven Super Emeralds */

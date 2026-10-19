@@ -83,7 +83,7 @@ def main():
         runtime=case/'runtime'; runtime_files(args.exe,args.bank,runtime,mighty=args.mighty)
         env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage['stage'],
-                 TRILOGY_CHAR=str(args.character),TRILOGY_GOD='1')
+                 TRILOGY_CHAR=str(args.character+4 if args.mighty and args.character<2 else args.character),TRILOGY_GOD='1')
         if args.kind=='sfx':env['TRILOGY_SFXTEST']=args.sfx_start
         if args.kind=='signposts':
             sign=next(o for o in stage['objects'] if o['id']==13)

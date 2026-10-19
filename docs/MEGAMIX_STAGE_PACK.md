@@ -29,14 +29,25 @@ is accepted. The donor is 1,283,224 bytes, CRC32 `66ECB4F4`, SHA256
 the [official v3 download](https://www.headcannon.com/TeamMegamix/builds/S1MM%20v30.zip).
 Supported S3K CRC32: `63522553`. Inputs are never changed.
 
+Existing SPK2 banks can retain all their converted stages and gain the new
+Mighty menu/HUD data and original-ROM water/background resources without the
+Sonic 1 input:
+
+```text
+python tools/build_megamix_pack.py --upgrade-presentation --base-bank sonic-megamix-stages.bin --s3k sonic3k.bin --megamix "sonic-1-megamix-v3.0 (1).zip" --out sonic-megamix-updated.bin
+```
+
 SPK2 checks length, CRC, complete directory, geometry, sprites and versioned
 MDI/MDY metadata. SPK1 remains supported for the base campaign, but cannot
 enable Megamix or Mighty. Invalid resources refuse launch.
+The visual fixes require MDI version 3; older extended banks must be upgraded.
 
 ## Gameplay and controls
 
-Mighty replaces player-one Sonic in Sonic and Sonic & Tails modes across
-the campaign. Tails and Knuckles retain their characters. This is the Mega
+Mighty and Mighty & Tails are additional Data Select choices. On a NEW or
+NO SAVE slot, use Up/Down to cycle Sonic & Tails, Sonic, Tails, Knuckles,
+Mighty & Tails and Mighty. Saved files remember their own character; Sonic
+remains available with the mod enabled. This is the Mega
 Drive v3 shield character with native S3K movement/collision and translated
 v3 animations, mappings, DPLCs, palettes and shield behavior.
 
@@ -51,9 +62,11 @@ v3 animations, mappings, DPLCs, palettes and shield behavior.
   per enemy, halved per element. Boss price is triple; remaining HP rounds
   up after halving. Hurt preserves storage; death clears it.
 
-Later CD abilities are outside this v3 port. The native Sonic save portrait
-and life label remain; Mighty is selected by the mod, not a new character
-slot. Blue Spheres remains the special-stage system. Corresponding native
+Mighty has a donor-derived standing menu portrait, a donor-derived life
+head and a MIGHTY HUD label. His sprite palette is isolated from Tails,
+Sonic, monitors, checkpoints and stage art, including Super and water colors.
+Later CD abilities are outside this v3 port.
+Blue Spheres remains the special-stage system. Corresponding native
 S3K sound effects are reused.
 
 Megamix saves use **sonic3k-megamix.srm**; the base uses
@@ -76,16 +89,32 @@ Outskirts 2/3 exceed native chunk limits; bounded MGL1 readers retain full
 16-bit layouts. Collision, native streaming and adaptive rendering share
 that reader. Explicitly marked actor sprites use an immutable texture bank
 in both renderers; unmarked sprites and planes retain VRAM. All paths use
-portable C. All 18 retail hook sites are instruction/annotation-verified by
+portable C. All 21 retail hook sites are instruction/annotation-verified by
 `tools/gen_megamix_geometry_sites.py`. Interior labels are not assumed
 callable function entries.
 
 Actual donor DLE instructions correct Sunny Shores 2, Dark Fortress 1–3
-and Metallic Base bounds/arenas. Dynamic water at `$5A62–$5C20` matches
-the imported S1 logic; starts come from `$587A`. Oscillator tables at
+and Metallic Base bounds/arenas. Megamix dynamic water at `$5882–$5A24`
+differs from the adjacent Original-mode routines; starts come from `$5872`.
+The MB3 tunnel rectangle (`$5D32`) and changed slide entry (`$5E08`) also
+follow v3; the retail S1 versions remain separate.
+The earlier conversion incorrectly used Original-mode water. The presentation
+upgrade corrects those four small water records while retaining all geometry,
+placements and songs. MB3's separate level graphics override at `$5114`
+(PLC `$28`) is also applied: its terrain is repacked with its native
+level-art door mappings, retaining every layout/chunk/collision record.
+Oscillator tables at
 `$609E/$6138` equal S1's tables. Changed palette cycles and all 23 used
 main/alternate songs come from v3. Sideways stomper `$45` is ported from
 `$10D0C–$10FC2`.
+
+The renderer publishes all 64 KiB of RAM to imported plane callbacks. Its
+previous `$A800` snapshot omitted the zone and restart state, causing an
+out-of-bounds read and missing backgrounds. Misty Maze initializes background
+Y to `$20` and uses v3's five horizontal bands/wave table. Metallic Base 3
+also initializes at `$20`, then takes its separately verified original-style
+scrolling branch (`$9C46`). Native Sonic/Tails CRAM remains untouched by
+Mighty; private sprite colors include the normal, water and Super palettes.
 
 ## Validation
 
@@ -111,7 +140,29 @@ Private evidence under `build/`:
 | S3K handoff | Actual final boss segment/defeat/chase/ending → Sunny Shores; `qa-mm-confirm-handoff-2`; earlier DEZ bosses bypassed |
 | Save resume | All seven earned Megamix zone codes 32–38 reload through Data Select; completed campaign replays from Green Hill; `qa-mm-earned-save-resumes`, `qa-mm-final-fight-resume` |
 | Native regression | All 49 PNG/RAM/VRAM artifacts identical; `qa-mm-confirm-mod-off` |
-| Automated | All 32 CTests; private animation run: 36 native states × four orientations × 600 ticks, 31,942 bounded DPLC uploads |
+| Automated, original gameplay delivery | All 32 CTests; private animation run: 36 native states × four orientations × 600 ticks, 31,942 bounded DPLC uploads |
+
+The owner playtest reopened visual acceptance. `run_megamix_visual_spots.py`
+derives representative starts, enemies, monitors, checkpoints and route
+positions from actual tables. The first corrected pass captured **140
+locations across 19 acts** (`qa-mm-visual-spots`); subsequent Misty/water
+reruns are kept separately. `run_megamix_reference_spots.py` captures the
+same starts/late positions in the unmodified donor using an independently
+supplied libretro core. Its 38 references retain canonical RAM, exact cheats
+and core/donor hashes. Freeze/protection and direct selection are bypasses;
+these captures do not establish interactions or exits. The first reference
+iteration's incorrect Original-mode MB3 fixture is retained and superseded
+by `qa-mm-original-reference-frozen`.
+
+`check_megamix_water.py` executes the unchanged `$5882` routine in that
+independent 68000 core through an explicit private test bootstrap, then
+compares its water/trigger results with the compiled portable implementation.
+`run_megamix_selection.py` verifies saved character identities through real
+Data Select inputs; its completed SRAM fixtures are seeded, not earned.
+Presentation-specific CTests check menu/save bounds, isolated sprite colors,
+native HUD digit preservation, the mixed menu atlas and full-RAM published
+frame stability in both renderer profiles. Retain capture/review/interaction
+results separately; screenshots alone never certify a stage.
 
 Enemy evidence is split across `qa-mm-confirm-enemies`,
 `qa-mm-confirm-enemies-3`, `qa-mm-special-enemies` and `qa-mm-grounded-roller`.
@@ -126,5 +177,18 @@ return, or an uncheated playthrough. Native S3K physics, Blue Spheres and
 reused sound effects are deliberate integration choices. Earlier failed
 fixtures remain beside corrected reruns; only corresponding passed evidence
 belongs in the final matrix.
+
+Presentation correction evidence (2026-10-19): all **34 CTests** pass;
+the **29 Mighty input/ability checks** pass again; all **six independent
+completed character files** reload Megamix through native Data Select;
+all **49 native mod-off artifacts** remain byte-identical. The independent
+68000 water oracle passes **524 cases** (`qa-mm-water-instructions`).
+`qa-mm-water-visual` supersedes the initial Misty captures, and
+`qa-mm-mb3-art-fixed` supersedes MB3. MB3's **616 terrain tile words and
+216 active door tiles** reconstruct the actual independently emulated
+donor VRAM exactly (`qa-mm-original-mb3-state/converted-art-check.json`).
+The 140-location/38-reference review covers representative graphics and
+palette anomalies; it does not certify all donor pixels or every camera
+alignment. The initial failed reference/pacing fixtures remain retained.
 
 Tracking: central Beads `beads-tdq.3.20`, engine `beads-3vb.23`.

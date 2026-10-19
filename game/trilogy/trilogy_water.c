@@ -248,6 +248,7 @@ static void wind_tunnels(int act)
         { 0xA80, 0x300, 0xC10, 0x380 }, { 0xF80, 0x100, 0x1410, 0x180 },
         { 0x460, 0x400, 0x710, 0x480 }, { 0xA20, 0x600, 0x1610, 0x6E0 },
         { 0xC80, 0x600, 0x13D0, 0x680 } };
+    static const uint16_t megamix_exit[4]={0x89B,0x633,0xB07,0x673}; /* v3 $5D32 */
     if (r16(RAM_Debug_placement_mode)) return;
     int first = act == 0 ? 0 : act + 1, n = act == 0 ? 2 : 1;
     for (int i = 0; i < 2; i++) {
@@ -257,7 +258,8 @@ static void wind_tunnels(int act)
         int in = 0;
         for (int k = first; k < first + n; k++) {
             uint16_t px = OB16(p, OBJ_x_pos), py = OB16(p, OBJ_y_pos);
-            if (px < data[k][0] || px >= data[k][2] || py < data[k][1] || py >= data[k][3]) continue;
+            const uint16_t *bounds=act==3 && tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX?megamix_exit:data[k];
+            if (px < bounds[0] || px >= bounds[2] || py < bounds[1] || py >= bounds[3]) continue;
             in = 1;
             if (i == 0 && !(r8(RAM_Level_frame_counter + 1) & 0x3F))
                 o_sfx(0x4B);                           /* sfx_Waterfall: S3K waterfall splash */
@@ -293,7 +295,11 @@ static void water_slides(void)
         int k = -1;
         if (!(OB8(p, OBJ_status) & 2)) {
             uint8_t c = s1_chunk(OB16(p, OBJ_x_pos), OB16(p, OBJ_y_pos));
-            for (int j = 6; j >= 0; j--) if (chunks[j] == c) { k = j; break; }
+            for (int j = 6; j >= 0; j--) {
+                uint8_t expected=chunks[j];
+                if(j==4 && tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX)expected=0xFF; /* v3 $5E08 */
+                if (expected == c) { k = j; break; }
+            }
         }
         if (k < 0) {
             if (OB8(p, OBJ_status2) & 0x80) {
@@ -319,7 +325,13 @@ static void dynamic_water(void)
     tri_lz_surfaces();
     wind_tunnels(act);
     water_slides();
-    switch (act) {
+    if(tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX) {
+        uint16_t mean=r16(RAM_Mean_water_level),target=r16(RAM_Target_water_level);
+        if(tri_megamix_water_event((unsigned)act,r16(RAM_Camera_X_pos),
+            r16(RAM_Player_1+OBJ_y_pos),&mean,&target,&s_wtr_routine))
+            w8(RAM_Level_trigger_array+8,1);
+        w16(RAM_Mean_water_level,mean);w16(RAM_Target_water_level,target);
+    } else switch (act) {
     case 0: dyn_lz1(); break;
     case 1: dyn_lz2(); break;
     case 2: dyn_lz3(); break;

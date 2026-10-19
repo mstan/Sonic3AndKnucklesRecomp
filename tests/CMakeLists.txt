@@ -4,10 +4,17 @@ add_executable(megamix_geometry_test runtime/megamix_geometry_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/megamix_geometry.c")
 target_include_directories(megamix_geometry_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME megamix_geometry COMMAND megamix_geometry_test)
+add_executable(megamix_background_test runtime/megamix_background_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/megamix_background.c")
+add_test(NAME megamix_background COMMAND megamix_background_test)
 add_executable(megamix_mighty_test runtime/megamix_mighty_test.c)
 target_include_directories(megamix_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
 add_test(NAME megamix_mighty COMMAND megamix_mighty_test)
+add_executable(megamix_presentation_test runtime/megamix_presentation_test.c)
+target_include_directories(megamix_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+add_test(NAME megamix_presentation COMMAND megamix_presentation_test)
 add_executable(megamix_sat_test runtime/megamix_sat_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/trilogy_megamix_sprites.c")
 target_include_directories(megamix_sat_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"

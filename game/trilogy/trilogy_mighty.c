@@ -13,6 +13,9 @@ enum { SH_BASIC=1,SH_FIRE=2,SH_LIGHTNING=4,SH_BUBBLE=8 };
 static uint8_t inventory[4],old_super,super_saved,super_mask;
 static int old_native=-1,source_anim=-1,cursor,timer,last_frame=-1,pal_tick;
 static int bubble_bounce;
+int tri_mighty_selected;
+static uint16_t super_colors[2][4];
+static int palette_cycling;
 static uint32_t descriptor(void)
 {
     uint32_t d=tri_rd32(TRI_BANK_BASE+0x24);
@@ -20,7 +23,17 @@ static uint32_t descriptor(void)
 }
 static int active(void)
 {
-    return s3_stage_pack_mighty && r16(RAM_Player_mode)<2 && descriptor();
+    return s3_stage_pack_mighty && tri_mighty_selected && r16(RAM_Player_mode)<2 && descriptor();
+}
+int tri_mighty_active(void) { return active(); }
+uint16_t tri_mighty_color(int wet,unsigned color)
+{
+    uint32_t d=descriptor();
+    if(!d)return 0;
+    if(palette_cycling && color>=2 && color<6)return super_colors[wet!=0][color-2];
+    uint32_t pal=tri_rd32(d+(wet?36:16));
+    if(wet && r16(RAM_Current_zone_and_act)==0x3503)pal=tri_rd32(d+40);
+    return tri_rd16(pal+(color&15)*2);
 }
 static int done(void)
 {
@@ -165,18 +178,6 @@ static void load_frame(uint32_t p,uint32_t d)
         tri_vram_queue(art+(entry&0xFFF)*32,dest,len);dest+=len;
     }
 }
-static void palettes(uint32_t pc,uint32_t d)
-{
-    unsigned id=(D(0)&0xFFFF)>>3;
-    if(id==3)A(1)=tri_rd32(d+52);
-    else if(id==0x31 || id==0x32 || id==0x33)A(1)=tri_rd32(d+56);
-    uint32_t e=tri_dir();
-    if(e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX) {
-        uint32_t info=tri_rd32(e+TD_EXTRA),s1=tri_rd32(info+28);
-        if(id==tri_rd8(s1+516) && tri_rd32(info+60))A(1)=tri_rd32(info+60);
-    }
-    (void)pc;
-}
 static void super_palette(uint32_t d)
 {
     int state=r8(0xFFF65F);
@@ -185,15 +186,15 @@ static void super_palette(uint32_t d)
         if(++pal_tick<16)return;
         w8(0xFFF65F,255);w8(RAM_Player_1+0x2E,0);w8(RAM_Player_1+OBJ_anim,0);pal_tick=0;
     } else if(state!=255) {
-        uint32_t dry=tri_rd32(d+16),wet=tri_rd32(d+36);
-        for(unsigned i=0;i<32;i++){w8(RAM_Normal_palette+i,tri_rd8(dry+i));w8(RAM_Water_palette+i,tri_rd8(wet+i));}
+        palette_cycling=0;
         w8(0xFFF65F,0);pal_tick=0;return;
     }
     unsigned frame=((unsigned)pal_tick++/4)&15;
     for(unsigned wet=0;wet<2;wet++) {
-        uint32_t src=tri_rd32(d+(wet?48:44))+frame*8,dst=(wet?RAM_Water_palette:RAM_Normal_palette)+4;
-        for(unsigned i=0;i<8;i++)w8(dst+i,tri_rd8(src+i));
+        uint32_t src=tri_rd32(d+(wet?48:44))+frame*8;
+        for(unsigned i=0;i<4;i++)super_colors[wet][i]=tri_rd16(src+i*2);
     }
+    palette_cycling=1;
 }
 static void frame(void)
 {
@@ -320,10 +321,9 @@ int tri_mighty_hook(uint32_t pc)
         if(r8(RAM_Game_mode)==0x4C){memset(inventory,0,sizeof inventory);old_super=0;}
         return 0;
     case TH_LEVEL_ENTRY:
-        old_native=source_anim=last_frame=-1;cursor=timer=pal_tick=bubble_bounce=0;return 0;
+        old_native=source_anim=last_frame=-1;cursor=timer=pal_tick=bubble_bounce=0;
+        palette_cycling=0;return 0;
     case TH_LVL_PRE_SPRITES:frame();return 0;
-    case TH_PALPOINT:case TH_PALPOINT_I:case TH_PALPOINT2:case TH_PALPOINT2_I:
-        palettes(pc,d);return 0;
     case MG_PC_MIGHTY_ANIMATE:
         if(p==RAM_Player_1){animate(p,d);return done();}return 0;
     case MG_PC_MIGHTY_PLC:case MG_PC_MIGHTY_PLC2:
