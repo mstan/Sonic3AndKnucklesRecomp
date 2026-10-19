@@ -219,3 +219,20 @@ Only player placement/protection is cheated; sign state and completion
 flags are not injected. Earlier failed reference fixtures are retained.
 
 Tracking: central Beads `beads-tdq.3.20`, engine `beads-3vb.23`.
+
+Final independent-pack integration (2026-10-19): all 29 real-input Mighty
+checks pass on the combined 0.5.3 build (`qa-experimental-final-abilities-3`).
+The underwater fixture now positions below the observed live surface, clear
+of the real basic-shield monitor at `$230/$3B1`. Earlier fixtures respectively
+stayed above the corrected water surface and collected that monitor during
+reversion; their evidence remains retained. The corrected run observes real
+water entry, combined Super shields, restoration of the bubble shield, and
+normal death/retry clearing storage. It writes no shield, inventory, water
+or transformation result flags.
+
+The private owner-folder smoke imports all six completed character fixtures
+through native Data Select and enters Sunny Shores as Mighty & Tails. The
+original legacy file remains byte-identical, native SRAM checksums and
+level/character bounds are valid, and the companion journal is present.
+Audio remains at 100 percent and widescreen remains adaptive Fit to screen.
+These are seeded clear files for playtesting, not earned completion evidence.

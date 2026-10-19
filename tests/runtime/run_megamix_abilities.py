@@ -142,11 +142,16 @@ def main():
         restart('3500');r=press(0x40,'bubble-for-water')
         check('inventory survives stage entry',shield(r)==0x41,shield=shield(r))
         r=press(0x30,'water-super');run.step(35)
-        r,_=run.snapshot();run.player(r,0x200,0x200,attack=True);camera_at(run,0x200,0x200);run.step(20)
+        # The donor's live MM1 water is below the old hard-coded $200 Y.
+        # Position below the observed surface; never set underwater state.
+        # Stay clear of the real basic-shield monitor at ($230,$3B1), whose
+        # pickup would legitimately replace the restored bubble shield.
+        r,_=run.snapshot();water_x=0x100;water_y=u16(r,0xf646)+0x50
+        run.player(r,water_x,water_y,attack=True);camera_at(run,water_x,water_y);run.step(20)
         r,_=run.snapshot('super-underwater')
         check('Super combined shields survive water entry',bool(r[0xb02a]&0x40) and shield(r)==0x71,
-              player_status=r[0xb02a],shield=shield(r))
-        r=press(0x30,'water-revert',0x200,0x200,False);run.step(20);r,_=run.snapshot('water-normal')
+              player_status=r[0xb02a],shield=shield(r),water_level=u16(r,0xf646),player_y=u16(r,0xb014))
+        r=press(0x30,'water-revert',water_x,water_y,False);run.step(20);r,_=run.snapshot('water-normal')
         check('underwater revert restores bubble shield',not r[0xfe19] and shield(r)==0x41,shield=shield(r))
         # Time is a stated prerequisite bypass; the normal HUD death path
         # and level restart must clear storage, not the probe.

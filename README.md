@@ -5,13 +5,20 @@ Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
-## Optional Sonic 1 & 2 stages
+## Experimental campaign mods
 
-The combined **Sonic3KRecomp** target includes an experimental, default-off
-**Sonic 1 & 2 Stage Pack** in Mods. It brings all 39 acts into the S3K engine
-as a continuous campaign, using a converted bank built from your own ROMs.
-The game retains its name and native controls. Campaign saves are separate
-from ordinary S3K saves. See [setup, credits and validation limits](docs/STAGE_PACKS.md).
+The combined **Sonic3KRecomp** target includes three independent, default-off
+mods: **Sonic 1 Stages**, **Sonic 2 Stages**, and **Sonic Megamix + Mighty**.
+Any combination works. Enabled campaigns run in that order around the native
+Sonic 3 & Knuckles campaign, with Megamix last. Megamix always adds Mighty
+and Mighty & Tails as selectable characters. Convert your own source ROMs
+into separate content packs; no ROMs or converted packs are distributed.
+
+Saves retain native-compatible SRAM and keep addon progress in a companion
+journal. Removing a pack safely parks its progress; adding it back restores
+the saved stage and character. Keep the SRAM, its `.campaign` companion and
+backup together. See [setup, credits and validation limits](docs/STAGE_PACKS.md)
+and [Megamix conversion and gameplay](docs/MEGAMIX_STAGE_PACK.md).
 
 ## Opt-in widescreen experiment
 
