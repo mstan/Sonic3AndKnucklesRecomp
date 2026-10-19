@@ -13,6 +13,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+from run_stage_pack_audit import manifest
+from run_campaign_permutations import slots
 
 ZONES = [(0x20,3),(0x21,4),(0x22,3),(0x23,3),(0x24,3),(0x25,3),
          (0x28,2),(0x29,2),(0x2a,2),(0x2b,2),(0x2c,2),(0x2d,2),(0x2e,2),
@@ -30,7 +32,7 @@ def main():
     args=ap.parse_args()
     exe,rom,bank,out=[x.resolve() for x in (args.exe,args.rom,args.bank,args.out)]
     out.mkdir(parents=True,exist_ok=True)
-    stages=[z*256+a for z,n in ZONES for a in range(n)] if args.zones=='all' else [int(x,16) for x in args.zones.split(',')]
+    stages=[int(s['stage'],16) for s in manifest(bank)] if args.zones=='all' else [int(x,16) for x in args.zones.split(',')]
     chars=[int(x) for x in args.characters.split(',')]
     def run(case):
         za,char=case;name=f'{za:04x}-char{char}';case=out/name;case.mkdir(exist_ok=True)
@@ -38,7 +40,8 @@ def main():
         shutil.copy2(exe,runtime/exe.name);shutil.copy2(exe.parent/'SDL2.dll',runtime/'SDL2.dll')
         native_save=runtime/(rom.stem+'.srm');sentinel=b'Native save isolation test\0'*1024
         native_save.write_bytes(sentinel)
-        (runtime/'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\n')
+        (runtime/'invalid-native-fixture.evidence').write_bytes(sentinel)
+        (runtime/'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(bank.read_bytes()[-12:-8]==b"SPK2")}\n')
         (runtime/'settings.ini').write_text('[audio]\nvolume=0\n')
         (runtime/'debug.ini').write_text('[debug]\nenabled=0\n')
         script='WAIT 700\nPRESS START 2\nWAIT 90\nPRESS START 2\nWAIT 400\nPRESS START 2\nWAIT_RAM8 FFF600 0C\nWAIT 180\n'
@@ -66,11 +69,15 @@ def main():
         import re
         misses=re.search(r'(\d+) unique true-miss addrs',text)
         if misses and int(misses[1]):errors.append(misses[0])
+        try:
+            data=slots(native_save)
+            safe=all(data[i]&128 or (data[i+3]<=14 and data[i+2]>>4<=3) for i in range(0,80,10))
+        except (OSError,ValueError):safe=False
         record={'stage':f'{za:04x}','character':char,'exit':code,'loaded_stage':actual,
-            'game_mode':mode,'player':player,'native_save_unchanged':native_save.read_bytes()==sentinel,
+            'game_mode':mode,'player':player,'native_save_valid':safe,
             'screenshots':(case/'start.png').exists() and (case/'move.png').exists(),
             'errors':errors[:10],'seconds':round(time.monotonic()-started,2)}
-        record['passed']=code==0 and actual==za and mode==0xc and player==(0 if char<2 else char-1) and not errors and record['native_save_unchanged'] and record['screenshots']
+        record['passed']=code==0 and actual==za and mode==0xc and player==(0 if char<2 else char-1) and not errors and record['native_save_valid'] and record['screenshots']
         (case/'result.json').write_text(json.dumps(record,indent=2))
         # Keep diagnostic artifacts; copies of the same executable add no evidence.
         (runtime/exe.name).unlink();(runtime/'SDL2.dll').unlink()
