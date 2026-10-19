@@ -309,6 +309,49 @@ int main(int argc,char **argv)
         for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
         CHECK(s_bg_checks>0 && s_bg_errors==0);
     }
+    /* LBZ1 draws its lower band from X=0 (HScroll_table+$004), while the
+     * finer water deformation scrolls through it. Repeat that 512px canvas
+     * only below the authored $D0 split; the upper Death Egg world remains
+     * spatial. A second layout bank here is deliberately unrelated green. */
+    g_ram[0xFE10]=6;g_ram[0xFE11]=0;word(g_ram,0xEEC2,0);
+    word(g_ram,0x800E,0x8140);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,1);
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF00FF00);
+    word(g_ram,0xEE90,0xD0);v.vsram[1]=0xD0;
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
+    CHECK(s_bg_checks>0 && s_bg_errors==0);
+    word(g_ram,0xEE90,0);v.vsram[1]=0;
+    /* HPZ can update its fine/coarse position before the next tile-column
+     * streamer runs. Compare only the last Draw_BG interval: A802=$10,
+     * not the pending A800=$20. The stale rightmost native tile is red,
+     * while the authored expanded world and all streamed cells are green. */
+    g_ram[0xFE10]=22;g_ram[0xFE11]=1;
+    memset(g_ram+0x8140,2,32);word(g_ram,0x8016,0x8140);
+    word(g_ram,0xA800,32);word(g_ram,0xA802,16);
+    word(g_ram,0xEE90,506);v.vsram[1]=506;
+    word(v.vram,0xF002,(uint16_t)-40);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,2);
+    word(v.vram,0xE000+31*128+44*2,1);
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_bg_checks>0 && s_bg_errors==0 && s_bg_unstreamed>0);
+    s3_video_vblank();
+    word(g_ram,0xA802,32); /* next queue prepared after the displayed V-int */
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_bg_checks>0 && s_bg_errors==0 && s_bg_unstreamed>0);
+    g_ram[0xF600]=4;s3_video_vblank();g_ram[0xF600]=12;
+    /* Without a matching scene, the displayed native viewport is copied
+     * from hardware. Discarded provisional world samples are not errors. */
+    memset(s_history,0,sizeof s_history);memset(&s_display_frame,0,sizeof s_display_frame);
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
+    scanline(&v,0,native,320,out,796);
+    CHECK(!s_display && !s_bg_checks && !s_terrain_checks);
+    CHECK(!memcmp(out+s_native_x,native,sizeof native));
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    word(g_ram,0xEE90,0);v.vsram[1]=0;
+    word(v.vram,0xF002,(uint16_t)-1024);
     /* FBZ's indoors/outdoors wipes publish mixed rows/columns. Keep that
      * exact plane throughout either act and every background event; do
      * not choose a complete bank early or repeat the combined layout. */
