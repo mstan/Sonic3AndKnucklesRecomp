@@ -20,7 +20,8 @@ def main():
     ap.add_argument('--out',required=True,type=Path,help='private audit JSON path')
     ap.add_argument('--preview-dir',type=Path,help='optional private source-data previews')
     ap.add_argument('--check-conversion',action='store_true',help='also validate S3K static geometry conversion')
-    ap.add_argument('--export-geometry-dir',type=Path,help='private static payloads; extended chunks require runtime support')
+    ap.add_argument('--export-geometry-dir',type=Path,help='private static payloads; not a playable stage bank')
+    ap.add_argument('--export-mighty-dir',type=Path,help='private native sprite payloads; character runtime still required')
     args=ap.parse_args();rom=MegamixV3(load_rom(args.rom))
     stages=[]
     for z,a in ORDER:
@@ -54,11 +55,19 @@ def main():
         stages.append(stage)
         print(stage['name'],stage['source_stage'],stage['placements'],'placements',flush=True)
     frames=rom.mighty_frames()
+    from megamix.mighty import convert_mighty
+    mighty_data,mighty_report=convert_mighty(rom)
+    if args.export_mighty_dir:
+        args.export_mighty_dir.mkdir(parents=True,exist_ok=True)
+        for key,value in mighty_data.items():(args.export_mighty_dir/(key+'.bin')).write_bytes(value)
+        (args.export_mighty_dir/'manifest.json').write_text(json.dumps(mighty_report,indent=2)+'\n',
+                                                         encoding='utf-8',newline='\n')
     report=dict(source=dict(bytes=len(rom.data),crc32=f'{CRC32:08X}',sha256=SHA256),
                 campaign_order=['Sonic 1','Sonic 2','Sonic 3 & Knuckles','Sonic Megamix'],
                 tables=TABLES,stages=stages,mighty=dict(**MIGHTY,frames=len(frames),
-                    frame_art_sha256=hashlib.sha256(b''.join(tiles for _,tiles in frames)).hexdigest()),
-                status='source data inventoried; S3K stage/runtime/Mighty integration pending')
+                    frame_art_sha256=hashlib.sha256(b''.join(tiles for _,tiles in frames)).hexdigest(),
+                    native_conversion=mighty_report),
+                status='source data converted; stage enrollment/gameplay/Mighty controller integration pending')
     report['requires_extended_chunks']=[s['source_stage'] for s in stages
         if s.get('conversion',{}).get('requires_extended_chunks')]
     args.out.parent.mkdir(parents=True,exist_ok=True)
@@ -69,7 +78,7 @@ def main():
         mighty_sheet(rom,args.preview_dir/'mighty-source-frames.png')
     print('Inventoried',len(stages),'acts;',sum(s['placements'] for s in stages),'placements')
     if report['requires_extended_chunks']:
-        print('Runtime needs extended chunk support for:',','.join(report['requires_extended_chunks']))
+        print('Extended layouts required for:',','.join(report['requires_extended_chunks']))
 
 
 if __name__=='__main__':main()

@@ -56,6 +56,15 @@ if(EXISTS "${S3_GAME_COMMON}/../sonic3k/sonic3k.bin")
 endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME megamix_sprite_formats COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/megamix_sprite_test.py")
+    if(EXISTS "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin")
+        add_test(NAME megamix_geometry_sites COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_LIST_DIR}/../tools/gen_megamix_geometry_sites.py"
+            --rom "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin" --check)
+    endif()
+endif()
 set(S3_SK_LISTING "" CACHE FILEPATH
     "Built skdisasm sonic3k.lst (tools/sonic3_disassembly.py); enables the hook-site drift check")
 set(S3_S3_LISTING "" CACHE FILEPATH "Built skdisasm s3.lst; enables SpecialVInt discovery drift check")

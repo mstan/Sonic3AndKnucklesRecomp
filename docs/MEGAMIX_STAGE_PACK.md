@@ -89,6 +89,31 @@ python tests/runtime/check_megamix_geometry.py --inventory build/megamix-v3-conv
 The descriptor reader does not enroll a stage or expose an enabled package.
 Actual Megamix terrain interactions, stage events and exits remain unverified.
 
+## Mighty sprite conversion milestone
+
+`tools/megamix/mighty.py` converts the exact donor's shared 176-frame mapping
+and dynamic-art tables to S3K's word-count mappings, signed 16-bit X
+coordinates and word-count DPLCs. Decoding the resulting native payloads
+reconstructs every original mapping piece, flip, palette/priority bit and
+dynamic tile run exactly. Art is 3,239 tiles, within the native 12-bit DPLC
+index range. The shared unused Sonic-form frames remain labeled as unused
+shared data rather than active Mighty poses.
+
+The animation table has **38 entries**, not 44: the idle script appears
+before the first walk script, so the first pointer alone is not a table-size
+oracle. The original animation bytecode is retained separately. It needs a
+v3 animation controller; native S3K Sonic frame IDs cannot simply be reused.
+
+```text
+python tools/inspect_megamix.py --rom "Sonic 1 Megamix v3.0.bin" --out build/megamix-v3-native-sprites.json --export-mighty-dir build/megamix-mighty
+```
+
+Actual v3 instructions also confirm ordinary shield swapping spends five
+rings (`$1999A/$199A2`), Up+A uses the store path (`$19950`), and normal
+storage shifts four byte slots (`$19AAA`). Super storage follows a different
+packed representation. These bindings prevent borrowing later CD-version
+behavior blindly. Ability/controller/UI integration remains outstanding.
+
 ## Acceptance still in progress
 
 The reader and source previews do not constitute a playable stage/character
