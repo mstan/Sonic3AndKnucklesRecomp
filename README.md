@@ -5,6 +5,14 @@ Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
+## Optional Sonic 1 & 2 stages
+
+The combined **Sonic3KRecomp** target includes an experimental, default-off
+**Sonic 1 & 2 Stage Pack** in Mods. It brings all 39 acts into the S3K engine
+as a continuous campaign, using a converted bank built from your own ROMs.
+The game retains its name and native controls. Campaign saves are separate
+from ordinary S3K saves. See [setup, credits and validation limits](docs/STAGE_PACKS.md).
+
 ## Opt-in widescreen experiment
 
 The custom renderer is available in all three targets, developed first on

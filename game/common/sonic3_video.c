@@ -329,7 +329,10 @@ static int s_loader_active;
 static uint8_t scene_read8(unsigned a)
 {
     a &= 0xFFFFFFu;
-    return a < 0x400000u ? g_rom[a] : a >= 0xFF0000u ? g_ram[a & 65535u] : 0;
+    if (a < 0x400000u) return g_rom[a];
+    if (a >= 0xFF0000u) return g_ram[a & 65535u];
+    /* the opt-in expansion bank (game-added zones keep their layouts there) */
+    return g_rom_ext && a - 0x400000u < g_rom_ext_size ? g_rom_ext[a - 0x400000u] : 0;
 }
 static uint16_t scene_read16(unsigned a) { return (uint16_t)((scene_read8(a)<<8)|scene_read8(a+1)); }
 static uint32_t scene_read32(unsigned a) { return ((uint32_t)scene_read16(a)<<16)|scene_read16(a+2); }
@@ -460,8 +463,12 @@ static void spawn_scene(void)
     write16(0xF76E,camera&0xFF80);write16(0xF770,cy&0xFF80);
     write16(0xF7DA,(camera-128)&0xFF80);write16(0xEF64,(cy-128)&0xFF80);
 }
+static S3VideoRingLayout s_ring_layout;
+void s3_video_set_ring_layout(S3VideoRingLayout fn) { s_ring_layout = fn; }
 static unsigned rings_base(void)
 {
+    unsigned own=s_ring_layout?s_ring_layout():0;
+    if(own)return own;
     unsigned index=(g_ram[0xFE10]*8u)+((g_ram[0xFE11]&1u)*4u);
     /* Ring layouts begin with an x=0 sentinel, native status index zero. */
     return scene_read32(S3_RINGS+index);
@@ -469,7 +476,7 @@ static unsigned rings_base(void)
 static unsigned rings_end(void)
 {
     unsigned p=rings_base();
-    if(p>=0x400000u)return p;
+    if(p>=0x400000u+(g_rom_ext?g_rom_ext_size:0u))return p;
     for(unsigned n=0;n<512 && scene_read16(p)!=65535u;++n)p+=4;
     return p;
 }
@@ -645,7 +652,10 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             uint8_t p=pattern_pixel(v,cell,ix,iy);
             if(!p)continue;
             s_priority[x]|=2;
-            if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=palette[p];
+            /* extended sprite lines (game-added art keeping its own colours) */
+            int ext=p<16?gvdp_ext_line(cell&2047u):0;
+            uint32_t c=ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,p),GENESIS_DAC_NORMAL):palette[p];
+            if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
         }
     }
 }
@@ -1069,4 +1079,11 @@ void s3_video_state(S3StateIO *io)
         s_frame_special = ss_ready = ss_latched = 0;
     }
 }
-const GameVideo sonic3_video = { configure, enabled, width, scanline };
+static S3VideoFrameOverlay s_frame_overlay;
+void s3_video_set_frame_overlay(S3VideoFrameOverlay draw) { s_frame_overlay = draw; }
+static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int width)
+{
+    (void)v;
+    if (s_frame_overlay) s_frame_overlay(line, out, width);
+}
+const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline };

@@ -237,6 +237,10 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${S3_GAME_COMMON}/sonic3_title_art.c"
             "${S3_GAME_COMMON}/sonic3_mods.c")
     endif()
+    if(PREFIX STREQUAL "sonic3k")
+        file(GLOB STAGE_PACK_SOURCES CONFIGURE_DEPENDS "${S3_GAME_ROOT}/trilogy/*.c")
+        list(APPEND SHARED_SRC ${STAGE_PACK_SOURCES})
+    endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
     # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)
     # unconditionally, so every target built against it links these (AGPL-free).
@@ -254,6 +258,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/external/clowncommon"
         "${RECOMP_ROOT}/recompiler/src"          # m68k_decoder.h (floor)
         "${GAME}"
+        "${S3_GAME_ROOT}/trilogy"
         "${S3_GAME_COMMON}"                      # sonic3_video.h (all modes)
     )
     if(GENESIS_Z80_RECOMP)
@@ -374,6 +379,7 @@ foreach(_repo SOURCE ENGINE UI DISASM)
     else()
         set(_dir "${S3_GAME_ROOT}/skdisasm")
     endif()
+    get_filename_component(_dir "${_dir}" REALPATH)
     execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${_dir}" rev-parse HEAD
         OUTPUT_VARIABLE S3_${_repo}_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE
         RESULT_VARIABLE _git_result)

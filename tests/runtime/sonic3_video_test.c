@@ -1,6 +1,10 @@
 /* Test the actual renderer's row-pointer layout and host publication helpers. */
 #include "../../game/common/sonic3_video.c"
 uint8_t g_ram[65536],g_rom[0x400000];
+uint8_t *g_rom_ext;
+uint32_t g_rom_ext_size;
+int gvdp_ext_line(unsigned tile) { (void)tile; return 0; }
+uint16_t gvdp_ext_color(int row,int line,int nib) { (void)row;(void)line;(void)nib;return 0; }
 M68KState g_cpu;
 void m68k_write8(uint32_t a,uint8_t v){g_ram[a&65535]=v;}
 void m68k_write16(uint32_t a,uint16_t v){m68k_write8(a,v>>8);m68k_write8(a+1,v);}

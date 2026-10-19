@@ -17,6 +17,8 @@
 #include "sonic3_mods.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
+#include "trilogy.h"
+#include "stage_pack.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -43,9 +45,21 @@ extern void func_000584(void);  /* VInt         ($000584) */
 extern void func_000D0C(void);  /* JmpTo_HInt   ($000D0C) */
 extern void func_000D10(void);  /* HInt         ($000D10) */
 
-static void s3k_call_entry_point(void) { s3_army_init(); recomp_call_addr(0x000206u); }
-static void s3k_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
-static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); }
+static int s3k_instruction(uint32_t pc)
+{
+    if (trilogy_instruction(pc)) return 1;
+    /* New hook sites must never reach the renderer's object-range default,
+     * even with the pack disabled. Shared army sites retain their old chain. */
+    if (trilogy_owns(pc) && !s3_army_owns(pc)) return 0;
+    return s3_sk_instruction_hook(pc);
+}
+extern void tri_obj_vblank(void);
+static void s3k_call_entry_point(void) { trilogy_init(); s3_army_init(); recomp_call_addr(0x000206u); }
+static void s3k_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); if (tri_bank_loaded()) tri_obj_vblank(); }
+static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); s3_stage_pack_load(path); }
+static const struct RecompLauncherCModProvider *s3k_mods(const struct RecompLauncherCModProvider *base)
+{ return s3_stage_pack_mods(s3_mods(base)); }
+static int s3k_netplay_allowed(void) { return !s3_stage_pack_enabled && s3_mods_netplay_allowed(); }
 static void s3k_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* ---- 68K work-RAM accessors ---- */
@@ -220,14 +234,16 @@ const GameSpec g_game_spec = {
     .state_at_boundary      = s3_state_at_boundary,
     .save_resume_pc         = s3_state_resume_pc,
     .video                  = &sonic3_video,
-    .instruction_hook       = s3_sk_instruction_hook,
+    .instruction_hook       = s3k_instruction,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras; seat 2
      * still drives native Tails in Sonic & Tails games. */
     .logical_players        = 4,
     .load_settings          = s3k_load_settings,
-    .mods                   = s3_mods,
-    .netplay_allowed        = s3_mods_netplay_allowed,
+    .mods                   = s3k_mods,
+    .netplay_allowed        = s3k_netplay_allowed,
+    .state_unavailable_reason = s3_stage_pack_state_reason,
+    .sram_filename          = s3_stage_pack_sram,
     .display_name           = "Sonic 3 & Knuckles v" S3_BUILD_VERSION,
     .short_name             = "Sonic3K",
     .boxart                 = "boxart-sonic3k.tga",
@@ -260,7 +276,7 @@ const GameSpec g_game_spec = {
 
     .handle_arg             = NULL,
     .arg_usage              = NULL,
-    .dispatch_override      = NULL,
+    .dispatch_override      = trilogy_dispatch,
 
     .fill_frame_record      = s3k_fill_frame_record,
     .frame_record_version   = SONIC_GAME_DATA_VERSION,
