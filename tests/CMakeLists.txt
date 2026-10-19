@@ -3,6 +3,9 @@ add_executable(campaign_save_test runtime/campaign_save_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
 target_include_directories(campaign_save_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME campaign_save COMMAND campaign_save_test)
+add_executable(scd_resource_test runtime/scd_resource_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c")
+target_include_directories(scd_resource_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_executable(campaign_mighty_test runtime/campaign_mighty_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_mighty.c")
 target_include_directories(campaign_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
@@ -81,6 +84,10 @@ endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME scd_resource COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_resource_test.py" --validator "$<TARGET_FILE:scd_resource_test>")
+    add_test(NAME scd_disc COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_disc_test.py")
     add_test(NAME megamix_sprite_formats COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/megamix_sprite_test.py")
     if(EXISTS "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin")

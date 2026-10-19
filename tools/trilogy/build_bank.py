@@ -884,6 +884,54 @@ def _q_glyph(o_tiles):
     return bytes(out)
 
 
+def title_card_glyphs(s3k):
+    """CD title glyphs; adapted from SonicAnthology 8f5726a.
+
+    Kept independent of the existing campaign builder's output contract.
+    """
+    lg = S3K_SYMS['TitleCard_LevelGfx']
+    zone_art = {z: _kosm_decode(s3k, be32(s3k, lg + z * 4)) for z in range(14)}
+    red = _kosm_decode(s3k, S3K_SYMS['ArtKosM_TitleCardRedAct'])
+
+    def glyph_tiles(ch):
+        src, base, w = GLYPHS[ch]
+        if src == 'common':
+            return None
+        if src == 'vflipM':
+            src, base, w = GLYPHS['M']
+        if src == 'custom':
+            return _q_glyph(red[(0x528 - 0x500) * 32:(0x528 - 0x500 + 9) * 32])
+        art = zone_art[src]
+        o = (base - 0x54D) * 32
+        return art[o:o + w * 3 * 32]
+    return glyph_tiles
+
+
+def title_card_name(name, glyph_tiles):
+    """SonicAnthology's CD zone name tiles and native mapping frame."""
+    tiles, placed, pieces, x = bytearray(), {}, [], 0
+    for ch in name:
+        if ch == ' ':
+            x += 8
+            continue
+        src, base, w = GLYPHS[ch]
+        key = 'M' if ch == 'W' else ch
+        flip = 0x1000 if ch == 'W' else 0
+        if src == 'common':
+            tile = base
+        else:
+            if key not in placed:
+                placed[key] = 0x54D + len(tiles) // 32
+                tiles += glyph_tiles(ch)
+            tile = placed[key]
+        pieces.append((x, ((w - 1) << 2) | 2, 0x8000 | flip | tile))
+        x += w * 8
+    frame = struct.pack('>H', len(pieces))
+    for px, size, tw in pieces:
+        frame += struct.pack('>bBHh', 0, size, tw, 128 - x + px)
+    return bytes(tiles), frame
+
+
 def build_title_cards(bank, s3k):
     lg = S3K_SYMS['TitleCard_LevelGfx']
     zone_art = {z: _kosm_decode(s3k, be32(s3k, lg + z * 4)) for z in range(14)}

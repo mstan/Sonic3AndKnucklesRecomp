@@ -49,6 +49,15 @@ void tri_bank_level(void)
 
 int tri_bank_loaded(void) { return s_bank != NULL; }
 
+/* A newer save schema must leave native saving available without any addon
+ * RAM projection or save hooks. Requested settings and files remain parked. */
+void tri_campaign_suspend(void)
+{
+    s_bank=NULL;s_bank_size=0;s_selected=-1;g_rom_ext=NULL;g_rom_ext_size=0;
+    s3_stage_pack_enabled=s3_stage_pack_sonic1=s3_stage_pack_sonic2=0;
+    s3_stage_pack_megamix=s3_stage_pack_mighty=0;
+}
+
 void trilogy_init(void)
 {
     if (!s3_stage_pack_enabled) return;
@@ -215,6 +224,7 @@ int trilogy_instruction(uint32_t pc)
         return 0;
     extern int tri_save_journal_hook(uint32_t pc);
     if(tri_save_journal_hook(pc))return 1;
+    if(!s_bank)return 0;
     if (tri_megamix_geometry_hook(pc))return 1;
     if (tri_megamix_sprite_hook(pc))return 1;
     if (tri_level_hook(pc))
