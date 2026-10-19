@@ -50,11 +50,18 @@ static uint8_t bg_chunk(int cx, int cy)
 
 const uint16_t *g_bg_tile_remap;          /* NULL, or a tile -> tile table for bg_block */
 
+static uint16_t bg_cell(int bx,int by)
+{
+    uint16_t cell;
+    if(tri_megamix_geometry_cell(bx,by,1,1,&cell))return cell;
+    uint8_t ch=bg_chunk(bx>>7,by>>7);
+    return r16(0xFF0000u+(uint32_t)ch*0x80u+(uint32_t)(by&0x70)+(uint32_t)((bx&0x70)>>3));
+}
+
 /* the tiles a BG block uses (for Sonic 2's ending) */
 void tri_bg_block_tiles(int bx, int by, uint16_t out[4])
 {
-    uint8_t ch = bg_chunk(bx >> 7, by >> 7);
-    uint16_t cw = r16(0xFF0000u + (uint32_t)ch * 0x80u + (uint32_t)(((by & 0x70) >> 4) * 16) + (uint32_t)(((bx & 0x70) >> 4) * 2));
+    uint16_t cw = bg_cell(bx,by);
     uint32_t blk = RAM_Block_table + (uint32_t)(cw & 0x3FF) * 8u;
     for (int i = 0; i < 4; i++) out[i] = r16(blk + (uint32_t)i * 2u) & 0x7FF;
 }
@@ -62,8 +69,7 @@ void tri_bg_block_tiles(int bx, int by, uint16_t out[4])
 /* Draw one 16x16 block cell of BG world (bx,by) (pixels, 16-aligned). */
 static void bg_block(int bx, int by)
 {
-    uint8_t ch = bg_chunk(bx >> 7, by >> 7);
-    uint16_t cw = r16(0xFF0000u + (uint32_t)ch * 0x80u + (uint32_t)(((by & 0x70) >> 4) * 16) + (uint32_t)(((bx & 0x70) >> 4) * 2));
+    uint16_t cw = bg_cell(bx,by);
     uint32_t blk = RAM_Block_table + (uint32_t)(cw & 0x3FF) * 8u;
     uint16_t t[4] = { r16(blk), r16(blk + 2), r16(blk + 4), r16(blk + 6) };
     if (cw & 0x0400) {            /* x flip */

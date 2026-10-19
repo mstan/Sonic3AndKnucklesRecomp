@@ -42,6 +42,7 @@
 #define TRI_GAME_S3K    0
 #define TRI_GAME_S1     1
 #define TRI_GAME_S2     2
+#define TRI_GAME_MEGAMIX 3
 
 /* ---- expansion bank ---------------------------------------------------- */
 #define TRI_BANK_BASE   0x400000u
@@ -244,6 +245,10 @@ void tri_refresh_fg(void);                /* redraw the FG plane after a layout 
 int  trilogy_dispatch(uint32_t addr);
 
 int  tri_level_hook(uint32_t pc);         /* trilogy_level.c */
+void tri_megamix_geometry_begin(void);
+int  tri_megamix_geometry_owns(uint32_t pc);
+int  tri_megamix_geometry_hook(uint32_t pc);
+int  tri_megamix_geometry_cell(int x,int y,int background,int wrap,uint16_t *cell);
 int  tri_screen_hook(uint32_t pc);        /* trilogy_screen.c */
 int  tri_titlecard_hook(uint32_t pc);     /* trilogy_titlecard.c */
 int  tri_flow_hook(uint32_t pc);          /* trilogy_flow.c */
