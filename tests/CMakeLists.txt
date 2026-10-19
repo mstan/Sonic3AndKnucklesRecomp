@@ -1,5 +1,12 @@
 # Sonic 3 family implementation tests belong to the game, never the shared engine.
 set(S3_GAME_COMMON "${CMAKE_CURRENT_LIST_DIR}/../game/common")
+add_executable(stage_pack_test runtime/stage_pack_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_mods.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_bank.c")
+target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${CMAKE_SOURCE_DIR}/recomp-ui/src")
+target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1)
+add_test(NAME stage_pack COMMAND stage_pack_test)
 
 add_executable(sonic3_mods_test runtime/sonic3_mods_test.c "${S3_GAME_COMMON}/sonic3_mods.c")
 target_include_directories(sonic3_mods_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
