@@ -721,6 +721,8 @@ static const ZoneScreen *zone_screen(void)
     static const ZoneScreen scz = { s2_scz_init2, s2_scz_event, s2_scz_camera, s2_anim, s2_wfz_palcycle };
     static const ZoneScreen wfz = { s2_wfz_init2, s2_wfz_event, NULL, s2_anim, s2_wfz_palcycle };
     static const ZoneScreen dez = { s2_dez_init2, s2_dez_event, NULL, s2_anim, s2_cpz_palcycle };   /* PalCycle_CPZ */
+    extern void tri_scd_palcycle(void), tri_scd_anim(void), tri_scd_level_events(void);
+    static const ZoneScreen cd = { NULL, bg_default_event, tri_scd_level_events, tri_scd_anim, tri_scd_palcycle };   /* (Sonic CD: its scripts) */
     switch (tri_source_zone()) {
     case TRI_S1_GHZ: return &ghz;
     case TRI_S1_LZ:  return &lz;
@@ -739,13 +741,22 @@ static const ZoneScreen *zone_screen(void)
     case TRI_S2_SCZ: return &scz;
     case TRI_S2_WFZ: return &wfz;
     case TRI_S2_DEZ: return &dez;
-    default:         return &dflt;
+    default:         return tri_cd_zone(tri_zone()) ? &cd : &dflt;
     }
 }
 
 /* ---- native screen routines (called through LevelSetup / ScreenEvents) -- */
 static void n_fg_init(void)
 {
+    extern void tri_scd_page(int force);
+    tri_scd_page(2);                                    /* (a Sonic CD level loaded: the chunks around the camera,
+                                                         *  the pager's slots afresh) */
+    uint32_t e = tri_dir();
+    if (e && (int16_t)tri_rd16(e + TD_SIZES + 4) == -0x100 && tri_rd16(e + TD_SIZES + 6) == 0x800) {
+        w16(0xFFEEAAu, 0x7FF);                          /* a wrapping level (S1/S2: top -$100, 2048 px):  */
+        w16(0xFFEEACu, 0x7F0);                          /* S3K's looping-level values (Screen_Y_wrap_value, */
+        w16(0xFFEEAEu, 0x3C);                           /* Camera_Y_pos_mask, Layout_row_index_mask) */
+    }
     tri_jsr(S3K_Reset_TileOffsetPositionActual);
     tri_jsr(S3K_Refresh_PlaneFull);
 }
@@ -769,6 +780,8 @@ void tri_refresh_fg(void)
 
 static void n_fg_event(void)
 {
+    extern void tri_scd_page(int force);
+    tri_scd_page(0);                                    /* (a Sonic CD level: the chunks near the camera) */
     tri_player_frame();
     tri_jsr(S3K_DrawTilesAsYouMove);
 }
@@ -796,10 +809,11 @@ void tri_screen_register(void)
     s_bg_event = tri_native(n_bg_event);
 }
 
-/* Do_ResizeEvents tail (camera max-Y easing), transcribed. */
+/* Do_ResizeEvents tail (camera max-Y easing), transcribed. Sonic CD's
+ * (R72B [$20342A]) is the same at twice the speed */
 static void resize_tail(void)
 {
-    int16_t d1 = 2;
+    int16_t d1 = tri_cd_zone(tri_zone()) ? 4 : 2;
     if (getenv("TRILOGY_CAMLOG"))                   /* development */
         fprintf(stderr, "[CAM] p %04X,%04X st %02X yv %d cam %04X,%04X max %04X tgt %04X\n",
                 r16(RAM_Player_1 + 0x10), r16(RAM_Player_1 + 0x14), r8(RAM_Player_1 + 0x2A),

@@ -18,14 +18,14 @@ int main(void)
     cleanup();uint8_t native[80],view[80],projection[80];CampaignSave s,t;
     memset(native,0xFF,80);memset(native,0,10);native[3]=2;native[8]=3;
     for(unsigned mask=0;mask<16;mask++) {
-        int n=14+((mask&1)?7:0)+((mask&2)?11:0)+((mask&4)?7:0)+((mask&8)?28:0);
+        int n=14+((mask&1)?7:0)+((mask&2)?11:0)+((mask&4)?7:0)+((mask&8)?70:0);
         CHECK(campaign_count(mask)==n);
-        for(int d=0;d<=n;d++){int c=campaign_stable(mask,d);CHECK(c>=0&&c<=67);CHECK(campaign_display(mask,c)==d);}
+        for(int d=0;d<=n;d++){int c=campaign_stable(mask,d);CHECK(c>=0&&c<=109);CHECK(campaign_display(mask,c)==d);}
         CHECK(campaign_stable(mask,n+1)==-1);
         CHECK((campaign_display(mask,40)>=0)==!!(mask&8));
         if(mask&8) {
             int cd=campaign_display(mask,40),base=campaign_display(mask,18);
-            CHECK(cd==((mask&1)?7:0)+((mask&2)?11:0));CHECK(base==cd+28);
+            CHECK(cd==((mask&1)?7:0)+((mask&2)?11:0));CHECK(base==cd+70);
         }
         if(mask&4)CHECK(campaign_display(mask,32)==n-7);
     }
@@ -81,9 +81,25 @@ int main(void)
     CHECK(t.slots[0][8]==17);CHECK(campaign_store(&t));
     CHECK(campaign_load(&t,"campaign-test.sav",native,1,15));
     CHECK(campaign_cd_get(&t,0,&restored));CHECK(restored.stones==0x55);
+    CHECK(campaign_load(&t,"campaign-test.sav",native,1,0));campaign_view(&t,view);
+    view[3]=3;view[8]=18;campaign_capture(&t,view,native);
+    CHECK(t.slots[0][30]==49 && native[3]==14 && native[8]==18); /* already-earned native clear survives replay */
+    CHECK(campaign_store(&t));CHECK(campaign_load(&t,"campaign-test.sav",native,1,15));
+    CHECK(t.slots[0][30]==49);CHECK(campaign_cd_get(&t,0,&restored));CHECK(restored.stones==0x55);
     memset(native,0xFF,10);CHECK(campaign_load(&t,"campaign-test.sav",native,1,0));
     CHECK(campaign_cd_get(&t,0,&restored));CHECK(!restored.stones && !restored.generators);
     CHECK(campaign_store(&t));CHECK(campaign_load(&t,"campaign-test.sav",native,1,15));CHECK(t.view[0]&128);
+    /* A normal CD save reached before native completion can advance native
+     * progress while CD is missing, without replacing the parked CD cursor. */
+    CampaignSave normal;
+    memset(native,0xFF,80);memset(native,0,10);native[8]=3;
+    CHECK(!campaign_load(&normal,"campaign-test-absent.sav",native,1,8));
+    campaign_view(&normal,view);view[3]=(uint8_t)campaign_display(8,49);
+    campaign_capture(&normal,view,native);CHECK(!normal.slots[0][31]);
+    normal.mask=0;campaign_view(&normal,view);view[3]=3;view[8]=18;
+    campaign_capture(&normal,view,native);
+    CHECK(normal.slots[0][30]==49 && native[3]==3 && native[8]==18);
+    normal.mask=8;campaign_view(&normal,view);CHECK(campaign_stable(8,view[3])==49);
     /* Future versions/capabilities in either companion are never overwritten. */
     read_raw("campaign-test.sav",raw);raw[4]=3;write_raw("campaign-test.sav",raw);
     read_raw("campaign-test.sav",original);

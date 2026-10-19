@@ -35,6 +35,7 @@ def main(argv=None):
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--kind', choices=('content', 'audio'), default='content')
     ap.add_argument('--s3k', type=Path)
+    ap.add_argument('--validator', type=Path, help='scd_pack_validate executable (required for content)')
     args = ap.parse_args(argv)
     try:
         disc = Disc(args.cue)
@@ -46,6 +47,15 @@ def main(argv=None):
             raise ValueError('output must differ from every source file')
         if source_identity(disc) != US_SHA256:
             raise ValueError('unsupported Sonic CD revision; only the qualified US data track is enrolled')
+        validator = None
+        if args.kind == 'content':
+            candidates = [args.validator] if args.validator else [
+                ROOT / 'tools/scd_pack_validate.exe',
+                ROOT / 'build/cd-dev/tests/Release/scd_pack_validate.exe',
+                ROOT / 'build/cd-dev/tests/scd_pack_validate']
+            validator = next((p.resolve() for p in candidates if p and p.is_file()), None)
+            if validator is None:
+                raise ValueError('build the scd_pack_validate target or supply --validator before converting content')
         output.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='sonic-cd-', dir=output.parent) as tmp:
             tmp = Path(tmp)
@@ -88,6 +98,8 @@ def main(argv=None):
                 entries += [(name, disc.read(name)) for name in CONTENT_NAMES[2:]]
                 write_pack(pack, b'SCDP', entries)
             validate_pack(pack, audio=args.kind == 'audio')
+            if validator:
+                subprocess.run([str(validator), str(pack)], check=True)
             os.replace(pack, output)
         with output.open('rb') as f:
             digest = hashlib.file_digest(f, 'sha256').hexdigest()

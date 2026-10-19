@@ -14,6 +14,19 @@
 #include <stdlib.h>
 
 static int s_plc_id = -1;
+uint32_t tri_scd_palpoint(unsigned id);               /* trilogy_scdlevel.c */
+uint32_t tri_scd_plc(unsigned id);
+uint32_t tri_scd_stop_byte(void);
+void tri_scd_level_music(void);
+
+/* The level to load next, set mid-frame (the zone select, Sonic CD's time
+ * warp) and made the current zone only as the level loads: the rest of the
+ * old level's frame still indexes S3K's zone tables (ScreenEvents' and the
+ * like), and a Sonic CD zone's own handlers answer only once its level is in
+ * the window (tri_scd_map), so a new zone number before then sent those
+ * lookups past S3K's tables (crashes going to Quartz Quadrant). */
+static uint16_t s_next_za = 0xFFFF;
+void tri_level_next(uint16_t za) { s_next_za = za; }
 
 /* Development entry: TRILOGY_ZONE=2000 (hex zone/act) replaces the first
  * level the game loads. */
@@ -202,6 +215,11 @@ int tri_level_hook(uint32_t pc)
         extern void s2_cnz_reset(void);
         extern void s2_obj_htz_reset(void);
         extern void tri_obj_level_entry(void);
+        if (s_next_za != 0xFFFF) {                   /* (tri_level_next) */
+            w16(RAM_Current_zone_and_act, s_next_za);
+            w16(RAM_Apparent_zone_and_act, tri_apparent(s_next_za));
+            s_next_za = 0xFFFF;
+        }
         dev_force_zone();
         tri_bank_level();
         tri_obj_level_entry();
@@ -229,6 +247,11 @@ int tri_level_hook(uint32_t pc)
     case TH_LVL_MUSIC: {            /* move.b (a1,d0.w),d0  — LevelMusic_Playlist */
         uint32_t e = tri_dir();
         uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
+        tri_scd_level_music();      /* (a Sonic CD level: its disc track; elsewhere it stops) */
+        if (e && tri_cd_zone(tri_zone())) {
+            A(1) = tri_scd_stop_byte() - (uint32_t)(int32_t)(int16_t)D(0);   /* (S3K's music: stopped) */
+            return 0;
+        }
         if (!e) {
             tri_music_restore();    /* S3K level: the driver's own songs */
             return 0;
@@ -262,6 +285,10 @@ int tri_level_hook(uint32_t pc)
             A(1) = e + TD_SOLIDS;
         return 0;
     }
+    case TH_SOLIDS_SPLIT:           /* a Sonic CD level's index is interleaved (S&K's), for 1024 blocks */
+        if (tri_dir() && tri_cd_zone(tri_zone()))
+            w32(RAM_Secondary_collision_addr, r32(RAM_Primary_collision_addr) + 1u);
+        return 0;
     case TH_LEVEL_SIZES: {          /* after lea LevelSizes(pc,d0.w),a0 */
         uint32_t e = tri_dir();
         if (e)
@@ -279,6 +306,10 @@ int tri_level_hook(uint32_t pc)
     case TH_PALPOINT2:
     case TH_PALPOINT2_I: {          /* after adda.w d0,a1 ; d0 = id*8 */
         uint32_t id = (D(0) & 0xFFFF) >> 3;
+        if (id >= TRI_PAL_CD && tri_scd_palpoint(id)) {
+            A(1) = tri_scd_palpoint(id);                    /* (a Sonic CD level's own) */
+            return 0;
+        }
         if (id >= TRI_PAL_BASE) {
             uint32_t t = tri_rd32(TRI_BANK_BASE + TB_PALPOINT);
             uint32_t n = tri_rd16(TRI_BANK_BASE + TB_PALCOUNT);
@@ -293,6 +324,10 @@ int tri_level_hook(uint32_t pc)
     case TH_LOAD_PLC_PTR: {         /* after lea (a1,d0.w),a1 */
         int id = s_plc_id;
         s_plc_id = -1;
+        if (id >= TRI_PLC_CD && tri_scd_plc((unsigned)id)) {
+            A(1) = tri_scd_plc((unsigned)id);
+            return 0;
+        }
         if (id >= TRI_PLC_BASE) {
             uint32_t t = tri_rd32(TRI_BANK_BASE + TB_PLCTABLE);
             uint32_t n = tri_rd16(TRI_BANK_BASE + TB_PLCCOUNT);
@@ -320,14 +355,27 @@ int tri_level_hook(uint32_t pc)
         return 0;
     }
     case TH_ANIMAL_TYPE: {          /* after lea byte_2C7BA(pc),a1 ; d1 = zone*2+n */
+        if(tri_dir() && tri_cd_zone(tri_zone())) {
+            A(1)-=(uint32_t)tri_zone()*2u; /* Native AIZ pair, independent of S1 resources. */
+            return 0;
+        }
         uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
         if (tri_dir() && t) A(1) = tri_rd32(t + TRI_BLOB_ANIMAL_TYPES * 4);
+        if (tri_dir() && t && tri_cd_zone(tri_zone()))      /* (Sonic CD: Green Hill's animals for now) */
+            A(1) += (uint32_t)(TRI_S1_GHZ - tri_zone()) * 2u;
         return 0;
     }
     case TH_ANIMAL_PLC: {           /* after lea PLCLoad_Animals_Index(pc,d0.w),a1 */
+        if(tri_dir() && tri_cd_zone(tri_zone())) {
+            /* The qualified retail routine at $85FDE reads its table at
+             * $85FFE. CD uses AIZ's native animal art without another pak. */
+            A(1)=0x085FFEu+tri_rd16(0x085FFEu);
+            return 0;
+        }
         uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
         if (tri_dir() && t) {
-            uint32_t p = tri_rd32(tri_rd32(t + TRI_BLOB_ANIMAL_PLCS * 4) + (uint32_t)(tri_zone() - TRI_ZONE_BASE) * 4u);
+            int z = tri_cd_zone(tri_zone()) ? TRI_S1_GHZ : tri_zone();
+            uint32_t p = tri_rd32(tri_rd32(t + TRI_BLOB_ANIMAL_PLCS * 4) + (uint32_t)(z - TRI_ZONE_BASE) * 4u);
             A(1) = p ? p : tri_rd32(t + TRI_BLOB_EMPTY_LIST * 4);
         }
         return 0;

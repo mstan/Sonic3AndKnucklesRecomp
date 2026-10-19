@@ -1,5 +1,15 @@
 # Sonic CD implementation handoff
 
+Owner follow-up (2026-10-19): after completing Sonic CD end to end, import
+Shadow from Sonic Megamix using the existing Mighty integration as the model.
+Track this separately in `beads-8y9v` under the same game epic. Finish CD first;
+preserve character identity, entitlement and save removal/reinstallation behavior
+when implementing Shadow.
+Owner reaffirmed the final visual-comparison gate: finish CD validation, add
+Shadow, then validate the combined build and perform mandatory comparisons
+against independent original-game or verified asset references before the
+owner playtest handoff. Earlier development screenshots do not satisfy it.
+
 Investigation: 2026-10-19. Owner explicitly requested investigation and this
 handoff **before implementation**, for a fresh Codex session to implement the
 feature end to end. No CD runtime, converter, save format, renderer or audio

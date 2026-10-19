@@ -68,6 +68,9 @@ def main():
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--extract', type=Path)
     args = ap.parse_args()
+    disc = Disc(args.cue)
+    if args.out.resolve() in ({args.cue.resolve()} | {t.path for t in disc.track_info}):
+        raise ValueError('manifest output must differ from every disc source file')
     if args.extract and args.extract.exists():
         raise ValueError('extraction destination must be new; original files are retained')
     report = inspect(args.cue, args.extract)

@@ -74,11 +74,12 @@ class Native:
         self.case.mkdir(parents=True,exist_ok=True)
         self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False))
         if getattr(args,'pack_mask',None) is not None:
-            names=('sonic1','sonic2','megamix');paths=args.packs
+            names=('sonic1','sonic2','megamix','sonic_cd');paths=args.packs
             (self.runtime/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(
-                f'{name}={(args.pack_mask>>i)&1}\n{name}_bank={(paths/(name+"-stages.pak")).as_posix()}\n' for i,name in enumerate(names)))
+                f'{name}={(args.pack_mask>>i)&1}\n{name}_bank={(paths/(("sonic-cd" if i==3 else name)+"-stages.pak")).as_posix()}\n' for i,name in enumerate(names)))
         (case/'input.txt').write_text(BOOT+'WAIT 500000\nEXIT\n')
-        env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
+        env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','MEGAMIX_','SONIC3_'))}
+        env.update(SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage,
                  TRILOGY_CHAR=str(args.character+4 if getattr(args,'mighty',False) and args.character<2 else args.character),TRILOGY_GOD='1')
         if not getattr(args,'god',True):env.pop('TRILOGY_GOD',None)
@@ -184,7 +185,9 @@ class Native:
         if self.proc.poll() is None: self.proc.terminate()
         self.proc.wait(timeout=15);self.log.close()
         (self.case/'events.json').write_text(json.dumps(self.events,indent=2))
-        for f in (self.runtime/self.args.exe.name,self.runtime/'SDL2.dll'): f.unlink(missing_ok=True)
+        for f in (self.runtime/self.args.exe.name,self.runtime/'SDL2.dll'):
+            try:f.unlink(missing_ok=True)
+            except OSError:pass # A crash-report process may still map it; retain that evidence.
 
 
 def boss(args,stage,port):

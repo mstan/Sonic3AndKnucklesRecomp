@@ -15,10 +15,13 @@
  * always gets Blue Spheres.
  */
 #include "trilogy_obj.h"
+#include "stage_pack.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 void tri_s2ss_start(int stage, void (*done)(int got_emerald));
+void tri_scdss_start(int stage,uint8_t stones,void (*done)(int));
+uint8_t tri_cd_stones(void);
 
 /* -> the emerald slot the next special stage is for (-1: everything collected) */
 int tri_ss_next(int *super)
@@ -32,7 +35,7 @@ int tri_ss_next(int *super)
     return -1;
 }
 
-int tri_ss_available(void) { return tri_ss_next(NULL) >= 0; }
+int tri_ss_available(void) { return tri_cd_zone(tri_zone())?tri_cd_stones()!=127:tri_ss_next(NULL)>=0; }
 
 /* an emerald won in a stage that isn't S3K's own (its results award S3K's) */
 static void award(int slot, int super)
@@ -64,11 +67,12 @@ void tri_ss_prepare_blue_spheres(void)
     if (slot >= 0) w8(RAM_Current_special_stage, (uint8_t)slot);
 }
 
-enum { SS_KIND_BLUE_SPHERES, SS_KIND_HALF_PIPE };
+enum { SS_KIND_BLUE_SPHERES, SS_KIND_HALF_PIPE, SS_KIND_UFO };
 
 /* the option: 0 per game, 1 Blue Spheres, 2 half-pipe */
 static int kind_for(int game)
 {
+    if(game==TRI_GAME_CD)return SS_KIND_UFO;
     extern int tri_option_special_stages(void);
     int opt = tri_option_special_stages();
     int k = opt == 1 ? SS_KIND_BLUE_SPHERES : opt == 2 ? SS_KIND_HALF_PIPE
@@ -77,16 +81,19 @@ static int kind_for(int game)
     return k;
 }
 
-int tri_ss_half_pipe(int game) { return kind_for(game) == SS_KIND_HALF_PIPE; }
+int tri_ss_half_pipe(int game) { return kind_for(game) != SS_KIND_BLUE_SPHERES; }
 
 /* ---- the half-pipe from a level ---------------------------------------------- */
-enum { RET_STARPOST, RET_NEXT_ACT, RET_RING };
-static int s_slot, s_super, s_ret;
+enum { RET_STARPOST, RET_NEXT_ACT, RET_RING, RET_PRACTICE };
+static int s_slot, s_super, s_ret,s_cd;
 static uint16_t s_next;
 
 static void half_pipe_done(int got)
 {
-    if (got) award(s_slot, s_super);
+    if (got && s_ret!=RET_PRACTICE) {
+        if(s_cd){extern void tri_cd_stone_award(unsigned);tri_cd_stone_award((unsigned)s_slot);}
+        else award(s_slot,s_super);
+    }
     if (s_ret == RET_RING) {                         /* a giant ring: back where it was (Saved2, as S3K's own) */
         w8(RAM_Special_bonus_entry_flag, 1);
         w8(RAM_Respawn_table_keep, 1);
@@ -94,8 +101,10 @@ static void half_pipe_done(int got)
         w8(RAM_Special_bonus_entry_flag, 0);
         w8(RAM_Respawn_table_keep, 0);               /* (S2: the level reloads, rings back to 0) */
     }
-    if (s_ret == RET_NEXT_ACT) {
+    if (s_ret == RET_NEXT_ACT || s_ret == RET_PRACTICE) {
         extern uint16_t tri_apparent(uint16_t za);
+        if(s_ret!=RET_PRACTICE && s_cd && (s_next&255)==2 && tri_cd_stones()==127)
+            s_next=(uint16_t)((((s_next>>8)&~3u)|TRI_CD_GOOD)<<8|2);
         w16(RAM_Current_zone_and_act, s_next);
         w16(RAM_Apparent_zone_and_act, tri_apparent(s_next));
         w8(RAM_Last_star_post_hit, 0);
@@ -103,6 +112,9 @@ static void half_pipe_done(int got)
         w8(RAM_Last_star_post_hit, r8(0xFFFE2B));    /* Saved_last_star_post_hit */
     }
     w8(RAM_Game_mode, 0x0C);
+    if(s_cd && s_ret==RET_NEXT_ACT) {
+        extern void tri_save_progress(uint16_t);tri_save_progress(s_next);
+    }
 }
 
 static void half_pipe(int ret, uint16_t next)
@@ -110,11 +122,30 @@ static void half_pipe(int ret, uint16_t next)
     s_slot = tri_ss_next(&s_super);
     s_ret = ret;
     s_next = next;
-    tri_s2ss_start(s_slot < 0 ? 0 : s_slot, half_pipe_done);
+    s_cd=tri_cd_zone(tri_zone());
+    if(s_cd) {
+        uint8_t stones=tri_cd_stones();s_slot=0;
+        while(s_slot<7 && (stones&(1u<<s_slot)))s_slot++;
+        if(s_slot>=7)s_slot=0;
+        tri_bank_select(4);tri_scdss_start(s_slot,stones,half_pipe_done);
+    } else tri_s2ss_start(s_slot < 0 ? 0 : s_slot, half_pipe_done);
 }
 
 /* a giant ring's stage, then the act after it (Sonic 1) */
 void tri_ss_half_pipe_then(uint16_t next) { half_pipe(RET_NEXT_ACT, next); }
+
+/* Practice is entered explicitly through the CD mod's No Save choice. It
+ * returns to that CD stage and never awards durable collectibles/progress. */
+static int s_practice_pending;
+void tri_ss_cd_practice_reset(void){s_practice_pending=s3_cd_ufo_practice;}
+void tri_ss_cd_practice_tick(void)
+{
+    if(s_practice_pending<1 || s_practice_pending>8 || !tri_scd_available() ||
+       (r32(0xFFE660u)&0xFFFFFFu) || !tri_cd_zone(tri_zone()) || r16(RAM_Level_frame_counter)<300)return;
+    int stage=s_practice_pending-1;s_practice_pending=0;
+    s_cd=1;s_slot=stage;s_super=0;s_ret=RET_PRACTICE;s_next=r16(RAM_Current_zone_and_act);
+    tri_bank_select(4);tri_scdss_start(stage,tri_cd_stones(),half_pipe_done);
+}
 
 /* ---- Sonic 2's star posts: the star circle at 50 rings ---------------------- */
 int tri_ss_stars_wanted(void)
@@ -159,9 +190,22 @@ int tri_ss_ring_half_pipe(void)
 /* development (TRILOGY_S2SS=n) */
 void tri_ss_dev(int stage)
 {
+    s_cd=0;
     s_slot = stage;
     s_super = 0;
     s_ret = RET_NEXT_ACT;
     s_next = r16(RAM_Current_zone_and_act);
     tri_s2ss_start(stage, half_pipe_done);
+}
+
+void tri_ss_dev_ufo(int stage)
+{
+#if GEN_ENABLE_TRACE
+    if(!tri_scd_available() || stage<0 || stage>7)return;
+    s_cd=1;s_slot=stage;s_super=0;s_ret=RET_NEXT_ACT;
+    s_next=r16(RAM_Current_zone_and_act);
+    tri_bank_select(4);tri_scdss_start(stage,tri_cd_stones(),half_pipe_done);
+#else
+    (void)stage;
+#endif
 }

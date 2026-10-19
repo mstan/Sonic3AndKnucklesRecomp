@@ -5,6 +5,7 @@ if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
 endif()
 add_compile_definitions(S3_BUILD_VERSION="${S3_BUILD_VERSION}")
+set(GENESIS_GAME_VERSION "${S3_BUILD_VERSION}")
 
 set(CMAKE_C_STANDARD 11)
 

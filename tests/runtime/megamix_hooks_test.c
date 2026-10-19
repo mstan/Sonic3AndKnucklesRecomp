@@ -18,6 +18,12 @@ int *g_rte_pending_ptr=&rte;
 static int active=1;
 static S3VideoWorldCell video;
 void s3_video_set_world_cell(S3VideoWorldCell fn){video=fn;}
+void s3_video_set_world_publish(S3VideoWorldPublish fn){CHECK(!fn);}
+int tri_scd_chunk(int p,int x,int y,uint32_t *d,unsigned *i)
+{(void)p;(void)x;(void)y;(void)d;(void)i;return 0;}
+int tri_scd_video_cell(const uint8_t *r,int x,int y,int b,uint16_t *c)
+{(void)r;(void)x;(void)y;(void)b;(void)c;return 0;}
+void tri_scd_publish(const uint8_t *ram){(void)ram;CHECK(0);}
 int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
 { (void)pixels;(void)bytes;(void)lines;return 1; }
 uint32_t tri_dir(void){return active?0x400040:0;}

@@ -9,7 +9,8 @@ from pathlib import Path
 from run_stage_pack_audit import BOOT,errors
 
 MENU='WAIT 700\nPRESS START 2\nWAIT 90\nPRESS START 2\nWAIT 400\n'
-NAMES=('sonic1','sonic2','megamix')
+NAMES=('sonic1','sonic2','megamix','sonic_cd')
+def bank_name(name):return ('sonic-cd' if name=='sonic_cd' else name)+'-stages.pak'
 
 def slots(path):
     raw=path.read_bytes()
@@ -44,10 +45,10 @@ def main():
         for f in (a.exe,a.exe.parent/'SDL2.dll'):shutil.copy2(f,rt/f.name)
         mods=rt/'mods';mods.mkdir(exist_ok=True)
         for name in NAMES:
-            f=a.packs/(name+'-stages.pak');shutil.copy2(f,mods/f.name)
+            f=a.packs/bank_name(name);shutil.copy2(f,mods/f.name)
         (rt/'settings.ini').write_text(''.join(f'[input.p{i}]\ndevice=0\n' for i in range(1,5)))
         (rt/'debug.ini').write_text('[debug]\nenabled=0\n')
-        (rt/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(f'{name}={(mask>>i)&1}\n{name}_bank=mods/{name}-stages.pak\n' for i,name in enumerate(NAMES)))
+        (rt/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(f'{name}={(mask>>i)&1}\n{name}_bank=mods/{bank_name(name)}\n' for i,name in enumerate(NAMES)))
     def run(rt,case,script):
         case.mkdir(parents=True,exist_ok=True)
         script+=f'WAIT 180\nDUMP_RAM {(case/"stage.ram").as_posix()}\nSCREENSHOT {(case/"stage.png").as_posix()}\nEXIT\n'
@@ -64,10 +65,10 @@ def main():
             errors=errors((case/'run.log').read_text(errors='replace')))
         rec['safe_native']=all(native[i]&128 or (native[i+3]<=14 and native[i+2]>>4<=3) for i in range(0,80,10))
         results.append(rec);return rec
-    for mask in range(8):
+    for mask in range(16):
         case=a.out/f'permutation-{mask}';rt=case/'runtime';runtime(rt,mask)
         script=MENU+('PRESS UP 2\nWAIT 8\n'*4 if mask&4 else '')+'PRESS START 2\nWAIT_RAM8 FFF600 0C\n'
-        rec=run(rt,case,script);rec['expected']='2000' if mask&1 else '2800' if mask&2 else '0000'
+        rec=run(rt,case,script);rec['expected']='2000' if mask&1 else '2800' if mask&2 else '4000' if mask&8 else '0000'
         rec['passed']=rec['stage']==rec['expected'] and rec['mode']==12 and rec['character']==(4 if mask&4 else 0) and rec['safe_native'] and not rec['errors'] and rec['exit']==0
         print(json.dumps(rec),flush=True)
     rt=a.out/'resilience-runtime';runtime(rt,7);seed(rt/'sonic3k-megamix.srm')
@@ -90,13 +91,13 @@ def main():
     # and must not touch the parked journal at all.
     journal_before=journal.read_bytes()
     for name in NAMES:
-        f=rt/'mods'/(name+'-stages.pak');f.rename(f.with_suffix('.pak.off'))
+        f=rt/'mods'/bank_name(name);f.rename(f.with_suffix('.pak.off'))
     rec=run(rt,a.out/'all-packs-missing',MENU+'PRESS UP 2\nWAIT 6\nPRESS START 2\nWAIT_RAM8 FFF600 0C\n')
     rec['journal_untouched']=journal.read_bytes()==journal_before
     rec['passed']=rec['stage']=='0000' and rec['character']==0 and rec['safe_native'] and rec['journal_untouched'] and not rec['errors']
     print(json.dumps(rec),flush=True)
     for name in NAMES:
-        f=rt/'mods'/(name+'-stages.pak.off');f.rename(f.with_suffix(''))
+        f=rt/'mods'/(bank_name(name)+'.off');f.rename(f.with_suffix(''))
     rec=run(rt,a.out/'all-packs-restored',BOOT);rec['passed']=rec['stage']=='3500' and rec['character']==4 and rec['safe_native'] and not rec['errors']
     print(json.dumps(rec),flush=True)
     native=rt/(a.rom.stem+'.srm');shutil.copy2(native,native.with_suffix('.srm.evidence'));native.write_bytes(b'truncated SRAM fixture')
@@ -112,7 +113,7 @@ def main():
             rec=run(rt,case,MENU+'PRESS UP 2\nWAIT 8\n'*4+'PRESS START 2\nWAIT_RAM8 FFF600 0C\n')
             rec['passed']=rec['stage']==('2000' if mask&1 else '2800') and rec['character']==4 and int(rec['map'],16)>=0x400000 and rec['safe_native'] and not rec['errors']
             print(json.dumps(rec),flush=True)
-    provenance=dict(exe=zlib.crc32(a.exe.read_bytes()),packs={n:zlib.crc32((a.packs/(n+'-stages.pak')).read_bytes()) for n in NAMES})
+    provenance=dict(exe=zlib.crc32(a.exe.read_bytes()),packs={n:zlib.crc32((a.packs/bank_name(n)).read_bytes()) for n in NAMES})
     (a.out/'results.json').write_text(json.dumps(dict(provenance=provenance,results=results),indent=2)+'\n')
     return int(not all(r['passed'] for r in results))
 

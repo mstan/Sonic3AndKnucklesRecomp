@@ -8,12 +8,15 @@
  * the game's PSG volume envelopes (S1 9, S2 13) are pointed into S3K
  * envelope slots that no S3K sound effect or trilogy-level jingle uses.
  * Any S3K level restores the driver's own entries.
+ * Sound effects: the Sonic 2 and Sonic CD sound sets, swapped into the
+ * driver while their game's zones and scenes run (below).
  */
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
 #include "genesis_machine.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define Z80_MUSIC_BANKS   0x0B65u   /* z80_MusicBanks: bits 15-22 of the 68k address */
 #define Z80_MUSIC_PTRS    0x1618u   /* z80_MusicPointers: LE Z80 window addresses */
@@ -159,23 +162,33 @@ void tri_music_zone(void)
     if (e) tri_music_play(TRI_SLOT_ZONE, tri_rd8(e + TD_MUSIC));
 }
 
-/* The Sonic 2 sound set (tools/trilogy/s2_sfx.py): while a Sonic 2 zone or
- * scene runs, the driver's three SFX bank switches (`ld a,$1F` then the bank
- * register at $6000) and its SFX pointer table (z80_SFXPointers, $33-$DF)
- * point at the S2 bank: S2's sounds for everything S2 has, S3K's for the
- * rest that can play there, silence otherwise. Anywhere else S3K's own.
- * Judged from the driver's RAM each time (it may have been reloaded). */
+/* Sound sets: Sonic 2's (tools/trilogy/s2_sfx.py, trilogy.bin) while a Sonic 2
+ * zone or scene runs, Sonic CD's (tools/trilogy/scd_sfx.py, scd.bin: placed by
+ * trilogy_core.c) while a Sonic CD level, its time warp or its special stage
+ * does. The driver's three SFX bank switches (`ld a,$1F` then the bank register
+ * at $6000) and its SFX pointer table (z80_SFXPointers, $33-$DF) point at that
+ * game's bank: its sounds for everything it has, S3K's for the rest that can
+ * play there, silence otherwise. Anywhere else, and in S3K's own special and
+ * bonus stages and menus, S3K's own. Each blob: u8 bank byte, u16 LE pointer per
+ * S3K id $33-$DF, then u8 S3K id per game sound id. Judged from the driver's
+ * RAM each time (it may have been reloaded, bringing S3K's back). */
 #define Z80_SFX_PTRS      0x167Eu   /* z80_SFXPointers, from sfx $33 */
 #define SFX_COUNT         (0xDF - 0x33 + 1)
 #define SND_BANK_BYTE     0x1F      /* zmake68kBank($F8000) */
+enum { SET_S3K, SET_S2, SET_CD };
 
-static uint8_t s_sfx_saved[SFX_COUNT * 2];
-static int s_sfx_on;
+static uint8_t s_sfx_saved[SFX_COUNT * 2];   /* S3K's table */
+static int s_set_now;                        /* the set the driver has */
+static int s_set_want;                       /* the set the game wants (put back after driver reloads) */
 
-static uint32_t sound_set(void)
+static uint32_t set_blob(int set)
 {
-    uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
-    uint32_t b = t ? tri_rd32(t + TRI_BLOB_S2_SFX * 4u) : 0;
+    uint32_t b = 0;
+    if (set == SET_S2) {
+        uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
+        b = t ? tri_rd32(t + TRI_BLOB_S2_SFX * 4u) : 0;
+    } else if (set == SET_CD)
+        b = tri_scd_sound();
     return b && tri_rd8(b) ? b : 0;
 }
 
@@ -191,44 +204,85 @@ static int sfx_bank_sites(uint8_t from, uint8_t to)
     return n;
 }
 
-void tri_s2_sound_set(int on)
+static void sound_set_log(int was)                /* (development: TRILOGY_SFXLOG) */
 {
-    uint32_t b = sound_set();
-    if (!b) return;
-    uint8_t bank = tri_rd8(b);
-    uint8_t *tab = zram() + Z80_SFX_PTRS;
-    if (on) {
-        if (sfx_bank_sites(SND_BANK_BYTE, bank)) {   /* (S3K's set loaded: keep its table, load ours) */
-            memcpy(s_sfx_saved, tab, sizeof s_sfx_saved);
-            for (int k = 0; k < SFX_COUNT * 2; k++) tab[k] = tri_rd8(b + 1u + (uint32_t)k);
-        }
-        s_sfx_on = 1;
-    } else {
-        if (sfx_bank_sites(bank, SND_BANK_BYTE)) memcpy(tab, s_sfx_saved, sizeof s_sfx_saved);
-        s_sfx_on = 0;
-    }
+    static int log = -1;
+    if (log < 0) log = getenv("TRILOGY_SFXLOG") != NULL;
+    if (!log || was == s_set_now) return;
+    static const char *const name[] = { "S3K", "S2", "CD" };
+    const uint8_t *t = zram() + Z80_SFX_PTRS;
+    fprintf(stderr, "[sfx] set %s -> %s (zone $%02X, mode $%02X; $62 at $%04X)\n", name[was], name[s_set_now],
+            (unsigned)r8(RAM_Current_zone), (unsigned)r8(RAM_Game_mode), (unsigned)(t[(0x62 - 0x33) * 2] | t[(0x62 - 0x33) * 2 + 1] << 8));
 }
 
-/* the set for where the game is: Sonic 2's in Sonic 2 zones */
+static void sound_set_apply(int set)
+{
+    int was = s_set_now;
+    uint32_t b = set_blob(set);
+    if (!b) set = SET_S3K;                        /* (that game's set not built: S3K's) */
+    uint8_t *tab = zram() + Z80_SFX_PTRS;
+    if (s_set_now != SET_S3K) {
+        uint32_t ob = set_blob(s_set_now);
+        uint8_t obank = ob ? tri_rd8(ob) : SND_BANK_BYTE;
+        if (set == s_set_now && sfx_bank_sites(obank, obank)) return;   /* (in, as wanted) */
+        if (sfx_bank_sites(obank, SND_BANK_BYTE))  /* (still in: S3K's back; else a reload did it) */
+            memcpy(tab, s_sfx_saved, sizeof s_sfx_saved);
+        s_set_now = SET_S3K;
+    }
+    if (set != SET_S3K && sfx_bank_sites(SND_BANK_BYTE, tri_rd8(b))) {   /* (S3K's set loaded: keep its table, load ours) */
+        memcpy(s_sfx_saved, tab, sizeof s_sfx_saved);
+        for (int k = 0; k < SFX_COUNT * 2; k++) tab[k] = tri_rd8(b + 1u + (uint32_t)k);
+        s_set_now = set;
+    }
+    sound_set_log(was);
+}
+
+static void sound_set_want(int set, int on)
+{
+    if (on) s_set_want = set;
+    else if (s_set_want == set) s_set_want = SET_S3K;
+    else return;
+    sound_set_apply(s_set_want);
+}
+
+void tri_s2_sound_set(int on) { sound_set_want(SET_S2, on); }
+void tri_scd_sound_set(int on) { sound_set_want(SET_CD, on); }
+
+/* the set for where the game is: Sonic 2's in Sonic 2 zones, Sonic CD's in its levels */
 void tri_sound_set_for_zone(void)
 {
     uint32_t e = tri_dir();
-    tri_s2_sound_set(e && tri_rd8(e + TD_GAME) == TRI_GAME_S2);
+    int g = e ? tri_rd8(e + TD_GAME) : TRI_GAME_S3K;
+    s_set_want = g == TRI_GAME_S2 ? SET_S2 : g == TRI_GAME_CD ? SET_CD : SET_S3K;
+    sound_set_apply(s_set_want);
 }
 
 /* every frame: S3K reloads its driver (level loads, title...), which brings back
- * S3K's bank and table; while the S2 set is wanted it goes straight back in */
+ * S3K's bank and table; while another set is wanted it goes straight back in.
+ * Only in a level ($08 demo, $0C) or one of the trilogy's scenes ($10): S3K's
+ * special stage, bonus stages and menus play S3K's own sounds */
 void tri_sound_set_tick(void)
 {
-    if (s_sfx_on) tri_s2_sound_set(1);
+    int mode = r8(RAM_Game_mode) & 0x7F;
+    int set = mode == 0x08 || mode == 0x0C || mode == 0x10 ? s_set_want : SET_S3K;
+    if (set != SET_S3K || s_set_now != SET_S3K) sound_set_apply(set);
 }
 
-int tri_s2_sound_set_on(void) { return s_sfx_on; }
+int tri_sound_set_foreign(void) { return s_set_now != SET_S3K; }
+int tri_scd_sound_set_on(void) { return s_set_now == SET_CD; }
 
 /* a Sonic 2 sound (SndID_*) -> the id it plays at in the S2 set (0: none) */
 int tri_s2_sfx_id(int sndid)
 {
-    uint32_t b = sound_set();
+    uint32_t b = set_blob(SET_S2);
     if (!b || sndid < 0xA0 || sndid > 0xF0) return 0;
     return tri_rd8(b + 1u + SFX_COUNT * 2u + (uint32_t)(sndid - 0xA0));
+}
+
+/* a Sonic CD FM sound ($90-$DF) -> the id it plays at in the CD set (0: none) */
+int tri_scd_sfx_id(int fm)
+{
+    uint32_t b = set_blob(SET_CD);
+    if (!b || fm < 0x90 || fm > 0xDF) return 0;
+    return tri_rd8(b + 1u + SFX_COUNT * 2u + (uint32_t)(fm - 0x90));
 }

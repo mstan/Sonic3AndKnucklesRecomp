@@ -1,4 +1,5 @@
 #include "stage_pack.h"
+#include "scd_resource.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,27 +8,30 @@
 #endif
 
 int s3_stage_pack_enabled,s3_stage_pack_sonic1,s3_stage_pack_sonic2;
-int s3_stage_pack_megamix,s3_stage_pack_mighty;
-int s3_pack_requested[3],s3_pack_available[3];
-char s3_pack_paths[3][1024],s3_stage_pack_path[1024];
-static char s_settings[1024],s_error[256],s_status[3][256];
-static int s_checked[3],s_verified[3];
-static const char *keys[]={"sonic1","sonic2","megamix"};
+int s3_stage_pack_megamix,s3_stage_pack_mighty,s3_stage_pack_cd;
+int s3_cd_ufo_practice;
+int s3_pack_requested[4],s3_pack_available[4];
+char s3_pack_paths[4][1024],s3_stage_pack_path[1024],s3_cd_audio_path[1024];
+static char s_settings[1024],s_error[256],s_status[4][256],s_music_status[256];
+static int s_checked[4],s_verified[4],s_music_checked,s_music_verified;
+static const char *keys[]={"sonic1","sonic2","megamix","sonic_cd"};
 
 void s3_pack_refresh(void)
 {
     memset(s_checked,0,sizeof s_checked);
-    for(int i=0;i<3;i++)s3_pack_available[i]=s3_pack_requested[i] &&
+    for(int i=0;i<4;i++)s3_pack_available[i]=s3_pack_requested[i] &&
         s3_pack_validate(s3_pack_paths[i],i+1,s_status[i],sizeof s_status[i]);
     s3_stage_pack_sonic1=s3_pack_available[0];
     s3_stage_pack_sonic2=s3_pack_available[1];
     s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
-    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix;
+    s3_stage_pack_cd=s3_pack_available[3];
+    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_cd;
 }
 void s3_stage_pack_load(const char *settings)
 {
     memset(s3_pack_requested,0,sizeof s3_pack_requested);
     memset(s3_pack_paths,0,sizeof s3_pack_paths);s3_stage_pack_path[0]=0;
+    s3_cd_audio_path[0]=0;s_music_checked=0;s3_cd_ufo_practice=0;
     snprintf(s_settings,sizeof s_settings,"%s",settings?settings:"settings.ini");
     char *a=strrchr(s_settings,'/'),*b=strrchr(s_settings,'\\');
     char *name=a&&(!b||a>b)?a+1:b?b+1:s_settings;
@@ -40,7 +44,11 @@ void s3_stage_pack_load(const char *settings)
         if(!strcmp(line,"enabled=1"))legacy=1;
         if(!strcmp(line,"megamix=1"))mm=1;
         if(!strncmp(line,"bank=",5))snprintf(s3_stage_pack_path,sizeof s3_stage_pack_path,"%s",line+5);
-        for(int i=0;i<3;i++) {
+        if(!strncmp(line,"sonic_cd_audio=",15))snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"%s",line+15);
+        if(!strncmp(line,"sonic_cd_ufo_practice=",22)) {
+            int value=atoi(line+22);if(value>=0 && value<=8)s3_cd_ufo_practice=value;
+        }
+        for(int i=0;i<4;i++) {
             char key[32];snprintf(key,sizeof key,"%s=",keys[i]);
             if(!strncmp(line,key,strlen(key)))s3_pack_requested[i]=atoi(line+strlen(key))!=0;
             snprintf(key,sizeof key,"%s_bank=",keys[i]);
@@ -52,8 +60,11 @@ void s3_stage_pack_load(const char *settings)
         s3_pack_requested[0]=s3_pack_requested[1]=1;s3_pack_requested[2]=mm;
         for(int i=0;i<3;i++)snprintf(s3_pack_paths[i],1024,"%s",s3_stage_pack_path);
     }
-    for(int i=0;i<3;i++) {
-        if(!s3_pack_paths[i][0])snprintf(s3_pack_paths[i],1024,"mods/%s-stages.pak",keys[i]);
+    for(int i=0;i<4;i++) {
+        if(!s3_pack_paths[i][0]) {
+            if(i==3)snprintf(s3_pack_paths[i],1024,"mods/sonic-cd-stages.pak");
+            else snprintf(s3_pack_paths[i],1024,"mods/%s-stages.pak",keys[i]);
+        }
         if(s3_pack_paths[i][0]!='/' && s3_pack_paths[i][0]!='\\' && s3_pack_paths[i][1]!=':') {
             char relative[1024];snprintf(relative,sizeof relative,"%s",s3_pack_paths[i]);
             size_t prefix=(size_t)(name-s_settings);
@@ -61,6 +72,12 @@ void s3_stage_pack_load(const char *settings)
                 memcpy(s3_pack_paths[i],s_settings,prefix);strcpy(s3_pack_paths[i]+prefix,relative);
             }
         }
+    }
+    if(!s3_cd_audio_path[0])snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"mods/sonic-cd-audio.pak");
+    if(s3_cd_audio_path[0]!='/' && s3_cd_audio_path[0]!='\\' && s3_cd_audio_path[1]!=':') {
+        char relative[1024];snprintf(relative,sizeof relative,"%s",s3_cd_audio_path);
+        size_t prefix=(size_t)(name-s_settings);
+        if(prefix+strlen(relative)<1024){memcpy(s3_cd_audio_path,s_settings,prefix);strcpy(s3_cd_audio_path+prefix,relative);}
     }
     s3_pack_refresh();
 }
@@ -71,20 +88,21 @@ const char *s3_stage_pack_sram(void) { return NULL; }
 #if RECOMP_LAUNCHER
 #include "recomp_launcher.h"
 #define COPY(dst,src) snprintf(dst,sizeof(dst),"%s",src)
-static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix"};
-static const char *names[]={"Sonic 1 stages (Experimental)","Sonic 2 stages (Experimental)","Sonic Megamix + Mighty (Experimental)"};
+static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix","sonic3.sonic-cd"};
+static const char *names[]={"Sonic 1 stages (Experimental)","Sonic 2 stages (Experimental)","Sonic Megamix + Mighty (Experimental)","Sonic CD stages (Experimental)"};
 static const char *descs[]={
     "Add all Sonic 1 stages before Sonic 3 & Knuckles. Works independently or with the other campaign packs.",
     "Add all Sonic 2 stages before Sonic 3 & Knuckles, after Sonic 1 when installed.",
-    "Add all 19 Megamix v3 acts after Sonic 3 & Knuckles and always add Mighty and Mighty & Tails to character selection. Works independently of Sonic 1 and Sonic 2 packs."};
+    "Add all 19 Megamix v3 acts after Sonic 3 & Knuckles and always add Mighty and Mighty & Tails to character selection. Works independently of Sonic 1 and Sonic 2 packs.",
+    "Add Sonic CD between Sonic 2 and Sonic 3 & Knuckles, with time travel and UFO special stages. Works independently of the other campaign packs."};
 static const RecompLauncherCModProvider *base;
-static int index_of(const char *p) { if(p)for(int i=0;i<3;i++)if(!strcmp(p,ids[i]))return i;return -1; }
+static int index_of(const char *p) { if(p)for(int i=0;i<4;i++)if(!strcmp(p,ids[i]))return i;return -1; }
 static int own(const char *p,const char *f) { return index_of(p)>=0 && f && !strcmp(f,"campaign"); }
-static int packages(void *c) { (void)c;return 3+(base&&base->package_count?base->package_count(base->ctx):0); }
-static int features(void *c) { (void)c;return 3+(base&&base->feature_count?base->feature_count(base->ctx):0); }
+static int packages(void *c) { (void)c;return 4+(base&&base->package_count?base->package_count(base->ctx):0); }
+static int features(void *c) { (void)c;return 4+(base&&base->feature_count?base->feature_count(base->ctx):0); }
 static int package_get(void *c,int i,RecompLauncherCModPackage *o)
 {
-    (void)c;if(i>=3)return base&&base->package_get&&base->package_get(base->ctx,i-3,o);
+    (void)c;if(i>=4)return base&&base->package_get&&base->package_get(base->ctx,i-4,o);
     if(i<0||!o)return 0;
     memset(o,0,sizeof *o);COPY(o->id,ids[i]);COPY(o->name,names[i]);COPY(o->version,"0.2.0-experimental");
     COPY(o->author,i==2?"Team Megamix; Sonic3AndKnucklesRecomp contributors":"sonsegajp; Sonic3AndKnucklesRecomp contributors");
@@ -94,14 +112,14 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
 }
 static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
 {
-    if(i>=3)return base&&base->feature_get&&base->feature_get(base->ctx,i-3,o);
+    if(i>=4)return base&&base->feature_get&&base->feature_get(base->ctx,i-4,o);
     RecompLauncherCModPackage p;if(i<0||!o||!package_get(c,i,&p))return 0;
     memset(o,0,sizeof *o);COPY(o->id,"campaign");COPY(o->package_id,p.id);COPY(o->package_name,p.name);
     COPY(o->name,names[i]);COPY(o->package_version,p.version);COPY(o->author,p.author);
     COPY(o->description,descs[i]);COPY(o->group,"Stages");COPY(o->status,p.status);
     COPY(o->source_name,i==2?"Team Megamix v3":"SonicTrilogy stage reference");
     COPY(o->source_url,i==2?"https://www.headcannon.com/TeamMegamix/":"https://github.com/sonsegajp/SonicTrilogy");
-    o->enabled=s3_pack_requested[i];o->channel=RECOMP_MOD_CHANNEL_EXPERIMENTAL;return 1;
+    o->enabled=s3_pack_requested[i];o->channel=RECOMP_MOD_CHANNEL_EXPERIMENTAL;o->option_count=i==3?1:0;return 1;
 }
 static int set_enabled(void *c,const char *p,int on)
 {
@@ -111,11 +129,22 @@ static int set_enabled(void *c,const char *p,int on)
 static int feature_enable(void *c,const char *p,const char *f,int on)
 { return index_of(p)<0?base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on):own(p,f)&&set_enabled(c,p,on); }
 static int resource_count(void *c,const char *p,const char *f)
-{ (void)c;return index_of(p)>=0?own(p,f):base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0; }
+{ (void)c;return index_of(p)>=0?(own(p,f)?(index_of(p)==3?2:1):0):base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0; }
 static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncherCModResource *o)
 {
     (void)c;int i=index_of(p);if(i<0)return base&&base->feature_resource_get&&base->feature_resource_get(base->ctx,p,f,n,o);
-    if(!own(p,f)||n||!o)return 0;
+    if(!own(p,f)||!o||n<0||n>(i==3?1:0))return 0;
+    if(n==1) {
+        memset(o,0,sizeof *o);COPY(o->id,"cd-music");COPY(o->label,"CD music");
+        COPY(o->description,"Present and future music from your converted disc. Missing music leaves stages, past music and voices available.");
+        COPY(o->path,s3_cd_audio_path);COPY(o->file_patterns,"*.pak");COPY(o->file_description,"Converted Sonic CD music");
+        if(!s_music_checked) {
+            ScdResource music={0};s_music_verified=scd_resource_open(&music,s3_cd_audio_path,1,s_music_status,sizeof s_music_status);
+            scd_resource_close(&music);s_music_checked=1;
+        }
+        o->required=0;o->verified=s_music_verified;
+        COPY(o->status,s_music_verified?"Verified music resource":"Music unavailable; stage progress retained");return 1;
+    }
     memset(o,0,sizeof *o);COPY(o->id,"stage-bank");COPY(o->label,"Campaign content pack");
     COPY(o->description,"Choose your locally converted content pack. Missing packs are skipped; saves and the selected path are retained.");
     COPY(o->path,s3_pack_paths[i]);COPY(o->file_patterns,"*.pak,*.bin");COPY(o->file_description,"Converted campaign content");
@@ -129,16 +158,39 @@ static int resource_set(void *c,const char *p,const char *f,const char *r,const 
 {
     (void)c;int i=index_of(p);s_error[0]=0;
     if(i<0)return base&&base->feature_resource_set_path&&base->feature_resource_set_path(base->ctx,p,f,r,path);
+    if(i==3 && own(p,f) && r && !strcmp(r,"cd-music")) {
+        if(!path || strlen(path)>=1024 || strchr(path,'\n') || strchr(path,'\r'))return 0;
+        ScdResource music={0};
+        if(*path && !scd_resource_open(&music,path,1,s_error,sizeof s_error))return 0;
+        scd_resource_close(&music);snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"%s",path);s_music_checked=0;return 1;
+    }
     if(!own(p,f)||!r||strcmp(r,"stage-bank")||!path||strlen(path)>=1024||strchr(path,'\n')||strchr(path,'\r'))return 0;
     if(*path&&!s3_pack_validate(path,i+1,s_error,sizeof s_error))return 0;
     snprintf(s3_pack_paths[i],1024,"%s",path);s3_pack_refresh();return 1;
 }
 static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCModOption *o)
-{ (void)c;return index_of(p)<0&&base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o); }
+{
+    (void)c;if(index_of(p)<0)return base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o);
+    if(index_of(p)!=3 || !own(p,f) || i || !o)return 0;
+    memset(o,0,sizeof *o);COPY(o->id,"ufo-practice");COPY(o->label,"UFO practice");
+    COPY(o->description,"Choose a UFO stage, then start No Save. Practice returns to Palmtree Panic and awards no Time Stones. Saved games keep their normal campaign.");
+    snprintf(o->value,sizeof o->value,"%d",s3_cd_ufo_practice);COPY(o->default_value,"0");
+    o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=9;return 1;
+}
 static int choice_get(void *c,const char *p,const char *f,const char *o,int i,RecompLauncherCModChoice *v)
-{ (void)c;return index_of(p)<0&&base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,o,i,v); }
+{
+    (void)c;if(index_of(p)<0)return base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,o,i,v);
+    if(index_of(p)!=3 || !own(p,f) || !o || strcmp(o,"ufo-practice") || i<0 || i>8 || !v)return 0;
+    memset(v,0,sizeof *v);snprintf(v->value,sizeof v->value,"%d",i);
+    if(i)snprintf(v->label,sizeof v->label,i==8?"UFO stage 8 (secret)":"UFO stage %d",i);
+    else COPY(v->label,"Normal campaign");return 1;
+}
 static int set_option(void *c,const char *p,const char *f,const char *o,const char *v)
-{ (void)c;return index_of(p)<0&&base&&base->feature_set_option&&base->feature_set_option(base->ctx,p,f,o,v); }
+{
+    (void)c;if(index_of(p)<0)return base&&base->feature_set_option&&base->feature_set_option(base->ctx,p,f,o,v);
+    if(index_of(p)!=3 || !own(p,f) || !o || strcmp(o,"ufo-practice") || !v || v[0]<'0' || v[0]>'8' || v[1])return 0;
+    s3_cd_ufo_practice=v[0]-'0';return 1;
+}
 static int commit(void *c,const char *image)
 {
     (void)c;s_error[0]=0;
@@ -146,7 +198,8 @@ static int commit(void *c,const char *image)
     char tmp[1040];snprintf(tmp,sizeof tmp,"%s.tmp",s_settings);
     FILE *f=fopen(tmp,"wb");if(!f)goto fail;
     fprintf(f,"format=2\n");
-    for(int i=0;i<3;i++)fprintf(f,"%s=%d\n%s_bank=%s\n",keys[i],s3_pack_requested[i],keys[i],s3_pack_paths[i]);
+    for(int i=0;i<4;i++)fprintf(f,"%s=%d\n%s_bank=%s\n",keys[i],s3_pack_requested[i],keys[i],s3_pack_paths[i]);
+    fprintf(f,"sonic_cd_audio=%s\nsonic_cd_ufo_practice=%d\n",s3_cd_audio_path,s3_cd_ufo_practice);
     int ok=!ferror(f);if(fclose(f))ok=0;
 #ifdef _WIN32
     if(ok)ok=MoveFileExA(tmp,s_settings,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;

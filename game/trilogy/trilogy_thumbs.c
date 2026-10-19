@@ -15,6 +15,9 @@
 #include "stage_pack.h"
 #include "genesis_machine.h"
 #include "megamix_geometry.h"
+#include "scd_geometry.h"
+#include "scd_pack.h"
+extern const ScdPack *tri_scd_pack(void);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,6 +41,7 @@ static uint16_t s_cpal[16];
 static uint8_t s_tiles[70 * 32];
 static int s_pending;
 static MegamixGeometry s_mm;
+static ScdGeometry s_cd;
 
 /* ---- Kosinski (S3K Kos_Decomp) from the 68K address space ---------------- */
 static uint32_t kos_end;                             /* where the last stream ended */
@@ -119,6 +123,8 @@ static int chunk_at(int bg, int x, int y)
 }
 static uint16_t chunk_word(int bg, int x, int y)
 {
+    uint16_t cd_cell;
+    if(scd_geometry_cell(&s_cd,x,y,bg,0x7C,&cd_cell))return cd_cell;
     if(s_mm.layout)return megamix_geometry_cell(&s_mm,bg,x,y,bg);
     int ch = chunk_at(bg, x, y);
     uint32_t o = (uint32_t)ch * 128u + (uint32_t)(((y >> 4) & 7) * 16 + ((x >> 4) & 7) * 2);
@@ -256,6 +262,7 @@ static void load_zone(int code)
     s_code = code;
     s_ok = 0;
     memset(&s_mm,0,sizeof s_mm);
+    memset(&s_cd,0,sizeof s_cd);
     uint16_t za = tri_code_to_za(code);
     int zone = za >> 8, act = za & 0xFF;
     uint32_t llb, lay, sizes, start;
@@ -266,6 +273,8 @@ static void load_zone(int code)
         lay = tri_rd32(dir + TD_LAYOUT);
         sizes = dir + TD_SIZES;
         start = dir + TD_START_S;
+        if(tri_rd8(dir+TD_GAME)==TRI_GAME_CD)
+            s_cd.blob=scd_pack_level(tri_scd_pack(),za,&s_cd.size);
         if(tri_rd8(dir+TD_GAME)==TRI_GAME_MEGAMIX) {
             uint32_t info=tri_rd32(dir+TD_EXTRA);
             uint32_t layout=tri_rd32(info+4)-TRI_BANK_BASE,chunks=tri_rd32(info+12)-TRI_BANK_BASE;
@@ -299,7 +308,9 @@ static void load_zone(int code)
     memset(s_pal, 0, sizeof s_pal);
     for (int k = 0; k < 16; k++) s_pal[k] = tri_rd16(S3K_Pal_SonicTails + (uint32_t)k * 2u);
     int pid = tri_rd8(llb + 8);
-    uint32_t pe = pid >= TRI_PAL_BASE ? tri_rd32(TRI_BANK_BASE + TB_PALPOINT) + (uint32_t)(pid - TRI_PAL_BASE) * 8u
+    uint32_t pe = s_cd.blob && pid >= TRI_PAL_CD
+        ? tri_rd32(tri_dir_for(zone,act)+0x40)+(uint32_t)(pid-TRI_PAL_CD)*8u
+        : pid >= TRI_PAL_BASE ? tri_rd32(TRI_BANK_BASE + TB_PALPOINT) + (uint32_t)(pid - TRI_PAL_BASE) * 8u
                                       : S3K_PalPoint + (uint32_t)pid * 8u;
     uint32_t src = tri_rd32(pe);
     int dst = (tri_rd16(pe + 4) - 0xFC00) / 2, cnt = (tri_rd16(pe + 6) + 1) * 2;
@@ -556,6 +567,7 @@ static void thumb_show(int code)
 void tri_thumb_show(int code)
 {
     int previous=tri_bank_select(tri_stage_content(tri_code_to_za(code)));
+    if(tri_stage_content(tri_code_to_za(code))==4)tri_scd_map(tri_code_to_za(code));
     thumb_show(code);
     tri_bank_select(previous);
 }

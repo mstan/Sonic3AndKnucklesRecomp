@@ -29,6 +29,7 @@
 #define CODE_S2         7
 #define CODE_S3K        18
 #define CODE_MM         32
+#define CODE_CD         40
 #define CODE_CLEAR      campaign_count(tri_campaign_mask())
 static int mm_after_credits;
 static const uint16_t k_mm_zones[7]={0x3400,0x3600,0x3800,0x3500,0x3700,0x3900,0x3902};
@@ -49,6 +50,11 @@ uint16_t tri_code_to_za(int code)
     if (code < CODE_S3K) return (uint16_t)((0x28 + code - CODE_S2) << 8);
     if (code < CODE_MM) return k_s3k_zones[code - CODE_S3K];
     if(s3_stage_pack_megamix && code<39)return k_mm_zones[code-CODE_MM];
+    if(code>=CODE_CD && code<110) {
+        unsigned row=(unsigned)(code-CODE_CD),round=row/10,k=row%10;
+        unsigned period=k<2?0:k<4?1:k<7?2:3,act=k-(period==0?0:period==1?2:period==2?4:7);
+        return (uint16_t)((TRI_CD_ZONE(round,period)<<8)|act);
+    }
     return 0;
 }
 
@@ -58,6 +64,12 @@ int tri_za_to_code(uint16_t za)
     extern uint16_t tri_apparent(uint16_t za);
     uint16_t ap = tri_apparent(za);
     int z = ap >> 8;
+    if(tri_cd_zone(z)) {
+        unsigned period=(unsigned)(z-TRI_CD_BASE)&3,act=za&255;
+        if(act>2 || (act==2 && period<2))return -1;
+        return campaign_display(tri_campaign_mask(),CODE_CD+((z-TRI_CD_BASE)/4)*10+
+            (period==0?0:period==1?2:period==2?4:7)+(int)act);
+    }
     static const int8_t s1[7] = { 0, 3, 1, 4, 2, 5, 6 };                /* $20 GHZ, $21 LZ, $22 MZ ... $26 FZ */
     if (z >= 0x20 && z <= 0x26) return campaign_display(tri_campaign_mask(),s1[z - 0x20]);
     if (z >= 0x28 && z <= 0x32) return campaign_display(tri_campaign_mask(),CODE_S2 + z - 0x28);
@@ -111,6 +123,7 @@ void tri_save_progress(uint16_t next_za)
     uint32_t a1 = slot();
     if (!a1) return;
     int code = tri_za_to_code(next_za);
+    if(code<0)return;
     if (!(r8(a1) & 3) || code >= r8(a1 + 3)) {     /* (a finished file replaying an earlier zone stays finished) */
         w8(a1, (uint8_t)(r8(a1) & 0xFC));
         w8(a1 + 3, (uint8_t)code);
@@ -162,6 +175,12 @@ void tri_save_megamix_complete(void)
 }
 
 void tri_thumb_show(int code);
+static int display_number(unsigned display)
+{
+    unsigned mask=tri_campaign_mask();int stable=campaign_stable(mask,(int)display);
+    if(stable>=40)return stable-39;
+    int old=campaign_display(mask&~8u,stable);return old>=0?old+1:1;
+}
 
 int tri_save_hook(uint32_t pc)
 {
@@ -179,7 +198,13 @@ int tri_save_hook(uint32_t pc)
         if (!tri_dir()) save_game_s3k();
         return 1;                                    /* (S1/S2 zones save on their own zone clears) */
     case TH_DS_NOSAVE_START:
+        if(s3_stage_pack_cd && s3_cd_ufo_practice) {
+            extern void tri_ss_cd_practice_reset(void);tri_ss_cd_practice_reset();
+            {extern void tri_cd_save_select(void);tri_cd_save_select();}
+            w16(RAM_Current_zone_and_act,0x4000);w16(RAM_Apparent_zone_and_act,0x4000);return 0;
+        }
     case TH_DS_NEWGAME:                              /* a new game starts with Sonic 1 */
+        {extern void tri_cd_save_select(void);tri_cd_save_select();}
         w16(RAM_Current_zone_and_act, tri_code_to_za(0));
         w16(RAM_Apparent_zone_and_act, tri_code_to_za(0));
         return 0;
@@ -187,18 +212,19 @@ int tri_save_hook(uint32_t pc)
         D(6) = (D(6) & 0xFFFF0000u) | (uint16_t)(CODE_CLEAR-1);
         return 0;
     case TH_DS_CODE_TO_ZONE: {
+        {extern void tri_cd_save_select(void);tri_cd_save_select();}
         int code = D(0) & 0xFF;
         D(0) = (D(0) & 0xFFFF0000u) | tri_code_to_za(code);
         return 1;
     }
     case TH_DS_ZONE_TENS: {                          /* "ZONE n": the trilogy's own numbering, 1-32 */
-        int n = (int)((D(0) & 0xFFFF) >> 1) + 1;
+        int n = display_number((D(0)&0xFFFF)>>1);
         if (n / 10) { D(1) = (D(1) & 0xFFFFFF00u) | (uint8_t)(n / 10); g_cpu.SR &= ~8u; }
         else { D(1) = (D(1) & 0xFFFFFF00u) | 0xFF; g_cpu.SR |= 8u; }   /* (blank: the bpl reads N) */
         return 0;
     }
     case TH_DS_ZONE_UNITS:
-        D(1) = (D(1) & 0xFFFFFF00u) | (uint8_t)(((D(0) & 0xFFFF) / 2 + 1) % 10);
+        D(1) = (D(1) & 0xFFFFFF00u) | (uint8_t)(display_number((D(0)&0xFFFF)/2)%10);
         return 0;
     case TH_RENDER_HUD: {                            /* (no HUD while the zone cards are recorded) */
         static int glide = -1;

@@ -1,6 +1,7 @@
 /* Local converted data is integrity-checked before any hooks or save loading.
  * SPK1 footer: payload length and CRC32, both big endian. */
 #include "stage_pack.h"
+#include "scd_pack.h"
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,6 +19,7 @@ static uint32_t crc32(const uint8_t *p, size_t n)
 }
 int s3_pack_validate(const char *path, int content, char *error, unsigned capacity)
 {
+    if(content==4)return scd_pack_validate(path,error,capacity);
     const char *message = "Choose a Sonic 1 & 2 stage bank built with tools/build_stage_pack.py";
     uint8_t *data = NULL;
     FILE *f = path && *path ? fopen(path,"rb") : NULL;

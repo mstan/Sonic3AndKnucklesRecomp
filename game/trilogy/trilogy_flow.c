@@ -8,6 +8,7 @@
  */
 #include "trilogy_obj.h"
 #include "trilogy_assets_s2.h"
+#include "scd.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -50,6 +51,8 @@ static int s_ss_advance;          /* back from the special stage: next act */
 int tri_sbz2_open;                /* SBZ2 tally done: boundary opening (s1dle) */
 static int s_sbz2_ss;             /* SBZ2's giant ring entered: its stage before SBZ3 */
 static int s_results_started, s_results_finished;
+static int s_runoff;              /* the tally's run off screen: bit 0 Player 1, bit 1 Player 2;
+                                   * bits 2, 3: gone (off screen, held there) */
 
 static uint32_t find_obj(uint32_t code)
 {
@@ -94,7 +97,7 @@ static void ss_enter(uint16_t next)
 {
     s_ss_pending = 0;
     extern int tri_ss_half_pipe(int game);
-    if (tri_ss_half_pipe(TRI_GAME_S1)) {             /* SPECIAL STAGES: the half-pipe, then the next act */
+    if (tri_ss_half_pipe(tri_rd8(tri_dir() + TD_GAME))) {   /* SPECIAL STAGES: the half-pipe / UFOs, then the next act */
         extern void tri_ss_half_pipe_then(uint16_t next);
         tri_jsr(S3K_Clear_SpriteRingMem);
         tri_ss_half_pipe_then(next);
@@ -134,6 +137,7 @@ void tri_flow_level_entry(void)
         ring_za = za;
     }
     tri_sbz2_open = 0;
+    s_runoff = 0;
     if (za != 0x2501) s_sbz2_ss = 0;
     w8(RAM_Disable_death_plane, 0);
     if (!s_ss_advance) return;
@@ -147,6 +151,15 @@ uint16_t tri_next_act(uint16_t za)
     static const uint16_t megamix[]={0x3400,0x3401,0x3402,0x3600,0x3601,0x3602,
         0x3800,0x3801,0x3802,0x3500,0x3501,0x3502,0x3700,0x3701,0x3702,0x3900,0x3901,0x3503,0x3902};
     for(unsigned i=0;i+1<sizeof megamix/sizeof megamix[0];i++)if(megamix[i]==za)return megamix[i+1];
+    int z = za >> 8, act = za & 0xFF;
+    if (tri_cd_zone(z)) {                        /* Sonic CD: acts 1, 2 in the present, then act 3's future */
+        int round = (z - TRI_CD_BASE) / 4;
+        extern int scd_act3_good(int round);
+        if (act == 0) return (uint16_t)((TRI_CD_ZONE(round, TRI_CD_PRESENT) << 8) | 1);   /* (each act starts in the present) */
+        if (act == 1)                                /* (Results: good futures in acts 1 and 2 -> act 3's) */
+            return (uint16_t)((TRI_CD_ZONE(round, scd_act3_good(round) ? TRI_CD_GOOD : TRI_CD_BAD) << 8) | 2);
+        return round < 6 ? (uint16_t)(TRI_CD_ZONE(round + 1, TRI_CD_PRESENT) << 8) : 0;
+    }
     for (unsigned i = 0; i + 1 < sizeof s1_order / sizeof s1_order[0]; i++)
         if (s1_order[i] == za)
             return s1_order[i + 1];
@@ -177,8 +190,8 @@ void tri_s1_complete(void)
         fprintf(stderr,"[megamix] Final Fight escape complete: campaign finished\n");
         return;
     }
-    extern int s3_stage_pack_sonic2;
-    uint16_t next=s3_stage_pack_sonic2?0x2800:0;
+    extern int s3_stage_pack_sonic2,s3_stage_pack_cd;
+    uint16_t next=s3_stage_pack_sonic2?0x2800:s3_stage_pack_cd?0x4000:0;
     fprintf(stderr, "[stage-pack] Sonic 1 complete: next campaign %04X\n",next);
     tri_ach_act_clear(0x2502);
     w16(RAM_Current_zone_and_act, next);
@@ -239,6 +252,18 @@ static int results_done(void)
         return 1;
     }
     uint16_t next = tri_next_act(za);
+    if (!next && tri_cd_zone(za >> 8)) {
+        extern void scd_audio_reset(void);
+        extern void tri_save_progress(uint16_t);
+        fprintf(stderr, "[trilogy] Sonic CD complete after $%04X -> Angel Island\n", za);
+        scd_audio_reset();
+        s_ss_pending = 0;
+        w16(RAM_Current_zone_and_act,0);w16(RAM_Apparent_zone_and_act,0);
+        w8(RAM_Last_star_post_hit,0);w16(RAM_Restart_level_flag,1);w8(RAM_Game_mode,0x0C);
+        tri_save_progress(0);
+        o_delete(A(0) & 0xFFFFFF);
+        return 1;
+    }
     if (!next) {
         fprintf(stderr, "[trilogy] campaign complete after $%04X\n", za);
         next = za;                               /* ending handled later */
@@ -262,9 +287,83 @@ static int results_done(void)
     return 1;
 }
 
+/* ------------------------------------------------------------------------
+ * The act's end with Sonic 1 / 2 / CD sprites in their games' levels: those
+ * games' players run off to the right during the tally (S1 Sign_SonicRun,
+ * S2 Obj0D, CD's goal post holding right) instead of S3K's ending pose. The
+ * right boundary gives them $40 more outside boss arenas, as in S1 and S2's
+ * Sonic_LevelBound (and the wider screen's extra). Off the screen (past
+ * its right edge, or fallen below it) a runner is gone: held where he is,
+ * out of play; nothing kills him meanwhile (Disable_death_plane), so a pit
+ * past the sign never restarts the act.
+ * ---------------------------------------------------------------------- */
+static int runoff_wanted(void)
+{
+    return tri_dir() && tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_CD;
+}
+
+static int runoff_gone(uint32_t p)                   /* (off the screen: right, or below) */
+{
+    extern int s3_video_canvas_width(void);
+    int extra = s3_video_canvas_width() - 320;
+    int dx = (int16_t)(OB16(p, OBJ_x_pos) - r16(RAM_Camera_X_pos));
+    int dy = (int16_t)(OB16(p, OBJ_y_pos) - r16(RAM_Camera_Y_pos));
+    return dx >= 320 + (extra > 0 ? extra : 0) + 24 || dy >= 224 + 48;
+}
+
+static void runoff_tick(void)
+{
+    if (!s_runoff) return;
+    w8(RAM_Disable_death_plane, 1);
+    for (int n = 0; n < 2; n++) {
+        uint32_t p = n ? RAM_Player_2 : RAM_Player_1;
+        if (!(s_runoff & (1 << n))) continue;
+        if (!(s_runoff & (4 << n)) && runoff_gone(p)) s_runoff |= 4 << n;
+        if (s_runoff & (4 << n)) {                   /* gone: still, out of play */
+            SET8(p, 0x2E, 0x81);                     /* object_control */
+            SET16(p, OBJ_x_vel, 0);
+            SET16(p, OBJ_y_vel, 0);
+            SET16(p, 0x1C, 0);                       /* ground_vel */
+            continue;
+        }
+        if (n) {
+            w8(RAM_Ctrl_2_locked, 0xFF);             /* (negative: no CPU steering) */
+            w16(0xFFF66Au, 0x0800);                  /* Ctrl_2_logical: right held */
+        } else {
+            w8(RAM_Ctrl_1_locked, 1);
+            w16(0xFFF602u, 0x0800);                  /* Ctrl_1_logical: right held */
+        }
+        SET8(p, 0x2E, 0);                            /* object_control */
+    }
+}
+
 int tri_flow_hook(uint32_t pc)
 {
     switch (pc) {
+    case TH_ENDING_POSE: {
+        if(!tri_cd_zone(tri_zone()))return 0;
+        uint32_t a1 = A(1) & 0xFFFFFFu;
+        int bit = a1 == RAM_Player_1 ? 1 : a1 == RAM_Player_2 ? 2 : 0;
+        if (!bit || !runoff_wanted()) return 0;
+        s_runoff |= bit;
+        SET8(a1, 0x3D, 0);                           /* spin_dash_flag */
+        SET8(a1, OBJ_status, OB8(a1, OBJ_status) & ~0x20);   /* (not pushing) */
+        runoff_tick();
+        return 1;                                    /* (no pose: rts) */
+    }
+    case TH_RIGHT_BOUND: {                           /* d0 = Camera_max_X_pos + $128 */
+        uint32_t a0 = A(0) & 0xFFFFFFu;
+        int bit = a0 == RAM_Player_1 ? 1 : a0 == RAM_Player_2 ? 2 : 0;
+        if ((s_runoff & bit) && !r8(RAM_Boss_flag)) {
+            extern int s3_video_canvas_width(void);
+            int extra = s3_video_canvas_width() - 320;
+            D(0) = (D(0) & 0xFFFF0000u) | (uint16_t)(D(0) + 0x40 + (extra > 0 ? extra : 0));
+        }
+        return 0;
+    }
+    case TH_LVL_PRE_SPRITES:
+        runoff_tick();
+        return 0;
     case TH_RESULTS_DONE:
         if (!tri_dir()) return 0;
         return results_done();
@@ -282,6 +381,26 @@ int tri_flow_hook(uint32_t pc)
             if (getenv("TRILOGY_MOVELOG"))              /* development */
                 fprintf(stderr, "[STARS] game %d wanted %d SR %04X\n", tri_rd8(tri_dir() + TD_GAME),
                         tri_ss_stars_wanted(), g_cpu.SR);
+        }
+        return 0;
+    case TH_RESULTS_MUSIC:          /* the tally's jingle: the act's game's own */
+        if (tri_dir()) {
+            int g = tri_rd8(tri_dir() + TD_GAME);
+            if (g == TRI_GAME_CD) {
+                scd_pcm_cmd(SCD_PCM_STOP);               /* (the past's song) */
+                scd_cd_play(SCD_CD_RESULTS, 0);
+                return 1;                                /* (skips jmp Play_Music) */
+            }
+            if (g == TRI_GAME_S1 || g == TRI_GAME_S2) {
+                tri_music_play(TRI_SLOT_ZONE, g == TRI_GAME_S1 ? 0x8E : 0x9A);   /* bgm_GotThrough, Mus_EndLevel */
+                return 1;
+            }
+        }
+        return 0;
+    case TH_SPRING_NEAR:            /* Sonic 1 and CD sideways springs fire only when pushed, */
+        if (tri_dir()) {            /* not on a run-up within $28 pixels (S2 added that)      */
+            int g = tri_rd8(tri_dir() + TD_GAME);
+            if (g == TRI_GAME_CD) return 1;
         }
         return 0;
     case TH_STARS_TOUCH:            /* the star circle: Sonic 2's special stage, not a bonus stage */
