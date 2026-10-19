@@ -105,8 +105,8 @@ from the local cartridges; they do not bundle the games.
 
 `tests/runtime/run_stage_pack_sweep.py` exercises every imported act and player
 mode in separate muted processes, records screenshots and RAM, checks stage
-entry and dispatch errors, and verifies native saves remain untouched. Developer
-stage selection in that sweep is a test hook, not evidence of completing all
+entry and dispatch errors, and verifies the saved native projection remains
+valid. Developer stage selection in that sweep is a test hook, not evidence of completing all
 acts through ordinary play. Full campaign, boss and special-stage route QA must
 be recorded separately. ROM-independent tests cover default-off settings,
 invalid-resource rollback, persistence, save selection, bank integrity boundaries,
@@ -136,13 +136,25 @@ see [the Megamix guide](MEGAMIX_STAGE_PACK.md) for conversion and audit bounds.
 
 ## Independent-pack integration checks (2026-10-19)
 
-The combined changes pass 36 CTests, all eight real-input new-game
-configurations, and 49 byte-identical native image/RAM/VRAM artifacts.
+The combined changes include the qualified 0.5.3 game fixes and engine
+renderer, stack-return and session-setup updates. They pass 39 CTests,
+all eight real-input new-game configurations, and 49 byte-identical native
+image/RAM/VRAM artifacts against the earlier mod-off baseline.
 `run_campaign_permutations.py` checks actual cartridge checksums and native
-stage/character bounds after each save, legacy migration, missing/re-added
-packs and recovery from a truncated companion. The first missing-pack
+stage/character bounds after each save. Its 17 production cases cover legacy
+migration, individual missing/re-added packs, removing and restoring every
+pack, truncated companion/native SRAM recovery, and Mighty in independently
+converted legacy S1/S2 banks. With all packs missing the companion remains
+byte-for-byte untouched. The first missing-pack
 fixture omitted the normal replay-zone choice for a completed file; its
 failure is retained and superseded by the corrected second run.
+
+Production entry/movement/render/save sweeps pass all 58 imported acts with
+their separate paks (S1 19, S2 20, Megamix 19). These use Sonic & Tails in
+16:9; they do not replace the separately recorded encounter/exit audits.
+Four native IceCap/Launch Base routes also pass with live renderer telemetry
+and six image/RAM/VRAM checkpoints per act. The initial telemetry run used
+an unavailable TCP port and is retained; the corrected run uses port 46051.
 
 `qa-experimental-s1-native` observes all eight real Final Zone boss hits,
 the escape and the fresh Angel Island start with Sonic 2 absent.
