@@ -485,7 +485,7 @@ void o_kill_player(uint32_t p)
 static int zone_asset(int asset)
 {
     static const uint8_t map[][3] = TRI_ZONE_ASSETS;
-    int z = tri_zone();
+    int z = tri_source_zone();
     for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++)
         if (map[i][0] == z && map[i][1] == asset) return map[i][2];
     return asset;
@@ -528,6 +528,7 @@ int o_asset_ready(int asset)
 static int s_card_done;
 static void upload_record(uint32_t r)
 {
+    if(tri_rd16(r+6)&0x4000)return; /* immutable host sprite-pattern bank */
     uint16_t nseg = tri_rd16(r + 6) & 0x7FFF;
     uint32_t seg = tri_rd32(r + 12);
     for (uint16_t s = 0; seg && s < nseg; s++) {

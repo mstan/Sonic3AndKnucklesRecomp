@@ -45,10 +45,11 @@ static uint32_t blob(int id)
 
 static int lz_water(void)
 {
-    return tri_dir() && tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 && tri_zone() == S1_LZ;
+    return tri_dir() && (tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_S1 || tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX)
+        && tri_source_zone()==S1_LZ;
 }
 
-static uint32_t s1info(void) { return tri_rd32(tri_dir() + TD_EXTRA); }
+static uint32_t s1info(void) { return tri_s1_info(); }
 
 /* Sonic 2 act with water (Level_InitWater: CPZ2, ARZ) */
 static int s2_water(void)
@@ -103,6 +104,10 @@ static void check_water(void)
 /* ---- LZ3: S1 layout row 2 column 6 changes ($4B: water rises, 7: switch $F) */
 void tri_lz3_patch(uint8_t chunk)
 {
+    extern int tri_megamix_lz_patch(uint8_t chunk);
+    if(tri_megamix_lz_patch(chunk)) {
+        s_lz3_chunk=chunk;tri_refresh_fg();return;
+    }
     uint32_t inf = s1info();
     uint32_t src = inf + S1I_LZ3_SWAP + (chunk == 7 ? 4u : 0u);
     uint32_t hdr = RAM_Level_layout_header;
@@ -353,17 +358,22 @@ int tri_water_hook(uint32_t pc)
 {
     switch (pc) {
     case TH_CHK_WATER:
-        if (!lz_water() && !s2_water()) return 0;
+        if (!lz_water() && !s2_water()) {
+            if(!tri_dir())return 0;
+            w8(RAM_Water_flag,0);w8(RAM_Water_full_screen_flag,0);
+            w16(RAM_Water_level,0x1000);w16(RAM_Mean_water_level,0x1000);
+            w16(RAM_Target_water_level,0x1000);return 1;
+        }
         check_water();
         return 1;
     case TH_WATER_PAL:
-        if (!lz_water() && !s2_water()) return 0;
+        if (!lz_water() && !s2_water()) return tri_dir()!=0;
         load_water_palette();
         return 1;
     case TH_DYN_WATER:
         if (lz_water()) dynamic_water();
         else if (s2_water()) s2_dynamic_water();
-        else return 0;
+        else return tri_dir()!=0; /* pending dry act must not index the native zone table */
         return 1;
     case TH_WATER_LEVEL:                       /* v_waterpos1 = v_waterpos2 + osc/2 (S2: not ARZ) */
         if (lz_water() || (s2_water() && tri_zone() != TRI_S2_ARZ))

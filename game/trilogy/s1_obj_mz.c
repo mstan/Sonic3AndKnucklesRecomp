@@ -19,7 +19,7 @@
 
 static uint16_t s_obj31ypos;          /* v_obj31ypos (shared stomper/push block) */
 
-static int zone_act(void) { return r16(RAM_Current_zone_and_act); }
+static int zone_act(void) { return tri_source_zone()*256+tri_act(); }
 static uint8_t *trig(int n) { (void)n; return 0; }
 #define TRIGGER(n)      (RAM_Level_trigger_array + (uint32_t)((n) & 0x0F))
 
@@ -591,7 +591,7 @@ static void button(uint32_t o)
 {
     if (OB8(o, OBJ_routine) == 0) {
         SET8(o, OBJ_routine, 2);
-        int mz = tri_zone() == S1_MZ;
+        int mz = tri_source_zone() == S1_MZ;
         o_init(o, mz ? S1A_BUTTON_MZ : S1A_BUTTON, 4, 4, 0x10, 0x10);
         SET16(o, OBJ_y_pos, OB16(o, OBJ_y_pos) + 3);
     }
@@ -1159,11 +1159,11 @@ static void moving_block(uint32_t o)
         static const uint8_t var[5][2] = { { 0x10, 0 }, { 0x20, 1 }, { 0x20, 2 }, { 0x40, 3 }, { 0x30, 4 } };
         SET8(o, OBJ_routine, 2);
         int mb = S1A_MBLOCK;
-        if (tri_zone() == TRI_S1_LZ) mb = S1A_MBLOCK_LZ;
-        if (tri_zone() == TRI_S1_SBZ)          /* 5228 short block, 523x long sliding floor */
+        if (tri_source_zone() == TRI_S1_LZ) mb = S1A_MBLOCK_LZ;
+        if (tri_source_zone() == TRI_S1_SBZ)          /* 5228 short block, 523x long sliding floor */
             mb = OB8(o, OBJ_subtype) == 0x28 ? S1A_MBLOCK_SBZS : S1A_MBLOCK_SBZL;
         o_init(o, mb, 4, 4, 0x10, 0x10);
-        if (tri_zone() == TRI_S1_LZ) SET8(o, OBJ_y_radius, 7);
+        if (tri_source_zone() == TRI_S1_LZ) SET8(o, OBJ_y_radius, 7);
         int i = ((OB8(o, OBJ_subtype) >> 3) & 0x1E) >> 1;
         if (i > 4) i = 4;
         SET8(o, OBJ_width_px, var[i][0]);
@@ -1264,7 +1264,7 @@ static void collapse_floor(uint32_t o)
     case 0:
         SET8(o, OBJ_routine, 2);
         o_init(o, S1A_CFLO, OB8(o, OBJ_render) | 4, 4, 0x44, 0x20);
-        if (tri_zone() == TRI_S1_SLZ) SET8(o, OBJ_frame, OB8(o, OBJ_frame) + 2);
+        if (tri_source_zone() == TRI_S1_SLZ) SET8(o, OBJ_frame, OB8(o, OBJ_frame) + 2);
         SET8(o, CF_TIME, 7);
         /* fall through */
     case 2:
@@ -1705,6 +1705,73 @@ static void caterkiller(uint32_t o)
     }
 }
 
+/* Object 45, the sideways stomper actually placed by Megamix v3.
+ * Source $10D0C-$10FC2: travel is 8.8, while child offsets use its high
+ * byte. The four parts share the parent's culling origin, not their X. */
+static void side_stomp(uint32_t o)
+{
+    enum { BASE=0x30, TRAVEL=0x32, MAXIMUM=0x34, RETURN=0x36,
+           HOLD=0x38, GROUP_X=0x3A, PARENT=0x3C };
+    if (!OB8(o, OBJ_routine)) {
+        static const uint8_t routines[4]={2,4,8,6},frames[4]={0,1,3,2};
+        static const int8_t offsets[4]={4,-28,52,40};
+        static const uint16_t limits[3]={0x3800,0xA000,0x5000};
+        uint8_t sub=OB8(o,OBJ_subtype);
+        for (int i=0;i<4;i++) {
+            uint32_t part=i ? o_alloc_after(o) : o;
+            if (!part) break;
+            SET32(part,OBJ_code,NATIVE_S1_BASE+0x45*4);
+            SET16(part,OBJ_x_pos,OB16(o,OBJ_x_pos)+offsets[i]);
+            SET16(part,OBJ_y_pos,OB16(o,OBJ_y_pos));
+            o_init(part,S1A_SIDESTOMP,4,i==3?3:4,0x20,0x20);
+            SET8(part,OBJ_routine,routines[i]);
+            SET8(part,OBJ_frame,frames[i]);
+            SET8(part,OBJ_subtype,sub);
+            SET16(part,BASE,OB16(part,OBJ_x_pos));
+            SET16(part,GROUP_X,OB16(o,OBJ_x_pos));
+            SET16(part,MAXIMUM,limits[(sub&0xF)<3?(sub&0xF):0]);
+            SET32(part,PARENT,o);
+            if (i==1) SET8(part,OBJ_coll_flags,0x91);
+        }
+        SET8(o,OBJ_width_px,0x10);
+    }
+    uint32_t parent=r32(o+PARENT)&0xFFFFFFu;
+    uint16_t old_x=OB16(o,OBJ_x_pos);
+    switch (OB8(o,OBJ_routine)) {
+    case 2: {
+        uint16_t travel=OB16(o,TRAVEL);
+        if (OB16(o,RETURN)) {
+            if (OB16(o,HOLD)) SET16(o,HOLD,OB16(o,HOLD)-1);
+            else if (travel<0x80) {
+                travel=0;SET16(o,OBJ_x_vel,0);SET16(o,RETURN,0);
+            } else travel-=0x80;
+        } else if (travel!=OB16(o,MAXIMUM)) {
+            uint16_t speed=OB16(o,OBJ_x_vel);
+            SET16(o,OBJ_x_vel,speed+0x70);
+            travel+=speed;
+            if (travel>=OB16(o,MAXIMUM)) {
+                travel=OB16(o,MAXIMUM);SET16(o,OBJ_x_vel,0);
+                SET16(o,RETURN,1);SET16(o,HOLD,0x3C);
+            }
+        }
+        SET16(o,TRAVEL,travel);
+        SET16(o,OBJ_x_pos,OB16(o,BASE)-(travel>>8));
+        o_solid(o,0x17,0x20,0x20,old_x);
+        break;
+    }
+    case 8:
+        SET8(o,OBJ_frame,((uint8_t)((OB16(parent,TRAVEL)>>8)+0x10)>>5)+3);
+        /* fall through */
+    case 4:
+        SET16(o,OBJ_x_pos,OB16(o,BASE)-(OB16(parent,TRAVEL)>>8));
+        if (OB8(o,OBJ_coll_flags)) o_touch(o);
+        break;
+    default: break;
+    }
+    o_draw(o);
+    if (o_out_of_range(o,OB16(o,GROUP_X))) o_delete_respawnable(o);
+}
+
 void s1_obj_mz_register(TriObjFn *t)
 {
     t[0x13] = lava_maker;
@@ -1715,6 +1782,7 @@ void s1_obj_mz_register(TriObjFn *t)
     t[0x32] = button;
     t[0x33] = push_block;
     t[0x35] = grass_fire;
+    t[0x45] = side_stomp;
     t[0x46] = brick;
     t[0x4C] = geyser_maker;
     t[0x4D] = lava_geyser;

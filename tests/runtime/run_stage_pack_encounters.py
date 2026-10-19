@@ -18,6 +18,11 @@ import time
 from run_stage_pack_audit import BOOT, errors, manifest, runtime_files
 
 BOSSES = {
+    '3402': (0x7e00f4,0x2a40,0x3a0,0),
+    '3602': (0x7e01cc,0x19e0,0x5b0,0),
+    '3802': (0x7e01d4,0x2d20,0x560,0),
+    '3502': (0x7e01dc,0x1ec0,0x580,0),
+    '3702': (0x7e01e8,0x2110,0x280,0),
     '2002': (0x7e00f4, 0x2a40, 0x3a0, 0),
     '2202': (0x7e01cc, 0x19e0, 0x2a0, 0),
     '2402': (0x7e01d4, 0x2d20, 0x560, 0),
@@ -36,6 +41,7 @@ BOSSES = {
     '3200': (0x7e12bc, 0x300, 0x120, 0),
 }
 NEXT_BOSS = {'2002':'2200','2202':'2400','2402':'2100','2102':'2300',
+             '3402':'3600','3602':'3800','3802':'3500','3502':'3700','3702':'3900',
              '2302':'2500','2801':'2900','2901':'2a00','2a01':'2b00',
              '2b01':'2c00','2c01':'2d00','2d01':'2e00','2e01':'2f00',
              '2f02':'3000','3100':'3200','3200':'0000'}
@@ -66,17 +72,19 @@ class Native:
             port=reservation.getsockname()[1]
         self.args,self.case,self.port=args,case,port
         self.case.mkdir(parents=True,exist_ok=True)
-        self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port)
+        self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False))
         (case/'input.txt').write_text(BOOT+'WAIT 500000\nEXIT\n')
         env=dict(os.environ,SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage,
                  TRILOGY_CHAR=str(args.character),TRILOGY_GOD='1')
+        if not getattr(args,'god',True):env.pop('TRILOGY_GOD',None)
         if start:
             x,y,rt=start
             env['TRILOGY_START']=f'{x:x},{y:x},1000,{rt:x}'
         self.log=(case/'run.log').open('w')
+        pace=['--target-fps','240'] if args.kind in ('abilities','mechanics') else ['--turbo']
         self.proc=subprocess.Popen([str(self.runtime/args.exe.name),str(args.rom),
-            '--no-launcher','--turbo','--max-frames','400000',
+            '--no-launcher',*pace,'--max-frames','400000',
             '--port',str(port),'--widescreen','off','--input-script',str(case/'input.txt')],
             cwd=self.runtime,env=env,stdout=self.log,stderr=self.log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
@@ -97,7 +105,7 @@ class Native:
         if self.sock is None: raise RuntimeError('debug listener not ready')
         while time.monotonic()<deadline:
             ram,frame=self.snapshot()
-            if ram[0xf600]==12 and u16(ram,0xfe04)>=(40 if args.kind in ('enemies','bosses') else 180): break
+            if ram[0xf600]==12 and u16(ram,0xfe04)>=(40 if args.kind in ('enemies','bosses','mechanics') else 180): break
             # Let the input-script clock run normally during menu boot.
             # run_frames advances simulation without ticking that script.
             time.sleep(.005)
@@ -210,10 +218,24 @@ def boss(args,stage,port):
                 run.step(4)
                 after,aframe=run.snapshot(f'hit-{len(record["hits"]):02d}')
                 observed=next((o for o in objects(after) if o['addr']==target['addr']),None)
+                # Turbo can finish the short defeat animation between TCP
+                # samples. Retain the completed-frame HP/status sequence.
+                info=run.cmd('frame_info');first=max(frame,info['oldest_frame'])
+                hp=run.cmd('frame_timeseries',**{'from':first,'to':aframe,
+                    'field':f'wram[{target["addr"]+0x29:X}]'})['values']
+                status=run.cmd('frame_timeseries',**{'from':first,'to':aframe,
+                    'field':f'wram[{target["addr"]+0x2a:X}]'})['values']
+                dead=next((first+i for i,(h,s) in enumerate(zip(hp,status))
+                    if h==0 and s is not None and s&0x80),None)
+                if dead is not None:
+                    record['defeat_observed']=True
+                    record['defeat_frame']=dead
+                    run.events.append(dict(defeat=True,frame=dead,hp=hp,status=status,first_frame=first))
                 if observed and observed['code']==code and observed['hp']<before['hp']:
                     record['hits'].append(dict(before=before,after=observed,frame=aframe))
                     if observed['hp']==0 and observed['status']&0x80:
                         record['defeat_observed']=True;break
+                if record.get('defeat_observed'):break
                 ram,frame=run.snapshot()
                 run.player(ram,x,y,freeze=True)
                 run.step(40)
@@ -251,6 +273,7 @@ def boss(args,stage,port):
                 run.step(90)
                 for n in range(5):
                     ram,frame=run.snapshot()
+                    if f'{u16(ram,0xfe10):04x}'!=stage:break
                     buttons=[o for o in objects(ram) if o['code'] in (0x7e00f8,0x7e10f8) and o['routine']==4]
                     if buttons:
                         btn=buttons[0]
@@ -289,6 +312,20 @@ def camera_at(run,x,y):
 def verify_next(run,expected):
     starts={s['stage']:s['start'] for s in manifest(run.args.bank)}
     start=starts.get(expected,(0x40,0x420)) # native Angel Island 1
+    # Read the actual first gameplay frames. LZ/MM starts immediately slide
+    # the player away; a late position is not evidence of a wrong spawn.
+    info=run.cmd('frame_info')
+    for frame in range(max(info['oldest_frame'],info['current_frame']-500),info['current_frame'],5):
+        state=bytes.fromhex(run.cmd('get_frame',frame=frame,include='wram')['wram'])
+        if (u16(state,0xfe10)==int(expected,16) and state[0xf600]==12
+            and 1<=u16(state,0xfe04)<=60 and state[0xfe2a]==0
+            and abs(u16(state,0xb010)-start[0])<0x100
+            and abs(u16(state,0xb014)-start[1])<0x100):
+            (run.case/'next-act-first.ram').write_bytes(state)
+            run.events.append(dict(next_start_verified=True,expected=expected,frame=frame,
+                level_frame=u16(state,0xfe04),x=u16(state,0xb010),y=u16(state,0xb014)))
+            run.step(60);stable,_=run.snapshot('next-act-settled')
+            return 'passed' if u16(stable,0xfe10)==int(expected,16) and stable[0xf600]==12 else 'failed'
     for _ in range(60):
         run.step(30);ram,frame=run.snapshot()
         if (u16(ram,0xfe10)==int(expected,16) and ram[0xf600]==12
@@ -384,13 +421,34 @@ def enemy(args,stage,placement,port):
         record['activity_observed']=any(a['addr']==b['addr'] and
             (a['x'],a['y'],a['frame'],a['routine']) != (b['x'],b['y'],b['frame'],b['routine'])
             for a in targets for b in objects(later) if b['code']==code)
-        for attempt in range(16):
+        if code==0x7e017c and targets: # Bomb is a proximity hazard, not a stomp kill.
+            target=targets[0]
+            run.player(later,target['x']+50,target['y']-30,freeze=True)
+            for n in range(50):
+                run.step(6);ram,frame=run.snapshot()
+                shrapnel=[o for o in objects(ram) if o['code']==code and o['collision']==0x98]
+                if len(shrapnel)>=4:
+                    record['interaction']='passed';record['evidence']='proximity fuse produced four damaging shrapnel objects'
+                    run.snapshot('bomb-shrapnel');break
+        if code==0x7e010c and targets: # Roller hides until the player passes.
+            target=targets[0]
+            run.player(later,target['x']+0x120,max(0,target['y']-80),freeze=True)
+            camera_at(run,target['x']+0x120,target['y'])
+            for n in range(70):
+                run.step(4);ram,frame=run.snapshot()
+                if any(o['code']==code and o['collision']==14 for o in objects(ram)):
+                    record['unroll']='passed';break
+        for attempt in range(0 if record['interaction']=='passed' else 16):
             ram,frame=run.snapshot()
-            targets=[o for o in objects(ram) if o['code']==code and o['collision'] and not o['collision']&0xc0]
+            targets=[o for o in objects(ram) if o['code']==code and
+                (code in (0x7e00b0,0x7e0140) or o['collision'] and not o['collision']&0xc0)]
             if not targets:
                 run.step(30);continue
             target=min(targets,key=lambda o:abs(o['x']-placement['x']))
-            run.player(ram,target['x'],max(0,target['y']-(10 if attempt%2 else 20)),attack=True)
+            offsets=[(0,-20),(0,-10),(-20,0),(20,0),(-16,8),(16,8)]
+            dx,dy=offsets[attempt%len(offsets)]
+            run.player(ram,target['x']+dx,max(0,target['y']+dy),attack=True)
+            run.write(0xb02e,b'\x01') # freeze movement, retain real touch response
             run.step(2);after,aframe=run.snapshot(f'attack-{attempt:02d}')
             hit=next((o for o in objects(after) if o['addr']==target['addr']),None)
             run.events.append(dict(frame=aframe,before=target,after=hit))
@@ -415,6 +473,7 @@ def main():
     ap.add_argument('--stages',default='all');ap.add_argument('--character',type=int,default=1)
     ap.add_argument('--kind',choices=['bosses','enemies'],default='bosses')
     ap.add_argument('--port',type=int,default=49500)
+    ap.add_argument('--mighty',action='store_true')
     args=ap.parse_args();args.out.mkdir(parents=True,exist_ok=True)
     if args.kind=='bosses':
         stages=list(BOSSES) if args.stages=='all' else args.stages.split(',')
@@ -423,8 +482,12 @@ def main():
         seen=set();cases=[]
         for s in manifest(args.bank):
             if args.stages!='all' and s['stage'] not in args.stages.split(','):continue
-            family=1 if int(s['stage'][:2],16)<0x28 else 2
+            family=1 if int(s['stage'][:2],16)<0x28 or int(s['stage'][:2],16)>=0x34 else 2
             for o in s['objects']:
+                # The first v3 CO1 Roller sits over non-solid source art and
+                # falls below the map. Use the actual grounded placement at
+                # AE8/B8 for interaction coverage; retain all survey points.
+                if s['stage']=='3800' and o['id']==0x43 and o['x']!=0xAE8:continue
                 if o['id'] in ENEMIES[family] and o['code'] not in seen:
                     seen.add(o['code']);cases.append((s['stage'],o))
         results=[enemy(args,s,o,args.port+i) for i,(s,o) in enumerate(cases)]

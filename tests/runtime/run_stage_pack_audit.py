@@ -27,7 +27,8 @@ NAMES = {0x20: 'Green Hill', 0x21: 'Labyrinth', 0x22: 'Marble',
          0x28: 'Emerald Hill', 0x29: 'Chemical Plant', 0x2a: 'Aquatic Ruin',
          0x2b: 'Casino Night', 0x2c: 'Hill Top', 0x2d: 'Mystic Cave',
          0x2e: 'Oil Ocean', 0x2f: 'Metropolis', 0x30: 'Sky Chase',
-         0x31: 'Wing Fortress', 0x32: 'Death Egg'}
+         0x31: 'Wing Fortress', 0x32: 'Death Egg',0x34:'Sunny Shores',0x35:'Misty Maze',
+         0x36:'Dark Fortress',0x37:'Starry Night',0x38:'City Outskirts',0x39:'Metallic Base'}
 
 
 def manifest(bank):
@@ -54,6 +55,8 @@ def manifest(bank):
             name = NAMES.get(z, f'Zone {z:02x}') + f' {act + 1}'
             if z == 0x21 and act == 3: name = 'Scrap Brain 3'
             if z == 0x25 and act == 2: name = 'Final Zone'
+            if z == 0x35 and act == 3: name = 'Metallic Base 3'
+            if z == 0x39 and act == 2: name = 'Final Fight'
             stages.append(dict(stage=f'{z:02x}{act:02x}', name=name,
                                bounds=bounds, start=start, objects=objects))
     return stages
@@ -82,14 +85,18 @@ def points(stage):
     return sorted(result, key=lambda p: (p['x'], p['y']))
 
 
-def runtime_files(exe, bank, runtime, debug_port=None):
+def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
     runtime.mkdir(parents=True, exist_ok=True)
     (runtime / 'provenance.json').write_text(json.dumps(dict(
         exe_sha256=hashlib.sha256(exe.read_bytes()).hexdigest(),
         bank_sha256=hashlib.sha256(bank.read_bytes()).hexdigest()),indent=2))
     for file in (exe, exe.parent / 'SDL2.dll'):
         shutil.copy2(file, runtime / file.name)
-    (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\n')
+    megamix=bank.read_bytes()[-12:-8]==b'SPK2'
+    (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\n')
+    # TCP/script inputs are additive. Ignore physical keyboards/controllers
+    # in unattended runs so a live device cannot change an audit fixture.
+    (runtime / 'settings.ini').write_text(''.join(f'[input.p{i}]\ndevice=0\n' for i in range(1,5)))
     (runtime / 'debug.ini').write_text('[debug]\nenabled=0\n' if debug_port is None
                                     else f'[debug]\nenabled=1\nport={debug_port}\n')
 

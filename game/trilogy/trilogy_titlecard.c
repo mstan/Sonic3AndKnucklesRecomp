@@ -18,6 +18,7 @@ int tri_titlecard_hook(uint32_t pc)
     switch (pc) {
     case TH_TC_LEVELGFX: {          /* after movea.l (a1,d0.w),a1 — letter KosM */
         if (!tri_dir()) return 0;
+        if(r8(RAM_Apparent_zone)<TRI_ZONE_BASE || r8(RAM_Apparent_zone)>=TRI_ZONE_END)return 0;
         uint32_t t = tri_rd32(TRI_BANK_BASE + TB_TITLEART);
         uint32_t a = t ? tri_rd32(t + (uint32_t)(r8(RAM_Apparent_zone) - TRI_ZONE_BASE) * 4u) : 0;
         if (a) A(1) = a;
@@ -28,6 +29,7 @@ int tri_titlecard_hook(uint32_t pc)
         return 0;
     case TH_TC_NAME: {              /* after add.b d0,mapping_frame(a0) */
         if (!tri_dir()) return 0;
+        if(r8(RAM_Apparent_zone)<TRI_ZONE_BASE || r8(RAM_Apparent_zone)>=TRI_ZONE_END)return 0;
         uint32_t m = tri_rd32(TRI_BANK_BASE + TB_TITLEMAP);
         if (!m) return 0;
         uint32_t a0 = A(0);

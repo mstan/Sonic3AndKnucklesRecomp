@@ -18,6 +18,7 @@ def main():
     for key in ('exe','rom','bank','out'):ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
     ap.add_argument('--stages',default='all');ap.add_argument('--character',type=int,default=1)
     ap.add_argument('--death-kind',choices=['fall','timeout'],default='fall')
+    ap.add_argument('--mighty',action='store_true')
     args=ap.parse_args();args.kind='checkpoints';args.out.mkdir(parents=True,exist_ok=True)
     results=[]
     for stage in manifest(args.bank):
@@ -41,6 +42,10 @@ def main():
                 # MZ1's route doubles back underground. Cross its real DLE
                 # thresholds so the post saves a valid deep camera state.
                 waypoints=[(0xea0,0x3c0),(0xb00,0x500),(0xc80,0x600),(x,y)]
+            if stage['stage']=='3600':
+                # v3 has a different final event phase. Visit its actual
+                # downward/backtracking thresholds before touching the post.
+                waypoints=[(0xe00,0x400),(0xb00,0x480),(0xb00,0x600),(x,y)]
             for wx,wy in waypoints:
                 ram,frame=run.snapshot();sx,sy=u16(ram,0xb010),u16(ram,0xb014)
                 count=max(1,(abs(wx-sx)+0x7f)//0x80,(abs(wy-sy)+0x7f)//0x80)

@@ -78,10 +78,30 @@ uint32_t tri_dir_for(int zone, int act)
     if (idx >= TRI_DIR_COUNT)
         return 0;
     uint32_t e = TRI_BANK_BASE + TRI_DIR_OFF + idx * TRI_DIR_ENTRY;
+    if(tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX && !s3_stage_pack_megamix)return 0;
     return tri_rd32(e + TD_LLB) ? e : 0;
 }
 
 uint32_t tri_dir(void) { return tri_dir_for(tri_zone(), tri_act()); }
+
+int tri_source_zone(void)
+{
+    uint32_t e=tri_dir();
+    return e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX
+        ?0x20+(int)tri_rd8(tri_rd32(e+TD_EXTRA)+24):tri_zone();
+}
+uint32_t tri_s1_info(void)
+{
+    uint32_t e=tri_dir();if(!e)return 0;
+    uint32_t info=tri_rd32(e+TD_EXTRA);
+    return tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX?tri_rd32(info+28):info;
+}
+uint16_t tri_source_stage(uint16_t stage)
+{
+    uint32_t e=tri_dir();
+    return e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX
+        ?(uint16_t)(stage+0x1400):stage;
+}
 
 /* ---- JSR-exact call into recompiled code -------------------------------- */
 void tri_jsr(uint32_t addr)
@@ -147,8 +167,10 @@ int trilogy_instruction(uint32_t pc)
     if (!s_bank)
         return 0;
     if (tri_megamix_geometry_hook(pc))return 1;
+    if (tri_megamix_sprite_hook(pc))return 1;
     if (tri_level_hook(pc))
         return 1;
+    if (tri_mighty_hook(pc))return 1;
     if (tri_screen_hook(pc))
         return 1;
     if (tri_titlecard_hook(pc))

@@ -250,10 +250,10 @@ class Song:
         return bytes(hdr + body + voices)
 
 
-def s1_envelopes(rom):
+def s1_envelopes(rom, addresses=S1_PSG_ENV):
     """S1 PSG envelopes, terminator $80 (hold) -> S3K $81 (hold)."""
     out = []
-    for a in S1_PSG_ENV:
+    for a in addresses:
         e = bytearray()
         while rom[a] < 0x80:
             e.append(rom[a])
@@ -263,11 +263,11 @@ def s1_envelopes(rom):
     return out
 
 
-def build_music(rom, bank):
+def build_music(rom, bank, index=S1_MUSIC_INDEX, envelopes=S1_PSG_ENV, starts=None):
     """Add S1 songs to the expansion bank. Returns a table blob:
     9 x u16 LE envelope Z80 pointers, then per song $81..$93:
     u8 bank, u8 0, u16 LE Z80 pointer."""
-    envs = s1_envelopes(rom)
+    envs = s1_envelopes(rom,envelopes)
     env_blob = bytearray()
     env_ptrs = []
     for e in envs:
@@ -275,7 +275,7 @@ def build_music(rom, bank):
         env_blob += e
     if len(env_blob) & 1:
         env_blob.append(0)
-    songs = [be32 for be32 in (struct.unpack_from('>I', rom, S1_MUSIC_INDEX + i * 4)[0] for i in range(19))]
+    songs = starts if starts is not None else [struct.unpack_from('>I',rom,index+i*4)[0] for i in range(19)]
     entries = []
     cur = bytearray(env_blob)
     pending = []                              # (song index, offset in cur)
@@ -310,7 +310,7 @@ def build_music(rom, bank):
     for addr, items in banks:
         for i, off in items:
             ent[i] = (((addr >> 15) & 0xFF), 0x8000 + off)
-    for i in range(19):
+    for i in range(len(songs)):
         bk, ptr = ent[i]
         table += struct.pack('<BBH', bk, 0, ptr)
     return bytes(table), converted

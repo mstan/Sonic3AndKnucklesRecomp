@@ -4,6 +4,13 @@ uint8_t g_ram[65536],g_rom[0x400000];
 uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
 int gvdp_ext_line(unsigned tile) { (void)tile; return 0; }
+static uint8_t test_atlas[128];
+static int test_atlas_enabled;
+const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
+    *bytes=test_atlas_enabled&&(flags&128)?sizeof test_atlas:0;
+    return *bytes?test_atlas:NULL;
+}
+int gvdp_sprite_pattern_line(unsigned flags,unsigned tile) { (void)flags;return gvdp_ext_line(tile); }
 uint16_t gvdp_ext_color(int row,int line,int nib) { (void)row;(void)line;(void)nib;return 0; }
 M68KState g_cpu;
 void m68k_write8(uint32_t a,uint8_t v){g_ram[a&65535]=v;}
@@ -17,6 +24,31 @@ void cmd_send_response(const char *json){(void)json;}
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static void word(uint8_t *p,unsigned a,unsigned v){p[a]=(uint8_t)(v>>8);p[a+1]=(uint8_t)v;}
 static void longword(uint8_t *p,unsigned a,unsigned v){word(p,a,v>>16);word(p,a+2,v);}
+static void test_sprite_atlas(void)
+{
+    GVDP v={0};SceneFrame scene={0};uint32_t out[64],pal[64]={0};
+    /* Distinct four tiles prove column ordering and both flips. VRAM has
+     * different pixels so an accidental fallback cannot satisfy this. */
+    for(unsigned t=0;t<4;t++){memset(test_atlas+t*32,(t+1)*17,32);pal[t+1]=0xFF000001+t;}
+    memset(v.vram,0x55,128);pal[5]=0xFF000005;
+    scene.scene=1;scene.count=1;scene.sprites[0]=(SceneSprite){8,0,0x8000,0x85,0};
+    const SceneFrame *previous=s_display;s_display=&scene;test_atlas_enabled=1;s_camera=s_camera_y=0;
+    for(unsigned flip=0;flip<4;flip++)for(int y=0;y<16;y++) {
+        scene.sprites[0].attr=(uint16_t)(0x8000|((flip&1)?0x800:0)|((flip&2)?0x1000:0));
+        memset(out,0,sizeof out);memset(s_priority,0,64);
+        draw_scene_sprites(&v,y,out,64,0,pal);
+        for(int x=0;x<16;x++) {
+            int ix=(flip&1)?15-x:x,iy=(flip&2)?15-y:y;
+            CHECK(out[8+x]==pal[1+ix/8*2+iy/8]);
+        }
+    }
+    scene.sprites[0].size=5;scene.sprites[0].attr=0x8000;
+    memset(s_priority,0,64);draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[5]);
+    scene.sprites[0].size=0x85;scene.sprites[0].attr=0x8004;
+    memset(out,0,sizeof out);memset(s_priority,0,64);
+    draw_scene_sprites(&v,0,out,64,0,pal);CHECK(!out[8]); /* atlas bounds */
+    test_atlas_enabled=0;s_display=previous;
+}
 static void test_file_select(void)
 {
     static GVDP v;
@@ -430,7 +462,7 @@ int main(int argc,char **argv)
         }
         ss_count=count;
     }
-    test_file_select();
+    test_sprite_atlas();test_file_select();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

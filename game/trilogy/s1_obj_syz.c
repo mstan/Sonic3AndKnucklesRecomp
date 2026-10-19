@@ -451,7 +451,7 @@ static void float_block(uint32_t o)
         SET8(o, OBJ_routine, 2);
         uint8_t sub = OB8(o, OBJ_subtype);
         int v = (sub >> 4) & 7;
-        o_init(o, tri_zone() == TRI_S1_LZ ? S1A_FBLOCK_LZ : S1A_FBLOCK, 4, 3, var[v][0], var[v][1]);
+        o_init(o, tri_source_zone() == TRI_S1_LZ ? S1A_FBLOCK_LZ : S1A_FBLOCK, 4, 3, var[v][0], var[v][1]);
         SET8(o, OBJ_y_radius, var[v][1]);
         SET8(o, OBJ_frame, v);
         SET16(o, FB_ORIGX, OB16(o, OBJ_x_pos));
@@ -467,7 +467,7 @@ static void float_block(uint32_t o)
             }
         }
         int k = (int)(sub & 0x0F) - 8;
-        if (tri_zone() != TRI_S1_LZ && k >= 0 && (int16_t)osc_word(0x2C + k * 4) < 0)
+        if (tri_source_zone() != TRI_S1_LZ && k >= 0 && (int16_t)osc_word(0x2C + k * 4) < 0)
             SET8(o, OBJ_status, OB8(o, OBJ_status) ^ 1);
         if (sub & 0x80) {
             SET8(o, FB_TYPE, sub & 0x0F);
@@ -516,7 +516,7 @@ static void spike_ball(uint32_t o)
     switch (OB8(o, OBJ_routine)) {
     case 0: {
         SET8(o, OBJ_routine, 2);
-        int lz = tri_zone() == TRI_S1_LZ;
+        int lz = tri_source_zone() == TRI_S1_LZ;
         int asset = lz ? S1A_SBALL_LZ : S1A_SBALL;
         o_init(o, asset, 4, 4, 8, 8);
         SET16(o, SB_ORIGX, OB16(o, OBJ_x_pos));

@@ -144,6 +144,9 @@ void tri_flow_level_entry(void)
 
 uint16_t tri_next_act(uint16_t za)
 {
+    static const uint16_t megamix[]={0x3400,0x3401,0x3402,0x3600,0x3601,0x3602,
+        0x3800,0x3801,0x3802,0x3500,0x3501,0x3502,0x3700,0x3701,0x3702,0x3900,0x3901,0x3503,0x3902};
+    for(unsigned i=0;i+1<sizeof megamix/sizeof megamix[0];i++)if(megamix[i]==za)return megamix[i+1];
     for (unsigned i = 0; i + 1 < sizeof s1_order / sizeof s1_order[0]; i++)
         if (s1_order[i] == za)
             return s1_order[i + 1];
@@ -158,6 +161,8 @@ uint16_t tri_apparent(uint16_t za)
 {
     if (za == 0x2103) return 0x2502;          /* SBZ3 shows as Scrap Brain act 3 */
     if (za == 0x2502) return 0x2600;          /* Final Zone */
+    if (za == 0x3503)return 0x3902;
+    if (za == 0x3902)return 0x3A00;
     return za;
 }
 
@@ -165,6 +170,13 @@ uint16_t tri_apparent(uint16_t za)
  * Emerald Hill, emeralds and lives carried over (they stay in RAM). */
 void tri_s1_complete(void)
 {
+    if(tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_MEGAMIX) {
+        extern void tri_save_megamix_complete(void);
+        tri_save_megamix_complete();
+        w8(RAM_Game_mode,4);
+        fprintf(stderr,"[megamix] Final Fight escape complete: campaign finished\n");
+        return;
+    }
     fprintf(stderr, "[trilogy] Sonic 1 complete: on to Emerald Hill\n");
     tri_ach_act_clear(0x2502);
     w16(RAM_Current_zone_and_act, 0x2800);
@@ -204,7 +216,7 @@ int tri_sbz2_fall(void)
 {
     if (!s_sbz2_ss) return 0;
     s_sbz2_ss = 0;
-    ss_enter(0x2103);
+    ss_enter(tri_source_stage(0x2103));
     return 1;
 }
 
@@ -217,7 +229,7 @@ static int results_done(void)
     s_results_finished = 1;
     uint16_t za = r16(RAM_Current_zone_and_act);
     tri_ach_act_clear(za);
-    if (za == 0x2501) {                          /* SBZ2: Eggman's scene first; a ring's stage */
+    if (za == 0x2501 || za==0x3901) {             /* SBZ2 / Metallic Base 2 cutscene */
         s_sbz2_ss = s_ss_pending;                    /* waits for the fall into SBZ3 (tri_sbz2_fall) */
         s_ss_pending = 0;
         sbz2_after_tally();
