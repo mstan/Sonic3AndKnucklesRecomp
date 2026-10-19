@@ -19,6 +19,8 @@ def main():
     ap.add_argument('--rom',required=True,type=Path,help='raw v3 cartridge or the owner ZIP')
     ap.add_argument('--out',required=True,type=Path,help='private audit JSON path')
     ap.add_argument('--preview-dir',type=Path,help='optional private source-data previews')
+    ap.add_argument('--check-conversion',action='store_true',help='also validate S3K static geometry conversion')
+    ap.add_argument('--export-geometry-dir',type=Path,help='private static payloads; extended chunks require runtime support')
     args=ap.parse_args();rom=MegamixV3(load_rom(args.rom))
     stages=[]
     for z,a in ORDER:
@@ -41,6 +43,14 @@ def main():
                         raise ValueError(f"Layout references absent chunk: {stage['name']}")
         stage['decoded']=dict(art_tiles=len(art)//32,blocks=len(blocks)//8,
                               chunks=len(chunks)//512,static_geometry='validated')
+        if args.check_conversion or args.export_geometry_dir:
+            from megamix.geometry import convert_geometry
+            converted=convert_geometry(rom,z,a)
+            stage['conversion']={k:v for k,v in converted.items() if isinstance(v,int)}
+            if args.export_geometry_dir:
+                dest=args.export_geometry_dir/stage['source_stage'];dest.mkdir(parents=True,exist_ok=True)
+                for key,value in converted.items():
+                    if isinstance(value,bytes):(dest/(key+'.bin')).write_bytes(value)
         stages.append(stage)
         print(stage['name'],stage['source_stage'],stage['placements'],'placements',flush=True)
     frames=rom.mighty_frames()
@@ -49,6 +59,8 @@ def main():
                 tables=TABLES,stages=stages,mighty=dict(**MIGHTY,frames=len(frames),
                     frame_art_sha256=hashlib.sha256(b''.join(tiles for _,tiles in frames)).hexdigest()),
                 status='source data inventoried; S3K stage/runtime/Mighty integration pending')
+    report['requires_extended_chunks']=[s['source_stage'] for s in stages
+        if s.get('conversion',{}).get('requires_extended_chunks')]
     args.out.parent.mkdir(parents=True,exist_ok=True)
     args.out.write_text(json.dumps(report,indent=2)+'\n',newline='\n')
     if args.preview_dir:
@@ -56,6 +68,8 @@ def main():
         args.preview_dir.mkdir(parents=True,exist_ok=True)
         mighty_sheet(rom,args.preview_dir/'mighty-source-frames.png')
     print('Inventoried',len(stages),'acts;',sum(s['placements'] for s in stages),'placements')
+    if report['requires_extended_chunks']:
+        print('Runtime needs extended chunk support for:',','.join(report['requires_extended_chunks']))
 
 
 if __name__=='__main__':main()
