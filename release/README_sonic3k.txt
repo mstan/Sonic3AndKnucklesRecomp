@@ -34,6 +34,18 @@ Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
 Linux refreshes bundled assets without replacing your settings or saves.
 Do not place the application in a read-only installation folder.
 
+OPTIONAL STAGE PACKS (WINDOWS PREVIEW)
+Mods > Sonic Campaign Stage Packs offers Sonic 1 & 2 stages, Megamix v3
+stages, and Mighty from Megamix v3. All are disabled by default. Campaign
+order: Sonic 1, Sonic 2, Sonic 3 & Knuckles, then all 19 Megamix acts.
+Bring your own supported ROMs and convert a bank with the included tools.
+See docs/STAGE_PACKS.md and docs/MEGAMIX_STAGE_PACK.md for instructions,
+Mighty controls and the audit's limits. No bank or ROM is included.
+Pack saves use sonic3k-stage-pack.srm; Megamix uses sonic3k-megamix.srm.
+These are local campaigns; quickstates, rewind and netplay are unavailable
+while stage packs are enabled. Native cartridge saves remain separate.
+This preview ZIP is validated on Windows x64.
+
 LICENSE AND SOURCE
 Project: PolyForm Noncommercial 1.0.0 (see LICENSE).
 Third-party notices: THIRD-PARTY-LICENSES.md and licenses/.

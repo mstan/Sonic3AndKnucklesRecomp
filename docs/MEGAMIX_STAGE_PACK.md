@@ -109,7 +109,7 @@ Private evidence under `build/`:
 | Mighty hurt | Real pickups, enemy hit, native recovery, storage retrieval at five-ring cost; `qa-mm-mighty-hurt` |
 | Sideways stomper | Four parts, motion, solid body, damaging spikes; `qa-mm-stomper-2` |
 | S3K handoff | Actual final boss segment/defeat/chase/ending → Sunny Shores; `qa-mm-confirm-handoff-2`; earlier DEZ bosses bypassed |
-| Save resume | Actual handoff SRAM loads via Data Select into Sunny Shores; `qa-mm-handoff-save-resume` |
+| Save resume | All seven earned Megamix zone codes 32–38 reload through Data Select; completed campaign replays from Green Hill; `qa-mm-earned-save-resumes`, `qa-mm-final-fight-resume` |
 | Native regression | All 49 PNG/RAM/VRAM artifacts identical; `qa-mm-confirm-mod-off` |
 | Automated | All 32 CTests; private animation run: 36 native states × four orientations × 600 ticks, 31,942 bounded DPLC uploads |
 
