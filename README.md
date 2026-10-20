@@ -7,12 +7,15 @@ runner.
 
 ## Experimental campaign mods
 
-The combined **Sonic3KRecomp** target includes three independent, default-off
-mods: **Sonic 1 Stages**, **Sonic 2 Stages**, and **Sonic Megamix + Mighty**.
-Any combination works. Enabled campaigns run in that order around the native
-Sonic 3 & Knuckles campaign, with Megamix last. Megamix always adds Mighty
-and Mighty & Tails as selectable characters. Convert your own source ROMs
-into separate content packs; no ROMs or converted packs are distributed.
+The combined **Sonic3KRecomp** target includes five independent, default-off
+mods: **Sonic 1 stages**, **Sonic 2 stages**, **Sonic Megamix stages**,
+**Mighty**, and **Shadow**. Stages run in that order around the native Sonic
+3 & Knuckles campaign, with Megamix last. Each extra character can be enabled
+without Megamix stages or the other character. All three Megamix additions
+require your own raw Megamix v3 ROM and locally converted content pack. Select
+them once in any of the three Mods entries; their paths fill automatically
+in the other two. Extract ZIP archives before selecting the ROM. No ROMs or
+converted packs are distributed.
 
 Saves retain native-compatible SRAM and keep addon progress in a companion
 journal. Removing a pack safely parks its progress; adding it back restores

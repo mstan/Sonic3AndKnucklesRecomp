@@ -39,9 +39,9 @@ static void choose_current(void)
         if(save>=0xFFE6AC && save<0xFFE6FC)mode=r8(save+2)>>4;
         else if(mode<2)mode+=tri_shadow_selected?6:tri_mighty_selected?4:0;
     }
-    tri_mighty_selected=mode==4 || mode==5;
+    tri_mighty_selected=(mode==4 || mode==5) && s3_stage_pack_mighty && data_for(1);
     tri_shadow_selected=(mode==6 || mode==7) && s3_stage_pack_shadow && data_for(2);
-    if(tri_mighty_selected || mode==6 || mode==7) {
+    if(mode>=4 && mode<=7) {
         mode&=1;w16(PLAYER_OPTION,(uint16_t)mode);w16(RAM_Player_mode,(uint16_t)mode);
     }
 }
@@ -53,7 +53,7 @@ int tri_mighty_presentation_hook(uint32_t pc)
     }
     if(pc==TH_DS_NOSAVE_START || pc==TH_DS_NEWGAME) {
         unsigned character=menu_mighty[menu_index(p)];
-        if(!s3_stage_pack_mighty || !data_for(character) || (character==2 && !s3_stage_pack_shadow))character=0;
+        if(!data_for(character) || (character==1 && !s3_stage_pack_mighty) || (character==2 && !s3_stage_pack_shadow))character=0;
         unsigned offset=character?character*2+2:0;
         unsigned mode=r16(PLAYER_OPTION);
         if(pc==TH_DS_NEWGAME && character) {
@@ -71,7 +71,7 @@ int tri_mighty_presentation_hook(uint32_t pc)
         if(mode>=4 && mode<=7)D(0)=(D(0)&0xFFFFFF00u)|(mode&1);
         return 0;
     }
-    if(!s3_stage_pack_mighty || !data_for(1))return 0;
+    if(!(s3_stage_pack_mighty || s3_stage_pack_shadow) || !data_for(1))return 0;
     if(pc==MG_PC_MIGHTY_HUD && tri_character_active()) {
         A(1)=tri_rd32(data()+84);
         return 0; /* native frame selection, positioning and SAT rendering */
@@ -79,11 +79,14 @@ int tri_mighty_presentation_hook(uint32_t pc)
     if(pc==MG_PC_DS_CHARACTER) {
         unsigned index=menu_index(p),mode=D(0)&0xFFFFu;
         if(menu_mighty[index] && mode<2)mode+=menu_mighty[index]*2+2;
-        unsigned count=s3_stage_pack_shadow && data_for(2)?8:6;
+        unsigned choices[8]={0,1,2,3},count=4,selection=0;
+        if(s3_stage_pack_mighty && data_for(1)){choices[count++]=4;choices[count++]=5;}
+        if(s3_stage_pack_shadow && data_for(2)){choices[count++]=6;choices[count++]=7;}
+        for(unsigned i=0;i<count;i++)if(choices[i]==mode)selection=i;
         if(!r16(RAM_Player_2+0x30)) {
             unsigned pressed=r8(RAM_Ctrl_1_pressed);
-            if(pressed&1){mode=(mode+1)%count;o_sfx(0x5B);}
-            else if(pressed&2){mode=(mode+count-1)%count;o_sfx(0x5B);}
+            if(pressed&1){mode=choices[(selection+1)%count];o_sfx(0x5B);}
+            else if(pressed&2){mode=choices[(selection+count-1)%count];o_sfx(0x5B);}
         }
         menu_mighty[index]=(uint8_t)(mode>=4?mode/2-1:0);
         D(0)=(D(0)&0xFFFF0000u)|(mode>=4?mode&1:mode);
@@ -118,7 +121,7 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
     int menu=(r8(RAM_Game_mode)&127)==0x4C;
     int player=(r8(RAM_Game_mode)&127)==0x0C && tri_character_active();
     if(menu)d=data_for(1);
-    if(!d || !s3_stage_pack_mighty || (!menu && !player))return 0;
+    if(!d || !(s3_stage_pack_mighty || s3_stage_pack_shadow) || (!menu && !player))return 0;
     if(menu) {
         memset(menu_palette_lines,3,32);memset(menu_palette_lines+32,2,32);
         uint32_t art=tri_rd32(d+68)-TRI_BANK_BASE,bytes=tri_rd32(d+72);

@@ -172,3 +172,25 @@ done:
 }
 int s3_stage_pack_validate(const char *path,char *error,unsigned capacity)
 { return s3_pack_validate(path,0,error,capacity); }
+
+/* Require the owner's actual donor at selection and each boot, even when a
+ * previously converted pack is installed. Never infer ownership from a pack. */
+int s3_megamix_rom_validate(const char *path,char *error,unsigned capacity)
+{
+    const char *message="Select your Sonic Megamix v3 ROM (extract ZIP archives first)";
+    FILE *f=path && *path?fopen(path,"rb"):NULL;
+    int ok=0;
+    if(f) {
+        if(!fseek(f,0,SEEK_END) && ftell(f)==1283224L) {
+            rewind(f);uint8_t *data=malloc(1283224);
+            if(data) {
+                ok=fread(data,1,1283224,f)==1283224 && fgetc(f)==EOF && crc32(data,1283224)==0x66ECB4F4u;
+                free(data);
+            }
+        }
+        fclose(f);
+        message=ok?"Verified Sonic Megamix v3 ROM (shared by all three mods)":"Expected raw Megamix v3: 1,283,224 bytes, CRC32 66ECB4F4";
+    }
+    if(error && capacity)snprintf(error,capacity,"%s",message);
+    return ok;
+}

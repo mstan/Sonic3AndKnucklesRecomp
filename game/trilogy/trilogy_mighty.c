@@ -22,7 +22,7 @@ static uint32_t descriptor(void)
 }
 static int active(void)
 {
-    return s3_stage_pack_mighty && (tri_mighty_selected || tri_shadow_selected) && r16(RAM_Player_mode)<2 && descriptor();
+    return ((tri_mighty_selected && s3_stage_pack_mighty) || (tri_shadow_selected && s3_stage_pack_shadow)) && r16(RAM_Player_mode)<2 && descriptor();
 }
 int tri_character_active(void) { return active(); }
 int tri_mighty_active(void) { return active() && tri_mighty_selected; }
