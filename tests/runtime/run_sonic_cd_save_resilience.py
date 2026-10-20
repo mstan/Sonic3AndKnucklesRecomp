@@ -58,6 +58,7 @@ def main():
     ap.add_argument('--expected-stage',default='4001')
     ap.add_argument('--collectible-seed-dir',type=lambda s:Path(s).resolve())
     ap.add_argument('--completed',action='store_true',help='Seed explicit completed-file fixtures and select the first replay through the real menu.')
+    ap.add_argument('--permutations-only',action='store_true',help='Check saved-file Continue/replay under all 16 installed/enabled combinations.')
     args=ap.parse_args();args.out.mkdir(parents=True,exist_ok=False)
     if args.completed:args.expected_stage='4000'
     env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','MEGAMIX_','SONIC3_'))}
@@ -102,6 +103,15 @@ def main():
                     (not args.completed or bool(native[0]&3)) and (not untouched or rec['journal_untouched'])) else 'failed'
             except Exception as exc:rec['error']=repr(exc)
             (case/'result.json').write_text(json.dumps(rec,indent=2)+'\n');results.append(rec);print(json.dumps(rec),flush=True)
+        if args.permutations_only:
+            for mask in range(16):
+                config(mask)
+                if args.completed:
+                    stage='2000' if mask&1 else '2800' if mask&2 else '4000' if mask&8 else '0000'
+                else:stage=args.expected_stage if mask&8 else '0000'
+                fallback=0 if character==4 else 1 if character==5 else character
+                run(f'permutation-{mask}',stage,character if mask&4 else fallback,untouched=mask==0)
+            return results
         config();run('continue',args.expected_stage,character)
         config(4);run('cd-disabled','0000',character)
         config();run('cd-enabled',args.expected_stage,character)

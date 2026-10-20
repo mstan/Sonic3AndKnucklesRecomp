@@ -112,8 +112,13 @@ def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
         bank_sha256=hashlib.sha256(bank.read_bytes()).hexdigest()),indent=2))
     for file in (exe, exe.parent / 'SDL2.dll'):
         shutil.copy2(file, runtime / file.name)
-    megamix=bank.read_bytes()[-12:-8]==b'SPK2'
-    (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\n')
+    resource=bank.read_bytes();megamix=resource[-12:-8]==b'SPK2'
+    if resource[:4]==b'SCDP':
+        (runtime/'sonic3k-stage-pack.ini').write_text('format=2\nsonic1=0\nsonic2=0\n'
+            f'megamix={int(mighty)}\nmegamix_bank={(bank.parent/"megamix-stages.pak").as_posix()}\n'
+            f'sonic_cd=1\nsonic_cd_bank={bank.as_posix()}\n')
+    else:
+        (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\n')
     # TCP/script inputs are additive. Ignore physical keyboards/controllers
     # in unattended runs so a live device cannot change an audit fixture.
     (runtime / 'settings.ini').write_text(''.join(f'[input.p{i}]\ndevice=0\n' for i in range(1,5)))
@@ -151,7 +156,8 @@ def survey(args):
             subset = pts[offset:offset + 240]
             point_file.write_text(''.join(f"{p['x']:X} {p['y']:X}\n" for p in subset))
             script = batch / 'input.txt'; script.write_text(BOOT + 'WAIT 250000\nEXIT\n')
-            env = dict(os.environ, SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
+            env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','MEGAMIX_','SONIC3_'))}
+            env.update(SDL_VIDEODRIVER='dummy', SDL_AUDIODRIVER='dummy',
                        SDL_RENDER_DRIVER='software', TRILOGY_GOD='1',
                        TRILOGY_ZONE=stage['stage'], TRILOGY_CHAR='1',
                        TRILOGY_AUDIT=str(point_file), TRILOGY_AUDIT_OUT=str(batch / 'point'),
@@ -188,7 +194,9 @@ def survey(args):
             batches.append(dict(exit=code, seconds=round(time.monotonic()-started,1),
                                 errors=errors(text), points=observed,
                                 completed=f'audit: {len(subset)} points' in text))
-            for file in (runtime / args.exe.name, runtime / 'SDL2.dll'): file.unlink()
+            for file in (runtime / args.exe.name, runtime / 'SDL2.dll'):
+                try:file.unlink(missing_ok=True)
+                except OSError:pass # Retain a binary mapped by a crash reporter.
         captured = sum(p['captured'] for b in batches for p in b['points'])
         observed = {o['respawn'] - 0xeb00 for b in batches for p in b['points']
                     for o in p.get('active',[]) if 0xeb00 <= o['respawn'] < 0xee00}
