@@ -104,7 +104,9 @@ static int ground_action(void)
         if(status&1)current=-current;
         speed=current<0xC00?speed:current+0x40;
         w16(RAM_Max_speed,0x1100);super_boost=1;
-        if((int16_t)r16(0xFFF65C)>10)w16(0xFFF65C,10);
+        int timer=(int16_t)r16(0xFFF670); /* retail Super_frame_count */
+        if(timer>10)timer=12;
+        w16(0xFFF670,(uint16_t)(timer-2));
     }
     if(status&1)speed=-speed;
     w16(p+OBJ_ground_vel,(uint16_t)speed);w8(p+OBJ_anim,1);
@@ -123,9 +125,10 @@ static void boost_frame(void)
         return;
     }
     if(speed<0xC00)w16(p+OBJ_ground_vel,(r8(p+OBJ_status)&1)?0xF400:0xC00);
-    /* v3 $11CEEE..$11CF0A: boosted Super drains a ring every ten
-     * frames; keep the native Super timer and its normal deduction path. */
-    if((int16_t)r16(0xFFF65C)>10)w16(0xFFF65C,10);
+    /* v3 $11CEEE..$11CF0A resets its counter to ten. Both original
+     * countdowns use BPL, so this produces eleven-frame drain intervals.
+     * Native $11B3E decrements Super_frame_count ($F670), not Palette_frame. */
+    if((int16_t)r16(0xFFF670)>10)w16(0xFFF670,10);
 }
 int tri_shadow_hook(uint32_t pc)
 {
@@ -141,6 +144,13 @@ int tri_shadow_hook(uint32_t pc)
     case MG_PC_MIGHTY_SHIELD:
         if(p!=RAM_Player_1)return 0;
         if(tri_character_transform())return done();
+        if((r8(RAM_Ctrl_1_pressed_logical)&0x40) && r8(RAM_Super_Sonic_Knux_flag) && r8(p+0x35)) {
+            /* v3 $198F0: an invincibility pickup enables a Super burst.
+             * Its temporary 768-ring budget is restored after normal enemy
+             * and boss hurt handlers; no kill or HP result is fabricated. */
+            unsigned flags=r8(p+0x2B),mask=(flags&0x70)?(flags&0x70)>>3:(flags&1);
+            tri_character_blast(mask,1);return done();
+        }
         if((r8(RAM_Ctrl_1_pressed_logical)&0x30) && !target)acquire(0);
         return done();
     default:return 0;

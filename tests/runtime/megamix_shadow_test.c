@@ -10,6 +10,8 @@
 uint8_t g_ram[65536],g_rom[0x400000];M68KState g_cpu;
 int g_split_sp_popped;static int pending;int *g_rte_pending_ptr=&pending;
 static int enabled=1,room=1,sound;
+static unsigned blast_calls;
+void tri_character_blast(unsigned mask,int temporary){CHECK(temporary && mask==0);++blast_calls;}
 int tri_shadow_active(void){return enabled;}
 int tri_character_transform(void){return 0;}
 uint32_t o_slot(int i){return RAM_Player_1+(uint32_t)i*OBJ_SIZE;}
@@ -42,10 +44,10 @@ int main(void)
     w8(RAM_Player_1+OBJ_status,1);w8(RAM_Player_1+0x36,1);w16(RAM_Ring_count,5);
     CHECK(tri_shadow_hook(MG_PC_SHADOW_GROUND) && (int16_t)r16(RAM_Player_1+OBJ_ground_vel)==-0x1000);
     init();w8(RAM_Ctrl_1_pressed_logical,0x40);w8(RAM_Ctrl_1_held_logical,0x48);
-    w8(RAM_Super_Sonic_Knux_flag,1);w16(0xFFF65C,60);w8(RAM_Player_1+OBJ_status,4);
+    w8(RAM_Super_Sonic_Knux_flag,1);w16(0xFFF670,60);w8(RAM_Player_1+OBJ_status,4);
     w16(RAM_Player_1+OBJ_y_pos,100);
     CHECK(tri_shadow_hook(MG_PC_SHADOW_GROUND) && super_boost && !r16(RAM_Ring_count));
-    CHECK(r16(RAM_Max_speed)==0x1100 && r16(0xFFF65C)==10 && r16(RAM_Player_1+OBJ_y_pos)==95);
+    CHECK(r16(RAM_Max_speed)==0x1100 && r16(0xFFF670)==10 && r16(RAM_Player_1+OBJ_y_pos)==95);
     CHECK(!(r8(RAM_Player_1+OBJ_status)&4) && r8(RAM_Player_1+OBJ_y_radius)==19);
     w8(RAM_Ctrl_1_held_logical,0);CHECK(!tri_shadow_hook(TH_LVL_PRE_SPRITES));
     CHECK(!super_boost && r16(RAM_Max_speed)==0xA00);
@@ -63,6 +65,8 @@ int main(void)
     w8(RAM_Player_1+OBJ_routine,4);CHECK(!tri_shadow_hook(MG_PC_SHADOW_AIR) && !target && !previous);
     init();enemy(2,129,5);enemy(3,48,0x85);w8(RAM_Player_1+OBJ_status,2);w8(RAM_Ctrl_1_pressed_logical,0x10);
     CHECK(tri_shadow_hook(MG_PC_MIGHTY_SHIELD) && !target);
+    w8(RAM_Super_Sonic_Knux_flag,1);w8(RAM_Player_1+0x35,1);w8(RAM_Ctrl_1_pressed_logical,0x40);
+    CHECK(tri_shadow_hook(MG_PC_MIGHTY_SHIELD) && blast_calls==1);
     enabled=0;CHECK(!tri_shadow_hook(MG_PC_MIGHTY_SHIELD));
     puts("Shadow ground boost cost/wall/facing/shoes and homing range/selection/chain/hurt contracts passed");return 0;
 }

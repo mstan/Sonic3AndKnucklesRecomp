@@ -39,7 +39,8 @@ def shadow_descriptor(bank,donor,s3k):
             0x1AC0E:'0c380002ffbb670845f90002c3d2',
             0x1AC1E:'45f90002ca1c',0x1AC7A:'0681000be2e4',
             0x53B4:'70166100ce6c',0x52BE:'701a0c380003fe116602701c',
-            0x1A7F4:'43f90001aa1c0c380001ffbb670c4a38fe19670643f90001ab5e'}
+            0x1A7F4:'43f90001aa1c0c380001ffbb670c4a38fe19670643f90001ab5e',
+            0x11C8EC:'41f90011cb7c',0x11C942:'41f90011ccfc'}
     for p,code in proofs.items():
         if donor.blob(p,len(code)//2)!=bytes.fromhex(code):raise ValueError(f'Unproven Shadow binding ${p:X}')
     sprite,report=convert_character(donor,SHADOW)
@@ -49,7 +50,7 @@ def shadow_descriptor(bank,donor,s3k):
         bank.add(sprite['art']),bank.add(palettes[0]),bank.add(sprite['animation_source']),
         len(sprite['art']),len(sprite['animation_source']),report['frames'],report['animation_entries'])
     record+=struct.pack('>4I',bank.add(palettes[1]),bank.add(palettes[2]),
-        bank.add(donor.blob(0x11CAFC,128)),bank.add(donor.blob(0x11CC7C,128)))
+        bank.add(donor.blob(0x11CB7C,128)),bank.add(donor.blob(0x11CCFC,128)))
     record+=struct.pack('>3I',*(bank.add(struct.pack('>IHH',bank.add(pal),0xFC00,7)) for pal in palettes))
     record+=struct.pack('>6I',bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
         bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings']))

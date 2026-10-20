@@ -54,6 +54,7 @@ int tri_shadow_active(void);
 int tri_character_active(void);
 int tri_shadow_hook(uint32_t pc);
 int tri_character_transform(void);
+void tri_character_blast(unsigned mask,int temporary_budget);
 void tri_shadow_menu_colors(uint16_t *top,uint16_t *bottom);
 int tri_stage_content(uint16_t stage);
 void tri_bank_level(void);
