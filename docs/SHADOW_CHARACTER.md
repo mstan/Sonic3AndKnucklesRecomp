@@ -115,9 +115,38 @@ and eight-frame/nine-step cycle are original-instruction qualified. Earlier
 failed fixtures/logs remain; one S1 homing setup landed before the button press
 and is being rerun with an explicitly checked airborne prerequisite.
 
-Remaining before standalone acceptance: native/S1/S2/MM extended ability,
-water/shield and transition coverage; explicit native deletion/recreation;
-completed-file menu checks; final candidate scene review and a clean
-normal-window/normal-audio owner build. No merge or final playtest delivery yet.
-After this branch qualifies, integrate Shadow into CD and resume the general
-Sega CD backend and outstanding CD acceptance work.
+The owner playtested Shadow with all emeralds and approved merging the
+experimental character on 2026-10-19. The independent mod/resource split was
+then qualified against game `64a6ef0` and engine `3f17adf` (including current
+master). Candidate SHA256:
+`4c5944857bdc2564f85c6c2d2aedfacc536eaf649ff7106603c695b7db325a2c`.
+
+- 43/43 combined CTests pass, including the rebuilt current engine tests.
+- Native mod-off parity remains 49/49 PNG/RAM/VRAM artifacts byte-identical.
+- Windows and Ubuntu GCC strict builds pass the shared donor/resource tests,
+  all 32 checkbox combinations, and normal/completed parked-save matrices for
+  identities 4?7 across all 32 configurations. No ROM data is in these tests.
+- Real New Game and cross-process Continue pass all eight combinations of
+  Megamix stages/Mighty/Shadow. A Shadow-only file parks under missing or wrong
+  ROM and restores its identity after the owned donor returns (19 launches
+  plus the retained-journal assertion).
+- With Mighty disabled, actual Shadow boost, homing enemy defeat/score,
+  transform, held Super boost with three native ring deductions, release,
+  airborne revert and natural timeout/death/retry all pass. An earlier probe
+  faced left near the stage boundary and correctly stopped; its retained log
+  led to an explicit rightward input through the open route.
+- Actual launcher screenshots show three separate checkboxes and the same
+  verified ROM/content path in all three detail pages. Real menu portraits,
+  native-stage Shadow and MM Super/HUD captures were visually reviewed,
+  retaining the earlier independent original-ROM artwork qualification.
+- Actual hidden Win32 gameplay and launcher captions are clean with configured
+  debug ports. The launcher probe now opens without a positional ROM/CLI port,
+  which deliberately bypass the launcher in the runner; it uses rom.cfg and
+  debug.ini instead. The old probe exercised gameplay twice.
+
+Private evidence: `build/qa-shadow-split-*`,
+`build/qa-shadow-only-abilities-final-2`, and `build/shadow-investigation`.
+Broader stage/boss/special-stage and water/shield interaction auditing remains
+explicitly incomplete under this experimental status. No final CD acceptance
+is implied. CD and its general Sega CD backend remain paused pending the
+owner?s BIOS; their AS IS checkpoint branches are separate from this merge.

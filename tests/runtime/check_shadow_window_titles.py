@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Observe real hidden Win32 gameplay/launcher captions with a debug port."""
+"""Observe real hidden Win32 gameplay/launcher captions with configured debug ports."""
 import argparse,ctypes as C,json,os,shutil,socket,subprocess,time
 from ctypes import wintypes as W
 from pathlib import Path
@@ -13,13 +13,15 @@ def main():
     for launcher in (False,True):
         case=a.out/('launcher' if launcher else 'gameplay');rt=case/'runtime';rt.mkdir(parents=True)
         for f in (a.exe,a.exe.parent/'SDL2.dll'):shutil.copy2(f,rt/f.name)
-        (rt/'settings.ini').write_text('[video]\nfullscreen=0\n[audio]\nvolume=0\n')
+        (rt/'settings.ini').write_text('[video]\nfullscreen=0\n[audio]\nvolume=0\n',encoding='utf-8')
+        (rt/'rom.cfg').write_text(str(a.rom)+'\n',encoding='utf-8')
         with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
         env={k:v for k,v in os.environ.items() if not k.startswith(('SDL_','LNG_','GENESIS_','TRILOGY_'))}
+        (rt/'debug.ini').write_text(f'[debug]\nenabled=1\nport={port}\n',encoding='utf-8')
         env.update(SDL_VIDEODRIVER='windows',SDL_AUDIODRIVER='dummy',SDL_RENDER_DRIVER='software',LNG_TEST_HIDDEN='1',LNG_SCRIPT='wait:6000;quit')
         found=[]
         with (case/'run.log').open('w') as log:
-            proc=subprocess.Popen([str(rt/a.exe.name),str(a.rom),'--launcher' if launcher else '--no-launcher','--port',str(port)],
+            proc=subprocess.Popen(([str(rt/a.exe.name),'--launcher'] if launcher else [str(rt/a.exe.name),str(a.rom),'--no-launcher','--port',str(port)]),
                 cwd=rt,env=env,stdout=log,stderr=log,creationflags=subprocess.CREATE_NO_WINDOW)
             try:
                 def collect(hwnd,param):
