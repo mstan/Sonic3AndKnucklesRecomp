@@ -53,7 +53,13 @@ def stage(build, dest, version, mode):
             pin = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{relative}"], text=True).strip()
             assert pin == head, f"Unpinned submodule: {relative}"
     binary = build / (spec["target"] + (".exe" if info["system"] == "Windows" else ""))
-    assert f"{spec['title']} v{version}".encode() in binary.read_bytes(), "Missing binary version stamp"
+    # Gameplay/launcher captions contain only the clean game name. Build
+    # identity is emitted separately by the shared runner for logs/About.
+    image = binary.read_bytes()
+    for label, stamp in (("game title", spec["title"]), ("version", version),
+                         ("source commit", info["source_commit"][:10]),
+                         ("engine commit", info["engine_commit"][:10])):
+        assert stamp.encode() + b"\0" in image, f"Missing binary {label} stamp"
     dest.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / f"release/README_{mode}.txt", dest / "README.txt")
     license_path = ROOT / "LICENSE.md"
