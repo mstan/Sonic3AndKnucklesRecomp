@@ -18,8 +18,9 @@ evidence is `build/cd-investigation/us-source-manifest.json`: 70 playable
 variants and three demos inspect successfully. The current source conversion
 produces 70 level blobs, 80 FM effects and 51 special/warp items, including
 eight special-stage datasets. All eight now have an explicit No Save practice
-entry and real win/timeout/return checks. Broader mechanics, final visuals and
-audio fidelity remain unverified. Failed conversion attempts are retained
+entry and real win/timeout/return checks. Broader mechanics and final visuals
+remain open; qualified audio checks and their limits are recorded below.
+Failed conversion attempts are retained
 beside the corrected third run; they are not gameplay evidence.
 
 Converter/runtime reference: `sonsegajp/SonicAnthology` at
@@ -135,7 +136,9 @@ build 5: 53 in `build/qa-cd-sign-exits-dev5` and three isolated startup retries
 (`4a01`, `5100`, `5b00`). The original startup failures remain recorded.
 All 14 generators and 12 projectors pass contact/break/durable-bit checks
 (`build/qa-cd-collectibles-dev6`); Metallic Madness has no projectors. A new
-build-7 chain checks accumulation through resumed processes. All eight No Save
+build-7 chain passes all 26 accumulated contacts through resumed processes,
+ending with generator/projector bytes `3fff0fff`
+(`build/qa-cd-collectibles-chain-dev7`). All eight No Save
 practices pass natural timeout and real six-UFO jump-collision wins, return
 without changing durable collectibles or saved native files
 (`build/qa-cd-practice-timeouts-dev5`, `build/qa-cd-practice-success-probe-dev6`,
@@ -143,12 +146,19 @@ without changing durable collectibles or saved native files
 trace-only player X/Y follow helper; collision, jump height, defeat and awards
 remain game-owned.
 
-Full source-derived time-post direction coverage is in progress. The first
-five-direction PPZ probe passes. A used destination post can immediately
+All 70 source-derived time-post direction cases now have passing outcomes:
+66 in `build/qa-cd-warps-dev8`, with its four failed fixtures retained; all
+four corrected reruns pass in `build/qa-cd-warp-fixture-reruns-dev9`.
+A used destination post can immediately
 start a second charge, so the corrected leak check stops player motion and
 observes cancellation instead of assuming an arrival invincibility bit is a
 leak. Missing live samples can be recovered from completed-frame history.
 Earlier ambiguous/failed fixtures are retained in `build/qa-cd-warps-dev6`.
+The stop fixture now writes only player velocities: rewriting the whole
+player from an older frame could restore a charge flag already cleared by
+the game. Post activation is checked both immediately and during charging.
+The trace-only Right-held position/velocity helper leaves object control
+untouched, because MMZ deliberately holds warps while an object owns Sonic.
 
 Development executable SHA256
 `07850a2af6ba5b862d531a88f576c307fde97f140edccd36ed29e7fbe7f4b449`
@@ -174,9 +184,9 @@ The atomic fixture produced entry/movement captures for all 70 variants
 (`build/qa-cd-entries-atomic-dev5/results.json`), but it is superseded for clean
 entry qualification. Even a single live zone/restart write can expose the new
 zone before its window loads. The replacement uses a fresh process per stage
-and the existing level-entry override. Four probes, including the affected
-WWZ boss variants, pass with no interior misses; the full fresh-process sweep
-is recorded under `build/qa-cd-fresh-entries-dev7`. Real exits, warps, deeper
+and the existing level-entry override. All 70 fresh-process entries and
+movement checks pass with no interior/unsafe-floor fallbacks
+(`build/qa-cd-fresh-entries-dev7`). Real exits, warps, deeper
 mechanics and final visual fidelity remain separate checks.
 
 Runtime resource enrollment, independent CD bank ownership, gameplay hooks,
@@ -200,7 +210,7 @@ Normal campaign / UFO practice 1..8 choice: starting No Save with a practice
 stage chosen enters CD directly and then that UFO stage. Practice returns to
 Palmtree Panic without awarding stones or changing saved campaign progress.
 Practice entry, both outcomes and return durability now pass the development
-checks above. Full original-game visual/audio fidelity remains unqualified.
+checks above. Full original-game runtime/visual equivalence remains unqualified.
 
 Content conversion now requires the `scd_pack_validate` executable (build that
 CMake target or supply `tools/build_sonic_cd_pack.py --validator <path>`). It
@@ -209,10 +219,71 @@ conversion continues to validate every normalized track against the enrolled
 source hashes. The raw BIN little-endian stereo interpretation also agrees
 with the independent [Genesis Plus GX drive implementation](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/core/cd_hw/cdd.c#L1554).
 
+PPZ and CCZ bosses pass in both futures on build 8; TTZ and QQZ pass in both
+futures on build 9. Evidence is `build/qa-cd-{ppz,ccz}-bosses-dev8` and
+`build/qa-cd-{ttz,qqz}-bosses-dev9`. These check actual damage/event phases,
+escape, capsule, tally, next round and exact save. TTZ also observes all 16
+bubbles, a real bubble restoring air from 2 to 30, and shots. Its chase
+positioning respects the player's `$800` wrap before the pod's `$880` wrap.
+QQZ uses real Right input through the entire treadmill wear sequence with
+zero position resets in both runs. Completed-frame history retains its zero
+HP crossing before the belt's natural signed underflow while slowing down.
+Navigation/attack-posture/protection bypasses are explicit in every result.
+All imported `TRILOGY_BOSSAUTOHIT` shortcuts have been removed; acceptance
+tests never enabled them. WWZ, SSZ race and the final boss remain open.
+
+## Independent audio qualification
+
+Development build 9 SHA256 is
+`73446967214af7f9a833b5ca14e157f613acf3be0fda38cdbc231fa135596b8e`.
+The 28 period captures on build 8 pass selection/delivery/no-clipping checks
+(`build/qa-cd-period-audio-dev8`). All 21 CD-DA period tracks correlate with
+the owned original BIN stereo samples at greater than 0.99988 per channel.
+Raw track reads use the original CUE start/pregap information independently
+of the runtime music pack.
+
+`tests/runtime/sonic_cd_pcm_reference.py` executes the owned banks' original
+68000 bytes in Unicorn, against unmodified Genesis Plus GX RF5C164 code at
+`49c584764893b0505ac7f768a754f97330fa4392`. The caller supplies the reference
+checkout; neither that core nor disc bytes are vendored or delivered. The
+bank has a 16-byte filename header: driver entry is `$40010`, variables
+`$40018`. Calls are atomic at 512-chip-sample service boundaries. All nine
+banks pass 180-second original/transcribed driver variable comparisons with
+zero differences (`build/qa-cd-original-pcm-long`). Commands for voices,
+pause, resume and fade also pass; the complete valid PPZ voice index passes
+`build/qa-cd-original-pcm-all-voices-v2`.
+
+The independent check exposed an extra sample-address advance at a loop
+marker. The fixed chip also reloads a stopped channel's address on ST writes.
+The [Sega PCM manual, section 4-8](https://www.megadrive.org/elbarto/megacd/Official%20Sega%20CD%20Manual/MegaCD/PCM-Sound/pcm-13.gif)
+specifies 16-bit accumulated output; the transcription's extra six-bit
+quantization has been removed. The multiply/truncate/add-subtract order
+differs from GX's signed-shift rounding by at most one LSB per channel (eight
+summed). Reference results record that bound rather than claiming bit equality.
+Raw correlations exceed 0.9999998. Bus timing and analogue filtering remain
+outside this driver/sample-stream qualification.
+
+All seven in-game Past themes on build 9 correlate with that original-driver
+reference above 0.99995 per stereo channel, with no clipping
+(`build/qa-cd-past-audio-analysis-dev9` for six themes and
+`build/qa-cd-past-audio-mmz-analysis-dev9` for MMZ). Initial analysis failures
+used the wrong raw-rate resampling ratio and a command-interrupted reference;
+their captures remain unchanged. The corrected analysis verifies build/resource
+identities and reuses those same WAV/RAM/log captures with pure-music references.
+
+The unused PPZ `$B0` sound contains undefined `$FE` bytecode: the original
+driver runs into data and faults. Its first transcription probe hung in an
+empty stream refill (debugger stack retained). Undefined bytecode and invalid
+empty/out-of-bank streams now stop safely; the production-only invalid-command
+probe passes `build/qa-cd-pcm-invalid-safe`. This is safe rejection, not claimed
+original-driver equivalence. The guarded valid-bank long sweep is in progress.
+Music/voice delivery during bosses, warps, results, UFO, pausing and pack removal
+still needs broader scene/transition checks.
+
 Remaining acceptance includes other bosses/race/final campaign transitions,
 broader geometry/gimmick/enemy/character interactions, checkpoint/death/warp
 state, CD-specific process removal/reinstallation and completed-file cases,
-audio fidelity, adaptive rendering, full-runtime portability and final owner
+scene audio behavior, adaptive rendering, full-runtime portability and final owner
 delivery. The mandatory final independent visual comparisons remain open.
 
 ## Follow-up after CD

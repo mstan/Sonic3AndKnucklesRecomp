@@ -257,11 +257,34 @@ int scd_time_pal_hook(uint32_t pc)
     }
 }
 
+#if GEN_ENABLE_TRACE
+/* Audit positioning/velocity bypass only, enabled while Right is held in
+ * the initial stage. Keep object_control untouched: MMZ intentionally holds
+ * a warp while an object owns the player. No post/timer/warp state changes. */
+static void audit_run(uint32_t p)
+{
+    static int checked,enabled,stage=-1;
+    static unsigned x,y,speed;
+    if(!checked) {
+        const char *v=getenv("TRILOGY_SCD_WARP_RUN");checked=1;
+        enabled=v && sscanf(v,"%x,%x,%x",&x,&y,&speed)==3 && x<=0xFFFF && y<=0xFFFF && speed>=0x600 && speed<=0x7FFF;
+    }
+    if(!enabled)return;
+    if(stage<0)stage=r16(RAM_Current_zone_and_act);
+    if(r16(RAM_Current_zone_and_act)!=(unsigned)stage || !(r8(RAM_Ctrl_1_held)&8) || (OB8(p,0x2E)&1))return;
+    SET16(p,OBJ_x_pos,x);SET16(p,OBJ_y_pos,y);
+    SET16(p,OBJ_x_vel,speed);SET16(p,OBJ_y_vel,0);SET16(p,OBJ_ground_vel,speed);
+}
+#endif
+
 /* RunTimeWarp + ObjSonic_TimeWarp, after the player has moved */
 static void frame(void)
 {
     uint32_t p = RAM_Player_1;
     if (!o_player_active(p) || OB8(p, OBJ_routine) != 2) return;
+#if GEN_ENABLE_TRACE
+    audit_run(p);
+#endif
     if (s_warp.on && r16(RAM_Current_zone_and_act) == s_warp.za) {   /* (arrived: running on) */
         s_warp.on = 0;
         for (unsigned k = 0; k < SAVED_LEN; k++) w8(RAM_Saved_block + k, s_prev_save[k]);   /* (the checkpoint again, */

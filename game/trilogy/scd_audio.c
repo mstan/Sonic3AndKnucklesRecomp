@@ -58,7 +58,10 @@ static void rf_write(unsigned reg, uint8_t v)
     case 3: c->fdh = v; break;
     case 4: c->lsl = v; break;
     case 5: c->lsh = v; break;
-    case 6: c->st = v; break;
+    case 6:
+        c->st = v;
+        if (!c->on) c->addr = (uint32_t)v << 19;
+        break;
     case 7:                                         /* CTRL: ON, MOD (channel / wave bank) */
         if (v & 0x40) s_rf.cur = v & 7; else s_rf.bank = v & 15;
         s_rf.enable = v >> 7;
@@ -87,14 +90,16 @@ static void rf_sample(int32_t *left, int32_t *right)
                 s = s_rf.wave[(c->addr >> 11) & 0xFFFF];
                 if (s == 0xFF) continue;
             }
-            c->addr += (uint32_t)((c->fdh << 8) | c->fdl);
+            else c->addr += (uint32_t)((c->fdh << 8) | c->fdl);
             if (s & 0x80) { s &= 0x7F; l += (s * lv) >> 5; r += (s * rv) >> 5; }
             else { l -= (s * lv) >> 5; r -= (s * rv) >> 5; }
         }
     l = l > 32767 ? 32767 : l < -32768 ? -32768 : l;
     r = r > 32767 ? 32767 : r < -32768 ? -32768 : r;
-    *left = l & ~0x3F;                              /* a 10-bit DAC */
-    *right = r & ~0x3F;
+    /* The Mega-CD PCM manual, section 4-8, specifies a 16-bit summed
+     * output. Dropping six bits here incorrectly adds 10-bit quantization. */
+    *left = l;
+    *right = r;
 }
 
 /* ------------------------------------------------------------------------
@@ -221,15 +226,25 @@ static void init_driver(void)
 
 static void stream_sample(int a3)
 {
-    setw(a3 + ptrkSampRAMOff, (uint16_t)(vw(a3 + ptrkSampRAMOff) + 0x200));
     uint32_t d6 = vl(a3 + ptrkSampRemain), a2 = vl(a3 + ptrkSamplePtr), a0 = vl(a3 + ptrkSampleRAM);
+    uint32_t size = vl(a3 + ptrkSampleSize), loop = vl(a3 + ptrkSampleLoop);
+    /* Undefined bytecode (including the disc's unused $FE sound) can leave
+     * an empty/invalid stream. The original runs into data; never let that
+     * turn the host's refill into an unbounded zero-length copy loop. */
+    if (!d6 || loop >= size || a2 < PCMDRIVER || a2 - PCMDRIVER >= s_bank_size ||
+        d6 > s_bank_size - (a2 - PCMDRIVER)) {
+        rest_track(a3);
+        note_off(a3);
+        return;
+    }
+    setw(a3 + ptrkSampRAMOff, (uint16_t)(vw(a3 + ptrkSampRAMOff) + 0x200));
     rf_write(7, (uint8_t)(((T(a3, ptrkChannel) << 1) + T(a3, ptrkSampleBank)) | 0x80));
     uint32_t d0 = 0x200, d1 = 0x200;
     for (;;) {
         if (d6 < d0) d0 = d6;
         d6 -= d0;
         d1 -= d0;
-        for (uint16_t k = (uint16_t)(d0 - 1);; k--) {   /* dbf: an empty copy runs 65536 times */
+        for (uint16_t k = (uint16_t)(d0 - 1);; k--) {
             wave_write(a0, rd8(a2++));
             a0 += 2;
             if (k == 0) break;
@@ -390,7 +405,11 @@ static int track_command(int a3, uint8_t cmd, uint32_t *a2)
         for (int t = 0; t < 9; t++) V[pdrvRhythm + t * ptrkSize + ptrkTickMult] = m;
         break;
     }
-    default: break;                                     /* nulls (and $FE, which runs off into data) */
+    case 0x1E: case 0x1F:                              /* undefined original bytecode, not a null */
+        T(a3, ptrkFlags) &= ~(1 << PTRK_PLAY);
+        note_off(a3);
+        return CMD_STOP;
+    default: break;                                     /* original null commands */
     }
     return CMD_OK;
 }

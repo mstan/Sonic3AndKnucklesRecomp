@@ -520,10 +520,6 @@ static void egg1(uint32_t o)
                 OB8(o, OBJ_coll_prop), OB16(o, OBJ_x_pos), OB16(o, OBJ_y_pos), lk(o, C30) ? OB8(lk(o, C30), OBJ_routine) : 0xFF,
                 OB16(RAM_Player_1, OBJ_x_pos), OB16(RAM_Player_1, OBJ_y_pos), OB8(RAM_Player_1, OBJ_status),
                 OB8(RAM_Player_1, OBJ_anim), r16(RAM_Camera_X_pos), r16(RAM_Camera_max_Y_pos));
-    static int autohit = -1;                                  /* development: a hit every N frames */
-    if (autohit < 0) autohit = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-    if (autohit > 0 && btst(o, 3) && !OB8(o, C34) && !(r16(RAM_Level_frame_counter) % autohit))
-        SET8(o, OBJ_coll_flags, 0);
     if (!egg1_step(o)) return;
     o_animate(o, o_asset_anim(SCDA_EGGMAN));
     part_draw(o);

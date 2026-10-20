@@ -173,7 +173,7 @@ class Native:
         self.write(0xfe02,b'\x00\x00')
     def write(self,addr,data): self.cmd('write_memory',addr=f'{addr|0xff0000:06X}',hex=data.hex())
 
-    def player(self,ram,x,y,attack=False,freeze=False):
+    def player(self,ram,x,y,attack=False,freeze=False,air=30):
         p=bytearray(ram[0xb000:0xb04a])
         struct.pack_into('>I',p,0x10,x<<16);struct.pack_into('>I',p,0x14,y<<16)
         struct.pack_into('>hhh',p,0x18,0,0x200 if attack else 0,0)
@@ -181,7 +181,7 @@ class Native:
         p[0x20]=2 if attack else 0
         p[0x2a]=(p[0x2a]&1) | (6 if attack else 2)
         p[0x2e]=0x81 if freeze else 0
-        p[0x2c]=30;p[0x34]=0x1c
+        p[0x2c]=air;p[0x34]=0x1c
         p[0x2f]=0;p[0x3d]=0
         self.write(0xb000,p)
 

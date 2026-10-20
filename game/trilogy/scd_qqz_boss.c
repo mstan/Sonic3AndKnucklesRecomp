@@ -396,9 +396,6 @@ static void meca2(uint32_t o)
         SET16(o, M2_HP, 0x960);
         /* fall through */
     case 2: {                                                 /* [$20B5F2] till spun into */
-        static int autohit = -1;                              /* development: the hit after N frames */
-        if (autohit < 0) autohit = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-        if (autohit > 0 && s_bossstart && !(r16(RAM_Level_frame_counter) % autohit)) SET8(o, OBJ_coll_flags, 0);
         if (OB8(o, OBJ_coll_flags)) break;
         if (OB8(o, OBJ_coll_prop) == 1) hit_bounce(o);        /* (Touch_Enemy's hit: 2 -> 1) */
         o_sfx_cd(FM_BOSSHIT);
@@ -866,9 +863,6 @@ static void belt(uint32_t o)
                 g = (uint16_t)(g - 0x5D0);
             }
             SET16(o, BL_GRIND, g);
-            static int autohit = -1;                          /* development: N more a frame */
-            if (autohit < 0) autohit = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-            if (autohit > 0 && m && (int16_t)OB16(m, M2_HP) > 0) SET16(m, M2_HP, OB16(m, M2_HP) - 1);
         }
         belt_anim(o);
         return;
