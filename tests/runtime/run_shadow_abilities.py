@@ -40,6 +40,10 @@ def main():
         if stage:
             game=2 if 0x28<=int(a.stage[:2],16)<=0x32 else 1
             wanted={0x40} if int(a.stage[:2],16)>=0x34 else ENEMIES[game]
+            if int(a.stage[:2],16)>=0x40:
+                from run_sonic_cd_enemies import FAMILIES
+                wanted={key for key,value in FAMILIES[(int(a.stage[:2],16)-0x40)//4].items()
+                        if value not in ('bigbom','scarab','hotaru','kemusi')}
             enemy=next(o for o in stage['objects'] if o['id'] in wanted)
             report['target_placement']=enemy
             r.close();r=None
@@ -66,7 +70,7 @@ def main():
         check('homing contact produces real enemy defeat and score',score_after>score_before,score_before=score_before,score_after=score_after,
             target_before=target,target_after=[o for o in objects(after) if o['addr']==target['addr']])
         # Native transform/revert with the S3K emerald requirement.
-        ram,_=r.snapshot();r.player(ram,0x300,0x200,attack=True);r.write(0xB040,b'\1');r.write(0xFE20,b'\0\xc8');r.write(0xFFB0,b'\7')
+        ram,_=r.snapshot();r.player(ram,ground_start[0]+64,max(40,ground_start[1]-100),attack=True);r.write(0xB040,b'\1');r.write(0xFE20,b'\0\xc8');r.write(0xFFB0,b'\7')
         before,after,hist=press(0x30,2);r.step(40);after,_=r.snapshot('super-ready')
         check('B+C transforms with seven emeralds and sufficient rings',bool(after[0xFE19]),super=after[0xFE19])
         # Return near the observed safe starting floor, then let native ground
@@ -89,7 +93,7 @@ def main():
         check('release restores native Super speed profile',u16(after,0xF760)==0xA00,max_speed=u16(after,0xF760))
         # Transformation has enough time to land. Re-establish the explicitly
         # declared airborne prerequisite before testing an airborne command.
-        ram,_=r.snapshot();r.player(ram,0x300,0x200,attack=True);r.write(0xB040,b'\1')
+        ram,_=r.snapshot();r.player(ram,ground_start[0]+64,max(40,ground_start[1]-100),attack=True);r.write(0xB040,b'\1')
         before,after,hist=press(0x30,2);r.step(20);after,_=r.snapshot('reverted')
         check('B+C reverts through native palette/state lifecycle',not after[0xFE19],super=after[0xFE19])
         lives=after[0xFE12];r.player(after,ground_start[0],max(40,ground_start[1]-100),freeze=True)

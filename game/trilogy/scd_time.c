@@ -244,6 +244,7 @@ int scd_time_pal_hook(uint32_t pc)
             A(1) = S3K_PLC_SpikesSprings;
             tri_jsr(S3K_Load_PLC_Raw);
             tri_jsr(S3K_PLCLoad_AnimalsAndExplosion);
+            tri_water_load_bubbles();
             A(0) = a0;
             A(1) = a1;
             tri_obj_titlecard_done();

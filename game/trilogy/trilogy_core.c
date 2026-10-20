@@ -283,6 +283,10 @@ int trilogy_owns(uint32_t pc)
 
 int trilogy_instruction(uint32_t pc)
 {
+    if (pc == TH_CD_MUSIC_REQUEST || pc == TH_CD_MUSIC_TEMPO) {
+        extern int tri_scd_music_request(unsigned id, int tempo);
+        if (tri_scd_music_request(D(0) & 255u, pc == TH_CD_MUSIC_TEMPO)) return 1;
+    }
     extern int tri_save_journal_hook(uint32_t pc);
     if(tri_save_journal_hook(pc))return 1;
     if (!s_bank)
@@ -301,6 +305,11 @@ int trilogy_instruction(uint32_t pc)
         return 1;
     if (tri_flow_hook(pc))
         return 1;
+    {
+        extern int scd_ttz_water(uint32_t pc);
+        if (scd_ttz_water(pc))                       /* (Tidal Tempest: Sonic CD's water levels) */
+            return 1;
+    }
     if (tri_water_hook(pc))
         return 1;
     /* Sonic CD's FindLevelFloor(2) .CheckNegFloor: looking down (a3 = $10), a
@@ -340,11 +349,6 @@ int trilogy_instruction(uint32_t pc)
             s_ang[k] = ang;
         }
         return 0;
-    }
-    {
-        extern int scd_ttz_water(uint32_t pc);
-        if (scd_ttz_water(pc))                       /* (Tidal Tempest: Sonic CD's water levels) */
-            return 1;
     }
     {
         extern void scd_ppz_hook(uint32_t pc), scd_time_hook(uint32_t pc), scd_wwz_hook(uint32_t pc);

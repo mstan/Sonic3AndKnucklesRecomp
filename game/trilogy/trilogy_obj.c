@@ -917,6 +917,8 @@ void tri_vram_queue(uint32_t src, uint32_t vram, uint32_t len)
 
 void tri_obj_vblank(void)
 {
+    extern void tri_scd_audio_frame(void);
+    tri_scd_audio_frame();
     vram_queue_flush();
     extern void tri_thumb_vblank(void);
     tri_thumb_vblank();

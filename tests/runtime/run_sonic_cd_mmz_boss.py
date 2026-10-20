@@ -109,6 +109,8 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for key in ('exe','rom','content','out'):
         ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
+    ap.add_argument('--music',type=lambda s:Path(s).resolve())
+    ap.add_argument('--capture-audio',action='store_true')
     ap.add_argument('--stages',default='5a02,5b02')
     ap.add_argument('--seed-dir',type=lambda s:Path(s).resolve())
     args=ap.parse_args();args.bank=args.content;args.packs=args.content.parent;args.pack_mask=8

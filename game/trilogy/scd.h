@@ -19,6 +19,8 @@ void scd_cd_play(int track, int loop);   /* CD-DA track (2..35), whole-track rep
 void scd_cd_stop(void);
 void scd_cd_fade(void);                   /* fade out, then stop */
 void scd_cd_pause(int paused);
+/* Native level pause, separate from the UFO scene's own CD-only pause. */
+void scd_audio_level_pause(int paused);
 int  scd_cd_track(void);                  /* playing track, 0 none */
 /* SMPS-PCM sound bank (the sub CPU's PRG-RAM $40000 file): SNCBNK1B.BIN
  * (Palmtree Panic) ... SNCBNKB1.BIN (boss), SNCBNKB2.BIN (final boss). */

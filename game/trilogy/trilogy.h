@@ -319,3 +319,6 @@ void tri_screen_register(void);
 void tri_player_frame(void);             /* trilogy_player.c */
 int  tri_obj_dispatch(uint32_t addr);     /* trilogy_obj.c */
 void tri_obj_upload_art(void);
+
+/* Shared water art after title cards and CD warp arrivals. */
+void tri_water_load_bubbles(void);

@@ -236,7 +236,9 @@ static void basic_super_attack(void)
         if(!r32(o) || !(r8(o+OBJ_render)&0x80) || !collision)continue;
         unsigned boss=r8(o+OBJ_coll_prop) &&
             ((collision&0xC0)==0xC0 || (collision&0x3F)==0x0F);
-        if(!boss && !((collision>=5 && collision<=14) || collision==0xCC))continue;
+        int cd=cd_attack_target_kind(o);
+        if(cd>=0) { if(!cd)continue;boss=cd==2; }
+        else if(!boss && !((collision>=5 && collision<=14) || collision==0xCC))continue;
         unsigned cost=price*(boss?3:1);
         if(r16(RAM_Ring_count)<cost)break;
         w16(RAM_Ring_count,r16(RAM_Ring_count)-cost);

@@ -8,6 +8,7 @@
  * with these objects exactly as with native S3K ones.
  */
 #pragma once
+#include <stddef.h>
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
 #include "trilogy_assets.h"
@@ -16,6 +17,18 @@
 #define NATIVE_S2_BASE  0x7E1000u
 #define NATIVE_CD_BASE  0x7E2000u      /* + slot*4 (scd_obj.c: common ids, then per round) */
 #define NATIVE_CD_SLOTS 0x800    /* (acts 1, 2 from $20; act 3 from $400; scd_level.py) */
+
+/* -1: another game's object; 0: ineligible CD controller/hazard/pose;
+ * 1: CD badnik; 2: CD boss with remaining native collision HP.
+ * CD's converted shapes extend beyond the retail/Megamix shape whitelist. */
+static inline int cd_attack_target_kind(uint32_t o)
+{
+    uint32_t code=r32(o);
+    if(code<NATIVE_CD_BASE || code>=NATIVE_CD_BASE+NATIVE_CD_SLOTS*4u)return -1;
+    unsigned render=r8(o+OBJ_render),c=r8(o+OBJ_coll_flags),hp=r8(o+OBJ_coll_prop);
+    if((render&0x84)!=0x84 || !c || (c&0x80) || ((c&0x40) && !hp))return 0;
+    return hp?2:1;
+}
 enum {                                 /* Sonic CD asset ids (scd_level.py CD_ASSETS) */
     SCDA_BOOSTER, SCDA_PLANT, SCDA_MOSQUI, SCDA_MOSQUI2, SCDA_PATABATA, SCDA_PATABATA2,
     SCDA_ANTON, SCDA_TAMABBOH, SCDA_TAMABBOH2, SCDA_TAMAMISSILE, SCDA_FLOATBLOCK, SCDA_SPIKES,

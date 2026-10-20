@@ -34,17 +34,21 @@ Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
 Linux refreshes bundled assets without replacing your settings or saves.
 Do not place the application in a read-only installation folder.
 
-OPTIONAL STAGE PACKS (WINDOWS PREVIEW)
-Mods > Sonic Campaign Stage Packs offers Sonic 1 & 2 stages, Megamix v3
-stages, and Mighty from Megamix v3. All are disabled by default. Campaign
-order: Sonic 1, Sonic 2, Sonic 3 & Knuckles, then all 19 Megamix acts.
-Bring your own supported ROMs and convert a bank with the included tools.
-See docs/STAGE_PACKS.md and docs/MEGAMIX_STAGE_PACK.md for instructions,
-Mighty controls and the audit's limits. No bank or ROM is included.
-Pack saves use sonic3k-stage-pack.srm; Megamix uses sonic3k-megamix.srm.
-These are local campaigns; quickstates, rewind and netplay are unavailable
-while stage packs are enabled. Native cartridge saves remain separate.
-This preview ZIP is validated on Windows x64.
+OPTIONAL CAMPAIGN MODS (EXPERIMENTAL)
+Mods offers six independent switches: Sonic 1 stages, Sonic 2 stages,
+Sonic CD stages, Megamix stages, Mighty and Shadow. All default off.
+Campaign order: Sonic 1, Sonic 2, Sonic CD, Sonic 3 & Knuckles, Megamix.
+Mighty, Shadow and Megamix stages require your matching Megamix v3 ROM;
+the three controls share the same ROM and converted-content paths.
+Sonic CD requires your supported US disc image, converted with the included
+tools. CD-DA music is a separate optional resource. See docs/SONIC_CD.md.
+The CD campaign has 70 act/time variants and its own Time Stone progress.
+See docs/STAGE_PACKS.md, MEGAMIX_STAGE_PACK.md and SHADOW_CHARACTER.md for
+other conversions and character controls. No ROM, BIOS or bank is included.
+
+Keep the .srm save and its .srm.campaign companion, .bak and migration backups
+together. Disabled/missing campaigns and characters park their progress for
+reinstallation. Quickstates, rewind and netplay are unavailable with these mods.
 
 LICENSE AND SOURCE
 Project: PolyForm Noncommercial 1.0.0 (see LICENSE).

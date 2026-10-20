@@ -66,7 +66,7 @@ static void dev_force_zone(void)
         const char *rg = getenv("TRILOGY_RINGS");   /* development: start with rings */
         w16(0xFFFE32, (uint16_t)(rg && *rg ? atoi(rg) : 0));  /* Saved_ring_count */
         w32(0xFFFE34, 0);                      /* Saved_timer */
-        w16(0xFFFE38, 0x0680);                 /* Saved_art_tile */
+        w16(0xFFFE38, r16(RAM_Player_mode)==2 ? 0x06A0 : 0x0680); /* Tails has his own PLC tile base */
         w16(0xFFFE3A, 0x0C0D);                 /* Saved_solid_bits */
         w16(0xFFFE3C, (uint16_t)(x > 0xA0 ? x - 0xA0 : 0));  /* Saved_camera_X_pos */
         w16(0xFFFE3E, (uint16_t)(y > 0x60 ? y - 0x60 : 0));  /* Saved_camera_Y_pos */
@@ -186,7 +186,7 @@ void tri_audit_frame(void)
         w16(0xFFFE30, y);                      /* Saved_Y_pos */
         w16(0xFFFE32, 0);                      /* Saved_ring_count */
         w32(0xFFFE34, 0);                      /* Saved_timer */
-        w16(0xFFFE38, 0x0680);                 /* Saved_art_tile */
+        w16(0xFFFE38, r16(RAM_Player_mode)==2 ? 0x06A0 : 0x0680); /* Tails has his own PLC tile base */
         w16(0xFFFE3A, 0x0C0D);                 /* Saved_solid_bits */
         w16(0xFFFE3C, (uint16_t)(x > 0xA0 ? x - 0xA0 : 0));   /* Saved_camera_X_pos */
         w16(0xFFFE3E, (uint16_t)(y > 0x60 ? y - 0x60 : 0));   /* Saved_camera_Y_pos */

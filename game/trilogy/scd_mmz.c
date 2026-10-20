@@ -19,8 +19,8 @@
  *   mini      the shrink ray ($1D) makes Sonic miniature (CD's miniSonic):
  *             radii $A/5 standing, 8/5 curled (CD moves him 2 px where the
  *             full size moves 5), no other physics change. Kept at a
- *             checkpoint and through a time warp. The drawing (CD's own small
- *             frames) is the renderer's: scd_mmz_mini() says when.
+ *             checkpoint and through a time warp. The renderer halves each
+ *             character's own art, including the P1 Tails tail attachment.
  *   warp      while an object holds the player (object_control bit 0) the time
  *             warp's run is reset (MMZ only: timeWarpTimer = 0, sparkles off).
  * These run from TH_LVL_PRE_SPRITES (the layer) and TH_LVL_POST_SPRITES (after
@@ -67,6 +67,13 @@ static uint8_t s_turn;                     /* (a cylinder turning the player: CD
 
 int scd_mmz_back(void) { return mmz() && s_back; }
 int scd_mmz_mini(void) { return mmz() && s_mini; }
+unsigned scd_mmz_object_zoom(unsigned object)
+{
+    if (!scd_mmz_mini() || r8(RAM_Game_mode) != 12) return 0;
+    if (!object || object == 0xB000u) return 128;
+    uint32_t o = 0xFF0000u | object;
+    return r32(o + OBJ_mappings) == 0x144BB8u && OB16(o, 0x30) == 0xB000u ? 128 : 0;
+}
 uint8_t *scd_mmz_switch(int n) { return &s_switch[n & 31]; }
 
 #define CD_CODE(id)     (NATIVE_CD_BASE + (uint32_t)(s_base + (id)) * 4u)

@@ -22,9 +22,13 @@ def fixture(native_path,journal_path,source,character,collectible_source=None,co
     raw=bytearray((source/'sonic3k.srm').read_bytes());native=bytearray(slots(source/'sonic3k.srm'))
     journal=bytearray((source/'sonic3k.srm.campaign').read_bytes())
     if len(journal)!=548 or journal[:7]!=b'SCS1\x02\x00\x01':raise ValueError('Expected confirmed SCS1 v2 seed')
-    fallback=0 if character==4 else 1 if character==5 else character
+    fallback=character&1 if character>=4 else character
     native[2]=(native[2]&15)|(fallback<<4)
     journal[34]=(journal[34]&15)|(character<<4)
+    if character>=6:
+        # A declared Shadow identity fixture requires its understood schema.
+        # v2 deliberately rejects identities above 5; it cannot encode Shadow.
+        journal[4]=3;journal[6]=3
     if completed:
         # Completion is a declared resilience prerequisite, not earned by
         # this probe. The real menu must choose a replay stage to continue.
@@ -109,7 +113,7 @@ def main():
                 if args.completed:
                     stage='2000' if mask&1 else '2800' if mask&2 else '4000' if mask&8 else '0000'
                 else:stage=args.expected_stage if mask&8 else '0000'
-                fallback=0 if character==4 else 1 if character==5 else character
+                fallback=character&1 if character>=4 else character
                 run(f'permutation-{mask}',stage,character if mask&4 else fallback,untouched=mask==0)
             return results
         config();run('continue',args.expected_stage,character)
@@ -118,7 +122,7 @@ def main():
         cd=mods/bank_name('sonic_cd');cd_off=cd.with_suffix('.pak.off');cd.rename(cd_off)
         run('cd-removed','0000',character);cd_off.rename(cd);run('cd-restored',args.expected_stage,character)
         mm=mods/bank_name('megamix');mm_off=mm.with_suffix('.pak.off');mm.rename(mm_off)
-        fallback=0 if character==4 else 1 if character==5 else character
+        fallback=character&1 if character>=4 else character
         run('mighty-entitlement-removed',args.expected_stage,fallback);mm_off.rename(mm)
         run('mighty-entitlement-restored',args.expected_stage,character)
         for name in NAMES:

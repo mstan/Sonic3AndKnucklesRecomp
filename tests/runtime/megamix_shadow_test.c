@@ -63,6 +63,17 @@ int main(void)
     w8(RAM_Player_1+OBJ_routine,4);CHECK(!tri_shadow_hook(MG_PC_SHADOW_AIR) && !target && !previous);
     init();enemy(2,129,5);enemy(3,48,0x85);w8(RAM_Player_1+OBJ_status,2);w8(RAM_Ctrl_1_pressed_logical,0x10);
     CHECK(tri_shadow_hook(MG_PC_MIGHTY_SHIELD) && !target);
+    /* The actual PPZ Tamabboh uses converted normal collision shape $1A,
+     * outside v3's original retail shape whitelist. Hurt/special categories
+     * and screen-relative firefly animation must remain ineligible. */
+    init();w8(RAM_Player_1+OBJ_status,2);w8(RAM_Ctrl_1_pressed_logical,0x10);
+    uint32_t cd=enemy(2,48,0x1A);w32(cd,0x7E2174);w8(cd+OBJ_render,0x84);
+    CHECK(tri_shadow_hook(MG_PC_MIGHTY_SHIELD) && target==cd);
+    w8(cd+OBJ_coll_flags,0x9A);CHECK(!targetable(cd));
+    w8(cd+OBJ_coll_flags,0xDA);CHECK(!targetable(cd));
+    w8(cd+OBJ_coll_flags,0x1A);w8(cd+OBJ_render,0x80);CHECK(!targetable(cd));
+    w8(cd+OBJ_render,0x84);w8(cd+OBJ_coll_flags,0x5A);CHECK(!targetable(cd));
+    w8(cd+OBJ_coll_prop,8);CHECK(targetable(cd));
     enabled=0;CHECK(!tri_shadow_hook(MG_PC_MIGHTY_SHIELD));
     puts("Shadow ground boost cost/wall/facing/shoes and homing range/selection/chain/hurt contracts passed");return 0;
 }

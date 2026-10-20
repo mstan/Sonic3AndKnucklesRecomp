@@ -78,6 +78,18 @@ static void load_water_palette(void)
         w8(RAM_Water_full_screen_flag, r8(RAM_Saved_water_full_screen_flag));
 }
 
+/* Both title-card completion and white-fade warp arrivals need this art.
+ * CD's standalone common bank has no S1 blob table. The retail cartridge's
+ * one-entry PLC_LBZRobotnikAfter contains precisely the same bubble request. */
+void tri_water_load_bubbles(void)
+{
+    if (!r8(RAM_Water_flag)) return;
+    uint32_t list = tri_cd_zone(tri_zone()) ? S3K_PLC_LBZRobotnikAfter : blob(TRI_BLOB_BUBBLES_PLC);
+    if (!list) return;
+    A(1) = list;
+    tri_jsr(S3K_Load_PLC_Raw);
+}
+
 /* ---- set-up (CheckLevelForWater + LoadWaterPalette) ---------------------- */
 static void check_water(void)
 {
@@ -349,6 +361,10 @@ uint16_t tri_water_start_y(void)
 {
     if (s2_water()) return tri_rd16(s1info() + S2I_WATER_Y);
     if (lz_water()) return tri_rd16(s1info() + S1I_WATER_Y);
+    /* CD's water handler owns the runtime setup; checkpoint starts must seed
+     * the same converted height instead of restoring the dry-act sentinel. */
+    if (tri_cd_zone(tri_zone()) && tri_rd8(s1info() + S1I_WATER_PAL))
+        return tri_rd16(s1info() + S1I_WATER_Y);
     return 0x1000;
 }
 

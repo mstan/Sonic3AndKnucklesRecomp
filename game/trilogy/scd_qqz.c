@@ -298,7 +298,7 @@ void scd_qqz_register(TriObjFn *t, int base)
 /* ---- the act's sections (acts 1-2, $FF156C; scd_level.py scenery_sections,
  * header +$F4): by player 1's x, the open middle with its own background
  * (art: trilogy_scdlevel.c's animated entry, flag 16) and palette 4 + set
- * (line 1 and line 2's first 8, into the palette and its fade target); and the
+ * (all three level lines, into the palette and its fade target); and the
  * zone's colour cycler [$200184]: the belts (the lever's table while the
  * belts run left) and a second by the section's parity -------------------- */
 static uint8_t s_section, s_set, s_cyc_time[2], s_cyc_frame[2];
@@ -335,17 +335,17 @@ static void scenery(void)
         if (set != s_set && set < tri_rd16(pals)) {
             s_set = set;
             extern void tri_scd_set_bg(uint32_t grid, unsigned w, unsigned h);
-            uint32_t b2 = pals + 2 + tri_rd16(pals) * 48u + 16;   /* (after the 4 cycles: set 1's background) */
+            uint32_t b2 = pals + 2 + tri_rd16(pals) * 96u + 16;   /* (after the 4 cycles: set 1's background) */
             if (set == 1 && tri_rd32(b2 + 4)) tri_scd_set_bg(tri_rd32(b2 + 4), tri_rd16(b2), tri_rd16(b2 + 2));
             else tri_scd_set_bg(0, 0, 0);
-            uint32_t c = pals + 2 + set * 48u;
-            for (unsigned k = 0; k < 24; k++) {
+            uint32_t c = pals + 2 + set * 96u;
+            for (unsigned k = 0; k < 48; k++) {
                 w16(RAM_Normal_palette + 0x20 + k * 2u, tri_rd16(c + k * 2u));
                 w16(RAM_Target_palette + 0x20 + k * 2u, tri_rd16(c + k * 2u));
             }
         }
     }
-    uint32_t cyc = pals + 2 + tri_rd16(pals) * 48u;
+    uint32_t cyc = pals + 2 + tri_rd16(pals) * 96u;
     uint32_t belt = tri_rd32(cyc + (s_colrev ? 4 : 0)), second = tri_rd32(cyc + (s_section & 1 ? 12 : 8));
     if (belt) cycle(0, belt);
     if (second) cycle(1, second);

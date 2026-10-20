@@ -23,6 +23,11 @@ void s3_video_set_ring_layout(S3VideoRingLayout fn);
  * Return zero to use the cartridge's ordinary mapping table. */
 typedef unsigned (*S3VideoHudMapping)(void);
 void s3_video_set_hud_mapping(S3VideoHudMapping fn);
+/* Optional object size in 256ths (zero = unchanged). Object zero asks whether
+ * the game needs this presentation at native width even with widescreen off.
+ * Sampled during scene publication; the callback must not change guest state. */
+typedef unsigned (*S3VideoObjectZoom)(unsigned object);
+void s3_video_set_object_zoom(S3VideoObjectZoom fn);
 typedef void (*S3VideoFrameOverlay)(int line, uint32_t *out, int width);
 void s3_video_set_frame_overlay(S3VideoFrameOverlay draw);
 

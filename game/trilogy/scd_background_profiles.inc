@@ -148,7 +148,7 @@ static void bg_11a_scroll(ScdBg *bg_ctx) {
   int32_t i, j;
   int32_t Lposi_TblCnt;
   uint16_t wD1, wD4, wD5, wD6;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()] != 0) return;
 
@@ -413,7 +413,7 @@ static void bg_11a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_11a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -441,7 +441,7 @@ static void bg_11a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_11a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -469,7 +469,7 @@ static void bg_11a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_11a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -504,7 +504,7 @@ static void bg_11b_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5);
 static void bg_11b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_11b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_11b_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = yWk;
   lYwk.words[1-bg_hi()] = 0;
@@ -525,7 +525,7 @@ static void bg_11b_scroll(ScdBg *bg_ctx) {
   int_union* pHScrollBuff;
   int32_t i;
   uint16_t wD0, wD1;
-  int_union lD2;
+  int_union lD2 = {0};
   int32_t lD4, lD5;
   int16_t* psHscr;
   static int32_t scaddtbl[4] = {
@@ -604,7 +604,7 @@ label2:
 }
 static void bg_11b_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   int32_t lD0, lD1;
-  int_union lD2;
+  int_union lD2 = {0};
 
   lD0 = bg_ctx->scrb_h_posit.l;
   lD2.l = bg_ctx->scrb_h_posit.l = lD1 = lD0 + lD4;
@@ -622,7 +622,7 @@ static void bg_11b_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   }
 }
 static void bg_11b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -647,7 +647,7 @@ static void bg_11b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
   }
 }
 static void bg_11b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -679,7 +679,7 @@ static void bg_11c_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5);
 static void bg_11c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_11c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_11c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = yWk;
   lYwk.words[1-bg_hi()] = 0;
@@ -700,7 +700,7 @@ static void bg_11c_scroll(ScdBg *bg_ctx) {
   int_union* pHScrollBuff;
   int32_t i;
   uint16_t wD0, wD1, wD3;
-  int_union lD2, lD3;
+  int_union lD2 = {0}, lD3 = {0};
   int32_t lD4, lD5;
   int16_t* psHscr;
   static int32_t scaddtbl[4] = {
@@ -794,7 +794,7 @@ label1:
 }
 static void bg_11c_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   int32_t lD0, lD1;
-  int_union lD2;
+  int_union lD2 = {0};
 
   lD0 = bg_ctx->scrb_h_posit.l;
   lD2.l = bg_ctx->scrb_h_posit.l = lD1 = lD0 + lD4;
@@ -812,7 +812,7 @@ static void bg_11c_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   }
 }
 static void bg_11c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -837,7 +837,7 @@ static void bg_11c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
   }
 }
 static void bg_11c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -869,7 +869,7 @@ static void bg_11d_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5);
 static void bg_11d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_11d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_11d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = yWk;
   lYwk.words[1-bg_hi()] = 0;
@@ -890,7 +890,7 @@ static void bg_11d_scroll(ScdBg *bg_ctx) {
   int_union* pHScrollBuff;
   int32_t i;
   uint16_t wD0, wD1;
-  int_union lD2;
+  int_union lD2 = {0};
   int32_t lD4, lD5;
   int16_t* psHscr;
   static int32_t scaddtbl[4] = {
@@ -965,7 +965,7 @@ label1:
 }
 static void bg_11d_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   int32_t lD0, lD1;
-  int_union lD2;
+  int_union lD2 = {0};
 
   lD0 = bg_ctx->scrb_h_posit.l;
   lD2.l = bg_ctx->scrb_h_posit.l = lD1 = lD0 + lD4;
@@ -983,7 +983,7 @@ static void bg_11d_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   }
 }
 static void bg_11d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD2;
+  int_union lD0 = {0}, lD2 = {0};
 
   lD2.l = bg_ctx->scrc_h_posit.l;
   lD0.l = lD2.l + lD4;
@@ -997,7 +997,7 @@ static void bg_11d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
   }
 }
 static void bg_11d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD2;
+  int_union lD0 = {0}, lD2 = {0};
 
   lD2.l = bg_ctx->scrz_h_posit.l;
   lD0.l = lD2.l + lD4;
@@ -1018,7 +1018,7 @@ static void bg_12a_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5);
 static void bg_12a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_12a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_12a_scrbinit(ScdBg *bg_ctx, int16_t d1, int16_t d0) {
-  int_union ld0;
+  int_union ld0 = {0};
 
 
 
@@ -1062,7 +1062,7 @@ static void bg_12a_scrbinit(ScdBg *bg_ctx, int16_t d1, int16_t d0) {
 
 }
 static void bg_12a_scroll(ScdBg *bg_ctx) {
-  int_union d0, d1, d2, d3, d4, d5, tmp;
+  int_union d0 = {0}, d1 = {0}, d2 = {0}, d3 = {0}, d4 = {0}, d5 = {0}, tmp = {0};
   int32_t l4, l5;
   int_union* pHscrollbuff;
   int16_t *p, *pHscrollwork;
@@ -1204,7 +1204,7 @@ static void bg_12a_scroll(ScdBg *bg_ctx) {
 }
 static void bg_12a_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   int32_t lD0, lD1;
-  int_union lD2;
+  int_union lD2 = {0};
 
   lD0 = bg_ctx->scrb_h_posit.l;
   lD2.l = bg_ctx->scrb_h_posit.l = lD1 = lD0 + lD4;
@@ -1222,7 +1222,7 @@ static void bg_12a_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
   }
 }
 static void bg_12a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -1247,7 +1247,7 @@ static void bg_12a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
   }
 }
 static void bg_12a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -1280,7 +1280,7 @@ static void bg_12b_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs);
 static void bg_12b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -1302,8 +1302,8 @@ static void bg_12b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   memset(bg_ctx->hscrollwork, 0, 32);
 }
 static void bg_12b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
-  int_union ldwk2;
+  int_union ldwk = {0};
+  int_union ldwk2 = {0};
   int_union* pHscrbuf;
   int32_t i, j;
   int32_t lXwk, lYwk;
@@ -1404,7 +1404,7 @@ static void bg_12b_scroll(ScdBg *bg_ctx) {
 }
 static void bg_12b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   for (i = 0, j = yoffs & 7; yline >= i; ++i, j = 0) {
@@ -1418,7 +1418,7 @@ static void bg_12b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, i
 }
 static void bg_12b_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
   int32_t lwk, lsv;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   lsv = bg_ctx->scrb_h_posit.l;
   ldwk.l = bg_ctx->scrb_h_posit.l = lwk = lsv + xOffs;
@@ -1449,7 +1449,7 @@ static void bg_12b_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
 }
 static void bg_12b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   ldXwk.l = bg_ctx->scrc_h_posit.l = lXwk = lXsv = bg_ctx->scrc_h_posit.l + xoffs;
   wk = ldXwk.words[1-bg_hi()], ldXwk.words[1-bg_hi()] = ldXwk.words[bg_hi()], ldXwk.words[bg_hi()] = wk;
@@ -1469,7 +1469,7 @@ static void bg_12b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_12b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   ldXwk.l = bg_ctx->scrz_h_posit.l = lXwk = lXsv = bg_ctx->scrz_h_posit.l + xoffs;
   wk = ldXwk.words[1-bg_hi()], ldXwk.words[1-bg_hi()] = ldXwk.words[bg_hi()], ldXwk.words[bg_hi()] = wk;
@@ -1496,7 +1496,7 @@ static void bg_12c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs);
 static void bg_12c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = yWk;
   lYwk.words[1-bg_hi()] = 0;
@@ -1515,12 +1515,12 @@ static void bg_12c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 static void bg_12c_scroll(ScdBg *bg_ctx) {
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* psHscr;
+  int16_t* psHscr;
   int32_t i;
   int32_t j;
   uint16_t wD1;
   uint16_t temp;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
   int32_t lD4, lD5;
   uint8_t z12c_cnttbl[5] = { 1, 3, 3, 3, 1 };
   static int32_t scaddtbl[5] = { 65536, 57344, 49152, 40960, 32768 };
@@ -1550,19 +1550,19 @@ static void bg_12c_scroll(ScdBg *bg_ctx) {
   bg_ctx->scrflagb.bytes[bg_hi()] = bg_ctx->scrflagb.bytes[bg_hi()] | bg_ctx->scrflagz.bytes[bg_hi()] | bg_ctx->scrflagc.bytes[bg_hi()];
   bg_ctx->scrflagz.bytes[bg_hi()] = bg_ctx->scrflagc.bytes[bg_hi()] = 0;
 
-  psHscr = (int_union*)bg_ctx->hscrollwork;
+  psHscr = bg_ctx->hscrollwork;
   for (i = 0; i < 5; ++i) {
-    psHscr->l += scaddtbl[i];
-    ++psHscr;
+    bg_work_add(psHscr, scaddtbl[i]);
+    psHscr += 2;
   }
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
-  psHscr = (int_union*)bg_ctx->hscrollwork;
+  psHscr = bg_ctx->hscrollwork;
   pHScrollWork = &bg_ctx->hscrollwork[10];
   for (i = 4; i >= 0; --i) {
 
-    wD1 = -(psHscr->words[bg_hi()] + bg_ctx->scrz_h_posit.words[bg_hi()]);
-    ++psHscr;
+    wD1 = -(psHscr[1] + bg_ctx->scrz_h_posit.words[bg_hi()]);
+    psHscr += 2;
     for (j = z12c_cnttbl[i]; j >= 0; --j) {
 
       *pHScrollWork++ = wD1;
@@ -1633,7 +1633,7 @@ static void bg_12c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_12c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -1649,7 +1649,7 @@ static void bg_12c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, i
 }
 static void bg_12c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
   int32_t lwk, lsv;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   lsv = bg_ctx->scrb_h_posit.l;
   ldwk.l = bg_ctx->scrb_h_posit.l = lwk = lsv + xOffs;
@@ -1680,7 +1680,7 @@ static void bg_12c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
 }
 static void bg_12c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -1704,7 +1704,7 @@ static void bg_12c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_12c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -1735,7 +1735,7 @@ static void bg_12d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs);
 static void bg_12d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_12d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = yWk;
   lYwk.words[1-bg_hi()] = 0;
@@ -1754,12 +1754,12 @@ static void bg_12d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 static void bg_12d_scroll(ScdBg *bg_ctx) {
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* psHscr;
+  int16_t* psHscr;
   int32_t i;
   int32_t j;
   uint16_t wD1;
 
-  int_union lD0, lD2;
+  int_union lD0 = {0}, lD2 = {0};
   int32_t lD4, lD5;
   uint8_t z12d_cnttbl[4] = { 0, 4, 3, 3 };
   static int32_t scaddtbl[4] = { 65536, 49152, 32768, 16384 };
@@ -1789,19 +1789,19 @@ static void bg_12d_scroll(ScdBg *bg_ctx) {
   bg_ctx->scrflagb.bytes[bg_hi()] = bg_ctx->scrflagb.bytes[bg_hi()] | bg_ctx->scrflagz.bytes[bg_hi()] | bg_ctx->scrflagc.bytes[bg_hi()];
   bg_ctx->scrflagz.bytes[bg_hi()] = bg_ctx->scrflagc.bytes[bg_hi()] = 0;
 
-  psHscr = (int_union*)bg_ctx->hscrollwork;
+  psHscr = bg_ctx->hscrollwork;
   for (i = 0; i < 4; ++i) {
-    psHscr->l += scaddtbl[i];
-    ++psHscr;
+    bg_work_add(psHscr, scaddtbl[i]);
+    psHscr += 2;
   }
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
-  psHscr = (int_union*)bg_ctx->hscrollwork;
+  psHscr = bg_ctx->hscrollwork;
   pHScrollWork = &bg_ctx->hscrollwork[8];
   for (i = 3; i >= 0; --i) {
 
-    wD1 = -(psHscr->words[bg_hi()] + bg_ctx->scrz_h_posit.words[bg_hi()]);
-    ++psHscr;
+    wD1 = -(psHscr[1] + bg_ctx->scrz_h_posit.words[bg_hi()]);
+    psHscr += 2;
     for (j = z12d_cnttbl[i]; j >= 0; --j) {
 
       *pHScrollWork++ = wD1;
@@ -1836,7 +1836,7 @@ static void bg_12d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_12d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -1852,7 +1852,7 @@ static void bg_12d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, i
 }
 static void bg_12d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
   int32_t lwk, lsv;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   lsv = bg_ctx->scrb_h_posit.l;
   ldwk.l = bg_ctx->scrb_h_posit.l = lwk = lsv + xOffs;
@@ -1883,7 +1883,7 @@ static void bg_12d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
 }
 static void bg_12d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -1907,7 +1907,7 @@ static void bg_12d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_12d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -1938,7 +1938,7 @@ static void bg_13c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs);
 static void bg_13c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_13c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_13c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -1959,7 +1959,7 @@ static void bg_13c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   memset(bg_ctx->hscrollwork, 0, 20);
 }
 static void bg_13c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk, ldwk2, ldwk3;
+  int_union ldwk = {0}, ldwk2 = {0}, ldwk3 = {0};
   int_union* pHscrbuf;
   int32_t i, j;
   int32_t lXwk, lYwk;
@@ -2086,7 +2086,7 @@ static void bg_13c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_13c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -2101,7 +2101,7 @@ static void bg_13c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, i
 }
 static void bg_13c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
   int32_t lwk, lsv;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   lsv = bg_ctx->scrb_h_posit.l;
   ldwk.l = bg_ctx->scrb_h_posit.l = lwk = lsv + xOffs;
@@ -2132,7 +2132,7 @@ static void bg_13c_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
 }
 static void bg_13c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -2156,7 +2156,7 @@ static void bg_13c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_13c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -2187,7 +2187,7 @@ static void bg_13d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs);
 static void bg_13d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_13d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_13d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -2208,8 +2208,8 @@ static void bg_13d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   memset(bg_ctx->hscrollwork, 0, 16);
 }
 static void bg_13d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
-  int_union ldwk2;
+  int_union ldwk = {0};
+  int_union ldwk2 = {0};
   int_union* pHscrbuf;
   int32_t i, j;
   int32_t lXwk, lYwk;
@@ -2309,7 +2309,7 @@ static void bg_13d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_13d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   for (i = 0, j = yoffs & 7; yline >= i; ++i, j = 0) {
@@ -2323,7 +2323,7 @@ static void bg_13d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, i
 }
 static void bg_13d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
   int32_t lwk, lsv;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   lsv = bg_ctx->scrb_h_posit.l;
   ldwk.l = bg_ctx->scrb_h_posit.l = lwk = lsv + xOffs;
@@ -2354,7 +2354,7 @@ static void bg_13d_scrollb_hv(ScdBg *bg_ctx, int32_t xOffs, int32_t yOffs) {
 }
 static void bg_13d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -2378,7 +2378,7 @@ static void bg_13d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_13d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
   int16_t wk;
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -2404,7 +2404,7 @@ static void bg_13d_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_13d_scrbinit(bg_ct
 /* 31A: src/R3/SCR31A.C */
 static void bg_31a_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_31a_scroll(ScdBg *bg_ctx);
-static void bg_31a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_31a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_31a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_31a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_31a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -2434,7 +2434,7 @@ static void bg_31a_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 15; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -2458,10 +2458,10 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5, wD6;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -2505,16 +2505,16 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
   bg_ctx->scrflagc.bytes[bg_hi()] = 0;
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 15; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for (i = 0; i < 64; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 10)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -2555,10 +2555,10 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
   }
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 14; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z31a_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -2628,7 +2628,7 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_31a_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z31a_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_31a_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z31a_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -2639,13 +2639,13 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
 
 
   wD1 = (bg_shl(wD5, 3)) - 1;
-  pHscrWk = (int_union*)&bg_ctx->hscrollwork[30];
+  pHscrWk = &bg_ctx->hscrollwork[30];
   wD5 = (uint8_t)bg_ctx->waterdirec.bytes[bg_hi()];
   wD4 -= (uint16_t)bg_ctx->scrb_v_posit.words[bg_hi()];
 
   do {
-    lD2.l = pHscrWk->l;
-    ++pHscrWk;
+    lD2.l = bg_work_get(pHscrWk);
+    pHscrWk += 2;
     lD2.l = (uint32_t)lD2.l >> 16 & 65535 | bg_shl(lD2.l, 16) & -65536;
     lD2.words[1-bg_hi()] += bg_ctx->scrb_h_posit.words[bg_hi()];
     lD2.words[1-bg_hi()] *= -1;
@@ -2667,11 +2667,11 @@ static void bg_31a_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_31a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_31a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   pA1 = *ppA1;
@@ -2789,7 +2789,7 @@ static void bg_31a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_31a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -2817,7 +2817,7 @@ static void bg_31a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_31a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -2845,7 +2845,7 @@ static void bg_31a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_31a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -2876,7 +2876,7 @@ static void bg_31a_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_31a_scrbinit(bg_ct
 /* 31B: src/R3/SCR31B.C */
 static void bg_31b_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_31b_scroll(ScdBg *bg_ctx);
-static void bg_31b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_31b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_31b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_31b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_31b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -2906,7 +2906,7 @@ static void bg_31b_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 13; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -2933,10 +2933,10 @@ static void bg_31b_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -3000,16 +3000,16 @@ static void bg_31b_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 13; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 77; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -3065,10 +3065,10 @@ static void bg_31b_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 12; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z31b_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -3142,7 +3142,7 @@ static void bg_31b_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_31b_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z31b_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_31b_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z31b_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -3179,11 +3179,11 @@ static void bg_31b_scroll(ScdBg *bg_ctx) {
   }
 
 }
-static void bg_31b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_31b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -3301,7 +3301,7 @@ static void bg_31b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_31b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -3329,7 +3329,7 @@ static void bg_31b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_31b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -3357,7 +3357,7 @@ static void bg_31b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_31b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -3388,7 +3388,7 @@ static void bg_31b_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_31b_scrbinit(bg_ct
 /* 31C: src/R3/SCR31C.C */
 static void bg_31c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_31c_scroll(ScdBg *bg_ctx);
-static void bg_31c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_31c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_31c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_31c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_31c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -3418,7 +3418,7 @@ static void bg_31c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 14; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -3438,10 +3438,10 @@ static void bg_31c_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -3505,16 +3505,16 @@ static void bg_31c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 14; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 78; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -3566,10 +3566,10 @@ static void bg_31c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 13; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z31c_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -3640,7 +3640,7 @@ static void bg_31c_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_31c_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z31c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_31c_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z31c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -3677,11 +3677,11 @@ static void bg_31c_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_31c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_31c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -3799,7 +3799,7 @@ static void bg_31c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_31c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -3827,7 +3827,7 @@ static void bg_31c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_31c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -3855,7 +3855,7 @@ static void bg_31c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_31c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -3886,7 +3886,7 @@ static void bg_31c_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_31c_scrbinit(bg_ct
 /* 31D: src/R3/SCR31D.C */
 static void bg_31d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_31d_scroll(ScdBg *bg_ctx);
-static void bg_31d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_31d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_31d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_31d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_31d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -3916,7 +3916,7 @@ static void bg_31d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 15; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -3939,10 +3939,10 @@ static void bg_31d_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -4006,16 +4006,16 @@ static void bg_31d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 15; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 79; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -4053,10 +4053,10 @@ static void bg_31d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 14; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z31d_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -4125,7 +4125,7 @@ static void bg_31d_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_31d_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z31d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_31d_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z31d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -4162,11 +4162,11 @@ static void bg_31d_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_31d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_31d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -4284,7 +4284,7 @@ static void bg_31d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_31d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -4312,7 +4312,7 @@ static void bg_31d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_31d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -4340,7 +4340,7 @@ static void bg_31d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_31d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -4371,7 +4371,7 @@ static void bg_31d_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_31d_scrbinit(bg_ct
 /* 32A: src/R3/SCR32A.C */
 static void bg_32a_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_32a_scroll(ScdBg *bg_ctx);
-static void bg_32a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_32a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_32a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_32a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_32a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -4401,7 +4401,7 @@ static void bg_32a_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 14; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -4421,10 +4421,10 @@ static void bg_32a_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -4487,16 +4487,16 @@ static void bg_32a_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 14; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 78; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -4548,10 +4548,10 @@ static void bg_32a_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 13; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z32a_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -4622,7 +4622,7 @@ static void bg_32a_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_32a_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z32a_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_32a_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z32a_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -4659,11 +4659,11 @@ static void bg_32a_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_32a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_32a_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -4781,7 +4781,7 @@ static void bg_32a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_32a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -4809,7 +4809,7 @@ static void bg_32a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_32a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -4837,7 +4837,7 @@ static void bg_32a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_32a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -4868,7 +4868,7 @@ static void bg_32a_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_32a_scrbinit(bg_ct
 /* 32B: src/R3/SCR32B.C */
 static void bg_32b_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_32b_scroll(ScdBg *bg_ctx);
-static void bg_32b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_32b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_32b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_32b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_32b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -4898,7 +4898,7 @@ static void bg_32b_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 10; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -4923,10 +4923,10 @@ static void bg_32b_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -4991,16 +4991,16 @@ static void bg_32b_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 10; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 74; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -5057,10 +5057,10 @@ static void bg_32b_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 9; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z32b_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -5134,7 +5134,7 @@ static void bg_32b_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_32b_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z32b_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_32b_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z32b_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -5171,11 +5171,11 @@ static void bg_32b_scroll(ScdBg *bg_ctx) {
   }
 
 }
-static void bg_32b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_32b_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -5293,7 +5293,7 @@ static void bg_32b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_32b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -5321,7 +5321,7 @@ static void bg_32b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_32b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -5349,7 +5349,7 @@ static void bg_32b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_32b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -5380,7 +5380,7 @@ static void bg_32b_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_32b_scrbinit(bg_ct
 /* 32C: src/R3/SCR32C.C */
 static void bg_32c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_32c_scroll(ScdBg *bg_ctx);
-static void bg_32c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_32c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_32c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_32c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_32c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -5410,7 +5410,7 @@ static void bg_32c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 14; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -5430,10 +5430,10 @@ static void bg_32c_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -5497,16 +5497,16 @@ static void bg_32c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 14; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 78; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -5559,10 +5559,10 @@ static void bg_32c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 13; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z32c_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -5634,7 +5634,7 @@ static void bg_32c_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_32c_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z32c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_32c_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z32c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -5671,11 +5671,11 @@ static void bg_32c_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_32c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_32c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -5793,7 +5793,7 @@ static void bg_32c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_32c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -5821,7 +5821,7 @@ static void bg_32c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_32c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -5849,7 +5849,7 @@ static void bg_32c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_32c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -5880,7 +5880,7 @@ static void bg_32c_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_32c_scrbinit(bg_ct
 /* 32D: src/R3/SCR32D.C */
 static void bg_32d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_32d_scroll(ScdBg *bg_ctx);
-static void bg_32d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_32d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_32d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_32d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_32d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -5910,7 +5910,7 @@ static void bg_32d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 16; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -5933,10 +5933,10 @@ static void bg_32d_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -6000,16 +6000,16 @@ static void bg_32d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 16; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 80; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -6048,10 +6048,10 @@ static void bg_32d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 15; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z32d_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -6119,7 +6119,7 @@ static void bg_32d_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_32d_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z32d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_32d_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z32d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -6156,11 +6156,11 @@ static void bg_32d_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_32d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_32d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -6278,7 +6278,7 @@ static void bg_32d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_32d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -6306,7 +6306,7 @@ static void bg_32d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_32d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -6334,7 +6334,7 @@ static void bg_32d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_32d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -6365,7 +6365,7 @@ static void bg_32d_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_32d_scrbinit(bg_ct
 /* 33C: src/R3/SCR33C.C */
 static void bg_33c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_33c_scroll(ScdBg *bg_ctx);
-static void bg_33c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_33c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_33c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_33c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_33c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -6395,7 +6395,7 @@ static void bg_33c_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 12; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -6414,10 +6414,10 @@ static void bg_33c_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
 
@@ -6481,16 +6481,16 @@ static void bg_33c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 12; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 76; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -6543,10 +6543,10 @@ static void bg_33c_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 11; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z33c_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -6617,7 +6617,7 @@ static void bg_33c_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_33c_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z33c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_33c_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z33c_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -6654,11 +6654,11 @@ static void bg_33c_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_33c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_33c_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -6776,7 +6776,7 @@ static void bg_33c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_33c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -6804,7 +6804,7 @@ static void bg_33c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_33c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -6832,7 +6832,7 @@ static void bg_33c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_33c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -6863,7 +6863,7 @@ static void bg_33c_init(ScdBg *bg_ctx,int16_t x,int16_t y){bg_33c_scrbinit(bg_ct
 /* 33D: src/R3/SCR33D.C */
 static void bg_33d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk);
 static void bg_33d_scroll(ScdBg *bg_ctx);
-static void bg_33d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
+static void bg_33d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4);
 static void bg_33d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0);
 static void bg_33d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_33d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
@@ -6893,7 +6893,7 @@ static void bg_33d_scrbinit(ScdBg *bg_ctx, int16_t xWk, int16_t yWk) {
 
 
   for (i = 0; i < 12; ++i) {
-    ((int32_t*)bg_ctx->hscrollwork)[i] = 0;
+    bg_work_set(bg_ctx->hscrollwork + i * 2, 0);
   }
 
 }
@@ -6915,10 +6915,10 @@ static void bg_33d_scroll(ScdBg *bg_ctx) {
   };
   int16_t* pHScrollWork;
   int_union* pHScrollBuff;
-  int_union* pHscrWk;
+  int16_t* pHscrWk;
   int32_t i, j;
   uint16_t wD1, wD3, wD4, wD5;
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
 
   if (bg_ctx->scroll_start.bytes[bg_hi()]) return;
@@ -6983,16 +6983,16 @@ static void bg_33d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 0; i < 12; ++i) {
-    pHscrWk->l += LineSpdTbl[i];
-    ++pHscrWk;
+    bg_work_add(pHscrWk, LineSpdTbl[i]);
+    pHscrWk += 2;
   }
   wD1 = 0;
   for ( ; i < 76; ++i) {
     lD2.l = ((int32_t)(int32_t)bg_shl(wD1, 8)) + 32768;
-    pHscrWk->l += lD2.l;
-    ++pHscrWk;
+    bg_work_add(pHscrWk, lD2.l);
+    pHscrWk += 2;
     ++wD1;
   }
 
@@ -7034,10 +7034,10 @@ static void bg_33d_scroll(ScdBg *bg_ctx) {
 
 
 
-  pHscrWk = (int_union*)bg_ctx->hscrollwork;
+  pHscrWk = bg_ctx->hscrollwork;
   for (i = 11; i >= 0; --i) {
-    wD1 = -(pHscrWk->words[bg_hi()] + bg_ctx->scrb_h_posit.words[bg_hi()]);
-    ++pHscrWk;
+    wD1 = -(pHscrWk[1] + bg_ctx->scrb_h_posit.words[bg_hi()]);
+    pHscrWk += 2;
     for (j = z33d_cnttbl[i]; j >= 0; --j) {
       *pHScrollWork++ = wD1;
     }
@@ -7105,7 +7105,7 @@ static void bg_33d_scroll(ScdBg *bg_ctx) {
     pHScrollWork += (uint32_t)lD0.words[1-bg_hi()] / 2;
     bg_ctx->waterdirec.w += 64;
 
-    bg_33d_zonescrsetsub0(bg_ctx, &pHScrollBuff, (uint16_t**)&pHScrollWork, z33d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
+    bg_33d_zonescrsetsub0(bg_ctx, &pHScrollBuff, &pHScrollWork, z33d_kawatbl, awasintbl, wD1, (uint16_t*)&lD2.words[1-bg_hi()], &wD4);
 
 
   }
@@ -7142,11 +7142,11 @@ static void bg_33d_scroll(ScdBg *bg_ctx) {
   } while ((int16_t)--wD1 >= 0);
 
 }
-static void bg_33d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, uint16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
+static void bg_33d_zonescrsetsub0(ScdBg *bg_ctx, int_union** ppA1, int16_t** ppA2, uint16_t* pA3, uint8_t* pA4, uint16_t wD1, uint16_t* pwD2, uint16_t* pwD4) {
   int_union* pA1;
-  uint16_t* pA2;
+  int16_t* pA2;
   uint16_t wD3, wD6;
-  int_union lD0;
+  int_union lD0 = {0};
   int32_t i;
 
   lD0.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -7264,7 +7264,7 @@ static void bg_33d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_33d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -7292,7 +7292,7 @@ static void bg_33d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_33d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -7320,7 +7320,7 @@ static void bg_33d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_33d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -7358,7 +7358,7 @@ static void bg_41a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_41a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_41a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_41a_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
   int32_t i;
 
   data.l = 0;
@@ -7396,7 +7396,7 @@ static void bg_41a_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
   }
 }
 static void bg_41a_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -7469,7 +7469,7 @@ static void bg_41a_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_41a_z41aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z41ascrtbl[5] = {
     14, 10, 4, 2, 2
@@ -7499,8 +7499,8 @@ static int32_t bg_41a_z41aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_41a_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -7574,7 +7574,7 @@ static void bg_41a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_41a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -7602,7 +7602,7 @@ static void bg_41a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_41a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -7630,7 +7630,7 @@ static void bg_41a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_41a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -7687,7 +7687,7 @@ static void bg_41b_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
   }
 }
 static void bg_41b_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t temp1, temp2;
   int32_t hsCount;
   int32_t i;
@@ -7736,8 +7736,8 @@ static void bg_41b_scroll(ScdBg *bg_ctx) {
 }
 static void bg_41b_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -7792,7 +7792,7 @@ static void bg_41b_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_41b_scrollb_hv(ScdBg *bg_ctx, int32_t lD4, int32_t lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4;
@@ -7839,7 +7839,7 @@ static void bg_41c_scroll(ScdBg *bg_ctx);
 static void bg_41c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_41c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_41c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
   int32_t i;
 
   data.l = 0;
@@ -7860,8 +7860,8 @@ static void bg_41c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
   }
 }
 static void bg_41c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -7914,8 +7914,8 @@ static void bg_41c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_41c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -7970,7 +7970,7 @@ static void bg_41c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_41c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8017,7 +8017,7 @@ static void bg_41d_scroll(ScdBg *bg_ctx);
 static void bg_41d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_41d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_41d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
   int32_t i;
 
   data.l = 0;
@@ -8038,8 +8038,8 @@ static void bg_41d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
   }
 }
 static void bg_41d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8087,8 +8087,8 @@ static void bg_41d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_41d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -8143,7 +8143,7 @@ static void bg_41d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_41d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8190,7 +8190,7 @@ static void bg_42a_scroll(ScdBg *bg_ctx);
 static void bg_42a_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_42a_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_42a_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -8211,8 +8211,8 @@ static void bg_42a_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_42a_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8259,8 +8259,8 @@ static void bg_42a_scroll(ScdBg *bg_ctx) {
 }
 static void bg_42a_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -8315,7 +8315,7 @@ static void bg_42a_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_42a_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8362,7 +8362,7 @@ static void bg_42b_scroll(ScdBg *bg_ctx);
 static void bg_42b_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_42b_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_42b_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -8383,8 +8383,8 @@ static void bg_42b_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_42b_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8431,8 +8431,8 @@ static void bg_42b_scroll(ScdBg *bg_ctx) {
 }
 static void bg_42b_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -8487,7 +8487,7 @@ static void bg_42b_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_42b_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8534,7 +8534,7 @@ static void bg_42c_scroll(ScdBg *bg_ctx);
 static void bg_42c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_42c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_42c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -8555,8 +8555,8 @@ static void bg_42c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_42c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8603,8 +8603,8 @@ static void bg_42c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_42c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -8659,7 +8659,7 @@ static void bg_42c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_42c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8706,7 +8706,7 @@ static void bg_42d_scroll(ScdBg *bg_ctx);
 static void bg_42d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_42d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_42d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -8727,8 +8727,8 @@ static void bg_42d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_42d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8775,8 +8775,8 @@ static void bg_42d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_42d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -8831,7 +8831,7 @@ static void bg_42d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_42d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -8878,7 +8878,7 @@ static void bg_43c_scroll(ScdBg *bg_ctx);
 static void bg_43c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_43c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_43c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -8899,8 +8899,8 @@ static void bg_43c_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_43c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -8947,8 +8947,8 @@ static void bg_43c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_43c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -9003,7 +9003,7 @@ static void bg_43c_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_43c_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -9050,7 +9050,7 @@ static void bg_43d_scroll(ScdBg *bg_ctx);
 static void bg_43d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs);
 static void bg_43d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5);
 static void bg_43d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -9071,8 +9071,8 @@ static void bg_43d_scrbinit(ScdBg *bg_ctx, int16_t yWk) {
 
 }
 static void bg_43d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
-  int_union temp1, temp2;
+  uint_union data = {0};
+  int_union temp1 = {0}, temp2 = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -9119,8 +9119,8 @@ static void bg_43d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_43d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
-  short_union data1, data2;
+  int_union hsw = {0};
+  short_union data1 = {0}, data2 = {0};
   int16_t avp;
   int32_t i;
 
@@ -9175,7 +9175,7 @@ static void bg_43d_zonescrsetsub0(ScdBg *bg_ctx, int16_t HPosi, int16_t VPosi, u
 
 }
 static void bg_43d_scrollb_hv(ScdBg *bg_ctx, int_union* lD4, int_union* lD5) {
-  int_union lD0, lD2, lD3;
+  int_union lD0 = {0}, lD2 = {0}, lD3 = {0};
 
   lD0.l = lD2.l = bg_ctx->scrb_h_posit.l;
   lD0.l += lD4->l;
@@ -9229,7 +9229,7 @@ static void bg_51a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -9253,7 +9253,7 @@ static void bg_51a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos;
 }
 static void bg_51a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -9346,7 +9346,7 @@ static void bg_51a_scroll(ScdBg *bg_ctx) {
 }
 static void bg_51a_z51aline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl0[6] = {
@@ -9380,7 +9380,7 @@ static void bg_51a_z51aline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51a_z51aline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl1[7] = {
@@ -9411,7 +9411,7 @@ static void bg_51a_z51aline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51a_z51aline2(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl2[11] = {
@@ -9444,7 +9444,7 @@ static void bg_51a_z51aline2(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51a_z51aline3(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl3[3] = {
@@ -9475,7 +9475,7 @@ static void bg_51a_z51aline3(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -9510,7 +9510,7 @@ static void bg_51a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_51a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9534,7 +9534,7 @@ static void bg_51a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9558,7 +9558,7 @@ static void bg_51a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9594,7 +9594,7 @@ static void bg_51b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -9616,7 +9616,7 @@ static void bg_51b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_51b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -9689,7 +9689,7 @@ static void bg_51b_scroll(ScdBg *bg_ctx) {
 }
 static void bg_51b_z51bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl0[4] = {
@@ -9722,7 +9722,7 @@ static void bg_51b_z51bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51b_z51bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl1[12] = {
@@ -9754,7 +9754,7 @@ static void bg_51b_z51bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51b_z51bline2(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl2[4] = {
@@ -9787,7 +9787,7 @@ static void bg_51b_z51bline2(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51b_z51bline3(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl3[10] = {
@@ -9819,7 +9819,7 @@ static void bg_51b_z51bline3(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scrb_h_posit.words[bg_hi()];
@@ -9854,7 +9854,7 @@ static void bg_51b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_51b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9878,7 +9878,7 @@ static void bg_51b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9902,7 +9902,7 @@ static void bg_51b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -9935,7 +9935,7 @@ static void bg_51c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -9956,7 +9956,7 @@ static void bg_51c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_51c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -10046,7 +10046,7 @@ static void bg_51c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_51c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51cscrtbl[3] = {
@@ -10077,7 +10077,7 @@ static void bg_51c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -10111,7 +10111,7 @@ static void bg_51c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_51c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10135,7 +10135,7 @@ static void bg_51c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10159,7 +10159,7 @@ static void bg_51c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10193,7 +10193,7 @@ static void bg_51d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_51d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -10215,9 +10215,9 @@ static void bg_51d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos;
 }
 static void bg_51d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
-  int_union ldwk2, ldwk3;
+  int_union ldwk2 = {0}, ldwk3 = {0};
   int32_t i;
   int32_t lXwk, lYwk;
   int16_t sYnum;
@@ -10346,7 +10346,7 @@ static void bg_51d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_51d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51dscrtbl[3] = {
@@ -10380,7 +10380,7 @@ static void bg_51d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51d_z51dline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51dscrtbl0[6] = {
@@ -10411,7 +10411,7 @@ static void bg_51d_z51dline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_51d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -10445,7 +10445,7 @@ static void bg_51d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_51d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10469,7 +10469,7 @@ static void bg_51d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10493,7 +10493,7 @@ static void bg_51d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_51d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10529,7 +10529,7 @@ static void bg_52a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -10553,7 +10553,7 @@ static void bg_52a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos;
 }
 static void bg_52a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -10646,7 +10646,7 @@ static void bg_52a_scroll(ScdBg *bg_ctx) {
 }
 static void bg_52a_z51aline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl0[6] = {
@@ -10680,7 +10680,7 @@ static void bg_52a_z51aline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52a_z51aline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl1[7] = {
@@ -10711,7 +10711,7 @@ static void bg_52a_z51aline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52a_z51aline2(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl2[11] = {
@@ -10744,7 +10744,7 @@ static void bg_52a_z51aline2(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52a_z51aline3(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51ascrtbl3[3] = {
@@ -10775,7 +10775,7 @@ static void bg_52a_z51aline3(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -10809,7 +10809,7 @@ static void bg_52a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_52a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10833,7 +10833,7 @@ static void bg_52a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10857,7 +10857,7 @@ static void bg_52a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -10893,7 +10893,7 @@ static void bg_52b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -10915,7 +10915,7 @@ static void bg_52b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_52b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -10988,7 +10988,7 @@ static void bg_52b_scroll(ScdBg *bg_ctx) {
 }
 static void bg_52b_z51bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl0[4] = {
@@ -11021,7 +11021,7 @@ static void bg_52b_z51bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52b_z51bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl1[12] = {
@@ -11053,7 +11053,7 @@ static void bg_52b_z51bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52b_z51bline2(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl2[4] = {
@@ -11086,7 +11086,7 @@ static void bg_52b_z51bline2(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52b_z51bline3(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51bscrtbl3[10] = {
@@ -11118,7 +11118,7 @@ static void bg_52b_z51bline3(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -11152,7 +11152,7 @@ static void bg_52b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_52b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11176,7 +11176,7 @@ static void bg_52b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11200,7 +11200,7 @@ static void bg_52b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11233,7 +11233,7 @@ static void bg_52c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -11254,7 +11254,7 @@ static void bg_52c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_52c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -11344,7 +11344,7 @@ static void bg_52c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_52c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51cscrtbl[3] = {
@@ -11375,7 +11375,7 @@ static void bg_52c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -11409,7 +11409,7 @@ static void bg_52c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_52c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11433,7 +11433,7 @@ static void bg_52c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11457,7 +11457,7 @@ static void bg_52c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11491,7 +11491,7 @@ static void bg_52d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_52d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -11513,9 +11513,9 @@ static void bg_52d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos;
 }
 static void bg_52d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
-  int_union ldwk2, ldwk3;
+  int_union ldwk2 = {0}, ldwk3 = {0};
   int32_t i;
   int32_t lXwk, lYwk;
   int16_t sYnum;
@@ -11644,7 +11644,7 @@ static void bg_52d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_52d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51dscrtbl[3] = {
@@ -11678,7 +11678,7 @@ static void bg_52d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52d_z51dline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51dscrtbl0[6] = {
@@ -11709,7 +11709,7 @@ static void bg_52d_z51dline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_52d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -11743,7 +11743,7 @@ static void bg_52d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_52d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11767,7 +11767,7 @@ static void bg_52d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11791,7 +11791,7 @@ static void bg_52d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_52d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11824,7 +11824,7 @@ static void bg_53c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -11845,7 +11845,7 @@ static void bg_53c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_53c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -11908,7 +11908,7 @@ static void bg_53c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_53c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51cscrtbl[3] = {
@@ -11939,7 +11939,7 @@ static void bg_53c_z51cline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_53c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -11973,7 +11973,7 @@ static void bg_53c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_53c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -11997,7 +11997,7 @@ static void bg_53c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_53c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12021,7 +12021,7 @@ static void bg_53c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_53c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12054,7 +12054,7 @@ static void bg_53d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_53d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -12076,9 +12076,9 @@ static void bg_53d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrz_h_posit.words[bg_hi()] = sXpos;
 }
 static void bg_53d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
-  int_union ldwk2, ldwk3;
+  int_union ldwk2 = {0}, ldwk3 = {0};
   int32_t i;
   int32_t lXwk, lYwk;
   int16_t sYnum;
@@ -12195,7 +12195,7 @@ static void bg_53d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_53d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lHwk;
-  int_union ldHposwk;
+  int_union ldHposwk = {0};
   int32_t i, j;
   int16_t wk;
   int8_t z51dscrtbl[3] = {
@@ -12229,7 +12229,7 @@ static void bg_53d_z51dline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_53d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
 
@@ -12263,7 +12263,7 @@ static void bg_53d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_53d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12287,7 +12287,7 @@ static void bg_53d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_53d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12311,7 +12311,7 @@ static void bg_53d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_53d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12344,7 +12344,7 @@ static void bg_61a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -12364,7 +12364,7 @@ static void bg_61a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_61a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -12464,7 +12464,7 @@ static void bg_61a_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_61a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -12499,7 +12499,7 @@ static void bg_61a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_61a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12523,7 +12523,7 @@ static void bg_61a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12547,7 +12547,7 @@ static void bg_61a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12580,7 +12580,7 @@ static void bg_61b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -12600,7 +12600,7 @@ static void bg_61b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_61b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -12715,7 +12715,7 @@ static void bg_61b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
   };
   int32_t i;
   int32_t j;
-  int_union radwk;
+  int_union radwk = {0};
   int32_t lXwk;
 
   lXwk = bg_ctx->scra_h_posit.words[bg_hi()] - bg_ctx->scrb_h_posit.words[bg_hi()];
@@ -12743,7 +12743,7 @@ static void bg_61b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_61b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -12796,7 +12796,7 @@ static void bg_61b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_61b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12820,7 +12820,7 @@ static void bg_61b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12844,7 +12844,7 @@ static void bg_61b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -12877,7 +12877,7 @@ static void bg_61c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -12897,7 +12897,7 @@ static void bg_61c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_61c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -12996,7 +12996,7 @@ static void bg_61c_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_61c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -13031,7 +13031,7 @@ static void bg_61c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_61c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13055,7 +13055,7 @@ static void bg_61c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13079,7 +13079,7 @@ static void bg_61c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13112,7 +13112,7 @@ static void bg_61d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_61d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -13132,7 +13132,7 @@ static void bg_61d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_61d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -13232,7 +13232,7 @@ static void bg_61d_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_61d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -13267,7 +13267,7 @@ static void bg_61d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_61d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13291,7 +13291,7 @@ static void bg_61d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13315,7 +13315,7 @@ static void bg_61d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_61d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13348,7 +13348,7 @@ static void bg_62a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -13368,7 +13368,7 @@ static void bg_62a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_62a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -13466,7 +13466,7 @@ static void bg_62a_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_62a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -13501,7 +13501,7 @@ static void bg_62a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_62a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13525,7 +13525,7 @@ static void bg_62a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13549,7 +13549,7 @@ static void bg_62a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13582,7 +13582,7 @@ static void bg_62b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -13602,7 +13602,7 @@ static void bg_62b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_62b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -13705,7 +13705,7 @@ static void bg_62b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
   };
   int32_t i;
   int32_t j;
-  int_union radwk;
+  int_union radwk = {0};
   int32_t lXwk;
 
 
@@ -13735,7 +13735,7 @@ static void bg_62b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_62b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -13770,7 +13770,7 @@ static void bg_62b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_62b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13794,7 +13794,7 @@ static void bg_62b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13818,7 +13818,7 @@ static void bg_62b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -13851,7 +13851,7 @@ static void bg_62c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -13871,7 +13871,7 @@ static void bg_62c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_62c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -13970,7 +13970,7 @@ static void bg_62c_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_62c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -14005,7 +14005,7 @@ static void bg_62c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_62c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14029,7 +14029,7 @@ static void bg_62c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14053,7 +14053,7 @@ static void bg_62c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14086,7 +14086,7 @@ static void bg_62d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_62d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -14106,7 +14106,7 @@ static void bg_62d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_62d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -14205,7 +14205,7 @@ static void bg_62d_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_62d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -14240,7 +14240,7 @@ static void bg_62d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_62d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14264,7 +14264,7 @@ static void bg_62d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14288,7 +14288,7 @@ static void bg_62d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_62d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14321,7 +14321,7 @@ static void bg_63c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -14341,7 +14341,7 @@ static void bg_63c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_63c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -14441,7 +14441,7 @@ static void bg_63c_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_63c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -14476,7 +14476,7 @@ static void bg_63c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_63c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14500,7 +14500,7 @@ static void bg_63c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_63c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14524,7 +14524,7 @@ static void bg_63c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_63c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14557,7 +14557,7 @@ static void bg_63d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_63d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -14577,7 +14577,7 @@ static void bg_63d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_63d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -14676,7 +14676,7 @@ static void bg_63d_z61aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_63d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -14711,7 +14711,7 @@ static void bg_63d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_63d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14735,7 +14735,7 @@ static void bg_63d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_63d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14759,7 +14759,7 @@ static void bg_63d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_63d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -14794,7 +14794,7 @@ static void bg_71a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_71a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_71a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_71a_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -14809,7 +14809,7 @@ static void bg_71a_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_71a_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -14872,7 +14872,7 @@ static void bg_71a_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_71a_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[37] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -14907,7 +14907,7 @@ static int32_t bg_71a_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_71a_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[12] = {
     1, 1, 0, 0,
@@ -14938,7 +14938,7 @@ static int32_t bg_71a_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_71a_z71aline1(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl1[2] = {
     9,
@@ -14968,7 +14968,7 @@ static int32_t bg_71a_z71aline1(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_71a_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -15024,7 +15024,7 @@ static void bg_71a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_71a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -15052,7 +15052,7 @@ static void bg_71a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_71a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -15080,7 +15080,7 @@ static void bg_71a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_71a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -15119,7 +15119,7 @@ static void bg_71b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_71b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_71b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_71b_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -15134,7 +15134,7 @@ static void bg_71b_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_71b_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -15198,7 +15198,7 @@ static void bg_71b_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_71b_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[37] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -15233,7 +15233,7 @@ static int32_t bg_71b_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_71b_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[8] = {
     0, 0, 0, 0,
@@ -15263,7 +15263,7 @@ static int32_t bg_71b_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_71b_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
   int16_t VPosi2;
   int16_t wD2;
@@ -15343,7 +15343,7 @@ static void bg_71b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_71b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -15371,7 +15371,7 @@ static void bg_71b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_71b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -15399,7 +15399,7 @@ static void bg_71b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_71b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -15438,7 +15438,7 @@ static void bg_71c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_71c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_71c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_71c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -15453,7 +15453,7 @@ static void bg_71c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_71c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -15516,7 +15516,7 @@ static void bg_71c_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_71c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[39] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -15551,7 +15551,7 @@ static int32_t bg_71c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_71c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[10] = {
     7, 3, 3, 5,
@@ -15585,7 +15585,7 @@ static int32_t bg_71c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_71c_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -15641,7 +15641,7 @@ static void bg_71c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_71c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -15669,7 +15669,7 @@ static void bg_71c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_71c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -15697,7 +15697,7 @@ static void bg_71c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_71c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -15736,7 +15736,7 @@ static void bg_71d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_71d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_71d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_71d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -15751,7 +15751,7 @@ static void bg_71d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_71d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -15820,7 +15820,7 @@ static void bg_71d_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_71d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[16] = {
     3, 3, 1, 1, 0, 0,
@@ -15853,7 +15853,7 @@ static int32_t bg_71d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_71d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[11] = {
     1, 1, 1, 1,
@@ -15887,7 +15887,7 @@ static int32_t bg_71d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_71d_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -15943,7 +15943,7 @@ static void bg_71d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_71d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -15971,7 +15971,7 @@ static void bg_71d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_71d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -15999,7 +15999,7 @@ static void bg_71d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_71d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -16039,7 +16039,7 @@ static void bg_72a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_72a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_72a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_72a_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -16054,7 +16054,7 @@ static void bg_72a_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_72a_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -16117,7 +16117,7 @@ static void bg_72a_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_72a_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[37] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -16152,7 +16152,7 @@ static int32_t bg_72a_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_72a_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[12] = {
     1, 1, 0, 0,
@@ -16183,7 +16183,7 @@ static int32_t bg_72a_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_72a_z71aline1(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl1[2] = {
     9,
@@ -16213,7 +16213,7 @@ static int32_t bg_72a_z71aline1(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_72a_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -16269,7 +16269,7 @@ static void bg_72a_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_72a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -16297,7 +16297,7 @@ static void bg_72a_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_72a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -16325,7 +16325,7 @@ static void bg_72a_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_72a_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -16364,7 +16364,7 @@ static void bg_72b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_72b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_72b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_72b_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -16379,7 +16379,7 @@ static void bg_72b_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_72b_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -16443,7 +16443,7 @@ static void bg_72b_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_72b_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[37] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -16478,7 +16478,7 @@ static int32_t bg_72b_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_72b_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[8] = {
     0, 0, 0, 0,
@@ -16508,7 +16508,7 @@ static int32_t bg_72b_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_72b_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
   int16_t VPosi2;
   int16_t wD2;
@@ -16588,7 +16588,7 @@ static void bg_72b_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_72b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -16616,7 +16616,7 @@ static void bg_72b_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_72b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -16644,7 +16644,7 @@ static void bg_72b_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_72b_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -16683,7 +16683,7 @@ static void bg_72c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_72c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_72c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_72c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -16698,7 +16698,7 @@ static void bg_72c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_72c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -16761,7 +16761,7 @@ static void bg_72c_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_72c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[39] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -16796,7 +16796,7 @@ static int32_t bg_72c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_72c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[10] = {
     7, 3, 3, 5,
@@ -16830,7 +16830,7 @@ static int32_t bg_72c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_72c_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -16886,7 +16886,7 @@ static void bg_72c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_72c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -16914,7 +16914,7 @@ static void bg_72c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_72c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -16942,7 +16942,7 @@ static void bg_72c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_72c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -16981,7 +16981,7 @@ static void bg_72d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_72d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_72d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_72d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -16996,7 +16996,7 @@ static void bg_72d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_72d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -17065,7 +17065,7 @@ static void bg_72d_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_72d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[16] = {
     3, 3, 1, 1, 0, 0,
@@ -17098,7 +17098,7 @@ static int32_t bg_72d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_72d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[11] = {
     1, 1, 1, 1,
@@ -17132,7 +17132,7 @@ static int32_t bg_72d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_72d_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -17188,7 +17188,7 @@ static void bg_72d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_72d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -17216,7 +17216,7 @@ static void bg_72d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_72d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -17244,7 +17244,7 @@ static void bg_72d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_72d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -17283,7 +17283,7 @@ static void bg_73c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_73c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_73c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_73c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -17297,7 +17297,7 @@ static void bg_73c_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_73c_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -17360,7 +17360,7 @@ static void bg_73c_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_73c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[39] = {
     1, 1, 1, 1, 1, 1, 1, 0,
@@ -17395,7 +17395,7 @@ static int32_t bg_73c_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_73c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[10] = {
     7, 3, 3, 5,
@@ -17429,7 +17429,7 @@ static int32_t bg_73c_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_73c_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -17485,7 +17485,7 @@ static void bg_73c_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_73c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -17513,7 +17513,7 @@ static void bg_73c_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_73c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -17541,7 +17541,7 @@ static void bg_73c_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_73c_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -17580,7 +17580,7 @@ static void bg_73d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb);
 static void bg_73d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc);
 static void bg_73d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz);
 static void bg_73d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
-  uint_union data;
+  uint_union data = {0};
 
 
   data.l = 0;
@@ -17594,7 +17594,7 @@ static void bg_73d_scrbinit(ScdBg *bg_ctx, int16_t yWk, int16_t xWk) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = (uint16_t)((xWk >> 4) * 3);
 }
 static void bg_73d_scroll(ScdBg *bg_ctx) {
-  uint_union data;
+  uint_union data = {0};
   int32_t hsCount;
   int32_t i;
 
@@ -17663,7 +17663,7 @@ static void bg_73d_scroll(ScdBg *bg_ctx) {
 }
 static int32_t bg_73d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl[16] = {
     3, 3, 1, 1, 0, 0,
@@ -17696,7 +17696,7 @@ static int32_t bg_73d_z71aline(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static int32_t bg_73d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
   int32_t temp;
-  int_union data;
+  int_union data = {0};
   int32_t i, j;
   int32_t z71ascrtbl0[11] = {
     1, 1, 1, 1,
@@ -17730,7 +17730,7 @@ static int32_t bg_73d_z71aline0(ScdBg *bg_ctx, int32_t hsCount) {
 }
 static void bg_73d_zonescrsetsub0(ScdBg *bg_ctx, int16_t VPosi, uint16_t offs) {
   int_union* pHScrollBuff;
-  int_union hsw;
+  int_union hsw = {0};
   int32_t i, j;
 
 
@@ -17786,7 +17786,7 @@ static void bg_73d_scrollb_v(ScdBg *bg_ctx, uint16_t wD0) {
 
 }
 static void bg_73d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrb_h_posit.l;
@@ -17814,7 +17814,7 @@ static void bg_73d_scrollb_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagb) {
 
 }
 static void bg_73d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrc_h_posit.l;
@@ -17842,7 +17842,7 @@ static void bg_73d_scrollc_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagc) {
 
 }
 static void bg_73d_scrollz_h(ScdBg *bg_ctx, int32_t lD4, int32_t flagz) {
-  int_union lD0, lD1, lD2;
+  int_union lD0 = {0}, lD1 = {0}, lD2 = {0};
   uint8_t bD3;
 
   lD2.l = bg_ctx->scrz_h_posit.l;
@@ -17880,7 +17880,7 @@ static void bg_81a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -17900,7 +17900,7 @@ static void bg_81a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_81a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -17984,7 +17984,7 @@ static void bg_81a_scroll(ScdBg *bg_ctx) {
 static void bg_81a_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z81ascrtbl[5] = {
     3, 4, 2, 0, 0
@@ -18015,7 +18015,7 @@ static void bg_81a_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_81a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -18050,7 +18050,7 @@ static void bg_81a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_81a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18074,7 +18074,7 @@ static void bg_81a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18098,7 +18098,7 @@ static void bg_81a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18131,7 +18131,7 @@ static void bg_81b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -18151,7 +18151,7 @@ static void bg_81b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_81b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -18241,7 +18241,7 @@ static void bg_81b_scroll(ScdBg *bg_ctx) {
 static void bg_81b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw, int8_t* pScrTbl, int16_t AddrOffs, int16_t LoopNum) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
 
   lXwk = bg_ctx->scrc_h_posit.words[bg_hi()] - bg_ctx->scrz_h_posit.words[bg_hi()];
@@ -18269,7 +18269,7 @@ static void bg_81b_z81aline(ScdBg *bg_ctx, int16_t** ppHscw, int8_t* pScrTbl, in
 }
 static void bg_81b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -18304,7 +18304,7 @@ static void bg_81b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_81b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18328,7 +18328,7 @@ static void bg_81b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18352,7 +18352,7 @@ static void bg_81b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18385,7 +18385,7 @@ static void bg_81c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -18405,7 +18405,7 @@ static void bg_81c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_81c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -18489,7 +18489,7 @@ static void bg_81c_scroll(ScdBg *bg_ctx) {
 static void bg_81c_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z81ascrtbl[5] = {
     3, 4, 2, 0, 0
@@ -18520,7 +18520,7 @@ static void bg_81c_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_81c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -18555,7 +18555,7 @@ static void bg_81c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_81c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18579,7 +18579,7 @@ static void bg_81c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18603,7 +18603,7 @@ static void bg_81c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18636,7 +18636,7 @@ static void bg_81d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_81d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -18656,7 +18656,7 @@ static void bg_81d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_81d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -18740,7 +18740,7 @@ static void bg_81d_scroll(ScdBg *bg_ctx) {
 static void bg_81d_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z81ascrtbl[5] = {
     3, 4, 2, 0, 0
@@ -18771,7 +18771,7 @@ static void bg_81d_z81aline(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_81d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -18806,7 +18806,7 @@ static void bg_81d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_81d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18830,7 +18830,7 @@ static void bg_81d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18854,7 +18854,7 @@ static void bg_81d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_81d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -18888,7 +18888,7 @@ static void bg_82a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -18908,7 +18908,7 @@ static void bg_82a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_82a_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -18986,7 +18986,7 @@ static void bg_82a_scroll(ScdBg *bg_ctx) {
 static void bg_82a_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl0[7] = {
     0, 0, 0, 0, 1, 1, 1
@@ -19015,7 +19015,7 @@ static void bg_82a_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 static void bg_82a_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl1[7] = {
     0, 0, 0, 0, 1, 9, 1
@@ -19045,7 +19045,7 @@ static void bg_82a_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_82a_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -19080,7 +19080,7 @@ static void bg_82a_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_82a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19104,7 +19104,7 @@ static void bg_82a_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19128,7 +19128,7 @@ static void bg_82a_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82a_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19162,7 +19162,7 @@ static void bg_82b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -19182,7 +19182,7 @@ static void bg_82b_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_82b_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -19260,7 +19260,7 @@ static void bg_82b_scroll(ScdBg *bg_ctx) {
 static void bg_82b_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl0[8] = {
     1, 1, 0, 0, 0, 0, 0, 0
@@ -19289,7 +19289,7 @@ static void bg_82b_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 static void bg_82b_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl1[12] = {
     1, 1, 1, 1, 1, 1, 1, 3, 3, 1, 1, 1
@@ -19319,7 +19319,7 @@ static void bg_82b_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_82b_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.l = 0;
@@ -19354,7 +19354,7 @@ static void bg_82b_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_82b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19378,7 +19378,7 @@ static void bg_82b_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19402,7 +19402,7 @@ static void bg_82b_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82b_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19436,7 +19436,7 @@ static void bg_82c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -19456,7 +19456,7 @@ static void bg_82c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_82c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -19528,7 +19528,7 @@ static void bg_82c_scroll(ScdBg *bg_ctx) {
 static void bg_82c_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl0[7] = {
     9, 1, 1, 0, 0, 0, 0
@@ -19557,7 +19557,7 @@ static void bg_82c_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 static void bg_82c_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl1[5] = {
     3, 3, 3, 3, 3
@@ -19587,7 +19587,7 @@ static void bg_82c_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_82c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.l = 0;
@@ -19622,7 +19622,7 @@ static void bg_82c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_82c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19646,7 +19646,7 @@ static void bg_82c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19670,7 +19670,7 @@ static void bg_82c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19704,7 +19704,7 @@ static void bg_82d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_82d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -19724,7 +19724,7 @@ static void bg_82d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_82d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -19802,7 +19802,7 @@ static void bg_82d_scroll(ScdBg *bg_ctx) {
 static void bg_82d_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl0[7] = {
     0, 0, 0, 0, 1, 1, 1
@@ -19831,7 +19831,7 @@ static void bg_82d_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 static void bg_82d_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t i, j;
   int32_t lXwk;
-  int_union ldwk;
+  int_union ldwk = {0};
   int16_t wk;
   static int8_t z82bscrtbl1[7] = {
     0, 0, 0, 0, 1, 9, 1
@@ -19861,7 +19861,7 @@ static void bg_82d_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_82d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -19896,7 +19896,7 @@ static void bg_82d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_82d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19920,7 +19920,7 @@ static void bg_82d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19944,7 +19944,7 @@ static void bg_82d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_82d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -19979,7 +19979,7 @@ static void bg_83c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -19998,7 +19998,7 @@ static void bg_83c_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos * 3;
 }
 static void bg_83c_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -20064,7 +20064,7 @@ static void bg_83c_scroll(ScdBg *bg_ctx) {
 }
 static void bg_83c_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lWk1, lWk2;
-  int_union ldWk1, ldWk2;
+  int_union ldWk1 = {0}, ldWk2 = {0};
   int32_t i, j;
   static int8_t z82bscrtbl0[5] = {
     3, 3, 3, 1, 1
@@ -20094,7 +20094,7 @@ static void bg_83c_z82bline0(ScdBg *bg_ctx, int16_t** ppHscw) {
 }
 static void bg_83c_z82bline1(ScdBg *bg_ctx, int16_t** ppHscw) {
   int32_t lWk1, lWk2;
-  int_union ldWk1, ldWk2;
+  int_union ldWk1 = {0}, ldWk2 = {0};
   int32_t i, j;
   static int8_t z82bscrtbl1[5] = {
     1, 3, 1, 3, 1
@@ -20130,7 +20130,7 @@ static void bg_83c_line_div(ScdBg *bg_ctx, int32_t hWk1, int32_t* hWk2, int16_t 
 }
 static void bg_83c_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -20165,7 +20165,7 @@ static void bg_83c_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_83c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -20189,7 +20189,7 @@ static void bg_83c_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_83c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -20213,7 +20213,7 @@ static void bg_83c_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_83c_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -20245,7 +20245,7 @@ static void bg_83d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit);
 static void bg_83d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
-  int_union lYwk;
+  int_union lYwk = {0};
 
   lYwk.words[bg_hi()] = sYpos;
   lYwk.words[1-bg_hi()] = 0;
@@ -20264,7 +20264,7 @@ static void bg_83d_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
   bg_ctx->scrb_h_posit.words[bg_hi()] = sXpos + 112;
 }
 static void bg_83d_scroll(ScdBg *bg_ctx) {
-  int_union ldwk;
+  int_union ldwk = {0};
   int_union* pHscrbuf;
   int32_t i;
   int32_t lXwk;
@@ -20337,7 +20337,7 @@ static void bg_83d_scroll(ScdBg *bg_ctx) {
 }
 static void bg_83d_zonescrsetsub0(ScdBg *bg_ctx, int16_t yoffs, int16_t yline, int_union** pHscrbuf, int16_t* pHscrwk) {
   int32_t i, j;
-  int_union ldwk;
+  int_union ldwk = {0};
 
   ldwk.l = 0;
   ldwk.words[bg_hi()] = -bg_ctx->scra_h_posit.words[bg_hi()];
@@ -20372,7 +20372,7 @@ static void bg_83d_scrollb_v(ScdBg *bg_ctx, int16_t yPos) {
 }
 static void bg_83d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrb_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -20396,7 +20396,7 @@ static void bg_83d_scrollb_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_83d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrc_h_posit.l;
   lXwk = lXsv + xoffs;
@@ -20420,7 +20420,7 @@ static void bg_83d_scrollc_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
 }
 static void bg_83d_scrollz_h(ScdBg *bg_ctx, int32_t xoffs, int32_t flgbit) {
   int32_t lXwk, lXsv;
-  int_union ldXwk;
+  int_union ldXwk = {0};
 
   lXsv = bg_ctx->scrz_h_posit.l;
   lXwk = lXsv + xoffs;

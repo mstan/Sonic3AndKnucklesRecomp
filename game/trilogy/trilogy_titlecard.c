@@ -83,11 +83,7 @@ int tri_titlecard_hook(uint32_t pc)
             A(1) = S3K_PLC_SpikesSprings;
             tri_jsr(S3K_Load_PLC_Raw);
             tri_jsr(S3K_PLCLoad_AnimalsAndExplosion);
-            if (r8(RAM_Water_flag)) {              /* breathing bubbles, air countdown */
-                uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
-                A(1) = tri_rd32(t + TRI_BLOB_BUBBLES_PLC * 4u);
-                tri_jsr(S3K_Load_PLC_Raw);
-            }
+            tri_water_load_bubbles();
             A(0) = a0;
         }
         tri_obj_titlecard_done();

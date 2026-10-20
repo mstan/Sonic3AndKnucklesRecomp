@@ -1,5 +1,42 @@
 # Sonic CD implementation record
 
+Current integration findings, qualified evidence and remaining gates are tracked
+in [SONIC_CD_VALIDATION.md](SONIC_CD_VALIDATION.md). Historical checkpoints below
+retain their original scope and are superseded by that working ledger.
+
+## Current owner direction (supersedes older sequencing below)
+
+The owner resumed this as an active goal: finish Sonic CD end to end on the
+CD branch, validate and commit it, then implement a general Sega CD recompiler
+backend. An independent Sonic CD repository is authorized if useful. Shadow
+has already merged to game main `4e387ee` and engine master `3f17adf`; it is no
+longer queued after CD. CD's original AS IS snapshot branches remain preserved.
+Work stays solo. CD is not to be merged into main/master before the required
+backend work and final acceptance. A campaign checkpoint is not that backend.
+
+The CD engine now includes current master on `332ff1f`. Game integration
+checkpoint `7de1bf6` reconciles six independent default-off controls: S1, S2,
+CD, Megamix stages, Mighty and Shadow. The last three still require the owner's
+shared raw Megamix v3 ROM. Four stage switches have 16 combinations; with the
+two independent character switches, validate 64 configurations.
+
+SCS1 keeps all stable IDs and 548-byte records. It reads v1, CD v2/capability1,
+and Shadow v3/capability2. Combining both writes v3/capability3, preserving an
+immutable `.pre-v3-cap3.bak` from either predecessor. Capabilities remain parked
+when mods are removed. Character availability uses Shadow bit16 and Mighty
+bit32 independently of Megamix stage bit4. Unknown capabilities remain read-only.
+Strict Windows GCC passes both predecessor migrations, normal/completed saves
+across all64 masks, and the six-control resource/provider matrix. Integrated
+runtime gameplay and broader CD fidelity checks still need qualification.
+
+The owner's BIOS archive `E:/Downloads/Sega Mega CD BIOS.zip` has been qualified.
+Use only its `Sega CD (U) - Model 1 v1.10 (1992).bin` entry: 128KiB, CRC32
+`C6D10268`, SHA256
+`807384678ef259494d943eddb6954dfc7069693d0dde0c424e2028488d88e81a`.
+The private extracted input is under `build/private-inputs`; no BIOS is committed.
+This records input identity, not original-program/backend boot validation.
+
+
 Work remains on the prepared CD feature branches. The acceptance contract is
 [SONIC_CD_HANDOFF.md](SONIC_CD_HANDOFF.md); central tracking is `beads-ritf`.
 

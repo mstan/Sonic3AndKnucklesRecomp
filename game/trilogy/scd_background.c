@@ -28,6 +28,15 @@ static int32_t bg_divu_ext(uint32_t value,uint16_t divisor)
     uint32_t quotient=value/divisor;
     return (int16_t)(quotient>65535?value:quotient);
 }
+/* Work-array counters have logical low/high SHORT order from the Windows
+ * source, irrespective of the host byte order. Access their actual short
+ * objects; no long-pointer overlay or strict-aliasing exception is needed. */
+static int32_t bg_work_get(const int16_t *p)
+{ return (int32_t)((uint16_t)p[0] | (uint32_t)(uint16_t)p[1]<<16); }
+static void bg_work_set(int16_t *p,int32_t value)
+{ p[0]=(int16_t)value;p[1]=(int16_t)((uint32_t)value>>16); }
+static void bg_work_add(int16_t *p,int32_t value)
+{ bg_work_set(p,(int32_t)((uint32_t)bg_work_get(p)+(uint32_t)value)); }
 typedef union { int32_t l;int16_t words[2];int8_t bytes[4]; } int_union;
 typedef union { uint32_t l;uint16_t words[2];uint8_t bytes[4]; } uint_union;
 typedef union { int16_t w;int8_t bytes[2]; } short_union;
@@ -38,10 +47,7 @@ struct ScdBg {
     int profile;
     BgPlayer actwk[1];
     uint8_t enkeino;
-    /* Some original routines use 32-bit accumulators in the short work area.
-     * Keep its alignment explicit; compiler alias/overflow behavior is qualified
-     * with the generated profiles before production integration. */
-    _Alignas(int32_t) int16_t hscrollwork[256];
+    int16_t hscrollwork[256];
     int32_t linework[128];
     int_union *lphscrollbuff,output[1024];
     int_union scra_h_posit,scra_v_posit,scrb_h_posit,scrb_v_posit;

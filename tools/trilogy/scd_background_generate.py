@@ -77,6 +77,54 @@ def fixed_width(body):
     for i in range(1,5):body=body.replace('->b.b'+str(i),'->bytes[bg_byte('+str(4-i)+')]')
     return body
 
+
+def portable_work_function(body):
+    # The Windows source overlays long counters onto a short array. Its odd
+    # short indices mean the HIGH word even on a big-endian host. Preserve
+    # that logical order explicitly instead of casting pointers/depending on
+    # the host's object representation or alias-analysis settings.
+    names=set(re.findall(r'(\w+)\s*=\s*\(int_union\s*\*\)\s*&?bg_ctx->hscrollwork',body))
+    for name in names:
+        body=re.sub(r'\bint_union\s*\*\s*'+name+r'\b','int16_t* '+name,body)
+        body=re.sub(r'\b'+name+r'\s*=\s*\(int_union\s*\*\)',name+' = ',body)
+        body=re.sub(r'\b'+name+r'->l\s*\+=\s*([^;]+);',
+                    lambda m:'bg_work_add('+name+', '+m[1]+');',body)
+        body=body.replace(name+'->words[bg_hi()]',name+'[1]')
+        body=body.replace(name+'->words[1-bg_hi()]',name+'[0]')
+        body=body.replace(name+'->l','bg_work_get('+name+')')
+        body=body.replace('++'+name+';',name+' += 2;')
+    body=body.replace('((int32_t*)bg_ctx->hscrollwork)[i] = 0;',
+                      'bg_work_set(bg_ctx->hscrollwork + i * 2, 0);')
+    # Signed/unsigned SHORT objects may alias, but pointers to those pointers
+    # may not. The callee only copies the short words, so retain their type.
+    body=body.replace('uint16_t** ppA2','int16_t** ppA2')
+    body=body.replace('uint16_t* pA2;','int16_t* pA2;')
+    body=body.replace('(uint16_t**)&pHScrollWork','&pHScrollWork')
+    return body
+
+
+def portable_work(body):
+    # A name such as psHscr is also used for an ordinary short pointer in
+    # other profiles. Bind each overlay rewrite to its declaring function.
+    pattern=re.compile(r'^static\s+(?:void|int32_t|int16_t|uint32_t|uint16_t|int8_t|uint8_t)\s+\w+\([^;{}]*\)\s*\{',re.M)
+    out=[];last=0
+    for match in pattern.finditer(body):
+        end=match.end();depth=1
+        while end<len(body) and depth:
+            depth+=(body[end]=='{')-(body[end]=='}');end+=1
+        if depth:raise ValueError('Unbalanced generated function')
+        out.extend((body[last:match.start()],portable_work_function(body[match.start():end])))
+        last=end
+    out.append(body[last:])
+    # Match the prototypes to the now type-safe pointer-to-pointer arguments.
+    result=''.join(out).replace('uint16_t** ppA2','int16_t** ppA2')
+    # A MOVE.W-like assignment initializes only one half of a local union.
+    # The source sometimes later reads its long value. Unwritten host stack
+    # bytes are not emulated register state; define those halves as zero.
+    declaration=r'(?m)^(\s*)(int_union|uint_union|short_union|ushort_union)\s+([A-Za-z_]\w*(?:\s*,\s*\w+)*)\s*;'
+    return re.sub(declaration,lambda m:m[1]+m[2]+' '+', '.join(
+        name.strip()+' = {0}' for name in m[3].split(','))+';',result)
+
 def generate(source):
     src=source/'src';out=[];rows=[];profiles=[]
     table=(src/'TBL0.C').read_text()
@@ -126,7 +174,7 @@ def generate(source):
                 profiles.append('{'+prefix+'init,'+prefix+'scroll}')
                 rows.append(dict(level=level,source=p.relative_to(source).as_posix(),sha256=hashlib.sha256(p.read_bytes()).hexdigest(),functions=sorted(seen)))
     out.append('static const BgProfile profiles[70]={\n'+',\n'.join(profiles)+'\n};')
-    return '\n'.join(out),rows
+    return portable_work('\n'.join(out)),rows
 
 def main():
     ap=argparse.ArgumentParser(description=__doc__)

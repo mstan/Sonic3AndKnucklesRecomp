@@ -17,7 +17,7 @@ tri_scd_map).
     scd_level.py --disc DIR [--out build/Release/scd.bin] [--window 0x600000]
                  [--only R11A,...]
 
-scd.bin   "TSCD", u16 version (2), u16 levels, u32 window base, u32 window
+scd.bin   "TSCD", u16 version (3), u16 levels, u32 window base, u32 window
           size, levels x { u16 zone_and_act, u16 flags, u32 offset, u32 size }
           One more entry, zone_and_act $FFFF (flags 1), is no level but Sonic
           CD's FM sound set (scd_sfx.py): its 32 KB SFX bank, then its table,
@@ -46,7 +46,7 @@ blob      +$00 the level's directory entry (TD_*, trilogy.h)
                blocks use), frames (tile offsets, + durations) }
           +$F4 u32 Quartz Quadrant's sections (scenery_sections): u16 n, n x u16
                player x limits, (n + 1) x u8 set (even padded), u16 sets, sets x
-               24 colours (palette 4 + set: line 1, S3K's order, line 2's 0-7),
+               48 colours (palette 4 + set: lines 1-3, line 1 in S3K's order),
                u32 x 4 colour cycles (Sonic CD's {u8 index, frames, colours, time}
                + colours: the belts, the lever's, even sections', odd's; 0 none),
                u16 width, height, u32 grid: set 1's background (128 px cells, the
@@ -1640,11 +1640,13 @@ def convert(lv, base, glyphs, s3k):
         out = struct.pack('>H%dH' % len(lims), len(lims), *lims) + bytes(sets) + bytes(len(sets) & 1)
         out += struct.pack('>H', len(arts))
         for k in range(len(arts)):
-            cols = list(lv.palette_colours(4 + k))[:24] + [0] * 24
+            cols = list(lv.palette_colours(4 + k))
+            if len(cols) != 48:
+                raise ValueError(f'{lv.name}: scenery palette must contain all three level lines')
             l1 = [0] * 16
             for i in range(16):
                 l1[bb.L1_PERM[i]] = cols[i]
-            out += struct.pack('>24H', *(l1 + cols[16:24]))
+            out += struct.pack('>48H', *(l1 + cols[16:48]))
         for t in cyc:                                          # (belt, reversed, even, odd: Sonic CD's own form)
             out += struct.pack('>I', win.add(lv.bytes_at(t, 4 + lv.b(t + 1) * lv.b(t + 2) * 2)) if t else 0)
         out += struct.pack('>HHI', len(bg2[0]), len(bg2), bg2_a) if bg2 else bytes(8)   # (set 1's background)
@@ -1690,7 +1692,7 @@ def main(argv=None):
         print(f'  FM sound set: {len(ids)} effects, bank at ${snd_addr:06X}')
     except (SystemExit, ValueError) as e:
         print(f'  no FM sound set: {e}')
-    head = bytearray(b'TSCD' + struct.pack('>HHII', 2, len(entries), a.window, WINDOW_SIZE))
+    head = bytearray(b'TSCD' + struct.pack('>HHII', 3, len(entries), a.window, WINDOW_SIZE))
     body = bytearray()
     off = len(head) + len(entries) * 12
     for za, flags, blob in entries:

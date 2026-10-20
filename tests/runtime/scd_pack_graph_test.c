@@ -25,6 +25,12 @@ int main(void)
     CHECK(!extra(b,sizeof b)); /* truncated cycle frames */
     memset(b,0,sizeof b);ptr(b,0xE4,SCD_WINDOW+0x20);word(b,0x20,17);CHECK(!extra(b,sizeof b));
     CHECK(!mapping(b,sizeof b,SCD_WINDOW+250));
+    /* A scenery palette owns all 48 level colours. Truncating it to the
+     * former 24-colour record must not reinterpret colours as pointers. */
+    memset(b,0,sizeof b);ptr(b,0xF4,SCD_WINDOW+0x20);word(b,0x24,1);
+    CHECK(extra(b,0x9e));
+    CHECK(!extra(b,0x9d));
+    CHECK(!extra(b,0x6e));
     puts("CD inner graphs: bounded Kos/KosM tokens, truncation, back-references, animations, sections, cycles and definitions passed");
     return 0;
 }

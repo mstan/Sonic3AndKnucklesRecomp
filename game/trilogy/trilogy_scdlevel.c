@@ -276,8 +276,11 @@ uint8_t tri_scd_coll(uint8_t type)
 /* The round's PCM bank (the sub CPU's sound file) is loaded for every period:
  * it has the voices ("Past!", "Future!") and, in the past, the music. */
 static int s_bank_round = -1;
+static int s_music_override, s_resume_track;
 void tri_scd_level_music(void)
 {
+    s_music_override=s_resume_track=0;
+    scd_cd_pause(0);
     uint32_t w = window();
     if (!w) {
         if (scd_cd_track()) scd_cd_stop();
@@ -298,7 +301,60 @@ void tri_scd_level_music(void)
         if (scd_cd_track() != track) scd_cd_play(track, 1);
     } else {                                      /* (the past: the bank's song) */
         scd_cd_stop();
+        scd_pcm_cmd(SCD_PCM_UNPAUSE);
         scd_pcm_cmd(SCD_PCM_PAST);
+    }
+}
+
+/* Shared cartridge players ask Play_Music/Change_Music_Tempo for their
+ * powerups and Game Over. Route those requests to CD's score; the cartridge
+ * remains responsible for the actual pickup, timer and death transitions. */
+static void restore_cd_music(void)
+{
+    int previous=s_resume_track;
+    s_music_override=s_resume_track=0;scd_cd_pause(0);
+    if(previous) {scd_pcm_cmd(SCD_PCM_STOP);scd_cd_play(previous,1);}
+    else tri_scd_level_music();
+}
+static void foreground_cd_music(int kind,int track,int loop)
+{
+    if(!s_music_override)s_resume_track=scd_cd_track();
+    s_music_override=kind;
+    scd_pcm_cmd(SCD_PCM_STOP);scd_cd_play(track,loop);
+}
+int tri_scd_music_request(unsigned id,int tempo)
+{
+    if(!window() || (r8(RAM_Game_mode)&127)!=12)return 0;
+    unsigned power=r8(RAM_Player_1+0x2B);
+    if(tempo) {
+        if(id) {
+            if(!(power&2))foreground_cd_music(2,SCD_CD_SHOES,1);
+        } else if(s_music_override==2)restore_cd_music();
+        return 1;
+    }
+    if(id==0x27) {foreground_cd_music(4,SCD_CD_GAMEOVER,0);return 1;}
+    if(id==0x2C) {foreground_cd_music(1,SCD_CD_INVINC,1);return 1;}
+    if(id==0x31) {
+        /* The S3K player retains its native drowning countdown. Suspend the
+         * stage score rather than playing two music streams together. */
+        if(!s_music_override)s_resume_track=scd_cd_track();
+        s_music_override=3;scd_cd_pause(1);scd_pcm_cmd(SCD_PCM_PAUSE);
+        return 0;
+    }
+    if(id==0xE2 && s_music_override && s_music_override!=4) {
+        /* Current_music is CD's native-driver stop byte. The invincibility
+         * expiry requests it before clearing its own status bit. */
+        if(power&4)foreground_cd_music(2,SCD_CD_SHOES,1);
+        else restore_cd_music();
+    }
+    return 0;
+}
+void tri_scd_audio_frame(void)
+{
+    unsigned mode=r8(RAM_Game_mode)&127;
+    scd_audio_level_pause(mode==12 && tri_cd_zone(tri_zone()) && r16(RAM_Game_paused));
+    if(mode!=8 && mode!=12 && mode!=16 && (s_bank_round>=0 || scd_cd_track() || s_music_override)) {
+        scd_audio_reset();s_bank_round=-1;s_music_override=s_resume_track=0;
     }
 }
 

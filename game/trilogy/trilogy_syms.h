@@ -275,3 +275,6 @@
 #define RAM_Camera_RAM                         0xFFEE00u
 #define RAM_Pal_fade_delay2                    0xFFFACEu
 /* missing RAM: Normal_palette_line_2 */
+
+#define S3K_HInt2                              0x001024u
+#define S3K_PLC_LBZRobotnikAfter                0x08CF62u

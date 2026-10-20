@@ -50,7 +50,9 @@ def main(argv=None):
         validator = None
         if args.kind == 'content':
             candidates = [args.validator] if args.validator else [
+                ROOT / 'scd_pack_validate.exe', ROOT / 'scd_pack_validate',
                 ROOT / 'tools/scd_pack_validate.exe',
+                ROOT / 'build/cd-dev/Release/scd_pack_validate.exe',
                 ROOT / 'build/cd-dev/tests/Release/scd_pack_validate.exe',
                 ROOT / 'build/cd-dev/tests/scd_pack_validate']
             validator = next((p.resolve() for p in candidates if p and p.is_file()), None)
