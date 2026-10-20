@@ -14,8 +14,8 @@ from run_stage_pack_audit import manifest,errors
 from run_stage_pack_encounters import Native,u16,objects,verify_next
 
 
-def move(run,x,y,attack=False,air=30):
-    ram,frame=run.snapshot();run.player(ram,x,y,attack=attack,freeze=not attack,air=air)
+def move(run,x,y,attack=False,air=30,grounded=False):
+    ram,frame=run.snapshot();run.player(ram,x,y,attack=attack,freeze=not attack,air=air,grounded=grounded)
     camera=struct.pack('>II',max(0,x-160)<<16,max(0,y-96)<<16)
     run.write(0xee78,camera);run.write(0xee80,camera)
     if attack:run.write(0xb02e,b'\x01')

@@ -354,6 +354,14 @@ int tri_flow_hook(uint32_t pc)
     case TH_RIGHT_BOUND: {                           /* d0 = Camera_max_X_pos + $128 */
         uint32_t a0 = A(0) & 0xFFFFFFu;
         int bit = a0 == RAM_Player_1 ? 1 : a0 == RAM_Player_2 ? 2 : 0;
+        extern int scd_mmz3_ending_margin(void);
+        int cd_margin = bit == 1 ? scd_mmz3_ending_margin() : 0;
+        if (cd_margin) {
+            /* MMZ's pad script turns at $F90. S3K's $E60+$128
+             * clamp is $F88, so it could never reach the turn. Supply
+             * CD's original player margin without moving the camera. */
+            D(0) = (D(0) & 0xFFFF0000u) | (uint16_t)(D(0) + cd_margin);
+        }
         if ((s_runoff & bit) && !r8(RAM_Boss_flag)) {
             extern int s3_video_canvas_width(void);
             int extra = s3_video_canvas_width() - 320;

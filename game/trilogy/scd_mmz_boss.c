@@ -166,6 +166,7 @@ static int8_t s_shake;                 /* (Amy's: on the camera's bottom this fr
 static uint16_t s_frame = 0xFFFF;      /* (the events: once a frame) */
 static uint16_t s_pal[64];             /* (the colours before the ending's white) */
 static uint8_t s_pal_saved;
+static uint8_t s_ending_walk;
 
 static uint32_t native3(int id) { return NATIVE_CD_BASE + (uint32_t)(s_base3 + id) * 4u; }
 static int is(uint32_t o, int id) { return o && r32(o + OBJ_code) == native3(id); }
@@ -1825,6 +1826,7 @@ static void amy_move(uint32_t o) { cd_move(o, (int32_t)OBS16(o, OBJ_x_vel) << 8,
 static void amy_end(uint32_t o)                                /* (CD's ending: here S3K's results) */
 {
     uint32_t p = RAM_Player_1;
+    s_ending_walk = 0;
     if (s_pal_saved)
         for (unsigned k = 0; k < 64; k++) w16(RAM_Normal_palette + k * 2u, s_pal[k]);
     s_pal_saved = 0;
@@ -1848,6 +1850,7 @@ static void amy(uint32_t o)
     }
     switch (OB8(o, OBJ_routine)) {
     case 0:                                                   /* [$20D044] */
+        s_ending_walk = 1;
         init(o, SCDA_M3AMY, OB8(o, OBJ_render) | 4, 1, 0x10, 0x14);
         SET8(o, OBJ_routine, 2);
         w8(RAM_Ctrl_1_locked, 1);                             /* (ctrlLocked) */
@@ -2075,12 +2078,22 @@ static void block3(uint32_t o)
 /* ---- registration ---------------------------------------------------------- */
 int scd_mmz3_shut_flag(void) { return s_shut; }               /* (the curtain's animated art: held at frame 0) */
 
+int scd_mmz3_ending_margin(void)
+{
+    int z = tri_zone();
+    if (!s_ending_walk || !tri_cd_zone(z) || ((z - TRI_CD_BASE) >> 2) != 6 || tri_act() != 2) return 0;
+    /* CD's player bound is camera max + (320-16), plus 56 after
+     * bossFight clears. S3K uses +$128: the differences are 8 and 64. */
+    return s_fight ? 8 : 64;
+}
+
 void scd_mmz3_level_entry(void)
 {
     s_flags = s_fight = s_shut = 0;
     s_shake = 0;
     s_frame = 0xFFFF;
     s_pal_saved = 0;
+    s_ending_walk = 0;
 }
 
 void scd_mmz3_register(TriObjFn *t, int base3)
