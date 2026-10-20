@@ -7,7 +7,11 @@ Central tracking: `beads-8y9v`. Work is solo.
 
 ## Resource and character contracts
 
-The existing default-off Megamix mod also offers Shadow & Tails and Shadow.
+The default-off Shadow checkbox offers Shadow & Tails and Shadow. Mighty and
+Megamix stages have separate default-off checkboxes. All three require the
+owner?s raw Megamix v3 ROM and locally converted content pack, with one shared
+path per resource: selecting either file in any entry fills all three. The ROM
+is verified at selection and boot; a pack alone cannot enable any of them.
 Character identities 0–5 retain their meanings; the new identities are 6 and 7.
 Retail player modes remain 0–3. Shadow uses native Sonic movement/collision
 with the exact Mega Drive v3 donor graphics, animation and translated abilities.
@@ -71,7 +75,8 @@ Unknown versions/capabilities, including the separate CD version-2 companion,
 remain read-only and select native saving. CD integration must explicitly merge
 both capability contracts before it can use these saves.
 
-MM availability is mask bit 4; loaded Shadow resources use bit 16. No campaign
+Megamix stage availability is mask bit 4, Shadow bit 16 and Mighty bit 32.
+The character bits are independent of the stage bit. No campaign
 catalog ID is consumed. An unavailable identity projects to Sonic & Tails or
 Sonic while remaining parked in the companion. The native-only IO observer
 retains explicit deletion/recreation and does not resurrect an old character.

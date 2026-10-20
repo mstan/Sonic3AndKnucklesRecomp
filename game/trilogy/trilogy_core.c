@@ -42,7 +42,7 @@ int tri_stage_content(uint16_t stage)
 void tri_bank_level(void)
 {
     uint16_t stage=r16(RAM_Current_zone_and_act);int c=tri_stage_content(stage);
-    if(c && !s_banks[c-1]) {
+    if(c && (!s_banks[c-1] || (c==3 && !s3_stage_pack_megamix))) {
         fprintf(stderr,"[stage-pack] unavailable stage %04X; resuming Angel Island\n",stage);
         w16(RAM_Current_zone_and_act,0);w16(RAM_Apparent_zone_and_act,0);
         w8(RAM_Last_star_post_hit,0);c=0;
@@ -107,9 +107,10 @@ void trilogy_init(void)
         }
     }
     s3_stage_pack_sonic1=s3_pack_available[0];s3_stage_pack_sonic2=s3_pack_available[1];
-    s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
-    s3_stage_pack_shadow=s3_pack_available[2] && s_shadow[2]!=0;
-    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix;
+    s3_stage_pack_megamix=s3_pack_requested[2] && s3_pack_available[2];
+    s3_stage_pack_mighty=s3_pack_mighty_requested && s_mighty[2]!=0;
+    s3_stage_pack_shadow=s3_pack_shadow_requested && s_shadow[2]!=0;
+    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_mighty||s3_stage_pack_shadow;
     if(!s3_stage_pack_enabled)return;
     tri_screen_register();
     extern int tri_obj_audit_bank(void);

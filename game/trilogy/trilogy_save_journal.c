@@ -12,7 +12,7 @@ static char save_path[1200];
 static uint8_t loaded_native[80],saved[84];
 static int ready,projected,loaded_valid;
 unsigned tri_campaign_mask(void)
-{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_shadow?16:0); }
+{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_shadow?16:0)|(s3_stage_pack_mighty?32:0); }
 void tri_save_sram_loaded(const char *path,const uint8_t *data,size_t size,int loaded)
 {
     ready=projected=0;snprintf(save_path,sizeof save_path,"%s",path);

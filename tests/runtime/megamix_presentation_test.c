@@ -130,5 +130,20 @@ int main(void)
     w32(SAVE_POINTER,0xFFE6B6);w8(0xFFE6B8,0x70);w16(PLAYER_OPTION,1);
     CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));
     CHECK(tri_shadow_selected && !tri_mighty_selected && r16(RAM_Player_mode)==1);
+    /* Shadow-only choices skip IDs 4/5 in both directions, preserving stable IDs. */
+    s3_stage_pack_mighty=0;A(0)=0xFFB128;w32(A(0),0xD42C);w8(A(0)+0x2E,0);
+    const unsigned shadow_only[]={1,2,3,6,7,0};
+    D(0)=0;menu_mighty[0]=0;w8(RAM_Ctrl_1_pressed,1);
+    for(unsigned i=0;i<6;i++) {
+        CHECK(tri_mighty_presentation_hook(MG_PC_DS_CHARACTER));unsigned mode=shadow_only[i];
+        CHECK((D(0)&65535)==(mode>=4?mode&1:mode));
+        CHECK(menu_mighty[0]==(mode>=6?2:0));
+    }
+    w8(RAM_Ctrl_1_pressed,2);CHECK(tri_mighty_presentation_hook(MG_PC_DS_CHARACTER));
+    CHECK((D(0)&65535)==1 && menu_mighty[0]==2);
+    w16(PLAYER_OPTION,1);w32(SAVE_POINTER,0xFFE6AC);
+    CHECK(!tri_mighty_presentation_hook(TH_DS_NEWGAME));CHECK(r8(0xFFE6AE)==0x70);
+    CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));CHECK(tri_shadow_selected && !tri_mighty_selected);
+    w8(RAM_Game_mode,0x4C);CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
     puts("Mighty selection, save identity, menu atlas, palette isolation and HUD digits passed");return 0;
 }

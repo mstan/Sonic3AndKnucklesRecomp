@@ -45,7 +45,7 @@ int campaign_display(unsigned mask,int stable)
 static unsigned active_bits(unsigned mask)
 { return 4|(mask&3)|((mask&4)?8:0); }
 static int available(unsigned mask,unsigned ch)
-{ return ch<4 || (ch<6?(mask&4)!=0:(mask&20)==20); }
+{ return ch<4 || (ch<6?(mask&32)!=0:(mask&16)!=0); }
 static unsigned fallback(unsigned ch) { return ch>=4?(ch&1):ch; }
 static void native_sanitize(uint8_t *p)
 {

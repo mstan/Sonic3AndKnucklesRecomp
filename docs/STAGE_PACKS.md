@@ -1,13 +1,14 @@
 # Experimental campaign stage mods
 
-Three independent mods extend **Sonic 3 & Knuckles**: **Sonic 1 stages**,
-**Sonic 2 stages**, and **Sonic Megamix + Mighty**. All are experimental and
-disabled by default. Enable any combination on the launcher's Mods page.
-Campaign order is Sonic 1, Sonic 2, native Sonic 3 & Knuckles, then Megamix;
-absent or disabled campaigns are skipped. Sonic 1 supplies 19 acts and
-Sonic 2 supplies 20. Megamix always adds Mighty as a selectable character.
-Sonic & Tails, Sonic, Tails and Knuckles use the S3K player code throughout.
-The standalone Sonic 3 and Sonic & Knuckles targets do not enroll this pack.
+Five independent mods extend **Sonic 3 & Knuckles**: **Sonic 1 stages**,
+**Sonic 2 stages**, **Sonic Megamix stages**, **Mighty** and **Shadow**.
+All are experimental and disabled by default. Enable any combination on the
+launcher's Mods page. Campaign order is Sonic 1, Sonic 2, native Sonic 3 &
+Knuckles, then Megamix; absent or disabled campaigns are skipped. Sonic 1
+supplies 19 acts and Sonic 2 supplies 20. Megamix supplies 19 acts. Mighty
+and Shadow each add their own solo and Tails-partner Data Select choices;
+neither character requires the Megamix stage checkbox or the other character.
+The standalone Sonic 3 and Sonic & Knuckles targets do not enroll these mods.
 
 The game keeps its existing name, launcher, pause menu and native abilities.
 Blue Spheres is the special-stage system throughout. Upstream's achievements,
@@ -30,7 +31,17 @@ python tools/split_campaign_packs.py --bank sonic1-2-stages.bin --content sonic1
 python tools/split_campaign_packs.py --bank sonic1-2-stages.bin --content sonic2 --out mods
 ```
 
-Each mod has its own **Campaign content pack** resource. Default paths are
+Sonic 1 and Sonic 2 each have their own **Campaign content pack** resource.
+Megamix stages, Mighty and Shadow share one **Campaign content pack** and one
+required **Sonic Megamix v3 ROM** resource. Selecting either path from any of
+these three entries fills it in all three immediately, including after restart.
+The raw ROM (.bin/.md/.gen) must be 1,283,224 bytes with CRC32 `66ECB4F4`;
+extract ZIP archives first. The picker verifies it and boot verifies it again.
+A converted pack alone cannot activate any Megamix addition. If the ROM is
+removed or invalid, all three fall back safely with settings/progress retained.
+Replacing it restores only the independently selected additions.
+
+Default content pack paths are
 `mods/sonic1-stages.pak`, `mods/sonic2-stages.pak`, and
 `mods/megamix-stages.pak`, relative to settings. Legacy combined `.bin` banks
 remain accepted for migration; assigning one never enables another mod.
@@ -62,13 +73,13 @@ Settings live in `sonic3k-stage-pack.ini` next to the normal settings file.
 All configurations share the normal **<ROM basename>.srm**. Its on-disk
 records always contain native S3K levels and characters, with the cartridge's
 original checksums and primary/backup copies. Addon progress and preferred
-Mighty identities live in **<ROM basename>.srm.campaign**, using stable
+Mighty and Shadow identities live in **<ROM basename>.srm.campaign**, using stable
 campaign/zone IDs independent of the installed catalog. Keep this companion
 and its `.bak` with the SRAM when backing up or moving the complete campaign.
 Native SRAM exports alone carry the native campaign and shared stats.
 
 Removing packs parks their progress. The available menu falls back safely,
-and a temporary Sonic fallback retains Mighty's saved identity. Re-adding a
+and a temporary Sonic fallback retains the extra character?s saved identity. Re-adding a
 pack restores its parked resume stage. Native progression, lives and emeralds
 can still advance while addons are absent. Explicit native slot deletion
 clears that slot's parked progress when the journal next reconciles it.
@@ -78,8 +89,9 @@ existing native SRAM. Valid old `sonic3k-stage-pack.srm` and
 `sonic3k-megamix.srm` files are imported once into a new journal; their original
 files remain untouched. Atomic writes, CRC validation, a last-valid journal
 backup and pending/confirmed native projections handle interrupted saves.
-With every addon absent or disabled, the base cartridge runs without the
-campaign save hooks; the companion remains parked.
+With every addon absent or disabled, the native cartridge retains its normal
+projection. The companion observes explicit native deletion/recreation so a
+removed character cannot resurrect a deleted file.
 
 Campaign saving works through the native Data Select and save routines.
 Quickstates and rewind are unavailable while the pack is active: this larger

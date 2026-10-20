@@ -93,7 +93,7 @@ def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
     for file in (exe, exe.parent / 'SDL2.dll'):
         shutil.copy2(file, runtime / file.name)
     megamix=bank.read_bytes()[-12:-8]==b'SPK2'
-    (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\n')
+    (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\n')
     # TCP/script inputs are additive. Ignore physical keyboards/controllers
     # in unattended runs so a live device cannot change an audit fixture.
     (runtime / 'settings.ini').write_text(''.join(f'[input.p{i}]\ndevice=0\n' for i in range(1,5)))

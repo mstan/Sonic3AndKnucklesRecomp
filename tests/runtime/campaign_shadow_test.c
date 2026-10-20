@@ -26,7 +26,7 @@ int main(void)
         for(unsigned mask=0;mask<8;mask++)for(unsigned upgraded=0;upgraded<2;upgraded++) {
             unsigned installed=mask|(upgraded?16:0);
             CHECK(campaign_load(&t,path,projection,1,installed));campaign_view(&t,view);
-            CHECK((view[2]>>4)==((installed&20)==20?ch:ch&1));
+            CHECK((view[2]>>4)==((installed&16)?ch:ch&1));
             CHECK((view[2]&15)==5 && view[8]==9);
             view[8]=12;campaign_capture(&t,view,native);CHECK((native[2]>>4)==(ch&1) && native[3]<=14);
             CHECK(t.slots[0][2]>>4==ch && t.slots[0][30]==(complete?39:35));
@@ -46,6 +46,24 @@ int main(void)
             write_bytes(path,baseline);write_bytes("shadow-test.sav.bak",actual);
             CHECK(!campaign_load(&t,path,projection,1,23) && t.read_only);CHECK(!campaign_store(&t));
             read_bytes("shadow-test.sav.bak",after);CHECK(!memcmp(actual,after,548));
+        }
+    }
+    /* Character toggles are independent of all three stage toggles. */
+    for(unsigned ch=4;ch<=7;ch++)for(unsigned complete=0;complete<2;complete++) {
+        cleanup();memset(native,0xFF,80);memset(native,0,10);native[3]=2;native[8]=3;
+        CHECK(!campaign_load(&s,path,native,1,55));campaign_view(&s,view);
+        view[2]=(uint8_t)(ch<<4);view[3]=(uint8_t)(complete?39:35);view[0]=(uint8_t)complete;
+        campaign_capture(&s,view,projection);CHECK(campaign_store(&s) && campaign_confirm(&s));
+        for(unsigned toggles=0;toggles<32;toggles++) {
+            unsigned mask=(toggles&7)|((toggles&8)?32:0)|(toggles&16);
+            unsigned enabled=ch<6?mask&32:mask&16;
+            CHECK(campaign_load(&t,path,projection,1,mask));campaign_view(&t,view);
+            CHECK((view[2]>>4)==(enabled?ch:ch&1));
+            CHECK(campaign_count(mask)==campaign_count(mask&7));
+            campaign_capture(&t,view,native);
+            CHECK((native[2]>>4)==(ch&1) && native[3]<=14);
+            CHECK(t.slots[0][2]>>4==ch && t.slots[0][30]==(complete?39:35));
+            t.mask=55;campaign_view(&t,view);CHECK((view[2]>>4)==ch);
         }
     }
     cleanup();puts("Shadow: both identities, completed/normal files, all pack/old-resource permutations, immutable migration and future companions passed");return 0;
