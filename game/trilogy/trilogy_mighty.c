@@ -197,7 +197,7 @@ static void super_palette(uint32_t d)
         palette_cycling=0;
         w8(0xFFF65F,0);pal_tick=0;return;
     }
-    unsigned frame=((unsigned)pal_tick++/4)&15;
+    unsigned frame=tri_shadow_active()?6+((unsigned)pal_tick++/8)%9:((unsigned)pal_tick++/4)&15;
     for(unsigned wet=0;wet<2;wet++) {
         uint32_t src=tri_rd32(d+(wet?48:44))+frame*8;
         for(unsigned i=0;i<4;i++)super_colors[wet][i]=tri_rd16(src+i*2);
@@ -221,14 +221,16 @@ static void frame(void)
     }
     old_super=(uint8_t)super;
 }
-static void basic_super_attack(void)
+void tri_character_blast(unsigned mask,int temporary_budget)
 {
     /* v3 $117032: basic shield attacks visible enemies; every elemental
      * halves its ring price. Bosses cost three times as much and lose half
      * their remaining HP through their normal hurt path. */
-    unsigned mask=shield(),price=16;
+    unsigned price=16;
     for(unsigned bit=2;bit<=8;bit<<=1)if(mask&bit)price>>=1;
-    if(!(mask&1) || r16(RAM_Ring_count)<price)return;
+    if(!temporary_budget && (!(mask&1) || r16(RAM_Ring_count)<price))return;
+    unsigned original_rings=r16(RAM_Ring_count);
+    if(temporary_budget)w16(RAM_Ring_count,0x300); /* Shadow v3 $198FC */
     uint32_t p=RAM_Player_1;
     w8(p+0x2F,1);
     for(int i=2;i<110;i++) {
@@ -252,8 +254,10 @@ static void basic_super_attack(void)
     }
     w8(RAM_Update_HUD_ring_count,r8(RAM_Update_HUD_ring_count)|0x81);
     w16(p+OBJ_x_vel,0);w16(p+OBJ_y_vel,0);w16(p+OBJ_ground_vel,0);
+    if(temporary_budget)w16(RAM_Ring_count,(uint16_t)original_rings);
     o_sfx(0x41);
 }
+static void basic_super_attack(void) {tri_character_blast(shield(),0);}
 int tri_character_transform(void)
 {
     uint32_t p=RAM_Player_1;
