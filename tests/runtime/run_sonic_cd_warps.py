@@ -2,7 +2,7 @@
 """Activate real CD time posts and let their complete charge/scene run.
 
 Source-derived post positions select each available direction in all acts /
-periods. Teleporting and a frozen player with maintained ground speed bypass
+periods. Teleporting and a held position with maintained ground speed bypass
 navigation and acceleration. No time-post, timer, direction, warp or award
 flags are injected. This is not route-traversal or checkpoint/death coverage.
 """
@@ -51,7 +51,9 @@ def main():
                 for name in ('sonic3k.srm','sonic3k.srm.campaign','sonic3k.srm.campaign.bak'):
                     source=args.seed_dir/name
                     if source.exists():shutil.copy2(source,rt/name)
-            run=Native(args,stage['stage'],(max(0,post['x']-64),max(0,post['y']-24),0),case,0)
+            fixture=argparse.Namespace(**vars(args))
+            fixture.env={**args.env,'TRILOGY_SCD_WARP_RUN':f'{post["x"]:x},{post["y"]:x},800'}
+            run=Native(fixture,stage['stage'],(max(0,post['x']-64),max(0,post['y']-24),0),case,0)
             ram,frame=run.snapshot('before');rec['before_status2']=ram[0xb02b]
             initial=(run.runtime/'sonic3k.srm.campaign').read_bytes();stones=initial[81];generators=u16(initial,82)
             rec['cd_prerequisites']=dict(stones=stones,generators=generators,seed_dir=str(args.seed_dir) if args.seed_dir else None)
@@ -62,8 +64,12 @@ def main():
             rec['post_used_after_touch']=any(o['code']==post['code'] and o['x']==post['x'] and o['routine'] in (4,6) for o in objects(ram))
             rec['direction_icon_after_touch']=any(o['code']==0x7e2e84 and o['frame']==(0x12 if post['subtype']==8 else 0x13) for o in objects(ram))
             rec['activation']=rec['post_used_after_touch'] or rec['direction_icon_after_touch']
+            run.write(0xb02e,b'\0');run.cmd('set_input',keys='08')
             run.write(0xb018,struct.pack('>hhh',0x800,0,0x800));run.step(60)
             ram,frame=run.snapshot('charge');rec['charge_status2']=ram[0xb02b]
+            rec['post_used_during_charge']=any(o['code']==post['code'] and o['x']==post['x'] and o['routine'] in (4,6) for o in objects(ram))
+            rec['icon_during_charge']=any(o['code']==0x7e2e84 and o['frame']==(0x12 if post['subtype']==8 else 0x13) for o in objects(ram))
+            rec['activation']=rec['activation'] or rec['post_used_during_charge'] or rec['icon_during_charge']
             saw_scene=False
             for i in range(70):
                 run.step(30);ram,frame=run.snapshot()
@@ -85,7 +91,10 @@ def main():
                     # observe cancellation before diagnosing a leaked bit.
                     rec['arrival_status2']=row['status2']
                     rec['destination_post_used']=any(o['code']==0x7e2e80 and o['routine'] in (4,6) for o in objects(ram))
-                    run.player(ram,row['x'],row['y'],freeze=True);run.step(20)
+                    # Never rewrite the whole player from an earlier frame:
+                    # doing so can restore a charge bit already cleared by
+                    # the game. Only stop the three movement velocities.
+                    run.cmd('set_input',keys='00');run.write(0xb018,b'\0'*6);run.step(30)
                     ram,frame=run.snapshot('arrival-stopped')
                     rec['stopped_status2']=ram[0xb02b]
                     rec['invincibility_cleared']=bool(rec['charge_status2']&2) and not bool(ram[0xb02b]&2)

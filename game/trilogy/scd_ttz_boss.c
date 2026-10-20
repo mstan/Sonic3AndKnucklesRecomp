@@ -238,13 +238,6 @@ static void step_done(uint32_t o, const Step *e)              /* [$20BD6C] */
     }
 }
 
-static int dev_autohit(void)                                  /* development: a hit every N frames */
-{
-    static int n = -1;
-    if (n < 0) n = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-    return n > 0 && !(r16(RAM_Level_frame_counter) % n);
-}
-
 static void pod_hit_chk(uint32_t o)                           /* [$20BEEA] egg4air_hitchk */
 {
     if (OB8(o, PD_SLOW)) {
@@ -256,10 +249,6 @@ static void pod_hit_chk(uint32_t o)                           /* [$20BEEA] egg4a
         SET8(o, PD_REARM, OB8(o, PD_REARM) - 1);
         if (!OB8(o, PD_REARM)) set_coll(o, 0x3D);
         return;
-    }
-    if (OB8(o, OBJ_coll_flags) && dev_autohit()) {           /* (as Touch_Enemy: a hit spent) */
-        SET8(o, OBJ_coll_flags, 0);
-        SET8(o, OBJ_coll_prop, OB8(o, OBJ_coll_prop) - 1);
     }
     if (OB8(o, OBJ_coll_flags)) return;
     o_sfx_cd(FM_BOSSHIT);                                     /* (hit: away it rushes) */
@@ -591,10 +580,6 @@ static void die(uint32_t o)                                   /* [$20C828] egg4_
  * goes on with the routine that called it, as here) */
 static void hit_chk(uint32_t o)
 {
-    if (OB8(o, OBJ_coll_flags) && dev_autohit()) {           /* (as Touch_Enemy: a hit spent) */
-        SET8(o, OBJ_coll_flags, 0);
-        SET8(o, OBJ_coll_prop, OB8(o, OBJ_coll_prop) - 1);
-    }
     if (OB8(o, OBJ_coll_flags)) return;
     set_coll(o, 0x3C);
     if (OB8(o, OBJ_coll_prop) != 1) return;

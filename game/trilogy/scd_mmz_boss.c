@@ -553,11 +553,6 @@ static void firefly(uint32_t o)
             }
         }
         fly_animate(o);
-        if (OB8(o, F_IDX) == 10 && getenv("TRILOGY_BOSSAUTOHIT")) {   /* development: as Touch_Enemy's kill */
-            SET32(o, 0, S3K_Obj_Explosion);
-            SET8(o, OBJ_routine, 0);
-            return;
-        }
         SET8(o, F_IDX, OB8(o, F_IDX) - 1);
         if (!OB8(o, F_IDX)) SET8(o, OBJ_routine, 0xC);
         break;
@@ -722,13 +717,6 @@ static void coll_on(uint32_t o, uint32_t m)                    /* [$20B2C8] */
     set_coll(m, 0x33, 2);
 }
 
-static int dev_autohit(void)                                  /* development: a hit every N frames */
-{
-    static int n = -1;
-    if (n < 0) n = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-    return n > 0 && !(r16(RAM_Level_frame_counter) % n);
-}
-
 static void colichk(uint32_t o, uint32_t m)                    /* [$20B29E] a spin into the pod or the shell */
 {
     uint32_t p = RAM_Player_1;
@@ -739,7 +727,6 @@ static void colichk(uint32_t o, uint32_t m)                    /* [$20B29E] a sp
         if (!OB8(m, M_BLINK)) coll_on(o, m);
         return;
     }
-    if (dev_autohit()) SET8(o, OBJ_coll_flags, 0);
     if (OB8(o, OBJ_coll_flags) && OB8(m, OBJ_coll_flags)) return;
     if (OB8(o, OBJ_routine) == 0x1E) { coll_on(o, m); return; }   /* (firing: no) */
     set_coll(o, 0, 0);

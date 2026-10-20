@@ -712,10 +712,6 @@ static void egg6(uint32_t o)
     }
     shake(o);
     hit_chk(o);
-    static int autohit = -1;                                  /* development: a hit every N frames */
-    if (autohit < 0) autohit = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-    if (autohit > 0 && (OB8(o, B_FLAGS) & 1) && !OB8(o, B_COOL) && !(r16(RAM_Level_frame_counter) % autohit))
-        SET8(o, OBJ_coll_flags, 0);
     static int log = -1;                                      /* development */
     if (log < 0) log = getenv("TRILOGY_BOSSLOG") != NULL;
     if (log && !(r16(RAM_Level_frame_counter) & 7))

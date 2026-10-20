@@ -224,15 +224,6 @@ static void boss_touch(uint32_t o, int w, int h)
     }
 }
 
-static void dev_autohit(uint32_t o)                            /* development: a hit every N frames */
-{
-    static int n = -1;
-    if (n < 0) n = getenv("TRILOGY_BOSSAUTOHIT") ? atoi(getenv("TRILOGY_BOSSAUTOHIT")) : 0;
-    if (n <= 0 || !OB8(o, B_COLINO) || r16(RAM_Level_frame_counter) % n) return;
-    SET8(o, B_COLINO, 0);
-    if (OB8(o, B_COLICNT)) SET8(o, B_COLICNT, OB8(o, B_COLICNT) - 1);
-}
-
 /* ---- the explosions (bom_set [$20E190]): every tbl[0] frames of the clock,
  * the next of tbl[1] places ---------------------------------------------------- */
 static const int16_t BOM_DAI[] = { 4, 10, -48, -16, 48, 16, -16, -16, 16, 16, -32, 0, 48, -16, -48, 16, -16, 16, 16, -16, 32, 0 };
@@ -281,7 +272,6 @@ static void lid(uint32_t o)
 {
     frame_tick();
     boss_touch(o, 0x30, 0x10);                                 /* (CD's $3E) */
-    dev_autohit(o);
     switch (OB8(o, OBJ_routine)) {
     case 0: {                                                  /* [$20DB6A] */
         SET8(o, OBJ_routine, 2);
@@ -534,7 +524,6 @@ static void platform(uint32_t o)
 {
     frame_tick();
     boss_touch(o, 0x40, 0x10);                                 /* (CD's $3F) */
-    dev_autohit(o);
     if (OB8(o, B_HITS)) {                                      /* [$20DD0C]: the camera looks up */
         uint16_t v = r16(RAM_Distance_from_top);
         if (v >= 0xB0) v = 0xB2;
