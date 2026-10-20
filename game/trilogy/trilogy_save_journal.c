@@ -40,7 +40,7 @@ uint8_t tri_cd_stones(void){return cd_state.stones;}
 static void cd_capture(void)
 {
     extern void scd_time_export(uint16_t *,uint16_t *);
-    if(!s3_stage_pack_cd && journal.version<2)return;
+    if(!s3_stage_pack_cd && !(journal.capabilities&1))return;
     if(cd_selection_pending || ready<=0 || cd_slot<0 || current_slot()!=cd_slot)return;
     scd_time_export(&cd_state.generators,&cd_state.projectors);
     if(tri_cd_zone(tri_zone()))cd_state.act=(uint8_t)tri_act();
@@ -60,7 +60,7 @@ void tri_cd_save_flush(void)
 void tri_cd_stone_award(unsigned stone)
 {if(stone<7){cd_state.stones|=(uint8_t)(1u<<stone);tri_cd_save_flush();}}
 unsigned tri_campaign_mask(void)
-{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_cd?8:0); }
+{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_cd?8:0)|(s3_stage_pack_shadow?16:0)|(s3_stage_pack_mighty?32:0); }
 void tri_save_sram_loaded(const char *path,const uint8_t *data,size_t size,int loaded)
 {
     ready=projected=cd_selection_pending=0;cd_slot=-1;memset(&cd_state,0,sizeof cd_state);snprintf(save_path,sizeof save_path,"%s",path);

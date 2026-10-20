@@ -12,7 +12,7 @@ static uint32_t descriptor(void)
     uint32_t d=tri_rd32(TRI_BANK_BASE+0x24);
     if(!d || tri_rd16(d+10)<4)return 0;
     uint32_t p=tri_rd32(d+36);
-    return p && tri_rd32(p)==0x4D475331u?p:0;
+    return p && (tri_rd32(p)==0x4D475331u || tri_rd32(p)==0x4D475332u)?p:0;
 }
 uint32_t tri_signpost_mapping(void) { uint32_t p=descriptor();return p?tri_rd32(p+4):0; }
 uint32_t tri_signpost_animation(void) { uint32_t p=descriptor();return p?tri_rd32(p+8):0; }
@@ -23,7 +23,7 @@ int tri_signpost_frame(uint16_t *top,uint16_t *bottom)
     if(!p || (r8(RAM_Game_mode)&127)!=12) {
         gvdp_set_sprite_patterns_bank(1,NULL,0,NULL);return 0;
     }
-    unsigned character=tri_mighty_active()?1:0;
+    unsigned character=tri_shadow_active() && tri_rd32(p)==0x4D475332u?2:tri_mighty_active()?1:0;
     p+=12+character*20;
     memset(lines,2,sizeof lines);
     gvdp_set_sprite_patterns_bank(1,g_rom_ext+tri_rd32(p)-TRI_BANK_BASE,tri_rd32(p+4),lines);

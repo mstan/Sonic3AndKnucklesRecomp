@@ -49,10 +49,13 @@ int campaign_display(unsigned mask,int stable)
 }
 static unsigned active_bits(unsigned mask)
 { return 4|(mask&3)|((mask&4)?8:0)|((mask&8)?16:0); }
+static int available(unsigned mask,unsigned ch)
+{ return ch<4 || (ch<6?(mask&32)!=0:(mask&16)!=0); }
+static unsigned fallback(unsigned ch) { return ch>=4?(ch&1):ch; }
 static void native_sanitize(uint8_t *p)
 {
     if(empty(p))return;
-    unsigned ch=p[2]>>4;if(ch>3)p[2]=(uint8_t)((p[2]&15)|((ch==5?1:0)<<4));
+    unsigned ch=p[2]>>4;if(ch>3)p[2]=(uint8_t)((p[2]&15)|(fallback(ch)<<4));
     if(p[3]>14)p[3]=0;
 }
 static void from_native(uint8_t *r,const uint8_t *p)
@@ -78,7 +81,7 @@ void campaign_view(CampaignSave *s,uint8_t out[80])
         unsigned complete=(r[DONE]&active_bits(s->mask))==active_bits(s->mask);
         p[0]=(uint8_t)((p[0]&0xFC)|(complete?(r[COMMON]&3?r[COMMON]&3:1):0));
         p[3]=(uint8_t)(complete?campaign_count(s->mask):display);
-        if(!(s->mask&4) && (p[2]>>4)>=4)p[2]=(uint8_t)((p[2]&15)|(((p[2]>>4)==5?1:0)<<4));
+        if(!available(s->mask,p[2]>>4))p[2]=(uint8_t)((p[2]&15)|(fallback(p[2]>>4)<<4));
     }
     memcpy(s->view,out,80);
 }
@@ -96,7 +99,7 @@ void campaign_capture(CampaignSave *s,const uint8_t view[80],uint8_t native[80])
         unsigned ch=r[COMMON+2]>>4;
         memcpy(r+COMMON,p,10);
         /* A temporary Sonic fallback must not erase parked Mighty identity. */
-        if(!(s->mask&4) && ch>=4 && p[2]==old[2])r[COMMON+2]=(uint8_t)((p[2]&15)|(ch<<4));
+        if(!available(s->mask,ch) && p[2]==old[2])r[COMMON+2]=(uint8_t)((p[2]&15)|(ch<<4));
         if(p[0]&3)r[DONE]|=(uint8_t)active_bits(s->mask);
         if(changed && code!=39) {
             unsigned c=content(code);
@@ -121,16 +124,18 @@ static int read_file(const char *path,uint8_t data[548])
     FILE *f=fopen(path,"rb");if(!f)return 0;
     memset(data,0,548);
     int ok=fread(data,1,548,f)==548 && fgetc(f)==EOF;fclose(f);
-    if(!memcmp(data,"SCS1",4) && data[4]!=1 && data[4]!=2)return 2;
+    if(!memcmp(data,"SCS1",4) && data[4]!=1 && data[4]!=2 && data[4]!=3)return 2;
     if(data[4]==1 && memcmp(data+6,(uint8_t[26]){0},26))return 2;
     if(data[4]==2 && (data[6]!=1 || memcmp(data+7,(uint8_t[25]){0},25)))return 2;
+    if(data[4]==3 && ((data[6]!=2 && data[6]!=3) || memcmp(data+7,(uint8_t[25]){0},25)))return 2;
+    unsigned cap=data[4]==1?0:data[6];
     uint32_t crc=((uint32_t)data[544]<<24)|((uint32_t)data[545]<<16)|((uint32_t)data[546]<<8)|data[547];
     if(!ok||memcmp(data,"SCS1",4)||data[5]>1||crc32(data,544)!=crc)return 0;
     for(unsigned i=0;i<8;i++) {
         const uint8_t *r=data+32+i*64;
-        if(!empty(r) && ((r[2]>>4)>5 || !stable_valid(r[RESUME]) ||
-           (data[4]==1?(r[RESUME]>39 || (r[DONE]&0xF0)):(r[DONE]&0xE0))))return 0;
-        if(data[4]==2 && (r[CD_ACT]>2 || (r[CD_STONES]&0x80) || (r[CD_GENERATORS]&0xC0) || (r[CD_PROJECTORS]&0xC0)))return 0;
+        if(!empty(r) && ((r[2]>>4)>((cap&2)?7:5) || !stable_valid(r[RESUME]) ||
+           (!(cap&1)?(r[RESUME]>39 || (r[DONE]&0xF0)):(r[DONE]&0xE0))))return 0;
+        if((cap&1) && (r[CD_ACT]>2 || (r[CD_STONES]&0x80) || (r[CD_GENERATORS]&0xC0) || (r[CD_PROJECTORS]&0xC0)))return 0;
         if(!empty(r+NATIVE) && (r[NATIVE+3]>14 || (r[NATIVE+2]>>4)>3))return 0;
     }
     return 1;
@@ -157,7 +162,8 @@ int campaign_store(CampaignSave *s)
 {
     if(s->read_only)return 0;
     uint8_t old[548],data[548]={0};char backup[1240];
-    unsigned version=s->version==2 || (s->mask&8)?2:1;
+    unsigned cap=s->capabilities|((s->mask&8)?1:0)|((s->mask&16)?2:0);
+    unsigned version=(cap&2)?3:(cap&1)?2:1;
     snprintf(backup,sizeof backup,"%s.bak",s->path);
     /* Never replace a good backup with a damaged primary. */
     int previous=read_file(s->path,old);
@@ -165,12 +171,14 @@ int campaign_store(CampaignSave *s)
     uint8_t parked[548];int previous_backup=read_file(backup,parked);
     if(previous_backup==2){s->read_only=1;return 0;}
     const uint8_t *migration=previous==1?old:previous_backup==1?parked:NULL;
-    if(version==2 && migration && migration[4]==1) {
-        char immutable[1240];snprintf(immutable,sizeof immutable,"%s.pre-v2.bak",s->path);
+    unsigned old_cap=migration && migration[4]!=1?migration[6]:0;
+    if(migration && (migration[4]!=version || old_cap!=cap)) {
+        const char *suffix=cap==1?"pre-v2.bak":cap==2?"pre-shadow.bak":"pre-v3-cap3.bak";
+        char immutable[1240];snprintf(immutable,sizeof immutable,"%s.%s",s->path,suffix);
         FILE *f=fopen(immutable,"rb");
         if(f) {
             fclose(f);uint8_t snapshot[548];
-            if(read_file(immutable,snapshot)!=1 || snapshot[4]!=1)return 0;
+            if(read_file(immutable,snapshot)!=1 || snapshot[4]!=migration[4] || (snapshot[4]!=1 && snapshot[6]!=old_cap))return 0;
         }
         else {
 #ifdef _WIN32
@@ -194,10 +202,10 @@ int campaign_store(CampaignSave *s)
     }
     /* An unknown backup must survive too, even with a valid primary. */
     if(previous==1 && !atomic_file(backup,old,sizeof old))return 0;
-    memcpy(data,"SCS1",4);data[4]=(uint8_t)version;data[5]=(uint8_t)s->pending;data[6]=version==2;
+    memcpy(data,"SCS1",4);data[4]=(uint8_t)version;data[5]=(uint8_t)s->pending;data[6]=(uint8_t)cap;
     memcpy(data+32,s->slots,512);uint32_t crc=crc32(data,544);
     for(unsigned i=0;i<4;i++)data[544+i]=(uint8_t)(crc>>(24-i*8));
-    int ok=atomic_file(s->path,data,sizeof data);if(ok)s->version=(int)version;return ok;
+    int ok=atomic_file(s->path,data,sizeof data);if(ok){s->version=(int)version;s->capabilities=cap;}return ok;
 }
 int campaign_confirm(CampaignSave *s)
 {
@@ -211,7 +219,7 @@ int campaign_load(CampaignSave *s,const char *path,const uint8_t native[80],int 
     uint8_t backup_data[548];int primary=read_file(path,data),secondary=read_file(backup,backup_data);
     s->read_only=primary==2 || secondary==2;
     s->loaded=!s->read_only && (primary==1 || secondary==1);
-    if(s->loaded){if(primary!=1)memcpy(data,backup_data,548);memcpy(s->slots,data+32,512);s->pending=data[5]!=0;s->version=data[4];}
+    if(s->loaded){if(primary!=1)memcpy(data,backup_data,548);memcpy(s->slots,data+32,512);s->pending=data[5]!=0;s->version=data[4];s->capabilities=data[4]==1?0:data[6];}
     for(int i=0;i<8;i++) {
         uint8_t *r=s->slots[i];const uint8_t *p=native+i*10;
         if(!s->loaded){from_native(r,p);continue;}
@@ -242,7 +250,8 @@ int campaign_cd_set(CampaignSave *s,unsigned slot,const CampaignCdState *state)
     if(s->read_only || slot>=8 || !state || state->act>2 || state->stones>127 ||
        state->generators>0x3FFF || state->projectors>0x3FFF)return 0;
     uint8_t *r=s->slots[slot];r[CD_ACT]=state->act;r[CD_STONES]=state->stones;
-    s->version=2;
+    s->capabilities|=1;
+    s->version=(s->capabilities&2)?3:2;
     r[CD_GENERATORS]=(uint8_t)(state->generators>>8);r[CD_GENERATORS+1]=(uint8_t)state->generators;
     r[CD_PROJECTORS]=(uint8_t)(state->projectors>>8);r[CD_PROJECTORS+1]=(uint8_t)state->projectors;return 1;
 }

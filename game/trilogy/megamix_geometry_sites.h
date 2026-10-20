@@ -13,6 +13,8 @@
 #define MG_PC_MIGHTY_PLC2 0x012CBAu
 #define MG_PC_MIGHTY_SUPER_PAL 0x003750u
 #define MG_PC_MIGHTY_SHIELD 0x011900u
+#define MG_PC_SHADOW_GROUND 0x0117DAu
+#define MG_PC_SHADOW_AIR 0x0118BCu
 #define MG_PC_MIGHTY_LAND 0x01222Au
 #define MG_PC_MONITOR_ICON 0x01D75Eu
 #define MG_PC_MONITOR_FIRE 0x01D954u
@@ -25,4 +27,4 @@
 #define MG_PC_SAVE_LOADED 0x00C256u
 #define MG_PC_SAVE_WRITE 0x00C3E4u
 #define MG_PC_SAVE_RETURN 0x00C402u
-#define MG_GEOMETRY_CASES case 0x00EFB6u: case 0x00EFF0u: case 0x04EC54u: case 0x21032Cu: case 0x210366u: case 0x239B0Au: case 0x01AF6Cu: case 0x01B070u: case 0x012600u: case 0x012CB4u: case 0x012CBAu: case 0x003750u: case 0x011900u: case 0x01222Au: case 0x01D75Eu: case 0x01D954u: case 0x01D992u: case 0x01D9D0u: case 0x00D3CCu: case 0x00D6D0u: case 0x01ABC6u: case 0x00DBA2u: case 0x00C256u: case 0x00C3E4u: case 0x00C402u:
+#define MG_GEOMETRY_CASES case 0x00EFB6u: case 0x00EFF0u: case 0x04EC54u: case 0x21032Cu: case 0x210366u: case 0x239B0Au: case 0x01AF6Cu: case 0x01B070u: case 0x012600u: case 0x012CB4u: case 0x012CBAu: case 0x003750u: case 0x011900u: case 0x0117DAu: case 0x0118BCu: case 0x01222Au: case 0x01D75Eu: case 0x01D954u: case 0x01D992u: case 0x01D9D0u: case 0x00D3CCu: case 0x00D6D0u: case 0x01ABC6u: case 0x00DBA2u: case 0x00C256u: case 0x00C3E4u: case 0x00C402u:

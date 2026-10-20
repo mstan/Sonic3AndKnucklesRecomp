@@ -8,7 +8,7 @@ import struct
 from .mighty import table
 
 
-def hud_name(s3k):
+def hud_name(s3k, shadow_character=False):
     from mdcodecs import nemesis_decode
     # ArtNem_SonicLifeIcon / ArtNem_MilesLifeIcon / ArtNem_TailsLifeIcon.
     # These are the supported raw lock-on ROM's own 48x16 HUD strips.
@@ -33,13 +33,21 @@ def hud_name(s3k):
     glyphs[2][3][3:]=[True,True,True]
     glyphs[2][4][4:]=[True,True]
     glyphs[2][5]=[False,True,True,True,True,False]
+    if shadow_character:
+        # Same native six-row capitals and two-pixel strokes as the existing
+        # Mighty label. S, O and I come directly from SONIC.
+        glyphs=[face(sp,1,6),glyphs[3],
+            [[bool(v) for v in row] for row in ((0,1,1,1,1,0),(1,1,0,0,1,1),(1,1,0,0,1,1),(1,1,1,1,1,1),(1,1,0,0,1,1),(1,1,0,0,1,1))],
+            [[bool(v) for v in row] for row in ((1,1,1,1,0),(1,1,0,1,1),(1,1,0,1,1),(1,1,0,1,1),(1,1,0,1,1),(1,1,1,1,0))],
+            face(sp,8,6),
+            [[bool(v) for v in row] for row in ((1,1,0,0,1,1),(1,1,0,0,1,1),(1,1,0,0,1,1),(1,1,1,1,1,1),(1,1,1,1,1,1),(0,1,1,1,1,0))]]
     pixels={};x=0
     for glyph in glyphs:
         for y,row in enumerate(glyph,1):
             for dx,on in enumerate(row):
                 if on:pixels[x+dx,y]=5 if y in (1,2,5,6) else 1
         x+=len(glyph[0])+1
-    assert x<=40
+    assert x-1<=40
     # Native HUD letters cast their dark palette-$E shadow down/right.
     shadow={(x+1,y+1):14 for x,y in pixels}
     shadow.update(pixels)
@@ -62,10 +70,13 @@ def hud_name(s3k):
     return name,table(records)
 
 
-def presentation(donor, s3k):
+def presentation(donor, s3k, character=None):
+    from .v3_rom import MIGHTY, SHADOW
+    character = character or MIGHTY
+    shadow_character = character == SHADOW
     offsets, animation = donor.mighty_animations()
     frame = animation[offsets[5] + 1]  # actual standing/wait animation
-    pieces, pixels = donor.mighty_frames()[frame]
+    pieces, pixels = donor.character_frames(character)[frame]
     maps = 0xCE0E
     records = []
     for i in range(36):
@@ -78,7 +89,7 @@ def presentation(donor, s3k):
         for p in pieces:
             attributes = p['attributes'] & 0x8000
             # Host sprite patterns avoid every tile owned by the native menu.
-            tile = p['tile']
+            tile = p['tile'] + (32 if shadow_character else 0)
             tile |= attributes | (0x800 if p['x_flip'] else 0) | (0x1000 if p['y_flip'] else 0)
             output.append(struct.pack('>bBHh', p['y']-20,
                 0x80|(p['width']-1)*4+p['height']-1, tile, p['x']+x))
@@ -110,6 +121,6 @@ def presentation(donor, s3k):
         return bytes((read(tx+x, ty+y)<<4)|read(tx+x+1, ty+y)
                      for y in range(8) for x in range(0,8,2))
     head_art = b''.join(tile(head,x,y) for x in (0,8) for y in (0,8))
-    name_art,hud_mappings=hud_name(s3k)
+    name_art,hud_mappings=hud_name(s3k, shadow_character)
     return dict(menu_mappings=table(records), menu_art=pixels,
                 hud_head=head_art, hud_name=name_art, hud_mappings=hud_mappings)

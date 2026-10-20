@@ -47,7 +47,7 @@ static void dev_force_zone(void)
     const char *ch = getenv("TRILOGY_CHAR"); /* native modes 0-3; 4 Mighty+Tails, 5 Mighty */
     if (ch && *ch) {
         unsigned mode=(unsigned)atoi(ch);
-        if(mode<=5) {
+        if(mode<=7) {
             w16(RAM_Player_mode,(uint16_t)mode);w16(0xFFFF0Au,(uint16_t)mode);
             uint32_t save=r32(0xFFE660u)&0xFFFFFFu;
             if(save>=0xFFE6AC && save<0xFFE6FC)w8(save+2,(uint8_t)((r8(save+2)&15)|(mode<<4)));

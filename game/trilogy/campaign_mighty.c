@@ -25,13 +25,14 @@ static uint32_t table(Copy *c,uint32_t p,unsigned count,unsigned unit)
     }
     return copy(c,p,n);
 }
-uint32_t campaign_mighty_copy(uint8_t **dst,uint32_t *dst_size,const uint8_t *src,uint32_t size)
+static uint32_t character_copy(uint8_t **dst,uint32_t *dst_size,const uint8_t *src,uint32_t size,unsigned field,const char *magic)
 {
-    if(!dst||!*dst||!dst_size||!src||size<0x28||*dst_size>0x400000-0x30000)return 0;
+    if(!dst||!*dst||!dst_size||!src||size<0x28||*dst_size>0x400000-88)return 0;
     uint32_t metadata=rd(src+0x24);
-    if(!bounds(metadata,16,size)||memcmp(src+metadata-BASE,"MDI1",4))return 0;
-    uint32_t d=rd(src+metadata-BASE+12);
-    if(!bounds(d,88,size)||memcmp(src+d-BASE,"MDY3",4))return 0;
+    if(!bounds(metadata,field+4,size)||memcmp(src+metadata-BASE,"MDI1",4))return 0;
+    if(field==40 && word(src+metadata-BASE+10)!=5)return 0;
+    uint32_t d=rd(src+metadata-BASE+field);
+    if(!bounds(d,88,size)||memcmp(src+d-BASE,magic,4))return 0;
     const uint8_t *m=src+d-BASE;uint8_t descriptor[88];memcpy(descriptor,m,88);
     Copy c={malloc(0x30000),0,0x30000,src,size};if(!c.out)return 0;
     /* Temporarily build at a zero-based guest address, then adjust only the
@@ -68,3 +69,7 @@ uint32_t campaign_mighty_copy(uint8_t **dst,uint32_t *dst_size,const uint8_t *sr
     } else result=0;
     free(c.out);return result;
 }
+uint32_t campaign_mighty_copy(uint8_t **dst,uint32_t *n,const uint8_t *src,uint32_t size)
+{return character_copy(dst,n,src,size,12,"MDY3");}
+uint32_t campaign_shadow_copy(uint8_t **dst,uint32_t *n,const uint8_t *src,uint32_t size)
+{return character_copy(dst,n,src,size,40,"MSW1");}

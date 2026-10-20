@@ -114,7 +114,7 @@ def select_stages(stages,selection):
     return [s for s in stages if s['stage'] in wanted]
 
 
-def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
+def runtime_files(exe, bank, runtime, debug_port=None, mighty=False, shadow=False):
     runtime.mkdir(parents=True, exist_ok=True)
     (runtime / 'provenance.json').write_text(json.dumps(dict(
         exe_sha256=hashlib.sha256(exe.read_bytes()).hexdigest(),
@@ -123,11 +123,12 @@ def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
         shutil.copy2(file, runtime / file.name)
     resource=bank.read_bytes();megamix=resource[-12:-8]==b'SPK2'
     if resource[:4]==b'SCDP':
-        (runtime/'sonic3k-stage-pack.ini').write_text('format=2\nsonic1=0\nsonic2=0\n'
-            f'megamix={int(mighty)}\nmegamix_bank={(bank.parent/"megamix-stages.pak").as_posix()}\n'
+        (runtime/'sonic3k-stage-pack.ini').write_text('format=3\nsonic1=0\nsonic2=0\n'
+            f'mighty={int(mighty)}\nshadow={int(shadow)}\n'
+            f'megamix={int(mighty)}\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\nmegamix_bank={os.environ.get("MEGAMIX_TEST_BANK",(bank.parent/"megamix-stages.pak").as_posix())}\n'
             f'sonic_cd=1\nsonic_cd_bank={bank.as_posix()}\n')
     else:
-        (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\n')
+        (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\n')
     # TCP/script inputs are additive. Ignore physical keyboards/controllers
     # in unattended runs so a live device cannot change an audit fixture.
     (runtime / 'settings.ini').write_text(''.join(f'[input.p{i}]\ndevice=0\n' for i in range(1,5)))

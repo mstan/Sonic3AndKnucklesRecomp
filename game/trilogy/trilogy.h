@@ -69,6 +69,13 @@ int tri_scd_video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *c
 int tri_scd_live_cell(int x,int y,int background,uint16_t *cell);
 void tri_scd_publish(const uint8_t *ram);
 uint32_t tri_mighty_descriptor(void);
+uint32_t tri_shadow_descriptor(void);
+extern int tri_shadow_selected;
+int tri_shadow_active(void);
+int tri_character_active(void);
+int tri_shadow_hook(uint32_t pc);
+int tri_character_transform(void);
+void tri_shadow_menu_colors(uint16_t *top,uint16_t *bottom);
 int tri_stage_content(uint16_t stage);
 void tri_bank_level(void);
 #define TRI_DIR_OFF     0x40u          /* directory of zone-act entries */

@@ -29,12 +29,12 @@ int main(void)
         }
         if(mask&4)CHECK(campaign_display(mask,32)==n-7);
     }
-    CHECK(!campaign_load(&s,"campaign-test.sav",native,1,7));campaign_view(&s,view);
+    CHECK(!campaign_load(&s,"campaign-test.sav",native,1,39));campaign_view(&s,view);
     CHECK(view[3]==20);view[2]=0x40;view[3]=35;view[8]=9;
     campaign_capture(&s,view,projection);CHECK(projection[3]==14 && (projection[0]&3));CHECK((projection[2]>>4)==0);
     CHECK(campaign_store(&s));CHECK(campaign_confirm(&s));
     for(unsigned mask=0;mask<8;mask++) {
-        CHECK(campaign_load(&t,"campaign-test.sav",projection,1,mask));campaign_view(&t,view);
+        CHECK(campaign_load(&t,"campaign-test.sav",projection,1,mask|((mask&4)?32:0)));campaign_view(&t,view);
         CHECK(campaign_stable(mask,view[3])>=0);CHECK((view[2]>>4)==((mask&4)?4:0));
         if(mask&4)CHECK(campaign_stable(mask,view[3])==35);
         campaign_capture(&t,view,native);CHECK(native[3]<=14 && (native[2]>>4)<=3);
@@ -42,17 +42,17 @@ int main(void)
     }
     CHECK(campaign_load(&t,"campaign-test.sav",projection,1,3));campaign_view(&t,view);
     view[8]=12;campaign_capture(&t,view,native);CHECK(campaign_store(&t));CHECK(campaign_confirm(&t));
-    CHECK(campaign_load(&t,"campaign-test.sav",native,1,7));campaign_view(&t,view);
+    CHECK(campaign_load(&t,"campaign-test.sav",native,1,39));campaign_view(&t,view);
     CHECK(view[3]==35 && view[2]==0x40 && view[8]==12);
     /* Missing/truncated native SRAM restores journal progress, including Mighty. */
-    memset(native,0xFF,80);CHECK(campaign_load(&t,"campaign-test.sav",native,0,7));campaign_view(&t,view);CHECK(view[3]==35);
+    memset(native,0xFF,80);CHECK(campaign_load(&t,"campaign-test.sav",native,0,39));campaign_view(&t,view);CHECK(view[3]==35);
     /* A valid base-game deletion is intentional and must stay deleted. */
-    CHECK(campaign_load(&t,"campaign-test.sav",native,1,7));campaign_view(&t,view);CHECK(view[0]&128);
+    CHECK(campaign_load(&t,"campaign-test.sav",native,1,39));campaign_view(&t,view);CHECK(view[0]&128);
     /* Damaged primary restores its last valid backup without importing legacy again. */
     FILE *f=fopen("campaign-test.sav","wb");CHECK(f);fputs("short",f);fclose(f);
-    CHECK(campaign_load(&t,"campaign-test.sav",native,0,7));campaign_view(&t,view);CHECK(view[3]==35);
+    CHECK(campaign_load(&t,"campaign-test.sav",native,0,39));campaign_view(&t,view);CHECK(view[3]==35);
     /* Interrupted native write accepts the previous projection, preserving the pending journal. */
-    memcpy(native,t.slots[0]+38,10);CHECK(campaign_load(&s,"campaign-test.sav",native,1,7));
+    memcpy(native,t.slots[0]+38,10);CHECK(campaign_load(&s,"campaign-test.sav",native,1,39));
     campaign_view(&s,view);CHECK(view[3]==35);
     /* A real v1 byte fixture must migrate without renumbering old IDs. */
     uint8_t raw[548],original[548],again[548];read_raw("campaign-test.sav.bak",raw);
@@ -67,7 +67,7 @@ int main(void)
     CampaignCdState cd={0x1234,0x0234,1,0x55},restored;
     CHECK(campaign_cd_set(&s,0,&cd));CHECK(campaign_store(&s));CHECK(campaign_confirm(&s));
     for(unsigned mask=0;mask<16;mask++) {
-        CHECK(campaign_load(&t,"campaign-test.sav",projection,1,mask));
+        CHECK(campaign_load(&t,"campaign-test.sav",projection,1,mask|((mask&4)?32:0)));
         CHECK(campaign_cd_get(&t,0,&restored));CHECK(restored.act==1 && restored.stones==0x55);
         CHECK(restored.generators==0x1234 && restored.projectors==0x0234);
         campaign_view(&t,view);CHECK((view[2]>>4)==((mask&4)?5:1));
