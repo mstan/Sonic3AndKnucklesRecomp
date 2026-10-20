@@ -1,7 +1,7 @@
 """Exact v3 sign strips; PLC1/$D000 is monitors, not the signpost.
 
 The actual late-stage loader at $621C selects PLC12/24/25 for Sonic,
-Mighty and Shadow. Shadow is outside this port. A separate strip avoids sharing
+Mighty and Shadow. A separate strip avoids sharing
 monitor tiles or the native results tally's VRAM allocations.
 """
 import struct
@@ -9,7 +9,7 @@ from mdcodecs import nemesis_decode
 from s1_objects import convert_mappings,anim_blob
 
 
-def signpost(bank,donor):
+def signpost(bank,donor,shadow=False):
     proofs={0x621C:'0c380001ffbb6700001a0c380002ffbb67000030',
             0x6230:'70124ef9000015a6',0x623E:'7024',0x625E:'70254ef9000015a6',
             0x14486:'217c000146c20004317c06800002',
@@ -28,8 +28,10 @@ def signpost(bank,donor):
             tile=int.from_bytes(maps[pos+2:pos+4],'big')&0x7FF
             if tile+(((size>>2)&3)+1)*((size&3)+1)>58:raise ValueError('Sign mapping exceeds source strip')
             maps[pos+1]|=0xC0
-    result=struct.pack('>4sII',b'MGS1',bank.add(maps),bank.add(anim_blob(donor.data,0x146A6)))
-    for plc,normal,water,mb3 in ((0x12,3,0xF,0x10),(0x24,0x15,0x19,0x1B)):
+    result=struct.pack('>4sII',b'MGS2' if shadow else b'MGS1',bank.add(maps),bank.add(anim_blob(donor.data,0x146A6)))
+    characters=[(0x12,3,0xF,0x10),(0x24,0x15,0x19,0x1B)]
+    if shadow:characters.append((0x25,0x16,0x1A,0x1C))
+    for plc,normal,water,mb3 in characters:
         sources=[src for src,dst in donor.plc(plc) if dst==0xD000]
         if len(sources)!=1:raise ValueError('Ambiguous v3 sign PLC')
         art,_=nemesis_decode(donor.data,sources[0])

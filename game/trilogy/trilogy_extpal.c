@@ -140,6 +140,7 @@ void tri_ext_frame(void)
     int mighty=tri_mighty_presentation_frame(s_tiles,top+32,bot+32);
     extern int tri_signpost_frame(uint16_t *,uint16_t *);
     int sign=tri_signpost_frame(top+16,bot+16);
+    tri_shadow_menu_colors(top+16,bot+16);
     if(!actors && !mighty && !sign){gvdp_set_ext_tiles(NULL);return;}
     int split = 1 << 20;
     if (r8(RAM_Water_flag))

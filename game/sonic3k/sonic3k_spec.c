@@ -245,7 +245,7 @@ const GameSpec g_game_spec = {
     .state_unavailable_reason = s3_stage_pack_state_reason,
     .sram_loaded           = tri_save_sram_loaded,
     .sram_flushed          = tri_save_sram_flushed,
-    .display_name           = "Sonic 3 & Knuckles v" S3_BUILD_VERSION,
+    .display_name           = "Sonic 3 & Knuckles",
     .short_name             = "Sonic3K",
     .boxart                 = "boxart-sonic3k.tga",
 

@@ -12,7 +12,7 @@ static char save_path[1200];
 static uint8_t loaded_native[80],saved[84];
 static int ready,projected,loaded_valid;
 unsigned tri_campaign_mask(void)
-{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0); }
+{ return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_shadow?16:0); }
 void tri_save_sram_loaded(const char *path,const uint8_t *data,size_t size,int loaded)
 {
     ready=projected=0;snprintf(save_path,sizeof save_path,"%s",path);
@@ -25,7 +25,7 @@ void tri_save_sram_loaded(const char *path,const uint8_t *data,size_t size,int l
 void tri_save_sram_flushed(const char *path,const uint8_t *data,size_t size)
 {
     (void)path;uint8_t native[80];
-    if(!ready || !campaign_native_block(data,(unsigned)size,native))return;
+    if(ready<=0 || !campaign_native_block(data,(unsigned)size,native))return;
     for(int i=0;i<8;i++)if(memcmp(native+i*10,journal.slots[i]+20,10))return;
     if(!campaign_confirm(&journal))fprintf(stderr,"[campaign-save] confirmation write failed; pending recovery retained\n");
 }
@@ -52,14 +52,41 @@ int tri_save_journal_hook(uint32_t pc)
         char path[1240];snprintf(path,sizeof path,"%s.campaign",save_path);
         FILE *previous=fopen(path,"rb");int had_journal=previous!=NULL;if(previous)fclose(previous);
         if(!had_journal) {char backup[1280];snprintf(backup,sizeof backup,"%s.bak",path);previous=fopen(backup,"rb");had_journal=previous!=NULL;if(previous)fclose(previous);}
+        /* Observe native writes even when every pack is absent. A deleted
+         * slot can be recreated before the next install; the final native
+         * record alone cannot distinguish that new file from parked progress.
+         * With no companion, leave the cartridge path entirely unchanged. */
+        if(!s3_stage_pack_enabled && !had_journal)return 0;
         int existed=campaign_load(&journal,path,native,loaded_valid,tri_campaign_mask());
+        if(journal.read_only) {
+            extern void tri_campaign_suspend(void);
+            tri_campaign_suspend();
+            ready=-1;
+            fprintf(stderr,"[campaign-save] newer companion retained; using native cartridge saving\n");
+            return 0;
+        }
+        if(!s3_stage_pack_enabled) {
+            ready=2; /* Native-only observer: no RAM projection or forced IO. */
+            memcpy(loaded_native,native,80);loaded_valid=1;
+            return 0;
+        }
         if(!existed && !had_journal)import_legacy();
         uint8_t view[80];campaign_view(&journal,view);
         for(unsigned i=0;i<80;i++)w8(SAVED+i,view[i]);ready=1;
         tri_jsr(S3K_Write_SaveGame);
         fprintf(stderr,"[campaign-save] ready: %d zones, mask %u, %s\n",campaign_count(journal.mask),journal.mask,existed?"journal restored":"initialized");
     }
-    if(pc==MG_PC_SAVE_WRITE && ready && !projected) {
+    if(pc==MG_PC_SAVE_WRITE && ready==2) {
+        uint8_t native[80],projection[80];
+        for(unsigned i=0;i<80;i++)native[i]=r8(SAVED+i);
+        if(memcmp(native,loaded_native,80)) {
+            campaign_capture(&journal,native,projection);
+            if(campaign_store(&journal))memcpy(loaded_native,native,80);
+            else fprintf(stderr,"[campaign-save] native-only companion update failed; cartridge saving continues\n");
+        }
+        return 0;
+    }
+    if(pc==MG_PC_SAVE_WRITE && ready==1 && !projected) {
         for(unsigned i=0;i<84;i++)saved[i]=r8(SAVED+i);
         uint8_t native[80];campaign_capture(&journal,saved,native);
         if(!campaign_store(&journal)) {

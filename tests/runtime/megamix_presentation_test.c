@@ -14,6 +14,9 @@ uint8_t *g_rom_ext=bank;uint32_t g_rom_ext_size=sizeof bank;
 GenesisMachine g_machine;M68KState g_cpu;
 int g_split_sp_popped;static int rte;int *g_rte_pending_ptr=&rte;
 int s3_stage_pack_mighty=1,s3_stage_pack_megamix=1,s3_stage_pack_enabled=1;
+int s3_stage_pack_shadow,tri_shadow_selected;
+uint32_t tri_shadow_descriptor(void){return s3_stage_pack_shadow?0x400E00:0;}
+int tri_character_active(void){return tri_mighty_active();}
 int tri_mighty_selected;static int player_active=1,atlas_calls;
 uint8_t tri_rd8(uint32_t a) { CHECK(a>=0x400000 && a<0x401000);return bank[a-0x400000]; }
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1)); }
@@ -25,7 +28,12 @@ void s3_video_set_hud_mapping(S3VideoHudMapping fn) { custom_hud=fn; }
 uint16_t tri_mighty_color(int wet,unsigned color) { return color==2?(wet?0xE00:0x00E):0; }
 void o_sfx(int sound) { CHECK(sound==0x5B); }
 int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
-{ CHECK(pixels==bank+0x600 && bytes==128 && lines[0]==3 && lines[3]==3);++atlas_calls;return 1; }
+{
+    CHECK(lines[0]==3 && lines[3]==3);
+    if(s3_stage_pack_shadow)CHECK(bytes==2048 && pixels[1024]==0xCC && lines[32]==2);
+    else CHECK(pixels==bank+0x600 && bytes==128);
+    ++atlas_calls;return 1;
+}
 #include "../../game/trilogy/trilogy_mighty_presentation.c"
 static void word(unsigned p,unsigned v) { bank[p]=(uint8_t)(v>>8);bank[p+1]=(uint8_t)v; }
 static void longword(unsigned p,unsigned v) { word(p,v>>16);word(p+2,v); }
@@ -36,6 +44,8 @@ int main(void)
     longword(0x244,0x400600);longword(0x248,128);
     longword(0x24C,0x400900);longword(0x250,0x400A00);
     longword(0x254,0x400B00);
+    longword(0x210,0x400C00);longword(0x224,0x400D00);
+    word(0xC04,0x00E);word(0xD04,0xE00);
     memset(bank+0x900,0x99,128);memset(bank+0xA00,0xAA,192);
     A(0)=0xFFB128;w32(A(0),0xD42C);w8(A(0)+0x2E,0);
     D(0)=0;w8(RAM_Ctrl_1_pressed,1);
@@ -94,5 +104,31 @@ int main(void)
     CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
     CHECK(!top[0] && !top[2] && !bottom[2]);
     player_active=0;CHECK(!tri_mighty_presentation_frame(tiles,top,bottom));CHECK(!tiles[0x680]);
+    /* A mixed eight-character menu owns two immutable atlas/palette ranges.
+     * Saved Mighty, saved Shadow and a retail slot must coexist. */
+    s3_stage_pack_shadow=1;player_active=1;tri_shadow_selected=0;
+    longword(0xE00,0x4D535731);longword(0xE10,0x400F80);longword(0xE24,0x400FA0);
+    longword(0xE40,0x400E80);longword(0xE44,0x400F00);longword(0xE48,128);
+    longword(0xE4C,0x400900);longword(0xE50,0x400A00);longword(0xE54,0x400B00);
+    memset(bank+0xF00,0xCC,128);word(0xF84,0xE22);
+    A(0)=0xFFB128;w32(A(0),0xD42C);w8(A(0)+0x2E,0);D(0)=0;menu_mighty[0]=0;
+    w8(RAM_Ctrl_1_pressed,1);
+    for(unsigned choice=1;choice<=8;choice++) {
+        CHECK(tri_mighty_presentation_hook(MG_PC_DS_CHARACTER));
+        unsigned virtual_mode=choice%8;
+        CHECK((D(0)&65535)==(virtual_mode>=4?virtual_mode&1:virtual_mode));
+        CHECK(menu_mighty[0]==(virtual_mode>=4?virtual_mode/2-1:0));
+    }
+    w8(RAM_Game_mode,0x4C);w8(A(0)+0x2E,1);D(0)=7;
+    CHECK(!tri_mighty_presentation_hook(MG_PC_DS_SLOT_CHARACTER));
+    w32(A(0)+OBJ_mappings,0xCE0E);w8(A(0)+OBJ_frame,5);
+    CHECK(!tri_mighty_presentation_hook(MG_PC_DS_DRAW));
+    CHECK(r32(A(0)+OBJ_mappings)==0x400E80 && r8(A(0)+OBJ_frame)==9 && menu_mighty[1]==2);
+    for(unsigned i=0;i<64;i++)w16(RAM_Normal_palette+i*2,i?0xEEE:0);
+    CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
+    tri_shadow_menu_colors(top,bottom);CHECK(top[2]==0xE22 && bottom[2]==0xE22);
+    w32(SAVE_POINTER,0xFFE6B6);w8(0xFFE6B8,0x70);w16(PLAYER_OPTION,1);
+    CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));
+    CHECK(tri_shadow_selected && !tri_mighty_selected && r16(RAM_Player_mode)==1);
     puts("Mighty selection, save identity, menu atlas, palette isolation and HUD digits passed");return 0;
 }

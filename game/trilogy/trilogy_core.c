@@ -17,8 +17,11 @@ static uint8_t *s_banks[3];
 static uint32_t s_sizes[3];
 static int s_selected=-1;
 static uint32_t s_mighty[3];
+static uint32_t s_shadow[3];
 uint32_t tri_mighty_descriptor(void)
 { return s_selected>=0?s_mighty[s_selected]:0; }
+uint32_t tri_shadow_descriptor(void)
+{ return s_selected>=0?s_shadow[s_selected]:0; }
 
 int tri_bank_select(int content)
 {
@@ -48,6 +51,12 @@ void tri_bank_level(void)
 }
 
 int tri_bank_loaded(void) { return s_bank != NULL; }
+void tri_campaign_suspend(void)
+{
+    s3_stage_pack_enabled=s3_stage_pack_sonic1=s3_stage_pack_sonic2=0;
+    s3_stage_pack_megamix=s3_stage_pack_mighty=s3_stage_pack_shadow=0;
+    s_selected=-1;s_bank=NULL;s_bank_size=0;g_rom_ext=NULL;g_rom_ext_size=0;
+}
 
 void trilogy_init(void)
 {
@@ -84,9 +93,14 @@ void trilogy_init(void)
         uint32_t info=((uint32_t)s_banks[2][0x24]<<24)|((uint32_t)s_banks[2][0x25]<<16)|((uint32_t)s_banks[2][0x26]<<8)|s_banks[2][0x27];
         const uint8_t *p=s_banks[2]+info-TRI_BANK_BASE+12;
         s_mighty[2]=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        if(s_banks[2][info-TRI_BANK_BASE+11]>=5) {
+            p=s_banks[2]+info-TRI_BANK_BASE+40;
+            s_shadow[2]=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        }
         for(int i=0;i<2;i++)if(s_banks[i]) {
             s_mighty[i]=campaign_mighty_copy(&s_banks[i],&s_sizes[i],s_banks[2],s_sizes[2]);
-            if(!s_mighty[i]) {
+            if(s_shadow[2])s_shadow[i]=campaign_shadow_copy(&s_banks[i],&s_sizes[i],s_banks[2],s_sizes[2]);
+            if(!s_mighty[i] || (s_shadow[2] && !s_shadow[i])) {
                 fprintf(stderr,"[stage-pack] content %d cannot attach Mighty resources; pack skipped\n",i+1);
                 free(s_banks[i]);s_banks[i]=NULL;s_sizes[i]=0;s3_pack_available[i]=0;
             }
@@ -94,6 +108,7 @@ void trilogy_init(void)
     }
     s3_stage_pack_sonic1=s3_pack_available[0];s3_stage_pack_sonic2=s3_pack_available[1];
     s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
+    s3_stage_pack_shadow=s3_pack_available[2] && s_shadow[2]!=0;
     s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix;
     if(!s3_stage_pack_enabled)return;
     tri_screen_register();
@@ -211,16 +226,17 @@ int trilogy_owns(uint32_t pc)
 
 int trilogy_instruction(uint32_t pc)
 {
-    if (!s_bank)
-        return 0;
     extern int tri_save_journal_hook(uint32_t pc);
     if(tri_save_journal_hook(pc))return 1;
+    if (!s_bank)
+        return 0;
     if (tri_megamix_geometry_hook(pc))return 1;
     if (tri_megamix_sprite_hook(pc))return 1;
     if (tri_level_hook(pc))
         return 1;
     if (tri_mighty_presentation_hook(pc))return 1;
     if (tri_mighty_hook(pc))return 1;
+    if (tri_shadow_hook(pc))return 1;
     if (tri_screen_hook(pc))
         return 1;
     if (tri_titlecard_hook(pc))

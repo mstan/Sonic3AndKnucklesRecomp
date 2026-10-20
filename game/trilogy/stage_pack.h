@@ -4,6 +4,7 @@
 struct RecompLauncherCModProvider;
 extern int s3_stage_pack_enabled;
 extern int s3_stage_pack_megamix, s3_stage_pack_mighty;
+extern int s3_stage_pack_shadow;
 extern int s3_stage_pack_sonic1, s3_stage_pack_sonic2;
 extern int s3_pack_requested[3], s3_pack_available[3];
 extern char s3_pack_paths[3][1024];
