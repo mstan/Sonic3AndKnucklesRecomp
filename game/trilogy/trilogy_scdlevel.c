@@ -329,6 +329,12 @@ static uint8_t s_render_blob[SCD_WINDOW_SIZE];
 static uint32_t s_render_size,s_render_bg;
 static unsigned s_render_bgw,s_render_bgh;
 static uint16_t s_render_stage;
+int tri_scd_live_cell(int x,int y,int background,uint16_t *cell)
+{
+    if(!window() || tri_bank_current()!=4)return 0;
+    ScdGeometry g={g_rom_ext+SCD_WINDOW-TRI_BANK_BASE,SCD_WINDOW_SIZE,s_bg_grid,s_bg_w,s_bg_h};
+    return scd_geometry_cell(&g,x,y,background,r16(RAM_Layout_row_index_mask),cell);
+}
 void tri_scd_publish(const uint8_t *ram)
 {
     uint16_t za=(uint16_t)((ram[RAM_Current_zone_and_act&65535]<<8)|ram[(RAM_Current_zone_and_act+1)&65535]);

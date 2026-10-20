@@ -122,7 +122,11 @@ void tri_audit_frame(void)
         w16(RAM_Player_1 + OBJ_y_pos, (uint16_t)pts[idx][1]);
         w16(RAM_Player_1 + OBJ_x_vel, 0);
         w16(RAM_Player_1 + OBJ_y_vel, 0);
-        w16(RAM_Player_1 + OBJ_ground_vel, 0);
+        /* A tunnel can catch the checkpoint spawn before this hold runs.
+         * Retain its ground-speed prerequisite: the original route's DIVS
+         * uses it on the next frame. Position/XY velocity already hold the
+         * survey player; zeroing that controller state caused host divides
+         * by zero in frozen WWZ future surveys. This is not a route test. */
         w8(RAM_Player_1 + 0x2E, 0x81); /* object_control: no player physics */
         w8(RAM_Player_1 + 0x34, 0x1C); /* hurt immunity */
         w8(RAM_Player_1 + 0x2C, 30);   /* air timer */

@@ -339,8 +339,8 @@ character or award overrides.
 The source-derived route survey now understands independent CD resources.
 Initial probes in PPZ1 Present and MMZ2 Past capture all 103/108 planned
 locations and observe all 188/200 placements, with no runtime errors or wrong
-stage captures (`build/qa-cd-route-survey-probes-dev12`). The full 70-variant
-survey is running. This establishes positional/object coverage only; terrain,
+stage captures (`build/qa-cd-route-survey-probes-dev12`). The completed 70-variant
+survey is recorded below. This establishes positional/object coverage only; terrain,
 enemy and gimmick interactions require separate outcome evidence.
 
 The actual S2->CD boundary passes on build 12 (`build/qa-cd-s2-to-cd-dev12`):
@@ -382,6 +382,59 @@ timeout death, life decrement, natural retry and stable checkpoint return:
 normal fade/title sequence; the corrected verifier waits for the actual return.
 Timeout is an explicit timer prerequisite, not injected death/retry state.
 Post-warp checkpoint state and hurt/game-over behavior remain separate checks.
+
+The full positional survey now captures all 7,893 planned locations across
+70 variants (`build/qa-cd-route-survey-dev12`, with both WWZ1 futures rerun in
+`build/qa-cd-route-survey-wwz-reruns-dev14`). It lists 14,184 source placements;
+780 have no active-object observation, including future self-destruction and
+script-dependent objects. These remain explicitly listed, not declared working.
+Both WWZ1 future surveys initially crashed because the hold cheat zeroed a
+tunnel's already-assigned ground speed, violating the original DIVS prerequisite.
+The corrected survey preserves that speed. Separate unfrozen runs pass actual
+catch, route movement and release in both futures (`build/qa-cd-wwz-tunnels-dev13`).
+
+Fourteen real Future-post warps with seven separately earned stones all select
+Good Future; another fourteen with the separately earned generator flags do
+the same (`build/qa-cd-seven-stone-future-warps-dev14` and
+`build/qa-cd-generator-future-warps-dev14`). Neither sweep injects award or warp
+outcomes. The source-derived enemy subtype sweep currently has 59 defeat
+passes and ten actual enemy/spawner subtypes requiring further interaction
+probes. The initial inventory also included Koma, which is a spring platform;
+that non-enemy is now excluded from the kill inventory.
+
+Adaptive probes found two real background integration defects. CD's native
+writer drew only source rows 0..255 despite a nonzero vertical scroll, and its
+cell reader bypassed the complete 16-bit CD grid/QQZ background selection.
+It now draws the visible circular-table rows and reads the same complete live
+geometry used by collision/rendering. Build 16 SHA256 is
+`2d1d5b4beee8fbf998e04d1050e9f4e15ab61fe0517f79ea441bab7fe3d22dfc`;
+46 CTests and all 49 native baseline artifacts pass. All nine tested QQZ/MMZ
+background locations now report zero background mismatches through six live
+Fit window sizes, from 4:3 through a 4000x500 custom window and back.
+
+The initial 70-middle-location resize sweep on build 15 passed 50 cases and
+failed 20; its failures are retained. Some middle fixtures have stale native
+foreground rows or enter death/fade during observation. Nine isolated normal
+start reruns pass the affected foreground comparisons. Those reruns do not
+qualify traversal or replace the required meaningful-location visual review.
+Six further normal-start cases pass all six live resizes on build 16
+(`build/qa-cd-adaptive-start-reruns-dev16`), including both WWZ bosses and the
+MMZ1 variants whose arbitrary middle fixtures died. Across the retained sweeps,
+each of the 70 variants now has a passing resize case; unresolved middle-location
+differences remain open and this is not a final visual fidelity qualification.
+The screenshot dimensions are correctly rounded (21:9 at 224 lines is 523
+pixels). Stage-selection helpers now reject unknown IDs: PowerShell converts
+unquoted comma-list entries such as `4e00` to `4`; quote such lists.
+
+Original background/parallax fidelity remains open: CD still uses the imported
+generic half-speed background rather than every original deformation routine.
+Independent reference investigation now also uses Clownacy's Gems Collection
+C decompilation at `fd4e17382beb6c705032a533b4db307fe6f1ea9b` (CC0), privately
+checked out under `build/reference-scd-c`. A private isolated prototype extracts
+the 70 background-only function sets (42B shares 42A, 42D shares 42C as its
+original build does), with camera/events/drawing omitted for analysis. It
+compiles and produces scroll samples for all 70, but has not been integrated
+or qualified against the original Sega CD routines. It is not a fidelity pass.
 
 Remaining acceptance includes broader geometry/gimmick/enemy/character interactions,
 checkpoint/death/warp state and additional native progression cases,

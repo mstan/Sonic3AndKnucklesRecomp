@@ -53,6 +53,7 @@ const uint16_t *g_bg_tile_remap;          /* NULL, or a tile -> tile table for b
 static uint16_t bg_cell(int bx,int by)
 {
     uint16_t cell;
+    if(tri_scd_live_cell(bx,by,1,&cell))return cell;
     if(tri_megamix_geometry_cell(bx,by,1,1,&cell))return cell;
     uint8_t ch=bg_chunk(bx>>7,by>>7);
     return r16(0xFF0000u+(uint32_t)ch*0x80u+(uint32_t)(by&0x70)+(uint32_t)((bx&0x70)>>3));
@@ -106,7 +107,12 @@ static void bg_default_event(void)
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy);
     int camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
     int bx = camx / 2, byv = camy / 4;
-    for (int y = 0; y < 256; y += 16)
+    /* CD's complete background may be taller than the 256px name table.
+     * Draw the rows actually exposed by VScroll into that circular table.
+     * Always drawing source rows 0..255 showed the wrong bank below them,
+     * while the complete-grid renderer correctly sampled the visible rows. */
+    int top = tri_cd_zone(tri_zone()) ? byv & ~15 : 0;
+    for (int y = top; y < top + 256; y += 16)
         bg_band(y, y + 16, bx);
     for (int l = 0; l < 224; l++)
         w32(RAM_H_scroll_buffer + (uint32_t)l * 4u, ((uint32_t)(uint16_t)-camx << 16) | (uint16_t)-bx);

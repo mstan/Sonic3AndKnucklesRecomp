@@ -66,6 +66,7 @@ int tri_bank_select(int content);
 int tri_bank_current(void);
 int tri_scd_chunk(int plane,int column,int row,uint32_t *definitions,unsigned *id);
 int tri_scd_video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell);
+int tri_scd_live_cell(int x,int y,int background,uint16_t *cell);
 void tri_scd_publish(const uint8_t *ram);
 uint32_t tri_mighty_descriptor(void);
 int tri_stage_content(uint16_t stage);

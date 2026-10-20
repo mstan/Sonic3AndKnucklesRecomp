@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import struct
 import shutil
-from run_stage_pack_audit import manifest,errors
+from run_stage_pack_audit import manifest,errors,select_stages
 from run_stage_pack_encounters import Native,u16,objects
 
 
@@ -28,12 +28,13 @@ def main():
         ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
     ap.add_argument('--stages',default='all');ap.add_argument('--workers',type=int,default=1)
     ap.add_argument('--seed-dir',type=lambda s:Path(s).resolve())
+    ap.add_argument('--direction',choices=('all','past','future'),default='all')
     args=ap.parse_args();args.bank=args.content;args.packs=args.content.parent;args.pack_mask=8
     args.character=1;args.kind='mechanics';args.god=True;args.env={'TRILOGY_TIMELOG':'1'}
     args.out.mkdir(parents=True,exist_ok=False);checks=[]
-    for stage in manifest(args.content):
-        if args.stages!='all' and stage['stage'] not in args.stages.lower().split(','):continue
+    for stage in select_stages(manifest(args.content),args.stages):
         for sub in (8,9):
+            if args.direction!='all' and sub!=(8 if args.direction=='past' else 9):continue
             posts=[o for o in stage['objects'] if o['code']==0x7e2e80 and o['subtype']==sub]
             if posts:checks.append((stage,posts[0]))
     if not checks:raise ValueError('No source time posts selected')
