@@ -18,8 +18,10 @@ def main():
     for key in ('exe','rom','bank','out'):ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
     ap.add_argument('--stages',default='all');ap.add_argument('--character',type=int,default=1)
     ap.add_argument('--death-kind',choices=['fall','timeout'],default='fall')
+    ap.add_argument('--target-fps',type=int)
     ap.add_argument('--mighty',action='store_true')
     args=ap.parse_args();args.kind='checkpoints';args.out.mkdir(parents=True,exist_ok=True)
+    args.god=False # Travel protection below ends before the actual touch/death.
     results=[]
     for stage in manifest(args.bank):
         if args.stages!='all' and stage['stage'] not in args.stages.split(','):continue
@@ -71,7 +73,10 @@ def main():
                     run.player(ram,u16(ram,0xb010),u16(ram,0xb014))
                     # Advance time; the normal HUD path must kill the player.
                     run.write(0xfe22,bytes((0,9,59,59)))
-                for n in range(30):
+                # Death animation plus the title-card/fade can exceed 600
+                # frames. Observe the actual return rather than imposing the
+                # shorter animation-only window used by the first fixtures.
+                for n in range(60):
                     run.step(20);ram,frame=run.snapshot()
                     run.events.append(dict(frame=frame,checkpoint=ram[0xfe2a],lives=ram[0xfe12],
                         player=[u16(ram,0xb010),u16(ram,0xb014),ram[0xb005]],mode=ram[0xf600]))

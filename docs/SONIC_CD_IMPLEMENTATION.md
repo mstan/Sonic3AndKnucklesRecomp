@@ -349,9 +349,42 @@ Palmtree Panic entry. The resulting save has cursor 40, S2 completion bit 2,
 identity 1 and empty CD collectibles. Position, attack posture and protection
 bypass navigation/attack execution; no boss HP or transition flags are set.
 
-Remaining acceptance includes native->MM campaign-boundary regressions,
-broader geometry/gimmick/enemy/character interactions, checkpoint/death/warp
-state, CD-specific process removal/reinstallation and completed-file cases,
+The native S3K->Megamix boundary also passes with CD installed, using Mighty
+on build 13 (`build/qa-cd-native-to-mm-dev13`). The probe starts at the final
+boss segment, bypassing earlier Death Egg encounters. Real contact damage,
+defeat, chase, ending and credits lead into Sunny Shores; no boss HP, ending
+or campaign-transition flags are written.
+
+The native-only deletion/recreation probe exposed a real save bug: an old CD
+cursor and collectibles could return if the file was erased and recreated
+before packs were reinstalled. The journal now observes actual native save
+writes whenever an existing companion is present, even with every mod absent.
+It does not project addon data into native RAM or force cartridge IO in that
+mode. Actual deletion clears the parked state before a recreated file can
+inherit it; unchanged native records leave the companion untouched. A binary
+that does not implement this observer cannot record an intermediate deletion
+that is no longer visible in the final native record.
+
+Build 13 SHA256 is
+`c1c55c3fd6a47d4e8325d2a5a2a604e490240341b4eb5d2596ad794dae49da26`.
+It passes 46 CTests, all 49 native baseline artifacts, all 19 save-edge cases
+(`build/qa-cd-save-edges-2-dev13`) and the affected 12 normal/12 completed
+Mighty resilience cases. Future schema/capability in either companion remains
+read-only with native saving available. Moved content paths, absent/damaged/
+restored music, actual native-menu deletion, native recreation and two subsequent
+reinstalled Continue launches pass. The pre-fix resurrection and initial
+post-fix verifier's obsolete byte-preservation expectations remain retained.
+
+All 14 Present acts that actually place checkpoints pass real starpost touch,
+timeout death, life decrement, natural retry and stable checkpoint return:
+12 cases in `build/qa-cd-checkpoints-dev12`, plus PPZ2/SSZ2 reruns in
+`build/qa-cd-checkpoint-reruns-dev13`. The first retry window ended during their
+normal fade/title sequence; the corrected verifier waits for the actual return.
+Timeout is an explicit timer prerequisite, not injected death/retry state.
+Post-warp checkpoint state and hurt/game-over behavior remain separate checks.
+
+Remaining acceptance includes broader geometry/gimmick/enemy/character interactions,
+checkpoint/death/warp state and additional native progression cases,
 scene audio behavior, adaptive rendering, full-runtime portability and final owner
 delivery. The mandatory final independent visual comparisons remain open.
 
