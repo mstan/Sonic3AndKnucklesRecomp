@@ -144,13 +144,6 @@ int tri_shadow_hook(uint32_t pc)
     case MG_PC_MIGHTY_SHIELD:
         if(p!=RAM_Player_1)return 0;
         if(tri_character_transform())return done();
-        if((r8(RAM_Ctrl_1_pressed_logical)&0x40) && r8(RAM_Super_Sonic_Knux_flag) && r8(p+0x35)) {
-            /* v3 $198F0: an invincibility pickup enables a Super burst.
-             * Its temporary 768-ring budget is restored after normal enemy
-             * and boss hurt handlers; no kill or HP result is fabricated. */
-            unsigned flags=r8(p+0x2B),mask=(flags&0x70)?(flags&0x70)>>3:(flags&1);
-            tri_character_blast(mask,1);return done();
-        }
         if((r8(RAM_Ctrl_1_pressed_logical)&0x30) && !target)acquire(0);
         return done();
     default:return 0;

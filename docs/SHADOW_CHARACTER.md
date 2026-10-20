@@ -52,11 +52,15 @@ can acquire another target for five rings. B+C uses the existing S3K requirement
 of seven Chaos Emeralds and at least 50 rings to transform; airborne B+C reverts.
 Super ground A boosts while held and accelerates native ring draining. The v3
 counter resets to ten and uses BPL, giving eleven-frame drain intervals; the
-native equivalent is `Super_frame_count` at `$F670`. An invincibility pickup
-also enables the source Super A burst, using normal enemy/boss hurt handlers
-with the donor's temporary ring budget restored afterward. Native
+native equivalent is `Super_frame_count` at `$F670`. Native
 S3K movement, Super presentation and corresponding native sound effects remain
-the integration basis, as with Mighty. Further Super interactions are under QA.
+the integration basis, as with Mighty.
+
+The source contains a dormant airborne A burst at `$198F0`, requiring both
+Super and a nonzero invincibility timer. The original transformation clears
+that timer (`$11CE96`), and the original invincibility monitor rejects Super
+(`$EFD6`). Native S3K follows the same rules. This is not an exposed v3 ability;
+the port preserves normal pickup behavior rather than adding a way around it.
 
 ## Save format
 
@@ -107,7 +111,7 @@ failed fixtures/logs remain; one S1 homing setup landed before the button press
 and is being rerun with an explicitly checked airborne prerequisite.
 
 Remaining before standalone acceptance: native/S1/S2/MM extended ability,
-water/shield/burst and transition coverage; explicit native deletion/recreation;
+water/shield and transition coverage; explicit native deletion/recreation;
 completed-file menu checks; final candidate scene review and a clean
 normal-window/normal-audio owner build. No merge or final playtest delivery yet.
 After this branch qualifies, integrate Shadow into CD and resume the general
