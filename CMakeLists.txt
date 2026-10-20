@@ -240,6 +240,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     endif()
     if(PREFIX STREQUAL "sonic3k")
         file(GLOB STAGE_PACK_SOURCES CONFIGURE_DEPENDS "${S3_GAME_ROOT}/trilogy/*.c")
+        # The CD deformation transcription intentionally wraps original
+        # fixed-width accumulators. Qualify these
+        # semantics on GNU/Clang as well as MSVC; no host assembly is required.
+        set_source_files_properties("${S3_GAME_ROOT}/trilogy/scd_background.c"
+            PROPERTIES COMPILE_OPTIONS "$<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fwrapv>")
         list(APPEND SHARED_SRC ${STAGE_PACK_SOURCES})
     endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
@@ -417,6 +422,12 @@ recomp_target_launcher_ui(Sonic3KRecomp
 recomp_target_launcher_ui(SonicAndKnucklesRecomp
     CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonick.tga  BOXART_NAME boxart-sonick.tga)
+
+# Public owned-disc conversion also needs its bounded graph validator when
+# tests/debugging are disabled in a release build.
+add_executable(scd_pack_validate tools/scd_pack_validate.c
+    game/trilogy/scd_resource.c game/trilogy/scd_pack.c)
+target_include_directories(scd_pack_validate PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 
 option(BUILD_TESTING "Build ROM-independent renderer and framework tests" ON)
 if(BUILD_TESTING)

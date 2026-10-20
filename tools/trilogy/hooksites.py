@@ -67,6 +67,9 @@ def find(label, pattern, where='after', nth=0, half='sk'):
 
 # name, label, regex, where, nth, half
 HOOKS = [
+    # Whole routine entries: CD supplies the original disc's foreground music.
+    ("CD_MUSIC_REQUEST", "Play_Music",          r".*", 'at', 0, 'sk'),
+    ("CD_MUSIC_TEMPO",   "Change_Music_Tempo",  r".*", 'at', 0, 'sk'),
     # --- level load -------------------------------------------------------
     ("LEVEL_ENTRY",     "Level",                 r"^bset #7,\(Game_mode\)\.w", 'at', 0, 'sk'),
     ("LVL_PLC1",        "Level",                 r"^move\.b \(a2,d1\.w\),d0", 'at', 0, 'sk'),
@@ -237,7 +240,7 @@ SYMS = [
     "ObjCheckCeilingDist", "ObjCheckRightWallDist", "ObjCheckLeftWallDist", "Obj_EnemyScore",
     "Clear_SpriteRingMem", "Go_Delete_SpriteSlotted2",
     "Obj_InvisibleBlock", "Obj_InvisibleLavaBlock", "Touch_Enemy",
-    "HInt3", "HInt4", "LoadPalette2", "LoadPalette2_Immediate",
+    "HInt2", "HInt3", "HInt4", "PLC_LBZRobotnikAfter", "LoadPalette2", "LoadPalette2_Immediate",
     "LevelLoadBlock", "LevelPtrs", "PalPoint", "Sonic_Start_Locations", "Knux_Start_Locations", "LevelSizes",
     "Pal_SonicTails", "Pal_Knuckles", "Write_SaveGame", "Save_Level_Data2",
     "Wait_VSync", "Map_Sonic", "Map_SuperSonic", "PLC_Sonic", "PLC_SuperSonic", "ArtUnc_Sonic",

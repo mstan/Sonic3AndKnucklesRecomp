@@ -9,14 +9,20 @@ add_executable(scd_geometry_test runtime/scd_geometry_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c")
 target_include_directories(scd_geometry_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME scd_geometry COMMAND scd_geometry_test)
-add_executable(scd_pack_validate "${CMAKE_SOURCE_DIR}/tools/scd_pack_validate.c"
-    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c"
-    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c")
-target_include_directories(scd_pack_validate PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_executable(scd_background_test runtime/scd_background_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_background.c")
+target_include_directories(scd_background_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME scd_background COMMAND scd_background_test)
 add_executable(scd_pack_graph_test runtime/scd_pack_graph_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c")
 target_include_directories(scd_pack_graph_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME scd_pack_graph COMMAND scd_pack_graph_test)
+add_executable(scd_audio_control_test runtime/scd_audio_control_test.c)
+target_include_directories(scd_audio_control_test PRIVATE "${RUNNER_ROOT}")
+if(NOT WIN32)
+    target_link_libraries(scd_audio_control_test PRIVATE m)
+endif()
+add_test(NAME scd_audio_control COMMAND scd_audio_control_test)
 add_executable(scd_resource_test runtime/scd_resource_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c")
 target_include_directories(scd_resource_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
@@ -108,6 +114,8 @@ endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_test(NAME trilogy_hook_ownership COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/check_trilogy_hook_ownership.py")
     add_test(NAME scd_resource COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_resource_test.py" --validator "$<TARGET_FILE:scd_resource_test>")
     add_test(NAME scd_disc COMMAND "${Python3_EXECUTABLE}"

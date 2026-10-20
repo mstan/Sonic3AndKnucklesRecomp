@@ -42,7 +42,11 @@ def stage(build, dest, version, mode):
                       ("ui_commit", ROOT / "recomp-ui"), ("disasm_commit", ROOT / "game/skdisasm")):
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
         assert info[key] == head, f"Stale build: {key}"
-        dirty = subprocess.check_output(["git", "-C", str(repo), "status", "--porcelain", "--untracked-files=normal"], text=True)
+        # Check each repository's own inputs here; the pinned engine/UI/game
+        # dependencies are checked independently below. Recursive status cannot
+        # resolve dependency gitdirs through a Windows worktree junction.
+        dirty = subprocess.check_output(["git", "-c", "core.fsmonitor=false", "-C", str(repo),
+            "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=all"], text=True)
         assert not dirty.strip(), f"Uncommitted release inputs in {repo}:\n{dirty}"
         if repo != ROOT:
             relative = repo.relative_to(ROOT).as_posix()
@@ -58,6 +62,30 @@ def stage(build, dest, version, mode):
     shutil.copy2(license_path, dest / "LICENSE")
     shutil.copy2(ROOT / "segagenesisrecomp/THIRD-PARTY-LICENSES.md", dest)
     shutil.copy2(metadata, dest / "build-info.json")
+    if mode == "sonic3k":
+        docs = dest / "docs"
+        docs.mkdir(exist_ok=True)
+        for name in ("STAGE_PACKS.md", "MEGAMIX_STAGE_PACK.md", "SHADOW_CHARACTER.md",
+                     "SONIC_CD.md", "SONIC_CD_VALIDATION.md"):
+            shutil.copy2(ROOT / "docs" / name, docs / name)
+        tools = dest / "tools"
+        tools.mkdir(exist_ok=True)
+        for name in ("build_stage_pack.py", "build_megamix_pack.py",
+                     "split_campaign_packs.py", "build_sonic_cd_pack.py"):
+            shutil.copy2(ROOT / "tools" / name, tools / name)
+        for directory in ("trilogy", "megamix"):
+            tracked = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--",
+                f"tools/{directory}"], text=True).splitlines()
+            for relative in tracked:
+                src = ROOT / relative
+                if src.suffix.lower() not in (".py", ".json", ".txt", ".png"):
+                    continue
+                target = tools / src.relative_to(ROOT / "tools")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, target)
+        helper = "scd_pack_validate" + (".exe" if info["system"] == "Windows" else "")
+        assert (build / helper).is_file(), "Build the public scd_pack_validate target"
+        shutil.copy2(build / helper, dest / helper)
     assets = build / "assets"
     assert (assets / "fonts/LatoLatin-Regular.ttf").is_file(), "Missing launcher font"
     assert (assets / "img" / spec["boxart"]).is_file(), "Missing mode box art"

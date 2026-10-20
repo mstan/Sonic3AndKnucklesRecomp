@@ -836,9 +836,17 @@ static int cd_frame(long n, int32_t *l, int32_t *r)
 static double s_pcm_frac;
 static int s_pcm_count;
 static int32_t s_pcm_prev[2], s_pcm_next[2];
+static int s_level_paused;
+
+void scd_audio_level_pause(int paused) { s_level_paused = paused != 0; }
 
 static void mix(int16_t *out, size_t frames, double rate)
 {
+    /* Pause_Game spins through V-int without running the level hooks. Its
+     * cartridge sound flag cannot suspend this game-owned stereo source.
+     * Retain both playback clocks and the PCM driver/chip state until Start
+     * resumes the level; never silence the runner's other audio sources. */
+    if (s_level_paused) return;
     double cd_step = CD_RATE / rate, pcm_step = PCM_RATE / rate;
     for (size_t i = 0; i < frames; i++) {
         int32_t l = 0, r = 0;
@@ -884,6 +892,7 @@ void scd_audio_init(void)
 
 void scd_audio_reset(void)
 {
+    s_level_paused=0;
     scd_cd_stop();
     if(s_bank){reset_driver();rf_write(8,0xFF);}
     s_bank=NULL;s_bank_size=0;

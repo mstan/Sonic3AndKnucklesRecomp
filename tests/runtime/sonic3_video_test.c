@@ -42,12 +42,42 @@ static void test_sprite_atlas(void)
             CHECK(out[8+x]==pal[1+ix/8*2+iy/8]);
         }
     }
+    /* Miniature characters keep their own atlas, tile ordering and flips.
+     * Sampling at half size must consume every second source pixel. */
+    scene.sprites[0].zoom=128;
+    for(unsigned flip=0;flip<4;flip++)for(int y=0;y<8;y++) {
+        scene.sprites[0].attr=(uint16_t)(0x8000|((flip&1)?0x800:0)|((flip&2)?0x1000:0));
+        memset(out,0,sizeof out);memset(s_priority,0,64);
+        draw_scene_sprites(&v,y,out,64,0,pal);
+        for(int x=0;x<8;x++) {
+            int ix=(flip&1)?15-x*2:x*2,iy=(flip&2)?15-y*2:y*2;
+            CHECK(out[8+x]==pal[1+ix/8*2+iy/8]);
+        }
+        CHECK(!out[7] && !out[16]);
+    }
+    memset(out,0,sizeof out);memset(s_priority,0,64);
+    draw_scene_sprites(&v,8,out,64,0,pal);CHECK(!out[8]);
+    scene.sprites[0].zoom=0;
     scene.sprites[0].size=5;scene.sprites[0].attr=0x8000;
     memset(s_priority,0,64);draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[5]);
     scene.sprites[0].size=0x85;scene.sprites[0].attr=0x8004;
     memset(out,0,sizeof out);memset(s_priority,0,64);
     draw_scene_sprites(&v,0,out,64,0,pal);CHECK(!out[8]); /* atlas bounds */
     test_atlas_enabled=0;s_display=previous;
+}
+static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
+static void test_object_zoom(void)
+{
+    memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));
+    s3_video_set_object_zoom(zoom_fixture);
+    CHECK(enabled() && width(2560,720,320,224)==320);
+    CHECK(s3_video_main_cpu_divisor()==1); /* no widescreen CPU policy */
+    word(g_rom,0x6000,2);word(g_rom,0x6002,1);
+    word(g_rom,0x6004,0xF005);word(g_rom,0x6006,0);word(g_rom,0x6008,0xFFF0);
+    s_build.count=0;add_mapping(0x6000,0,0,0,32,32,0,0,128);
+    CHECK(s_build.count==1 && s_build.sprites[0].x==24 && s_build.sprites[0].y==24);
+    CHECK(s_build.sprites[0].zoom==128);
+    s3_video_set_object_zoom(NULL);CHECK(!enabled());
 }
 static void test_file_select(void)
 {
@@ -555,7 +585,7 @@ int main(int argc,char **argv)
         }
         ss_count=count;
     }
-    test_sprite_atlas();test_file_select();test_world_snapshot();test_hud_mapping();
+    test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

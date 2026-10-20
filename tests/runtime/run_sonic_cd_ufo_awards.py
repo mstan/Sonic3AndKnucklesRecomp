@@ -19,11 +19,13 @@ def main():
     ap=argparse.ArgumentParser(description=__doc__)
     for key in ('exe','rom','content','out'):
         ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
+    ap.add_argument('--music',type=lambda s:Path(s).resolve())
+    ap.add_argument('--capture-audio',action='store_true')
     ap.add_argument('--attempts',type=int,default=7)
-    ap.add_argument('--character',type=int,choices=range(6),default=1)
+    ap.add_argument('--character',type=int,choices=range(8),default=1)
     ap.add_argument('--seed-dir',type=lambda s:Path(s).resolve())
     args=ap.parse_args();args.bank=args.content;args.packs=args.content.parent
-    args.pack_mask=12 if args.character>=4 else 8;args.kind='mechanics';args.god=True
+    args.pack_mask=None;args.mighty=args.character in (4,5);args.kind='mechanics';args.god=True
     args.env={'TRILOGY_SCDSS_FOLLOW':'1','TRILOGY_SCDSSLOG':'1','TRILOGY_RINGS':'50'}
     args.out.mkdir(parents=True,exist_ok=False)
     stage=next(s for s in manifest(args.content) if s['stage']=='4000')
@@ -41,6 +43,9 @@ def main():
         try:
             run=Native(args,'4000',(sign['x']-88,sign['y']-48,0),case,0)
             run.step(60);ram,frame=run.snapshot('before')
+            ptr=u16(ram,0xe662)
+            rec['before_character']=ram[ptr+2]>>4
+            if rec['before_character']!=args.character:raise AssertionError('Requested character was not selected')
             journal=(rt/'sonic3k.srm.campaign').read_bytes();before=journal[81]
             rec['before_stones']=before;rec['native_emeralds_before']=ram[0xffb0:0xffb9].hex()
             rec['prerequisite_rings']=u16(ram,0xfe20)
@@ -59,10 +64,12 @@ def main():
                         rec['return']=verify_next(run,'4001');break
             ram,frame=run.snapshot('after');journal=(rt/'sonic3k.srm.campaign').read_bytes()
             rec['after_stones']=journal[81];rec['saved_stable']=journal[62]
-            rec['native_emeralds_after']=ram[0xffb0:0xffb9].hex();rec['return_character']=u16(ram,0xff08)
+            rec['native_emeralds_after']=ram[0xffb0:0xffb9].hex()
+            ptr=u16(ram,0xe662);rec['return_character']=ram[ptr+2]>>4
+            rec['saved_character']=journal[34]>>4;rec['native_player_mode']=u16(ram,0xff08)
             next_stone=next((i for i in range(7) if not before&(1<<i)),None)
             rec['expected_stones']=before|(1<<next_stone) if next_stone is not None else before
-            rec['status']='passed' if rec.get('entry')=='passed' and rec.get('return')=='passed' and rec['after_stones']==rec['expected_stones'] and rec['after_stones']!=before and rec['saved_stable']==41 and rec['native_emeralds_before']==rec['native_emeralds_after'] and rec['return_character']==args.character else 'failed'
+            rec['status']='passed' if rec.get('entry')=='passed' and rec.get('return')=='passed' and rec['after_stones']==rec['expected_stones'] and rec['after_stones']!=before and rec['saved_stable']==41 and rec['native_emeralds_before']==rec['native_emeralds_after'] and rec['return_character']==rec['saved_character']==args.character else 'failed'
         except Exception as exc:rec.update(status='failed',error=repr(exc))
         finally:
             if run:

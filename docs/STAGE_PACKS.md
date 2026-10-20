@@ -1,9 +1,9 @@
 # Experimental campaign stage mods
 
-Five independent mods extend **Sonic 3 & Knuckles**: **Sonic 1 stages**,
-**Sonic 2 stages**, **Sonic Megamix stages**, **Mighty** and **Shadow**.
+Six independent mods extend **Sonic 3 & Knuckles**: **Sonic 1 stages**,
+**Sonic 2 stages**, **Sonic CD stages**, **Sonic Megamix stages**, **Mighty** and **Shadow**.
 All are experimental and disabled by default. Enable any combination on the
-launcher's Mods page. Campaign order is Sonic 1, Sonic 2, native Sonic 3 &
+launcher's Mods page. Campaign order is Sonic 1, Sonic 2, Sonic CD, native Sonic 3 &
 Knuckles, then Megamix; absent or disabled campaigns are skipped. Sonic 1
 supplies 19 acts and Sonic 2 supplies 20. Megamix supplies 19 acts. Mighty
 and Shadow each add their own solo and Tails-partner Data Select choices;
@@ -11,8 +11,11 @@ neither character requires the Megamix stage checkbox or the other character.
 The standalone Sonic 3 and Sonic & Knuckles targets do not enroll these mods.
 
 The game keeps its existing name, launcher, pause menu and native abilities.
-Blue Spheres is the special-stage system throughout. Upstream's achievements,
+Sonic CD uses its UFO special stages; the other campaigns retain Blue Spheres. Upstream's achievements,
 additional abilities, video settings and replacement launcher are not enrolled.
+
+For the separate owned-disc conversion and its 70 act/time variants, see
+[SONIC_CD.md](SONIC_CD.md).
 
 ## Build your stage bank
 

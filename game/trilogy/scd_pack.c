@@ -102,9 +102,9 @@ static int extra(const uint8_t *b,uint32_t n)
         p=guest(b,n,a,2);if(!p || w(p)>64)return 0;unsigned limits=w(p);
         const uint8_t *sets=guest(b,n,a+2+limits*2,limits+1);if(!sets)return 0;
         a+=2+limits*2+((limits+2)&~1u);p=guest(b,n,a,2);if(!p || !w(p) || w(p)>16)return 0;
-        unsigned count=w(p);if(!guest(b,n,a+2,count*48+24))return 0;
+        unsigned count=w(p);if(!guest(b,n,a+2,count*96+24))return 0;
         for(unsigned i=0;i<=limits;i++)if(sets[i]>=count)return 0;
-        a+=2+count*48;
+        a+=2+count*96;
         for(unsigned i=0;i<4;i++) {
             uint32_t script=l(guest(b,n,a+i*4,4));if(!script)continue;
             p=guest(b,n,script,4);if(!p || p[0]+p[2]>64 || !guest(b,n,script,4+p[1]*p[2]*2))return 0;
@@ -198,7 +198,7 @@ static int blob(const uint8_t *b,uint32_t n)
 static int levels(ScdPack *p)
 {
     const uint8_t *b=p->levels;uint32_t n=p->levels_size;unsigned seen[84]={0};
-    if(n<16+71*12 || memcmp(b,"TSCD",4) || w(b+4)!=2 || w(b+6)!=71 || l(b+8)!=SCD_WINDOW || l(b+12)!=SCD_WINDOW_SIZE)return 0;
+    if(n<16+71*12 || memcmp(b,"TSCD",4) || w(b+4)!=3 || w(b+6)!=71 || l(b+8)!=SCD_WINDOW || l(b+12)!=SCD_WINDOW_SIZE)return 0;
     uint32_t end=16+71*12;
     for(unsigned i=0;i<71;i++) {
         const uint8_t *e=b+16+i*12;unsigned za=w(e),flags=w(e+2);uint32_t at=l(e+4),size=l(e+8);

@@ -17,8 +17,16 @@ static int done(void)
 }
 static int targetable(uint32_t o)
 {
-    if(!r32(o) || !(r8(o+OBJ_render)&0x80))return 0;
+    uint32_t code=r32(o);
+    unsigned render=r8(o+OBJ_render);
+    if(!code || !(render&0x80))return 0;
     unsigned c=r8(o+OBJ_coll_flags);
+    /* CD maps its hitboxes into additional native shape indices. The v3
+     * retail-only shape list misses e.g. Tamabboh ($1A). Use the converted
+     * object's actual collision category; damaging/special controllers and
+     * Hotaru's temporary screen-relative pose are not homing targets. */
+    int cd=cd_attack_target_kind(o);
+    if(cd>=0)return cd!=0;
     return (c>=5 && c<=14) || c==0xCC || c==0x52 || c==0x46 || c==0x41;
 }
 static void steer(void)

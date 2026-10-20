@@ -39,6 +39,8 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
 
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
 static int s_mode;
+static S3VideoObjectZoom s_object_zoom;
+void s3_video_set_object_zoom(S3VideoObjectZoom fn) { s_object_zoom = fn; }
 static double s_ratio = 16.0 / 9.0;
 static int s_width, s_left, s_camera, s_stage_width, s_native_x, s_requested_width = 320;
 static int s_camera_y;
@@ -195,14 +197,14 @@ static int configure(const char *mode)
     scene_mode_changed(was_enabled);
     return 1;
 }
-static int enabled(void) { return s_mode != VIDEO_OFF; }
+static int enabled(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
     /* LevelLoop ($650C) still waits for the real V-int every tick.
      * Expanded activation must not inherit the 7.67 MHz object's lag budget.
      * Loading, special stages, native 2P and opt-out keep original timing. */
     int mode=g_ram[0xF600];
-    return enabled() && (mode==8 || mode==12) && gameplay() && g_ram[0xF711] ? 4 : 1;
+    return s_mode != VIDEO_OFF && (mode==8 || mode==12) && gameplay() && g_ram[0xF711] ? 4 : 1;
 }
 static int width(int dw, int dh, int nw, int nh)
 {
@@ -213,7 +215,7 @@ static int width(int dw, int dh, int nw, int nh)
         result = s_stage_width > nw ? s_stage_width : nw;
     }
     else if (s_mode == VIDEO_RATIO) result = nh * s_ratio;
-    else if (dw > 0 && dh > 0) result = (double)nh * dw / dh;
+    else if (s_mode != VIDEO_OFF && dw > 0 && dh > 0) result = (double)nh * dw / dh;
     /* Bound by representable dimensions and the SDL texture limit (runner),
      * never by an aspect preset. Even a stage-length viewport is supported. */
     if (result > INT_MAX - 1.0) result = INT_MAX - 1.0;
@@ -299,7 +301,7 @@ static int file_select_layout(const GVDP *v)
  * ceiling, or 20-sprites-per-line ceiling. Native BuildSprites still executes
  * for the hardware pass and publishes a signature used to align our list
  * with the exact VBlank upload displayed by the VDP. */
-typedef struct { int x, y; uint16_t attr; uint8_t size, hud; } SceneSprite;
+typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom; } SceneSprite;
 enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024 };
 typedef struct {
     SceneSprite sprites[SCENE_SPRITES];
@@ -386,9 +388,15 @@ static void scene_mode_changed(int was_enabled)
     /* Once adopted, the host loader also maintains a native-width window
      * on opt-out until the next level init, preserving existing object state. */
 }
-static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
-                        int x,int y,int anchor,int static_mapping)
+static int zoom_offset(int offset, unsigned zoom)
 {
+    int scaled = offset * (int)zoom;
+    return scaled >= 0 ? scaled / 256 : -((255 - scaled) / 256);
+}
+static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
+                        int x,int y,int anchor,int static_mapping,unsigned zoom)
+{
+    if (zoom < 64 || zoom > 512) zoom = 256;
     unsigned p=map;int count=1;
     if(!static_mapping) {
         p+=(int16_t)scene_read16(p+(frame&255u)*2u);
@@ -401,9 +409,10 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         uint16_t attr=(uint16_t)(scene_read16(p+2)+gfx);
         if(flags&1){dx=-dx-(((size>>2)&3)+1)*8;attr^=0x800;}
         if(flags&2){dy=-dy-((size&3)+1)*8;attr^=0x1000;}
-        if(y+dy>=224 || y+dy+((size&3)+1)*8<=0)continue;
+        dx=zoom_offset(dx,zoom);dy=zoom_offset(dy,zoom);
+        if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_build.sprites[s_build.count++];
-        q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;
+        q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
     }
 }
 
@@ -515,7 +524,7 @@ static void capture_objects(void)
         unsigned frame=blink*((ram16(0xFE20)==0?1:0)+(g_ram[0xFE23]==9?2:0));
         int hudx=(int8_t)g_ram[0xF711];if(hudx<0)hudx+=8;
         unsigned hud=s_hud_mapping?s_hud_mapping():0;
-        add_mapping(hud?hud:S3_HUD_MAP,frame,0x86CA,0,15+hudx,136,1,0);
+        add_mapping(hud?hud:S3_HUD_MAP,frame,0x86CA,0,15+hudx,136,1,0,0);
         unsigned base=rings_base(),end=rings_end();
         for(unsigned p=base+4;p<end;p+=4) {
             unsigned status=0xE700+(p-base)/2;
@@ -527,7 +536,7 @@ static void capture_objects(void)
             if(s_build.count<SCENE_SPRITES) {
                 SceneSprite *q=&s_build.sprites[s_build.count++];
                 q->x=x-cam+(int16_t)scene_read16(m+6);q->y=y+(int16_t)scene_read16(m);
-                q->attr=scene_read16(m+4);q->size=(uint8_t)scene_read16(m+2);q->hud=0;
+                q->attr=scene_read16(m+4);q->size=(uint8_t)scene_read16(m+2);q->hud=0;q->zoom=256;
             }
         }
     }
@@ -545,6 +554,7 @@ static void capture_objects(void)
                 if(s_visible_count<144)s_visible_objects[s_visible_count++]=o;
             } else {x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;anchor=2;}
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
+            unsigned zoom=(flags&4) && s_object_zoom?s_object_zoom(o):0;
             /* The title plane is queued even beyond the hardware viewport.
              * Retain its signed position instead of the wrapped/cut SAT. */
             if((g_ram[0xF600]&127)==4 && map==S3_TITLE_PLANE_MAP)anchor=3;
@@ -552,15 +562,15 @@ static void capture_objects(void)
              * native SAT builder. Preserve their signed carousel positions. */
             if(map==S3_FILE_SELECT_MAP)anchor=4;
             if(multi) {
-                if(g_ram[o+0x22])add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,0);
+                if(g_ram[o+0x22])add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,0,zoom);
                 unsigned count=ram16(o+0x16);if(count>8)count=8;
                 for(unsigned n=0;n<count;++n) {
                     unsigned child=o+0x18+n*6;
                     int sx=(int16_t)ram16(child)-128,sy=(int16_t)ram16(child+2)-128;
                     if(flags&4){sx=(int16_t)(ram16(child)-cam);sy=((ram16(child+2)-cy+128)&mask)-128;}
-                    add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0);
+                    add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
-            } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0);
+            } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
         }
     }
 }
@@ -655,23 +665,26 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int menu=s_display->scene==0;
         if(menu && s->hud!=(file_select_layout(v)?4:3))continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
+        unsigned zoom=s->zoom?s->zoom:256;
+        int drawn_width=cw*8*(int)zoom/256,drawn_height=ch*8*(int)zoom/256;
         unsigned pattern_bytes;
         const uint8_t *patterns=gvdp_sprite_patterns(s->size,&pattern_bytes);
         int world=!s->hud && s_display->scene==1;
         int y=s->y+(world?s_display->camera_y-s_camera_y:0);
-        if(line<y || line>=y+ch*8)continue;
+        if(line<y || line>=y+drawn_height)continue;
         int base=s->x+(s->hud==1?0:s->hud>=2?(width-320)/2:origin);
         /* Native camera scroll may advance while a completed host frame is
          * retained. Reproject its world coordinates, not its old screen
          * coordinates; otherwise stationary rings jitter with the camera. */
         if(world)base+=s_display->camera_x-s_camera;
-        int iy=line-y;
+        int iy=(line-y)*256/(int)zoom;
         if(s->attr&0x1000)iy=ch*8-1-iy;
-        for(int i=0;i<cw*8;++i) {
+        for(int i=0;i<drawn_width;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
             if(menu && x>=origin && x<origin+320)continue;
-            int ix=(s->attr&0x800)?cw*8-1-i:i;
+            int ix=i*256/(int)zoom;
+            if(s->attr&0x800)ix=cw*8-1-ix;
             uint16_t cell=(uint16_t)((s->attr&0xE000u)|
                 (((s->attr&2047u)+(unsigned)(ix/8*ch+iy/8))&2047u));
             uint8_t p;

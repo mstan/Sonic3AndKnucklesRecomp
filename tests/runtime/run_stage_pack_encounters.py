@@ -75,8 +75,14 @@ class Native:
         self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False),shadow=getattr(args,'character',0)>=6)
         if getattr(args,'pack_mask',None) is not None:
             names=('sonic1','sonic2','megamix','sonic_cd');paths=args.packs
-            (self.runtime/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(
-                f'{name}={(args.pack_mask>>i)&1}\n{name}_bank={(paths/(("sonic-cd" if i==3 else name)+"-stages.pak")).as_posix()}\n' for i,name in enumerate(names)))
+            (self.runtime/'sonic3k-stage-pack.ini').write_text('format=3\n'+''.join(
+                f'{name}={(args.pack_mask>>i)&1}\n{name}_bank={(paths/(("sonic-cd" if i==3 else name)+"-stages.pak")).as_posix()}\n' for i,name in enumerate(names))+
+                f'mighty={int(getattr(args,"mighty",False))}\nshadow={int(getattr(args,"character",0)>=6)}\n'+
+                f'megamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\n')
+        music=getattr(args,'music',None)
+        if music:
+            with (self.runtime/'sonic3k-stage-pack.ini').open('a') as config:
+                config.write(f'sonic_cd_audio={music.as_posix()}\n')
         (case/'input.txt').write_text(BOOT+'WAIT 500000\nEXIT\n')
         env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','MEGAMIX_','SONIC3_'))}
         env.update(SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',
@@ -96,7 +102,10 @@ class Native:
             cwd=self.runtime,env=env,stdout=self.log,stderr=self.log,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
         self.sock=None;self.stream=None;self.events=[]
-        deadline=time.monotonic()+60
+        # Cold content validation and durable journal creation share the test
+        # machine's disk with other builds. Retain a bounded startup deadline
+        # without classifying a delayed menu boot as a stage failure.
+        deadline=time.monotonic()+getattr(args,'boot_timeout',180)
         while time.monotonic()<deadline and self.proc.poll() is None:
             try:
                 bootlog=(case/'run.log').read_text(errors='replace')
@@ -106,7 +115,7 @@ class Native:
                 if '[cmd] Listening' not in bootlog:
                     time.sleep(.03);continue
                 self.sock=socket.create_connection(('127.0.0.1',port),timeout=1)
-                self.sock.settimeout(20);self.sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
+                self.sock.settimeout(getattr(args,'command_timeout',60));self.sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
                 self.stream=self.sock.makefile('rb');break
             except OSError: time.sleep(.05)
         if self.sock is None:
@@ -114,10 +123,13 @@ class Native:
             self.close()
             raise RuntimeError(f'debug listener not ready (process exit={code})')
         while time.monotonic()<deadline:
+            if not self.cmd('frame_info')['current_frame']:
+                time.sleep(.005);continue
             try:ram,frame=self.snapshot()
             except Exception:
                 self.close();raise
-            if ram[0xf600]==12 and u16(ram,0xfe04)>=(40 if args.kind in ('enemies','bosses','mechanics') else 180): break
+            if (ram[0xf600]==12 and u16(ram,0xfe10)==int(stage,16) and
+                    u16(ram,0xfe04)>=(40 if args.kind in ('enemies','bosses','mechanics') else 180)): break
             # Let the input-script clock run normally during menu boot.
             # run_frames advances simulation without ticking that script.
             time.sleep(.005)
@@ -128,6 +140,10 @@ class Native:
             self.close();raise RuntimeError('runtime loaded the wrong stage')
         self.god_player()
         if args.kind=='bosses':self.write(0xfe12,b'\x63')
+        if getattr(args,'capture_audio',False):
+            self.audio_origin_frame=self.cmd('frame_info')['current_frame']
+            self.cmd('audio_wav',action='start',path=str(self.case/'audio.wav'))
+            self.audio_capturing=True
 
     def cmd(self,cmd,**kw):
         self.sock.sendall((json.dumps(dict(id=1,cmd=cmd,**kw))+'\n').encode())
@@ -160,7 +176,7 @@ class Native:
         # Boss fixtures may intersect crushers/lava. Revive only the cheat
         # player, never the boss or stage state. Death/retry probes use a
         # different kind and never enable this protection.
-        if self.args.kind!='bosses':return
+        if self.args.kind!='bosses' and not getattr(self.args,'revive_player',False):return
         raw=self.cmd('read_ram',addr='B000',size=0x4a)
         p=bytearray.fromhex(raw['hex'])
         if p[5] not in (6,8):return
@@ -187,6 +203,10 @@ class Native:
         self.write(0xb000,p)
 
     def close(self):
+        if getattr(self,'audio_capturing',False) and self.proc.poll() is None:
+            self.cmd('audio_wav',action='stop')
+            (self.case/'audio-origin.json').write_text(json.dumps(dict(frame=self.audio_origin_frame)))
+            self.audio_capturing=False
         if self.sock:
             self.stream.close();self.sock.close()
         if self.proc.poll() is None: self.proc.terminate()

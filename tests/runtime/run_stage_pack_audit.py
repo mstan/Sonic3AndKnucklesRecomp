@@ -125,7 +125,7 @@ def runtime_files(exe, bank, runtime, debug_port=None, mighty=False, shadow=Fals
     if resource[:4]==b'SCDP':
         (runtime/'sonic3k-stage-pack.ini').write_text('format=3\nsonic1=0\nsonic2=0\n'
             f'mighty={int(mighty)}\nshadow={int(shadow)}\n'
-            f'megamix={int(mighty)}\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\nmegamix_bank={os.environ.get("MEGAMIX_TEST_BANK",(bank.parent/"megamix-stages.pak").as_posix())}\n'
+            f'megamix=0\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\nmegamix_bank={os.environ.get("MEGAMIX_TEST_BANK",(bank.parent/"megamix-stages.pak").as_posix())}\n'
             f'sonic_cd=1\nsonic_cd_bank={bank.as_posix()}\n')
     else:
         (runtime / 'sonic3k-stage-pack.ini').write_text(f'enabled=1\nbank={bank.as_posix()}\nmegamix={int(megamix)}\nmighty={int(mighty)}\nmegamix_rom={os.environ.get("MEGAMIX_TEST_ROM", "")}\n')

@@ -87,12 +87,6 @@ static int time_zone(void)
     return p == TRI_CD_PAST ? 0 : p == TRI_CD_PRESENT ? 1 : 2;
 }
 
-static uint32_t blob(int id)
-{
-    uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
-    return t ? tri_rd32(t + (uint32_t)id * 4u) : 0;
-}
-
 static uint32_t info(void) { uint32_t e = tri_dir(); return e ? tri_rd32(e + TD_EXTRA) : 0; }
 
 /* the act has its water (the converter gave it an underwater palette) */
@@ -127,8 +121,10 @@ static void check_water(void)              /* CheckLevelForWater; game_init's wa
     w8(RAM_Water_flag, 1);
     w16(RAM_Competition_mode, 0);
     w16(RAM_H_int_jump, 0x4EF9);
-    w32(RAM_H_int_addr, r16(RAM_V_blank_cycles) >= 0x1000 ? S3K_HInt4 : S3K_HInt3);
-    w32(RAM_Water_palette_data_addr, blob(TRI_BLOB_WATER_XFER));
+    /* CD swaps all 64 colours at the water line. HCZ's full-palette handler
+     * does that directly and requires no S1/Megamix common-bank transfer list. */
+    w32(RAM_H_int_addr, S3K_HInt2);
+    w32(RAM_Water_palette_data_addr, 0);
     uint16_t y = tri_rd16(info() + S1I_WATER_Y);
     w16(RAM_Water_level, y);
     w16(RAM_Mean_water_level, y);

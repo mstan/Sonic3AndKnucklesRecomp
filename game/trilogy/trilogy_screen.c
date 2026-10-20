@@ -9,7 +9,9 @@
  */
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
+#include "scd_background.h"
 #include "genesis_machine.h"
+#include "sonic3_video.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -118,6 +120,66 @@ static void bg_default_event(void)
         w32(RAM_H_scroll_buffer + (uint32_t)l * 4u, ((uint32_t)(uint16_t)-camx << 16) | (uint16_t)-bx);
     w16(RAM_Camera_X_pos_BG_copy, (uint16_t)bx);
     w16(RAM_Camera_Y_pos_BG_copy, (uint16_t)byv);
+}
+
+/* CD uses a different deformation program for every stage/time variant.
+ * Keep its accumulators across frames, but reset them at level initialization
+ * (including death/retry and time travel). The host camera remains S3K's. */
+static ScdBg *s_cd_bg;
+static int16_t s_cd_camx, s_cd_camy;
+static uint16_t s_cd_stage = 0xFFFF;
+
+static ScdBgInput cd_bg_input(void)
+{
+    extern int scd_qqz_bg_frame(void);
+    ScdBgInput in = {0};
+    in.camera_x = (int16_t)r16(RAM_Camera_X_pos_copy);
+    in.camera_y = (int16_t)r16(RAM_Camera_Y_pos_copy);
+    in.delta_x = (int16_t)((int32_t)(int16_t)(in.camera_x - s_cd_camx) * 256);
+    in.delta_y = (int16_t)((int32_t)(int16_t)(in.camera_y - s_cd_camy) * 256);
+    in.player_x = (int16_t)r16(RAM_Player_1 + 0x10);
+    in.player_y = (int16_t)r16(RAM_Player_1 + 0x14);
+    in.player_speed = (int16_t)r16(RAM_Player_1 + 0x18);
+    in.player_control = r8(RAM_Player_1 + 0x2E);
+    in.water_y = (int16_t)r16(RAM_Water_level);
+    in.scene = (uint8_t)scd_qqz_bg_frame();
+    return in;
+}
+
+static void cd_bg_init(void)
+{
+    /* Level/Main.asm selects $8720 after the common VDP initialization.
+     * Transparent sky pixels use CD's line 2 colour 0, independently of the
+     * selected S3K character's palette in line 0. Native level setup restores
+     * its own backdrop on leaving CD. */
+    g_machine.vdp.reg[7] = 0x20;
+    if (!s_cd_bg) s_cd_bg = scd_bg_create();
+    s_cd_stage = (uint16_t)((tri_zone() << 8) | tri_act());
+    ScdBgInput in = cd_bg_input();
+    s_cd_camx = in.camera_x; s_cd_camy = in.camera_y;
+    in.delta_x = in.delta_y = 0;
+    if (!scd_bg_reset(s_cd_bg, s_cd_stage, &in)) s_cd_stage = 0xFFFF;
+}
+
+static void cd_bg_event(void)
+{
+    uint16_t stage = (uint16_t)((tri_zone() << 8) | tri_act());
+    if (stage != s_cd_stage) cd_bg_init();
+    ScdBgInput in = cd_bg_input();
+    ScdBgOutput out;
+    if (!scd_bg_step(s_cd_bg, &in, &out)) { bg_default_event(); return; }
+    s_cd_camx = in.camera_x; s_cd_camy = in.camera_y;
+    for (int y = out.y & ~15; y < (out.y & ~15) + 256; y += 16) {
+        int line = y - out.y;
+        if (line < 0) line = 0;
+        if (line > 223) line = 223;
+        bg_band(y, y + 16, -(int)out.hscroll[line]);
+    }
+    uint32_t fg = (uint32_t)(uint16_t)-in.camera_x << 16;
+    for (unsigned line = 0; line < 224; line++)
+        w32(RAM_H_scroll_buffer + line * 4u, fg | (uint16_t)out.hscroll[line]);
+    w16(RAM_Camera_X_pos_BG_copy, (uint16_t)-out.hscroll[0]);
+    w16(RAM_Camera_Y_pos_BG_copy, (uint16_t)out.y);
 }
 
 /* ---- Sonic 1 Green Hill (Deform_GHZ, REV01) ----------------------------- */
@@ -728,7 +790,7 @@ static const ZoneScreen *zone_screen(void)
     static const ZoneScreen wfz = { s2_wfz_init2, s2_wfz_event, NULL, s2_anim, s2_wfz_palcycle };
     static const ZoneScreen dez = { s2_dez_init2, s2_dez_event, NULL, s2_anim, s2_cpz_palcycle };   /* PalCycle_CPZ */
     extern void tri_scd_palcycle(void), tri_scd_anim(void), tri_scd_level_events(void);
-    static const ZoneScreen cd = { NULL, bg_default_event, tri_scd_level_events, tri_scd_anim, tri_scd_palcycle };   /* (Sonic CD: its scripts) */
+    static const ZoneScreen cd = { cd_bg_init, cd_bg_event, tri_scd_level_events, tri_scd_anim, tri_scd_palcycle };
     switch (tri_source_zone()) {
     case TRI_S1_GHZ: return &ghz;
     case TRI_S1_LZ:  return &lz;
@@ -809,6 +871,8 @@ static uint32_t s_fg_init, s_bg_init, s_fg_event, s_bg_event;
 
 void tri_screen_register(void)
 {
+    extern unsigned scd_mmz_object_zoom(unsigned object);
+    s3_video_set_object_zoom(scd_mmz_object_zoom);
     s_fg_init = tri_native(n_fg_init);
     s_bg_init = tri_native(n_bg_init);
     s_fg_event = tri_native(n_fg_event);

@@ -83,6 +83,15 @@ int main(int argc,char **argv)
     call_count=0;w8(RAM_Ctrl_1_pressed_logical,0x30);w8(RAM_Ctrl_1_held_logical,0x30);
     jump_ability();CHECK(!r8(RAM_Super_Sonic_Knux_flag) && !call_count);
     CHECK(r16(RAM_Max_speed)==0x600 && r16(RAM_Acceleration)==12 && r16(RAM_Deceleration)==0x80);
+    /* CD's $1A hitbox is a normal enemy; its converted boss can have that
+     * same shape with HP. Preserve the normal kill/hurt service and costs. */
+    clear();equip(SH_BASIC);w16(RAM_Ring_count,100);
+    uint32_t cd=o_slot(2);w32(cd,0x7E2174);w8(cd+OBJ_render,0x84);w8(cd+OBJ_coll_flags,0x1A);
+    basic_super_attack();CHECK(call_count==1 && calls[0]==TH_KILL_ENEMY && r16(RAM_Ring_count)==84);
+    call_count=0;w8(cd+OBJ_coll_prop,7);w16(RAM_Ring_count,100);
+    basic_super_attack();CHECK(call_count==3 && calls[0]==0x100BC && r16(RAM_Ring_count)==52);
+    call_count=0;w8(cd+OBJ_coll_flags,0x9A);w16(RAM_Ring_count,100);
+    basic_super_attack();CHECK(!call_count && r16(RAM_Ring_count)==100);
     if(argc>1) {
         FILE *f=fopen(argv[1],"rb");CHECK(f);g_rom_ext_size=(uint32_t)fread(bank,1,sizeof bank,f);fclose(f);
         CHECK(g_rom_ext_size>0x2040 && descriptor());uint32_t d=descriptor();
