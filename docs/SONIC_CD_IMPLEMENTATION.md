@@ -473,3 +473,36 @@ The final combined build must receive regression checks and mandatory visual
 comparisons against independent original-game or verified asset references
 before the owner's playtest handoff. Earlier development captures do not
 satisfy that final comparison gate.
+
+## AS IS checkpoint and required engine refactor (2026-10-19)
+
+The owner clarified that the final target includes a general Sega CD
+recompilation backend in segagenesisrecomp. Current campaign code and the
+engine's optional game-owned audio callback are not that backend. The owner
+authorized preserving the current work AS IS now, with the architectural
+refactor deferred until before merge. `beads-ct0o` tracks that engine requirement;
+it blocks CD completion/merge. Both repositories have a matching
+`checkpoint/sonic-cd-as-is-2026-10-19` snapshot branch. Keep main/master unchanged.
+
+This checkpoint includes the unfinished, isolated `scd_background` component,
+its pinned CC0 profile generator/manifest and the extended original-code
+comparison tool. The component is not connected to CD's renderer: production
+scrolling still uses the generic implementation. Standalone MinGW builds used
+`-fwrapv -fno-strict-aliasing`; those assumptions and portability still require
+review before integration. Negative signed shifts have explicit register-style
+helpers, and MMZ3 Good reproduces the original DIVU overflow/EXT behavior.
+
+Candidate 3 passes all 70 original-start math cases over 64 updates each
+(`build/qa-cd-background-candidate-3-starts`). At the declared camera prerequisite
+(1000,100), 67 profiles pass and the three QQZ Bad profiles retain bounded
+one-pixel differences (`build/qa-cd-background-candidate-3-upper-math`). The first
+combined upper-position capture also had eight CCZ animation/reference failures;
+its outcome is retained and is not a game-mechanics failure or pass. The
+math-only rerun explicitly excludes drawing/animation. Earlier candidate failures
+and corrected TTZ water-boundary/MMZ division cases remain retained. These are
+component qualifications, not complete profile-domain or gameplay acceptance.
+
+No general backend refactor, final production build, final independent visual
+comparison or owner playtest delivery is claimed by this snapshot. Shadow is
+still queued after Sonic CD. The prior integrated development runtime remains
+build 16, with 46 CTests and 49 native baseline artifacts passing.

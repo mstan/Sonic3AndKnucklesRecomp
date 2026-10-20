@@ -1,5 +1,20 @@
 # Sonic CD implementation handoff
 
+Owner architecture clarification and checkpoint request (2026-10-19): the
+required final architecture is a **general Sega CD recompilation backend in
+segagenesisrecomp**. The existing S3K-hosted, hand-transcribed CD campaign port
+does not satisfy that backend requirement. Track the engine work in
+`beads-ct0o` under `beads-3vb`; it is required before merging CD.
+
+The owner then authorized a low-cost **AS IS checkpoint now**, with the
+architectural refactor deferred until before merge. Preserve current game and
+engine work on `checkpoint/sonic-cd-as-is-2026-10-19` in both repositories.
+Do not begin a wholesale backend rewrite as part of making this checkpoint.
+Keep the prepared feature branches, current port and QA/reference evidence.
+Neither snapshot nor the campaign port is a backend-completion claim or owner
+playtest handoff. Main/master remain unchanged. The detailed original campaign,
+save/mod, gameplay, audio and final visual requirements below remain open.
+
 Owner follow-up (2026-10-19): after completing Sonic CD end to end, import
 Shadow from Sonic Megamix using the existing Mighty integration as the model.
 Track this separately in `beads-8y9v` under the same game epic. Finish CD first;

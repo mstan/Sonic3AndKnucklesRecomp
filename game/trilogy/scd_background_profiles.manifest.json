@@ -1,0 +1,1013 @@
+[
+  {
+    "level": "11A",
+    "source": "src/R1/SCR11A.C",
+    "sha256": "2bbc69a7b68ff41124367a95f4b032dee035bf4ad250621c6d22daae9ca10854",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h"
+    ]
+  },
+  {
+    "level": "11B",
+    "source": "src/R1/SCR11B.C",
+    "sha256": "b5f2b1a95ef374ae7caf5c41be6590f421a743be6d8fd7ec0715b4bb9db90265",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h"
+    ]
+  },
+  {
+    "level": "11C",
+    "source": "src/R1/SCR11C.C",
+    "sha256": "22cf65328a189b6a6bbbdd71baf7b23356b64bfc0ef757ffe7fe909037967c9c",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h"
+    ]
+  },
+  {
+    "level": "11D",
+    "source": "src/R1/SCR11D.C",
+    "sha256": "1a5bf283fdc060f19f459bdbe115fe6cb6d0354f7ba3511390a85b41bedfa660",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h"
+    ]
+  },
+  {
+    "level": "12A",
+    "source": "src/R1/SCR12A.C",
+    "sha256": "28b1b252b817769bd2823e7ab96bdd512ad7315f5dc48fb05ed0a9812fa942cb",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h"
+    ]
+  },
+  {
+    "level": "12B",
+    "source": "src/R1/SCR12B.C",
+    "sha256": "f08ed17afd1c3d13841dc2260f18637141010121145b32faaf6196fe58934581",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "12C",
+    "source": "src/R1/SCR12C.C",
+    "sha256": "39629ad5dc865e9902a3d80f0187ece83025ea3684b3604b6b3f628660db711a",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "12D",
+    "source": "src/R1/SCR12D.C",
+    "sha256": "ebf99c1924db798651b93bc10b7b6c92c97beb6f4d22ef00f244173f2c9cb569",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "13C",
+    "source": "src/R1/SCR13C.C",
+    "sha256": "9ebcaf01f76351524969c71ee920458360daa7385114262e2ae7f99ada5a05fd",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "13D",
+    "source": "src/R1/SCR13D.C",
+    "sha256": "e1acae00f568700b729fc012db362a2b0f0ba09e888adeb597a43cb8ec174008",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "31A",
+    "source": "src/R3/SCR31A.C",
+    "sha256": "2078d8900daceef2d19d2d0d170d8341519218f382c85f675e5f3c05eee413ae",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "31B",
+    "source": "src/R3/SCR31B.C",
+    "sha256": "db4a028ddf65fb201e53310ad863aec4def9364c825312fb6d414022be8a5f66",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "31C",
+    "source": "src/R3/SCR31C.C",
+    "sha256": "0c37f5774a39a9d4b7206306e7166e16fbd8c4c5ead0331f9add878941e8e376",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "31D",
+    "source": "src/R3/SCR31D.C",
+    "sha256": "76495d9514bf925277fc08d4c8ec55bd5a1c535a79ce5e07094cf8bb28e44ded",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "32A",
+    "source": "src/R3/SCR32A.C",
+    "sha256": "544ae24b71231df8b25a9185cd12c725bd3294142af4a5977d8d096366a27616",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "32B",
+    "source": "src/R3/SCR32B.C",
+    "sha256": "dc2c3fcf9d555b74400db817b72731dadeccd362e84988618ac03e8ce45431db",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "32C",
+    "source": "src/R3/SCR32C.C",
+    "sha256": "186716d7ee87a3ebb3e9698e10582a4a0eb8081119e9b32d6162f42a51d9e041",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "32D",
+    "source": "src/R3/SCR32D.C",
+    "sha256": "f6b565bc53cf853b56f7f8298ff4d7734fdace450738be41433a9e8ee1925ff2",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "33C",
+    "source": "src/R3/SCR33C.C",
+    "sha256": "f96fd69b1a608c10cfc673159bf3290d95d322cf90f2d52782afa102c17b4391",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "33D",
+    "source": "src/R3/SCR33D.C",
+    "sha256": "2b4cc1cf895e3bf1be8f64bc6d7ed636ace0ef73427b816bfe136d0ceb2bda2f",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "41A",
+    "source": "src/R4/SCR41A.C",
+    "sha256": "2f0c9209cb246f540221b78084ce850194c9c49156dfb69a7fdb5fff8cd5b576",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z41aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "41B",
+    "source": "src/R4/SCR41B.C",
+    "sha256": "e1389f352977126930eb56a97dffddd96f7eebe76e6f88267fd0b254526f2f91",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "41C",
+    "source": "src/R4/SCR41C.C",
+    "sha256": "d13d0e0600ec45fe57200d78ac8b58906459f233c2f83787d1cc805954541ff1",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "41D",
+    "source": "src/R4/SCR41D.C",
+    "sha256": "d3fa4a0e964f6d76bd7588f7a79c6d71e714ff2c4f89a4451e6f63da55e69025",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "42A",
+    "source": "src/R4/SCR42A.C",
+    "sha256": "086f6789525b143383fe65b279cb9073935d1d66ad34ca0405c71e49bf3dacdc",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "42B",
+    "source": "src/R4/SCR42A.C",
+    "sha256": "086f6789525b143383fe65b279cb9073935d1d66ad34ca0405c71e49bf3dacdc",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "42C",
+    "source": "src/R4/SCR42C.C",
+    "sha256": "9860ccc6de5fdd55f75a33e9fff3ab7871be4fecdad9e52407dda4bd9343c364",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "42D",
+    "source": "src/R4/SCR42C.C",
+    "sha256": "9860ccc6de5fdd55f75a33e9fff3ab7871be4fecdad9e52407dda4bd9343c364",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "43C",
+    "source": "src/R4/SCR43C.C",
+    "sha256": "14a5ff1591266520fd15031dc3b23a0dbe2b0873c1954050c001a4922567ec18",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "43D",
+    "source": "src/R4/SCR43D.C",
+    "sha256": "8246032d33f8ecd6e25f580f9f39a2638b7db902d835fa5b9aea40980c43aee2",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_hv",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "51A",
+    "source": "src/R5/SCR51A.C",
+    "sha256": "0f07d503606e17705da87ac6dfb31d9fbab41ccb4fc8a9a73d6648e0eccb4de3",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51aline0",
+      "z51aline1",
+      "z51aline2",
+      "z51aline3",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "51B",
+    "source": "src/R5/SCR51B.C",
+    "sha256": "af6d8ae341961f79d6c7579b6e09b7a156e3507074f297dd0a43be717b9888e8",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51bline0",
+      "z51bline1",
+      "z51bline2",
+      "z51bline3",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "51C",
+    "source": "src/R5/SCR51C.C",
+    "sha256": "df1301b0703871a4ebc110395d3e5c552aa7d3f9dedca00f387ad0a451c5909f",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51cline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "51D",
+    "source": "src/R5/SCR51D.C",
+    "sha256": "4a77fa2ba92dd5c806316240236defc6913dbd37c4db9934368c826f393006e1",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51dline",
+      "z51dline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "52A",
+    "source": "src/R5/SCR52A.C",
+    "sha256": "705f3bcdfda89c221698602805f5171b231f654a8f0b2fa88205718ed9839d36",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51aline0",
+      "z51aline1",
+      "z51aline2",
+      "z51aline3",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "52B",
+    "source": "src/R5/SCR52B.C",
+    "sha256": "acc44971595ca76c7953066a4584af7016294021b7bcdcb7868a7dfc6239cd34",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51bline0",
+      "z51bline1",
+      "z51bline2",
+      "z51bline3",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "52C",
+    "source": "src/R5/SCR52C.C",
+    "sha256": "d57d3bb7140e084b1a444be7f779ee2aa39d8212772a6472263d1fb99bb449cd",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51cline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "52D",
+    "source": "src/R5/SCR52D.C",
+    "sha256": "e59adfcb7356c5ed3db65840c32a4b7ae5dfbfe779c8bd0ffdb835141b0f4306",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51dline",
+      "z51dline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "53C",
+    "source": "src/R5/SCR53C.C",
+    "sha256": "d02e04ad5d471a0dfa2a89ab04a08b5f02973e662ad4315229153ba31211111d",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51cline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "53D",
+    "source": "src/R5/SCR53D.C",
+    "sha256": "8d732b12541ae47025eb8283550aa50d2c70eb66a1abf80fd011ca99631c8ea0",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z51dline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "61A",
+    "source": "src/R6/SCR61A.C",
+    "sha256": "4d0d9685fea8a261e09ff949b0f2956cbeb3f2414eb47bab86ed57873a512a68",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "61B",
+    "source": "src/R6/SCR61B.C",
+    "sha256": "045f6d58352d0b5c53b447e8cdc05bf043b6e9698720e8aa70548a091cb957fb",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "61C",
+    "source": "src/R6/SCR61C.C",
+    "sha256": "469bc6b0a815db0fdd0ca6dc0b870b861aa1a7578a7e52372dba437f2a2c788e",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "61D",
+    "source": "src/R6/SCR61D.C",
+    "sha256": "43fdc09f9d8f92d0d21d6cbf13e8a2535314f9d94ffbb73021d8d67d0981dd8f",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "62A",
+    "source": "src/R6/SCR62A.C",
+    "sha256": "68cd95b165e824c455283cdcdba2c2df7bf7dcdc2947ee02043157742a2d40fc",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "62B",
+    "source": "src/R6/SCR62B.C",
+    "sha256": "e35abf3eb8e70461154585487030f301ed476dd305f35d122ed6b6fc7396c3aa",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "62C",
+    "source": "src/R6/SCR62C.C",
+    "sha256": "54d905e7ec048b3cc63f37bbedf5b77bdd0d45cdd02c1370fe6a58210ddd945a",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "62D",
+    "source": "src/R6/SCR62D.C",
+    "sha256": "4e5ff0fdd258d6e91204faec927aa4fb402a75743efa6962a707e5ff58ca7008",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "63C",
+    "source": "src/R6/SCR63C.C",
+    "sha256": "9b1f3328659c67c3d6350cef40b950a9909c03184d80b38d044ae230aee568cd",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "63D",
+    "source": "src/R6/SCR63D.C",
+    "sha256": "0cb62ffd59052e07de24fdb763a8c0424bd6870b4ef0000de102b16d5dd8a3ae",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z61aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "71A",
+    "source": "src/R7/SCR71A.C",
+    "sha256": "6e698fd3dba750667a98a8b1156139a28ba681b4236cdc4b96ec0e4341d92553",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "z71aline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "71B",
+    "source": "src/R7/SCR71B.C",
+    "sha256": "c43dc09440f97e9490984f3c44bd34f333c5b794a25d915aa8f772287f747a10",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "71C",
+    "source": "src/R7/SCR71C.C",
+    "sha256": "9e3d9d0fa5fd10820c3586583db89abc4411766c42dd12f8647cc92af1a97aec",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "71D",
+    "source": "src/R7/SCR71D.C",
+    "sha256": "d318bd1787ecdc983d7839bac2227c7130375ecd9bf3c067b6be0212a5962764",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "72A",
+    "source": "src/R7/SCR72A.C",
+    "sha256": "1a2a988e3cafe4aab9f330a0526138bb69fcd4d36b89b6e8fe0a4d58425b582a",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "z71aline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "72B",
+    "source": "src/R7/SCR72B.C",
+    "sha256": "66b95dc0982df5f87f8cd412d050f8b215a905904936075d481b94e052fe4dc1",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "72C",
+    "source": "src/R7/SCR72C.C",
+    "sha256": "3d27e1fade3bf834add8ec55ec5de95615105d5808aca448af9c42393921126a",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "72D",
+    "source": "src/R7/SCR72D.C",
+    "sha256": "faa68240b489b51bcc269615f5ad65ac2ec7232ce1543c7f6c52be2556bd802b",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "73C",
+    "source": "src/R7/SCR73C.C",
+    "sha256": "77867e9a22c74d6441d91376ddfea1c101edd45fa87c9a596b33b010304f5dc4",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "73D",
+    "source": "src/R7/SCR73D.C",
+    "sha256": "f3bf70014acc2e0e7fe9c58612b95f8821fc9e3cd17f4efb3b38beba1f8e8e51",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z71aline",
+      "z71aline0",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "81A",
+    "source": "src/R8/SCR81A.C",
+    "sha256": "ba8892e82a13eeda631f488c9564fac690b259c088089d8f12853472a14e6ea6",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "81B",
+    "source": "src/R8/SCR81B.C",
+    "sha256": "dfaa87ad0058fb36bb4bb6296488e6372f0c891a65b5d451b88eeab7fe261347",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "81C",
+    "source": "src/R8/SCR81C.C",
+    "sha256": "1f683bfecb9026e5e204a6806b732e60331ac9c5af7a9c8cdb50a54059c1cded",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "81D",
+    "source": "src/R8/SCR81D.C",
+    "sha256": "e7a9225b1b590a8836eac7840ceef26114011389ed01a8471e59b3f53a5d9e53",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z81aline",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "82A",
+    "source": "src/R8/SCR82A.C",
+    "sha256": "ce16b79acae409fb6d7a4a1457e17edf3a069da5c339145aafca225d7987b8e3",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z82bline0",
+      "z82bline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "82B",
+    "source": "src/R8/SCR82B.C",
+    "sha256": "37365b1a5312a964913eb2db0226bc4c18764868bed5ad8060654977bd069b5d",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z82bline0",
+      "z82bline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "82C",
+    "source": "src/R8/SCR82C.C",
+    "sha256": "12d8e8c6c214b1bfa4b328668d015aaddfc436d99904630ca50fb336455375ba",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z82bline0",
+      "z82bline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "82D",
+    "source": "src/R8/SCR82D.C",
+    "sha256": "4383588b24315c324ed770f79ab54c6d208a7f46d5e3324959e376312ef9ea63",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z82bline0",
+      "z82bline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "83C",
+    "source": "src/R8/SCR83C.C",
+    "sha256": "e39c06f47fae51ee47b18d86b1141c41d77cab193aec6cea14a45a113e8b8a14",
+    "functions": [
+      "line_div",
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "z82bline0",
+      "z82bline1",
+      "zonescrsetsub0"
+    ]
+  },
+  {
+    "level": "83D",
+    "source": "src/R8/SCR83D.C",
+    "sha256": "fd067dddf404d10090c012e2af2a64bc12600869a7ba5c072fbc073b83e742e1",
+    "functions": [
+      "scrbinit",
+      "scroll",
+      "scrollb_h",
+      "scrollb_v",
+      "scrollc_h",
+      "scrollz_h",
+      "zonescrsetsub0"
+    ]
+  }
+]
