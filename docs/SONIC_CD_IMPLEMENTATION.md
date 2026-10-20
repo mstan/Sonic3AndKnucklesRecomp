@@ -436,6 +436,30 @@ original build does), with camera/events/drawing omitted for analysis. It
 compiles and produces scroll samples for all 70, but has not been integrated
 or qualified against the original Sega CD routines. It is not a fidelity pass.
 
+The independent original-code reference now executes the owned MMD's scroll
+initialization, original camera/scroll routines, both original terrain-plane
+drawers and original tile animation in Unicorn. A checked VDP write/DMA sink
+retains the actual name-table/pattern bytes. All 140 captures (70 variants,
+fresh states after 1/64 updates) complete in
+`build/qa-cd-original-animated-terrain-starts`, using
+`tests/runtime/sonic_cd_background_reference.py`. Its two 24-bit RAM aliases
+share the same backing storage; owned program bytes remain unchanged. Only the
+level-event call is omitted. Palette cycles, objects, water palette splits,
+event-driven scene changes and bus timing remain outside this reference scope.
+Captured is not a gameplay or production-fidelity pass. Initial TTZ reference
+images exposed placeholder patterns because the first reference omitted tile
+animation; executing the original animation/DMA replaces those placeholders.
+The earlier reference captures and signature failures remain retained.
+
+The private C-profile extraction now links without allowing duplicate definitions.
+Original-code investigation has identified initializer, gradient, water-band and
+array-index differences in the C port. A single stationary 64-update sample now
+matches background Y/224 line values exactly for 67 profiles; the three QQZ Bad
+Future profiles differ by one pixel in some lines, with original register/fraction
+carry observations retained. This narrow sample does not qualify motion, the full
+profile domains, portability or integration. The production background is still
+generic; replacing it and resolving the deeper render comparisons remain open.
+
 Remaining acceptance includes broader geometry/gimmick/enemy/character interactions,
 checkpoint/death/warp state and additional native progression cases,
 scene audio behavior, adaptive rendering, full-runtime portability and final owner
