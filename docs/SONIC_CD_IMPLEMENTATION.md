@@ -324,14 +324,32 @@ removed/restored, damaged/repaired; Mighty entitlement removed/restored; all
 content removed/restored; and journal backup recovery. Cursor 41, all seven
 stones, 14 generators and 12 projectors survive. The final CRC-valid journals
 retain completion 0, so these probes have not awarded campaign clears. With
-all content absent the journals remain byte-identical. Completed-file cases
-are in progress. These deliberately combine separately earned stone and
+all content absent the journals remain byte-identical. All 72 completed-file
+cases pass too (`build/qa-cd-complete-resilience-all-state-dev12`): cursor 39,
+completion bits 31, collectibles and identity survive all the same operations,
+with real menu replay selection and safe native records. Saved-file Continue
+and completed-file replay each pass every one of the 16 mod combinations
+(`build/qa-cd-saved-permutations-dev12` and
+`build/qa-cd-complete-permutations-dev12`). These deliberately combine separately earned stone and
 generator/projector saves into declared resilience fixtures; they claim no
 joint playthrough. Completion fixtures are also explicit prerequisites. All
 tests operate through actual menu Continue/replay input without runtime zone,
 character or award overrides.
 
-Remaining acceptance includes S2->CD/native->MM campaign-boundary regressions,
+The source-derived route survey now understands independent CD resources.
+Initial probes in PPZ1 Present and MMZ2 Past capture all 103/108 planned
+locations and observe all 188/200 placements, with no runtime errors or wrong
+stage captures (`build/qa-cd-route-survey-probes-dev12`). The full 70-variant
+survey is running. This establishes positional/object coverage only; terrain,
+enemy and gimmick interactions require separate outcome evidence.
+
+The actual S2->CD boundary passes on build 12 (`build/qa-cd-s2-to-cd-dev12`):
+real Silver Sonic and Death Egg Robot damage/defeat, escape/ending and fresh
+Palmtree Panic entry. The resulting save has cursor 40, S2 completion bit 2,
+identity 1 and empty CD collectibles. Position, attack posture and protection
+bypass navigation/attack execution; no boss HP or transition flags are set.
+
+Remaining acceptance includes native->MM campaign-boundary regressions,
 broader geometry/gimmick/enemy/character interactions, checkpoint/death/warp
 state, CD-specific process removal/reinstallation and completed-file cases,
 scene audio behavior, adaptive rendering, full-runtime portability and final owner

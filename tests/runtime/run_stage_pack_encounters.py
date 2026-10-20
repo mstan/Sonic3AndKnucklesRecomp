@@ -325,6 +325,10 @@ def camera_at(run,x,y):
 
 def verify_next(run,expected):
     starts={s['stage']:s['start'] for s in manifest(run.args.bank)}
+    if expected not in starts and getattr(run.args,'packs',None):
+        for name in ('sonic-cd','sonic1','sonic2','megamix'):
+            pack=run.args.packs/(name+'-stages.pak')
+            if pack.exists():starts.update({s['stage']:s['start'] for s in manifest(pack)})
     start=starts.get(expected,(0x40,0x420)) # native Angel Island 1
     # Read the actual first gameplay frames. LZ/MM starts immediately slide
     # the player away; a late position is not evidence of a wrong spawn.
@@ -414,7 +418,8 @@ def finish_dez(run):
         for n in range(160):
             run.step(60);ram,frame=run.snapshot()
             if u16(ram,0xfe10)!=0x3200 and ram[0xf600] in (12,140):
-                record['transition']=verify_next(run,'0000')
+                expected='4000' if (getattr(run.args,'pack_mask',0) or 0)&8 else '0000'
+                record['transition']=verify_next(run,expected)
                 record['next_stage']=f'{u16(ram,0xfe10):04x}';break
         run.snapshot('after-ending')
     return record
@@ -488,7 +493,11 @@ def main():
     ap.add_argument('--kind',choices=['bosses','enemies'],default='bosses')
     ap.add_argument('--port',type=int,default=49500)
     ap.add_argument('--mighty',action='store_true')
+    ap.add_argument('--packs',type=lambda s:Path(s).resolve())
+    ap.add_argument('--pack-mask',type=int)
+    ap.add_argument('--target-fps',type=int)
     args=ap.parse_args();args.out.mkdir(parents=True,exist_ok=True)
+    if args.pack_mask is not None and args.packs is None:raise ValueError('--pack-mask requires --packs')
     if args.kind=='bosses':
         stages=list(BOSSES) if args.stages=='all' else args.stages.split(',')
         results=[boss(args,s,args.port+i) for i,s in enumerate(stages)]
