@@ -105,6 +105,15 @@ def points(stage):
     return sorted(result, key=lambda p: (p['x'], p['y']))
 
 
+def select_stages(stages,selection):
+    if selection=='all':return stages
+    wanted={s.strip().lower() for s in selection.split(',')}
+    unknown=wanted-{s['stage'] for s in stages}
+    if unknown:
+        raise ValueError(f'Unknown stage IDs: {sorted(unknown)}. Quote comma-separated IDs in PowerShell; unquoted 4e00 becomes 4.')
+    return [s for s in stages if s['stage'] in wanted]
+
+
 def runtime_files(exe, bank, runtime, debug_port=None, mighty=False):
     runtime.mkdir(parents=True, exist_ok=True)
     (runtime / 'provenance.json').write_text(json.dumps(dict(
@@ -136,8 +145,7 @@ def errors(log):
 
 
 def survey(args):
-    stages = manifest(args.bank)
-    if args.stages != 'all': stages = [s for s in stages if s['stage'] in args.stages.split(',')]
+    stages = select_stages(manifest(args.bank),args.stages)
     args.out.mkdir(parents=True, exist_ok=True)
     (args.out / 'manifest.json').write_text(json.dumps(dict(
         exe_sha256=hashlib.sha256(args.exe.read_bytes()).hexdigest(),
