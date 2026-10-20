@@ -274,10 +274,10 @@ int trilogy_owns(uint32_t pc)
 
 int trilogy_instruction(uint32_t pc)
 {
-    if (!s_bank)
-        return 0;
     extern int tri_save_journal_hook(uint32_t pc);
     if(tri_save_journal_hook(pc))return 1;
+    if (!s_bank)
+        return 0;
     if(!s_bank)return 0;
     if (tri_megamix_geometry_hook(pc))return 1;
     if (tri_megamix_sprite_hook(pc))return 1;

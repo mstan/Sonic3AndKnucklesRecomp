@@ -67,7 +67,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     for key in ('exe','rom','bank','out'):p.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
     p.add_argument('--case',choices=['handoff','metallic'],required=True)
-    p.add_argument('--pack-mask',type=int,choices=range(8))
+    p.add_argument('--pack-mask',type=int,choices=range(16))
     p.add_argument('--packs',type=lambda s:Path(s).resolve())
     args=p.parse_args();args.character=1;args.mighty=True;args.kind='bosses' if args.case=='handoff' else 'routes'
     args.out.mkdir(parents=True,exist_ok=True);rec=dict(status='unverified',case=args.case);run=None
