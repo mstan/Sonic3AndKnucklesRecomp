@@ -21,6 +21,39 @@ sys.path.insert(0,str(ROOT/'tools/trilogy'))
 from scd_mmd import scan,s16,BASE,Level
 DISASM_PIN='f8cf3f0af7bf419d18182ba98554f09307ad3cc6'
 
+class CandidateInput(C.Structure):
+    _fields_=[(n,C.c_int16) for n in ('camera_x','camera_y','delta_x','delta_y','player_x','player_y','player_speed','water_y')]+[(n,C.c_uint8) for n in ('player_control','scene','locked')]
+class CandidateOutput(C.Structure):
+    _fields_=[('y',C.c_int16),('hscroll',C.c_int16*224)]
+class Candidate:
+    """Give the candidate only camera/player prerequisites, never BG outcomes."""
+    def __init__(self,library,level):
+        self.library=library;self.state=library.scd_bg_create()
+        if not self.state:raise RuntimeError('Candidate allocation failed')
+        self.stage=(0x40+list((1,3,4,5,6,7,8)).index(int(level[1]))*4+'ABCD'.index(level[3]))*256+int(level[2])-1
+        self.result=dict(status='passed',frames=0,unequal_samples=0,max_error=0,examples=[])
+    def inputs(self,original):
+        ram=bytes(original.cpu.mem_read(0xff0000,65536));sym=original.sym
+        def word(addr):return struct.unpack_from('>h',ram,addr&65535)[0]
+        return CandidateInput(word(sym['cameraX']),word(sym['cameraY']),word(sym['scrollXDiff']),word(sym['scrollYDiff']),
+            word(sym['objPlayerSlot']+8),word(sym['objPlayerSlot']+12),word(sym['objPlayerSlot']+16),word(sym['waterHeight']),
+            ram[(sym['objPlayerSlot']+0x2c)&65535],ram[0x156c],ram[sym['scrollLock']&65535])
+    def reset(self,original):
+        data=self.inputs(original)
+        if not self.library.scd_bg_reset(self.state,self.stage,C.byref(data)):raise RuntimeError('Candidate rejected valid CD stage')
+    def step(self,original):
+        data=self.inputs(original);out=CandidateOutput()
+        if not self.library.scd_bg_step(self.state,C.byref(data),C.byref(out)):raise RuntimeError('Candidate step failed')
+        ram=bytes(original.cpu.mem_read(0xff0000,65536))
+        expected=[struct.unpack_from('>h',ram,original.sym['cameraBgY']&65535)[0]]
+        expected.extend(struct.unpack_from('>h',ram,(original.sym['hscroll']&65535)+i*4+2)[0] for i in range(224))
+        actual=[out.y,*out.hscroll];r=self.result;r['frames']+=1
+        for i,(a,b) in enumerate(zip(expected,actual)):
+            if a==b:continue
+            r['status']='failed';r['unequal_samples']+=1;r['max_error']=max(r['max_error'],abs(a-b))
+            if len(r['examples'])<12:r['examples'].append(dict(frame=r['frames'],sample=i,original=a,candidate=b))
+    def close(self):self.library.scd_bg_destroy(self.state)
+
 def symbols(reference):
     values={'WORKRAM':0xff0000,'oSize':64,'OBJFLAGSCNT':0x2fc};rs=0
     def expr(s):
@@ -88,7 +121,7 @@ class Original:
         self.cpu.mem_write(0xff8000,(0x100).to_bytes(4,'big'))
         self.cpu.emu_start(pc,0x100,count=2000000)
         if self.cpu.reg_read(UC_M68K_REG_PC)!=0x100:raise ValueError(('did not return',hex(self.cpu.reg_read(UC_M68K_REG_PC))))
-    def probe(self,cx,cy,px,py,frames,bounds):
+    def probe(self,cx,cy,px,py,frames,bounds,candidate=None):
         self.frames=frames
         self.w('cameraX',cx);self.w('cameraY',cy)
         for name,value in (('camXCenter',160),('camYCenter',bounds['y_center'])):
@@ -101,8 +134,11 @@ class Original:
             self.cpu.mem_write((a+off)|0xff000000,(value&65535).to_bytes(2,'big'))
         self.cpu.reg_write(UC_M68K_REG_D0,cy);self.cpu.reg_write(UC_M68K_REG_D1,cx)
         self.cpu.reg_write(UC_M68K_REG_A6,0xffffd000)
+        if candidate:candidate.reset(self)
         self.call(self.init)
-        for i in range(frames):self.call(self.scroll)
+        for i in range(frames):
+            self.call(self.scroll)
+            if candidate:candidate.step(self)
         b=bytes(self.cpu.mem_read(self.sym['hscroll']|0xff000000,224*4))
         lines=[struct.unpack_from('>h',b,i*4+2)[0] for i in range(224)]
         return [self.word('cameraBgY'),*lines]
@@ -197,6 +233,8 @@ def main():
     ap.add_argument('--levels',default='all',help='Quoted comma-separated MMD stems, e.g. R11A__,R61A__.')
     ap.add_argument('--frames',default='1,64',help='Separate fresh captures after these frame counts.')
     ap.add_argument('--camera',help='Optional explicit camera X,Y; otherwise use original starting position/bounds.')
+    ap.add_argument('--candidate',type=lambda s:pathlib.Path(s).resolve(),help='Optional DLL of the isolated production background component for strict per-frame comparison.')
+    ap.add_argument('--math-only',action='store_true',help='Compare scroll math without terrain drawing/animation; useful for declared camera prerequisites away from startup.')
     args=ap.parse_args()
     git=['C:/Program Files/Git/cmd/git.exe','-c','core.fsmonitor=false','-c','core.fscache=false','-c','core.preloadIndex=false','-C',str(args.reference)]
     pin=subprocess.check_output(git+['rev-parse','HEAD'],text=True).strip()
@@ -216,7 +254,15 @@ def main():
     variables=symbols(args.reference);args.out.mkdir(parents=True,exist_ok=False)
     (args.out/'reference-tool.py').write_bytes(pathlib.Path(__file__).read_bytes())
     result=dict(reference_pin=pin,tool_sha256=hashlib.sha256(pathlib.Path(__file__).read_bytes()).hexdigest(),
-        scope=__doc__,results=[])
+        scope=__doc__,math_only=args.math_only,results=[])
+    candidate_library=None
+    if args.candidate:
+        candidate_library=C.CDLL(str(args.candidate))
+        candidate_library.scd_bg_create.restype=C.c_void_p
+        candidate_library.scd_bg_destroy.argtypes=[C.c_void_p]
+        candidate_library.scd_bg_reset.argtypes=[C.c_void_p,C.c_uint16,C.POINTER(CandidateInput)]
+        candidate_library.scd_bg_step.argtypes=[C.c_void_p,C.POINTER(CandidateInput),C.POINTER(CandidateOutput)]
+        result['candidate_sha256']=hashlib.sha256(args.candidate.read_bytes()).hexdigest()
     for path in paths:
         lv=Level(path.read_bytes(),path.name)
         cx,cy=camera or [max(lv.bounds['left'],min(lv.start[0]-160,lv.bounds['right'])),
@@ -226,19 +272,27 @@ def main():
             row=dict(level=path.stem,frames=frame,camera=[cx,cy],player=[px,py],bounds=lv.bounds,
                      source_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),status='failed',visual_status='unverified')
             case=args.out/(path.stem+'-'+str(frame));case.mkdir()
+            candidate=None
             try:
-                original=Original(path,variables);scroll=original.probe(cx,cy,px,py,frame,lv.bounds)
-                decoded,draw=original.draw();original.image(decoded,case/'background.png')
-                original.image(decoded,case/'terrain.png',foreground=True)
+                if candidate_library:candidate=Candidate(candidate_library,path.stem)
+                original=Original(path,variables);scroll=original.probe(cx,cy,px,py,frame,lv.bounds,candidate)
+                draw=None
+                if not args.math_only:
+                    decoded,draw=original.draw();original.image(decoded,case/'background.png')
+                    original.image(decoded,case/'terrain.png',foreground=True)
                 ram=bytes(original.cpu.mem_read(0xff0000,65536));(case/'ram.bin').write_bytes(ram)
-                (case/'vram.bin').write_bytes(original.vram)
+                if not args.math_only:(case/'vram.bin').write_bytes(original.vram)
                 row.update(init=hex(original.init),scroll=hex(original.scroll),omissions=original.hooks,
                     actual_camera=[original.word('cameraX'),original.word('cameraY')],
                     background_y=scroll[0],background_hscroll=scroll[1:],draw=draw,
-                    vram_sha256=hashlib.sha256(original.vram).hexdigest(),status='captured')
+                    vram_sha256=None if args.math_only else hashlib.sha256(original.vram).hexdigest(),status='captured')
+                if candidate:row['candidate']=candidate.result
             except Exception as e:row['error']=str(e)
+            finally:
+                if candidate:
+                    row['candidate']=candidate.result;candidate.close()
             (case/'result.json').write_text(json.dumps(row,indent=2));result['results'].append(row)
             print(path.stem,frame,row['status'],row.get('error',''),flush=True)
     (args.out/'results.json').write_text(json.dumps(result,indent=2))
-    return int(any(r['status']!='captured' for r in result['results']))
+    return int(any(r['status']!='captured' or r.get('candidate',{}).get('status')=='failed' for r in result['results']))
 if __name__=='__main__':raise SystemExit(main())
