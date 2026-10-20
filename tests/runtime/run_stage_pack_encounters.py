@@ -88,7 +88,8 @@ class Native:
             x,y,rt=start
             env['TRILOGY_START']=f'{x:x},{y:x},1000,{rt:x}'
         self.log=(case/'run.log').open('w')
-        pace=['--target-fps','240'] if args.kind in ('abilities','mechanics') else ['--turbo']
+        target_fps=getattr(args,'target_fps',None)
+        pace=['--target-fps',str(target_fps or 240)] if target_fps or args.kind in ('abilities','mechanics') else ['--turbo']
         self.proc=subprocess.Popen([str(self.runtime/args.exe.name),str(args.rom),
             '--no-launcher',*pace,'--max-frames','400000',
             '--port',str(port),'--widescreen','off','--input-script',str(case/'input.txt')],
@@ -173,13 +174,13 @@ class Native:
         self.write(0xfe02,b'\x00\x00')
     def write(self,addr,data): self.cmd('write_memory',addr=f'{addr|0xff0000:06X}',hex=data.hex())
 
-    def player(self,ram,x,y,attack=False,freeze=False,air=30):
+    def player(self,ram,x,y,attack=False,freeze=False,air=30,grounded=False):
         p=bytearray(ram[0xb000:0xb04a])
         struct.pack_into('>I',p,0x10,x<<16);struct.pack_into('>I',p,0x14,y<<16)
         struct.pack_into('>hhh',p,0x18,0,0x200 if attack else 0,0)
         p[0x1e],p[0x1f]= (14,7) if attack else (19,9)
         p[0x20]=2 if attack else 0
-        p[0x2a]=(p[0x2a]&1) | (6 if attack else 2)
+        p[0x2a]=(p[0x2a]&1) | (6 if attack else 0 if grounded else 2)
         p[0x2e]=0x81 if freeze else 0
         p[0x2c]=air;p[0x34]=0x1c
         p[0x2f]=0;p[0x3d]=0

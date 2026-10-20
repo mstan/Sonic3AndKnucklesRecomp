@@ -230,7 +230,41 @@ zero position resets in both runs. Completed-frame history retains its zero
 HP crossing before the belt's natural signed underflow while slowing down.
 Navigation/attack-posture/protection bypasses are explicit in every result.
 All imported `TRILOGY_BOSSAUTOHIT` shortcuts have been removed; acceptance
-tests never enabled them. WWZ, SSZ race and the final boss remain open.
+tests never enabled them. WWZ also passes both futures, with real hits on
+each floor, three timed beam/block/launch events, rubble/spikes, defeat,
+escape, capsule, next round and save (`build/qa-cd-wwz-boss-probe-dev9` and
+`build/qa-cd-wwz-good-boss-dev9`). Platform riding and hazard avoidance are
+positioning bypasses, not qualified mechanics.
+
+SSZ wins pass both futures (`build/qa-cd-ssz-race-probe-dev9`,
+`build/qa-cd-ssz-good-race-paced-dev9`): actual start/gate sequence, laser,
+Metal's dash/electric field, spike-block smashing, player finish, barrier crash,
+Eggman escape, Amy capsule/hug, tally, next round and save. Both loss variants
+also pass with God disabled: Metal wins, his finish gate clamps the loser,
+Eggman's actual laser kills Sonic, lives change 3 to 2 and the stage naturally
+retries without CD completion/collectible awards (`build/qa-cd-ssz-race-loss-dev9`).
+Player/camera teleports bypass racing skill and terrain traversal.
+
+All 14 boss/race variants have passing outcome evidence. MMZ both futures
+pass on development build 12, SHA256
+`efc5dc05268d9515175e2d534f79d8c313c71925fe28b4425d18e7148d0bd7e4`
+(`build/qa-cd-mmz-walk-bosses-dev12`). Three fireflies are defeated through
+real vulnerable-window contacts; afterimages and sparks are observed. The
+final boss completes one whole source-derived attack script at each of four
+blade counts before each real hit. Script lengths are 28/28/22/12 entries;
+completed-frame history retains brief boundary actions. Amy's actual pad
+script, fade, tally and transition into native S3K pass, with stable cursor 18,
+CD completion, identity and collectibles preserved and native emeralds unchanged.
+
+The stricter MMZ probe found a real integration bug: S3K clamps the player to
+camera max + `$128` (`$F88`), before Amy's `$F90` turn. The original CD player
+uses `320-16`, plus 56 outside the fight. A margin of 8/64, scoped to MMZ's
+Amy sequence and player 1, now supplies those original bounds without moving
+the camera. All pad states 0/2/4/6 and the actual right/left walk are observed;
+per-frame history catches the single exact turn frame. The failed pre-fix
+probe and stricter sampling failures remain retained. Native build-12 parity
+still matches all 49 image/RAM/VRAM artifacts exactly. Final combined-head
+regressions remain required after Shadow.
 
 ## Independent audio qualification
 
@@ -276,11 +310,28 @@ driver runs into data and faults. Its first transcription probe hung in an
 empty stream refill (debugger stack retained). Undefined bytecode and invalid
 empty/out-of-bank streams now stop safely; the production-only invalid-command
 probe passes `build/qa-cd-pcm-invalid-safe`. This is safe rejection, not claimed
-original-driver equivalence. The guarded valid-bank long sweep is in progress.
+original-driver equivalence. The guarded valid-bank long sweep passes all nine
+180-second streams (`build/qa-cd-original-pcm-guarded-long`), and the guarded
+valid voice sequence passes `build/qa-cd-pcm-guarded-voices`.
 Music/voice delivery during bosses, warps, results, UFO, pausing and pack removal
 still needs broader scene/transition checks.
 
-Remaining acceptance includes other bosses/race/final campaign transitions,
+Mighty's initial 12-process removal/reinstallation/recovery chain passes on
+build 12 (`build/qa-cd-save-resilience-mighty-probe-dev12`), retaining seven
+earned stones and identity. All 72 normal-file cases across six identities
+also pass (`build/qa-cd-save-resilience-all-state-2-dev12`): CD disabled/enabled,
+removed/restored, damaged/repaired; Mighty entitlement removed/restored; all
+content removed/restored; and journal backup recovery. Cursor 41, all seven
+stones, 14 generators and 12 projectors survive. The final CRC-valid journals
+retain completion 0, so these probes have not awarded campaign clears. With
+all content absent the journals remain byte-identical. Completed-file cases
+are in progress. These deliberately combine separately earned stone and
+generator/projector saves into declared resilience fixtures; they claim no
+joint playthrough. Completion fixtures are also explicit prerequisites. All
+tests operate through actual menu Continue/replay input without runtime zone,
+character or award overrides.
+
+Remaining acceptance includes S2->CD/native->MM campaign-boundary regressions,
 broader geometry/gimmick/enemy/character interactions, checkpoint/death/warp
 state, CD-specific process removal/reinstallation and completed-file cases,
 scene audio behavior, adaptive rendering, full-runtime portability and final owner
