@@ -77,7 +77,9 @@ def main():
             if not ram[0xB02A]&2 and not ram[0xB02E]:break
         check('Super boost reaches a real grounded prerequisite',not ram[0xB02A]&2,position=[u16(ram,0xB010),u16(ram,0xB014)])
         r.write(0xFE20,b'\0\xc8');r.write(0xFE1D,b'\x81')
-        before,after,hist=press(0x40,33)
+        # Steer right through the open route: homing may leave Shadow facing
+        # left near the level boundary, which legitimately stops a held boost.
+        before,after,hist=press(0x48,33)
         # Real pickups may increase rings on the same route. Retain observed
         # deductions separately instead of subtracting only the final total.
         values=[u16(before,0xFE20)]+[u16(v,0xFE20) for v in hist]
