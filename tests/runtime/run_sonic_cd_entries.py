@@ -1,82 +1,80 @@
 #!/usr/bin/env python3
-"""Manifest-derived CD entry/movement captures. These are not mechanics passes.
+"""Fresh-process manifest-derived CD entry/movement captures.
 
-Stage/restart writes bypass campaign prerequisites. No checkpoint, boss HP,
-good-future, collectible or success flags are written. All input is muted and
-isolated. Full music QA is separate; this survey uses the content's PCM bank.
+The level-entry development override bypasses campaign prerequisites. No
+live zone/restart, checkpoint, boss, future, collectible or success writes
+are used. Entry/movement is not a deep mechanics or visual-fidelity pass.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
+import os
 from pathlib import Path
-import struct
-import time
-from run_stage_pack_encounters import Native, u16, objects
-from run_stage_pack_audit import errors
+import subprocess
+import tomllib
+from run_stage_pack_encounters import u16,objects
+from run_stage_pack_audit import BOOT,errors,runtime_files
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__)
-    for key in ('exe', 'rom', 'content', 'manifest', 'out'):
-        ap.add_argument('--'+key, required=True, type=lambda s: Path(s).resolve())
-    ap.add_argument('--stages', default='all')
-    args = ap.parse_args()
-    args.bank=args.content;args.packs=args.content.parent;args.pack_mask=8
-    args.character=1;args.kind='cd-entry';args.god=False
-    manifest=json.loads(args.manifest.read_text())
-    stages=sorted(manifest['levels'], key=lambda s: s['guest_stage'])
+    ap=argparse.ArgumentParser(description=__doc__)
+    for key in ('exe','rom','content','manifest','out'):
+        ap.add_argument('--'+key,required=True,type=lambda s:Path(s).resolve())
+    ap.add_argument('--stages',default='all');ap.add_argument('--workers',type=int,default=2)
+    args=ap.parse_args();source=json.loads(args.manifest.read_text())
+    stages=sorted(source['levels'],key=lambda s:s['guest_stage'])
     if args.stages!='all':stages=[s for s in stages if s['guest_stage'].lower() in args.stages.lower().split(',')]
     if not stages:raise ValueError('No source stages selected')
     args.out.mkdir(parents=True,exist_ok=False)
-    records=[];run=None
     report=dict(exe_sha256=hashlib.sha256(args.exe.read_bytes()).hexdigest(),
-                content_sha256=hashlib.sha256(args.content.read_bytes()).hexdigest(),
-                source_sha256=manifest['data_user_sha256'],
-                fixture='atomic stage/restart selection and 63 lives bypass prerequisites; real right/jump input; no success writes',
-                music='CD-DA absent; separate audio qualification required',stages=records)
-    try:
-        run=Native(args,stages[0]['guest_stage'].lower(),None,args.out/'session',0)
-        for index,stage in enumerate(stages):
-            code=stage['guest_stage'].lower();folder=args.out/code;folder.mkdir()
-            rec=dict(stage=code,source=stage['name'],entry='failed',movement='unverified',mechanics='unverified',visual_review='unverified')
-            records.append(rec)
-            run.cmd('set_input',keys='00')
-            if index:
-                ram,_=run.snapshot()
-                # These must share one command boundary. Separate writes let a
-                # live frame see the new zone with the old CD window before the
-                # restart, which is not a valid stage-selection fixture.
-                state=bytearray(ram[0xFE02:0xFE13]);state[:2]=b'\0\1'
-                state[14:16]=bytes.fromhex(code);state[16]=63
-                run.write(0xEE4E,bytes.fromhex(code));run.write(0xFE2A,b'\0');run.write(0xFE02,state)
-                run.step(500)
-            else:run.step(180)
+        content_sha256=hashlib.sha256(args.content.read_bytes()).hexdigest(),source_sha256=source['data_user_sha256'],
+        fixture='fresh process per variant; level-entry override bypasses campaign order; real Right and jump inputs',
+        music='CD-DA absent; separate audio qualification required')
+
+    def probe(stage):
+        code=stage['guest_stage'].lower();case=args.out/code;rt=case/'runtime'
+        rec=dict(stage=code,source=stage['name'],entry='failed',movement='unverified',
+            mechanics='unverified',visual_review='unverified',status='failed')
+        runtime_files(args.exe,args.content,rt)
+        (rt/'sonic3k-stage-pack.ini').write_text('format=2\nsonic1=0\nsonic2=0\nmegamix=0\nsonic_cd=1\n'
+            f'sonic_cd_bank={args.content.as_posix()}\n')
+        env={k:v for k,v in os.environ.items() if not k.startswith(('TRILOGY_','GENESIS_','MEGAMIX_','SONIC3_'))}
+        env.update(SDL_VIDEODRIVER='dummy',SDL_AUDIODRIVER='dummy',SDL_RENDER_DRIVER='software',
+            TRILOGY_ZONE=code,TRILOGY_CHAR='1')
+        script=BOOT+'WAIT 180\n'
+        for label,after in (('start','PRESS RIGHT 80\nPRESS A 12\nWAIT 8\n'),('move','EXIT\n')):
+            script+=f'DUMP_RAM {(case/(label+".ram")).as_posix()}\nSCREENSHOT {(case/(label+".png")).as_posix()}\n'+after
+        (case/'input.txt').write_text(script)
+        try:
+            with (case/'run.log').open('w') as log:
+                proc=subprocess.run([str(rt/args.exe.name),str(args.rom),'--no-launcher','--turbo',
+                    '--widescreen','off','--max-frames','5000','--input-script',str(case/'input.txt')],
+                    cwd=rt,env=env,stdout=log,stderr=log,timeout=180)
+            rec['exit']=proc.returncode;rec['errors']=errors((case/'run.log').read_text(errors='replace'))
             for label in ('start','move'):
-                ram,frame=run.snapshot()
-                (folder/(label+'.ram')).write_bytes(ram)
-                run.cmd('screenshot',path=str(folder/(label+'.png')))
-                rec[label]=dict(frame=frame,stage=f'{u16(ram,0xFE10):04x}',mode=ram[0xF600],
-                                level_frame=u16(ram,0xFE04),x=u16(ram,0xB010),y=u16(ram,0xB014),
-                                routine=ram[0xB005],status=ram[0xB02A],rings=u16(ram,0xFE20),
-                                objects=objects(ram))
-                if label=='start':
-                    run.cmd('set_input',keys='48');run.step(8)
-                    run.cmd('set_input',keys='08');run.step(112)
-                else:run.cmd('set_input',keys='00')
+                ram=(case/(label+'.ram')).read_bytes()
+                rec[label]=dict(stage=f'{u16(ram,0xfe10):04x}',mode=ram[0xf600],level_frame=u16(ram,0xfe04),
+                    x=u16(ram,0xb010),y=u16(ram,0xb014),routine=ram[0xb005],status=ram[0xb02a],
+                    rings=u16(ram,0xfe20),objects=objects(ram))
             rec['entry']='passed' if rec['start']['stage']==code and rec['start']['mode']==12 and rec['start']['routine']==2 else 'failed'
-            if rec['entry']=='passed' and rec['move']['stage']==code and rec['move']['x']!=rec['start']['x']:
-                rec['movement']='passed'
-            (folder/'result.json').write_text(json.dumps(rec,indent=2)+'\n')
-            (args.out/'results.json').write_text(json.dumps(report,indent=2)+'\n')
-            print(json.dumps({k:rec[k] for k in ('stage','entry','movement')}),flush=True)
-    finally:
-        if run:
-            try:report['dispatch']=run.cmd('dispatch_miss_info')
-            except (OSError,RuntimeError):pass
-            report['errors']=errors((run.case/'run.log').read_text(errors='replace'))
-            run.close()
-        (args.out/'results.json').write_text(json.dumps(report,indent=2)+'\n')
-    return int(any(r['entry']!='passed' or r['movement']!='passed' for r in records) or bool(report.get('errors')))
+            rec['movement']='passed' if rec['move']['stage']==code and rec['move']['mode']==12 and rec['move']['routine']==2 and rec['move']['x']!=rec['start']['x'] else 'failed'
+            rec['interior_misses']=tomllib.loads((rt/'interior_label_misses.toml').read_text())['interior_labels']['addresses']
+            rec['unsafe_floor']=tomllib.loads((rt/'floor_unsafe.toml').read_text())['floor_unsafe']['addresses']
+            rec['status']='passed' if rec['entry']==rec['movement']=='passed' and not rec['exit'] and not rec['errors'] and not rec['interior_misses'] and not rec['unsafe_floor'] else 'failed'
+        except Exception as exc:rec['error']=repr(exc)
+        finally:
+            (case/'result.json').write_text(json.dumps(rec,indent=2)+'\n')
+            print(json.dumps({k:rec[k] for k in ('stage','entry','movement','status')}),flush=True)
+            for path in (rt/args.exe.name,rt/'SDL2.dll'):
+                try:path.unlink(missing_ok=True)
+                except OSError:pass
+        return rec
+
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:records=list(pool.map(probe,stages))
+    report['stages']=records
+    (args.out/'results.json').write_text(json.dumps(report,indent=2)+'\n')
+    return int(not all(r['status']=='passed' for r in records))
 
 
 if __name__=='__main__':raise SystemExit(main())

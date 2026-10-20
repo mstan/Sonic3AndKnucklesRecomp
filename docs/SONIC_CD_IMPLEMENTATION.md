@@ -17,7 +17,8 @@ decoded layouts, camera bounds, object placements and source tables. Private
 evidence is `build/cd-investigation/us-source-manifest.json`: 70 playable
 variants and three demos inspect successfully. The current source conversion
 produces 70 level blobs, 80 FM effects and 51 special/warp items, including
-eight special-stage datasets. Dataset accessibility, mechanics, visuals and
+eight special-stage datasets. All eight now have an explicit No Save practice
+entry and real win/timeout/return checks. Broader mechanics, final visuals and
 audio fidelity remain unverified. Failed conversion attempts are retained
 beside the corrected third run; they are not gameplay evidence.
 
@@ -60,10 +61,11 @@ tracks 02..35, excluding pregaps. Conversion rejects unsupported source or
 audio identities and stages output beside its destination for atomic replace.
 Source files remain untouched. After conversion the source CUE/BIN files are
 not runtime dependencies. Missing CD-DA music can therefore be reported
-separately from stage geometry and past PCM music. Runtime enrollment and its
-UI policy are still being implemented; the container alone is not playable.
+separately from stage geometry and past PCM music. The independent CD mod is
+default off and marked experimental in recomp-ui. CD-only gameplay works;
+its full acceptance matrix is still in progress.
 
-The planned guest mapping belongs to CD's selected bank: common header and
+The runtime guest mapping belongs to CD's selected bank: common header and
 Mighty attachment below `$480000`, the level window at `$480000..$600000`,
 then the FM bank. Existing independent packs retain their original bytes and
 guest pointers. Synthetic dispatch remains at `$7E0000` and above.
@@ -97,14 +99,65 @@ binaries do not understand v2: downgrade requires preserving the v2 file and
 restoring a v1 pre-migration copy. An older binary can otherwise overwrite an
 unrecognized companion; downgrading readers are not promised compatibility.
 
-## Outstanding acceptance
+## Development validation and remaining acceptance
+
+Development build 7, SHA256
+`272d01b5db46760494e7f62528dc7b0eeffb6882794a5843ae17f946999737d9`,
+passes 46/46 combined CTests and 49/49 native image/RAM/VRAM byte comparisons
+(`build/qa-cd-native-parity-dev7`). It remains a trace-enabled development
+build, not the owner handoff or the mandatory final visual comparison build.
+
+The original-ROM Data Select code resolves the zone at `$D57A`, before setting
+`Save_pointer` at `$D5B2`. Importing CD state in the former hook made resumed
+files repeat UFO 1 despite a retained journal stone. The failed real-save
+chain is preserved in `build/qa-cd-ufo-awards-chain-dev6`. CD state now imports
+at level entry, after selection settles; pending menu saves cannot capture a
+previous slot's in-memory CD state. With the fix, the actual saved UFO chain
+continues through all seven unique stones, across process restarts, without
+changing native emeralds (`build/qa-cd-ufo-real-entry-probe-dev6` for stone 1,
+`build/qa-cd-ufo-awards-chain-dev7` for stones 2..7). It uses real giant-ring
+contact and tally, 50 prerequisite rings, player X/Y UFO positioning, real
+jump collisions, results, identity-preserving act-2 return and exact saves.
+No UFO, timer, damage, entry, award or completion flags are injected.
+
+An earned seven-stone save also passes a real act-2 sign/tally transition
+into Good Future act 3, with the exact saved period
+(`build/qa-cd-seven-stones-good-exit-dev7`). Both PPZ boss variants pass real
+damage phases 3/2/1, defeat, escape, capsule break, tally, next-round load and
+stable save (`build/qa-cd-ppz-bosses-dev7`). Player attack posture, position,
+camera travel and protection bypass route/attack execution, not outcomes.
+An earlier PPZ probe missed phase 2 between host samples; its eight-frame
+game log retained that phase. The corrected verifier uses both observations,
+and both variants were rerun rather than rewriting the failed evidence.
+
+All 56 source sign/tally/next-stage/save cases pass on immutable development
+build 5: 53 in `build/qa-cd-sign-exits-dev5` and three isolated startup retries
+(`4a01`, `5100`, `5b00`). The original startup failures remain recorded.
+All 14 generators and 12 projectors pass contact/break/durable-bit checks
+(`build/qa-cd-collectibles-dev6`); Metallic Madness has no projectors. A new
+build-7 chain checks accumulation through resumed processes. All eight No Save
+practices pass natural timeout and real six-UFO jump-collision wins, return
+without changing durable collectibles or saved native files
+(`build/qa-cd-practice-timeouts-dev5`, `build/qa-cd-practice-success-probe-dev6`,
+`build/qa-cd-practice-success-dev6`). UFO navigation is bypassed with a
+trace-only player X/Y follow helper; collision, jump height, defeat and awards
+remain game-owned.
+
+Full source-derived time-post direction coverage is in progress. The first
+five-direction PPZ probe passes. A used destination post can immediately
+start a second charge, so the corrected leak check stops player motion and
+observes cancellation instead of assuming an arrival invincibility bit is a
+leak. Missing live samples can be recovered from completed-frame history.
+Earlier ambiguous/failed fixtures are retained in `build/qa-cd-warps-dev6`.
 
 Development executable SHA256
 `07850a2af6ba5b862d531a88f576c307fde97f140edccd36ed29e7fbe7f4b449`
 passes all 49 existing native screenshot/RAM/VRAM artifacts byte for byte
 (`build/qa-cd-native-parity-dev5`). All 16 actual private resource/settings
-combinations pass the C provider test (`build/qa-cd-pack-matrix-dev5`). Actual
-new-game permutations are running separately; these are distinct checks.
+combinations pass the C provider test (`build/qa-cd-pack-matrix-dev5`). All
+16 actual New Game combinations and seven older process recovery cases also
+pass (`build/qa-cd-permutations-dev5`); these are distinct from CD-specific
+collectible/removal/completed-file resilience, which still needs coverage.
 Portable geometry and malformed graph tests pass strict Windows/Ubuntu GCC;
 the private corpus validates 3,163,648 cells across all 41 larger layouts.
 
@@ -113,16 +166,18 @@ observed; its initial two images were inspected. A multi-stage debug survey
 reached 21 variants before a watchdog on `$4801`. That stage passes a fresh
 isolated launch. The original survey used separate zone/restart writes across
 live frames, exposing a new stage ID while its old window remained mapped;
-an atomic selection fixture is now under validation. The failed logs remain
+the later atomic fixture also retains four interior-dispatch addresses. The failed logs remain
 under `build/qa-cd-entries-dev5`. Do not treat stage entry or handler coverage
 as a mechanics pass.
 
-The corrected atomic fixture passes entry and real movement input for all 70
-variants (`build/qa-cd-entries-atomic-dev5/results.json`), with no crash errors.
-Dispatch telemetry retains eight fallback events at four addresses; their
-classification remains to be reviewed. The multi-stage fixture resets its
-checkpoint and supplies 63 lives, explicitly bypassing those prerequisites.
-All real exits, warp transitions and deeper mechanics remain separate checks.
+The atomic fixture produced entry/movement captures for all 70 variants
+(`build/qa-cd-entries-atomic-dev5/results.json`), but it is superseded for clean
+entry qualification. Even a single live zone/restart write can expose the new
+zone before its window loads. The replacement uses a fresh process per stage
+and the existing level-entry override. Four probes, including the affected
+WWZ boss variants, pass with no interior misses; the full fresh-process sweep
+is recorded under `build/qa-cd-fresh-entries-dev7`. Real exits, warps, deeper
+mechanics and final visual fidelity remain separate checks.
 
 Runtime resource enrollment, independent CD bank ownership, gameplay hooks,
 campaign transitions, 70-entry replay navigation and durable CD state now
@@ -144,7 +199,8 @@ is an original sound-test secret (07/07/07). The CD mod exposes a default
 Normal campaign / UFO practice 1..8 choice: starting No Save with a practice
 stage chosen enters CD directly and then that UFO stage. Practice returns to
 Palmtree Panic without awarding stones or changing saved campaign progress.
-Runtime entry, outcomes and return behavior still require validation.
+Practice entry, both outcomes and return durability now pass the development
+checks above. Full original-game visual/audio fidelity remains unqualified.
 
 Content conversion now requires the `scd_pack_validate` executable (build that
 CMake target or supply `tools/build_sonic_cd_pack.py --validator <path>`). It
@@ -153,9 +209,11 @@ conversion continues to validate every normalized track against the enrolled
 source hashes. The raw BIN little-endian stereo interpretation also agrees
 with the independent [Genesis Plus GX drive implementation](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/core/cd_hw/cdd.c#L1554).
 
-All mechanics, process-level removal/reinstallation, screenshot
-review, original-reference comparisons, 49 native artifacts, portability of
-the full runtime and the final owner playtest delivery remain outstanding.
+Remaining acceptance includes other bosses/race/final campaign transitions,
+broader geometry/gimmick/enemy/character interactions, checkpoint/death/warp
+state, CD-specific process removal/reinstallation and completed-file cases,
+audio fidelity, adaptive rendering, full-runtime portability and final owner
+delivery. The mandatory final independent visual comparisons remain open.
 
 ## Follow-up after CD
 

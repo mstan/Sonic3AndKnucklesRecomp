@@ -18,6 +18,7 @@ import re
 import shutil
 import struct
 import subprocess
+import sys
 import time
 
 BOOT = ('WAIT 700\nPRESS START 2\nWAIT 90\nPRESS START 2\n'
@@ -33,6 +34,25 @@ NAMES = {0x20: 'Green Hill', 0x21: 'Labyrinth', 0x22: 'Marble',
 
 def manifest(bank):
     data = bank.read_bytes()
+    if data[:4]==b'SCDP':
+        sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools/trilogy'))
+        from scd_resource import validate_pack
+        offset,size=validate_pack(bank)['LEVELS'];levels=data[offset:offset+size];result=[]
+        names=('Palmtree Panic','Collision Chaos','Tidal Tempest','Quartz Quadrant','Wacky Workbench','Stardust Speedway','Metallic Madness')
+        periods=('Present','Past','Good Future','Bad Future')
+        for i in range(struct.unpack_from('>H',levels,6)[0]):
+            za,flags,offset,size=struct.unpack_from('>HHII',levels,16+i*12)
+            if flags:continue
+            blob=levels[offset:offset+size];word=lambda p:int.from_bytes(blob[p:p+4],'big')
+            ptr,table=word(0x1C)-0x480000,word(0x34)-0x480000;placements=[]
+            while True:
+                x,y,oid,sub=struct.unpack_from('>HHBB',blob,ptr);ptr+=6
+                if x==0xFFFF:break
+                placements.append(dict(index=len(placements),x=x,y=y&0xFFF,flags=y&0xF000,id=oid,subtype=sub,code=word(table+oid*4)))
+            zone,act=za>>8,za&255
+            result.append(dict(stage=f'{za:04x}',name=f'{names[(zone-0x40)//4]} {act+1} {periods[(zone-0x40)&3]}',
+                bounds=list(struct.unpack_from('>4H',blob,0xC)),start=list(struct.unpack_from('>2H',blob,0x14)),objects=placements))
+        return result
     def u32(p): return struct.unpack_from('>I', data, p)[0]
     stages = []
     for z in range(0x20, 0x40):

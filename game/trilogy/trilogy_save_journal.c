@@ -13,6 +13,7 @@ static uint8_t loaded_native[80],saved[84];
 static int ready,projected,loaded_valid;
 static CampaignCdState cd_state;
 static int cd_slot=-1;
+static int cd_selection_pending;
 static int current_slot(void)
 {
     uint32_t p=r32(0xFFE660u)&0xFFFFFFu;
@@ -20,6 +21,16 @@ static int current_slot(void)
 }
 void tri_cd_save_select(void)
 {
+    /* Data Select resolves the zone at $D57A before assigning Save_pointer
+     * at $D5B2. Import only once the selected file has reached level entry.
+     * Also keep intervening menu/native writes from capturing the old file's
+     * in-memory collectibles into a newly selected or recreated slot. */
+    cd_selection_pending=1;
+}
+void tri_cd_save_level_entry(void)
+{
+    if(!cd_selection_pending)return;
+    cd_selection_pending=0;
     extern void scd_time_import(uint16_t,uint16_t);
     cd_slot=current_slot();memset(&cd_state,0,sizeof cd_state);
     if(ready>0 && cd_slot>=0)campaign_cd_get(&journal,(unsigned)cd_slot,&cd_state);
@@ -30,14 +41,14 @@ static void cd_capture(void)
 {
     extern void scd_time_export(uint16_t *,uint16_t *);
     if(!s3_stage_pack_cd && journal.version<2)return;
-    if(ready<=0 || cd_slot<0 || current_slot()!=cd_slot)return;
+    if(cd_selection_pending || ready<=0 || cd_slot<0 || current_slot()!=cd_slot)return;
     scd_time_export(&cd_state.generators,&cd_state.projectors);
     if(tri_cd_zone(tri_zone()))cd_state.act=(uint8_t)tri_act();
     campaign_cd_set(&journal,(unsigned)cd_slot,&cd_state);
 }
 void tri_cd_save_flush(void)
 {
-    if(ready<=0 || cd_slot<0 || current_slot()!=cd_slot)return;
+    if(cd_selection_pending || ready<=0 || cd_slot<0 || current_slot()!=cd_slot)return;
     cd_capture();
     if(tri_cd_zone(tri_zone()) && !(r8(SAVED+(unsigned)cd_slot*10)&3)) {
         extern int tri_za_to_code(uint16_t);
@@ -52,7 +63,7 @@ unsigned tri_campaign_mask(void)
 { return (s3_stage_pack_sonic1?1:0)|(s3_stage_pack_sonic2?2:0)|(s3_stage_pack_megamix?4:0)|(s3_stage_pack_cd?8:0); }
 void tri_save_sram_loaded(const char *path,const uint8_t *data,size_t size,int loaded)
 {
-    ready=projected=0;cd_slot=-1;memset(&cd_state,0,sizeof cd_state);snprintf(save_path,sizeof save_path,"%s",path);
+    ready=projected=cd_selection_pending=0;cd_slot=-1;memset(&cd_state,0,sizeof cd_state);snprintf(save_path,sizeof save_path,"%s",path);
     loaded_valid=loaded && campaign_native_block(data,(unsigned)size,loaded_native);
     if(!s3_stage_pack_enabled || !loaded)return;
     char backup[1240];snprintf(backup,sizeof backup,"%s.pre-campaign.bak",path);

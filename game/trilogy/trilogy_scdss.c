@@ -144,6 +144,26 @@ static uint16_t s_hazard_count, s_fan_count, s_hazard_delay, s_hazard_frame, s_f
 static uint8_t s_stage_id, s_time_stones, s_flags, s_ufo_count;
 static uint16_t s_rings;
 static uint32_t s_timer;               /* specStageTimer (seconds; time attack: 0:mm:ss:ff) */
+#if GEN_ENABLE_TRACE
+static int audit_follow_enabled(void)
+{
+    static int enabled=-1;
+    if(enabled<0){const char *v=getenv("TRILOGY_SCDSS_FOLLOW");enabled=v && !strcmp(v,"1");}
+    return enabled;
+}
+/* Audit positioning bypass only. Jump height, proximity tests, collisions,
+ * UFO destruction, the timer and the collectible outcome remain game-owned. */
+static void audit_follow_ufo(void)
+{
+    if(!audit_follow_enabled() || s_stage_inactive || s_stage_over || s_got_stone || s_time_stopped)return;
+    for(int k=0;k<6;k++) {
+        uint32_t u=OA(O_UFO1+k),s=OA(O_SONIC);
+        if(B(u,oID)==2 && B(u,oRoutine)==1) {
+            SW(s,oX,W(u,oX));SW(s,oY,W(u,oY));return;
+        }
+    }
+}
+#endif
 
 /* Word RAM */
 #define IMGW        256
@@ -892,17 +912,17 @@ static void ufo_check_col(uint32_t a)                         /* ObjUFO_CheckPla
 {
     uint32_t s = OA(O_SONIC);
     if (!B(s, oID) || B(s, oPlayerUFOCol)) return;
-    static int any = -1;                                      /* development: TRILOGY_SCDSSUFO=1, a jump reaches every UFO */
-    if (any < 0) any = getenv("TRILOGY_SCDSSUFO") != NULL;
-    if (any) goto height;
     int16_t l = (int16_t)(WS(a, oX) - 16), r = (int16_t)(l + 32);
     int16_t sl = (int16_t)(WS(s, oX) - 16), sr = (int16_t)(sl + 32);
     if (sl > r || sr < l) return;
     int16_t t = (int16_t)(WS(a, oY) - 12), b = (int16_t)(t + 24);
     int16_t st = (int16_t)(WS(s, oY) - 16), sb = (int16_t)(st + 32);
     if (st > b || sb < t) return;
-height:
     if (W(s, oZ) < 0x210 || W(s, oZ) >= 0x270) return;        /* (only in the air, at the UFO's height) */
+#if GEN_ENABLE_TRACE
+    if(audit_follow_enabled())fprintf(stderr,"[scdss-hit] stage=%u ufo=%u player=%04X,%04X,%04X target=%04X,%04X remaining=%u\n",
+        s_stage_id+1,(unsigned)((a-VARSSTART)/OSIZE),W(s,oX),W(s,oY),W(s,oZ),W(a,oX),W(a,oY),s_ufo_count);
+#endif
     SB(s, oPlayerUFOCol, B(a, oID));
     SB(a, oUFOPlayerCol, B(s, oID));
 }
@@ -1445,6 +1465,9 @@ static int sub_update(void)
 {
     memset(s_snd_queue, 0, sizeof s_snd_queue);
     animate_stamps();
+#if GEN_ENABLE_TRACE
+    audit_follow_ufo();
+#endif
     get_gfx_sines();
     gen_trace_table();
     run_gfx();
