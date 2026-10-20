@@ -278,11 +278,13 @@ static void frame(void)
         SET8(p, OBJ_status, (OB8(p, OBJ_status) & ~3) | (s_warp.status & 3));
         extern void tri_cd_save_flush(void);tri_cd_save_flush();
     }
+#if GEN_ENABLE_TRACE
     {
         static int test = -2;                                 /* development: TRILOGY_WARPTEST=1 / -1, a warp a second in */
         if (test == -2) { const char *g = getenv("TRILOGY_WARPTEST"); test = g && *g ? atoi(g) : 0; }
         if (test && r16(RAM_Level_frame_counter) == 60) { s_dir = (int8_t)test; s_timer = 209; test = 0; }
     }
+#endif
     int charging = (r8(p + 0x3D) & 0x7F) != 0;                /* (spin_dash_flag: charging) */
     if (s_timer && !charging) s_timer++;
     if (round_of(tri_zone()) == 0 && tri_act() == 0 && cd_period() != TRI_CD_PRESENT &&

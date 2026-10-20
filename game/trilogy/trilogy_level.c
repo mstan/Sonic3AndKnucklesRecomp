@@ -207,6 +207,7 @@ int tri_level_hook(uint32_t pc)
 {
     switch (pc) {
     case TH_LEVEL_ENTRY: {
+        extern void tri_cd_save_level_entry(void);
         extern void tri_flow_level_entry(void);
         extern void s1_obj_syz_reset(void);
         extern void s1_obj_lz_reset(void);
@@ -220,6 +221,7 @@ int tri_level_hook(uint32_t pc)
             w16(RAM_Apparent_zone_and_act, tri_apparent(s_next_za));
             s_next_za = 0xFFFF;
         }
+        tri_cd_save_level_entry();
         dev_force_zone();
         tri_bank_level();
         tri_obj_level_entry();

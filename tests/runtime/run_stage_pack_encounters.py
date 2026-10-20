@@ -83,6 +83,7 @@ class Native:
                  SDL_RENDER_DRIVER='software',TRILOGY_ZONE=stage,
                  TRILOGY_CHAR=str(args.character+4 if getattr(args,'mighty',False) and args.character<2 else args.character),TRILOGY_GOD='1')
         if not getattr(args,'god',True):env.pop('TRILOGY_GOD',None)
+        env.update({k:v for k,v in getattr(args,'env',{}).items() if k.startswith('TRILOGY_')})
         if start:
             x,y,rt=start
             env['TRILOGY_START']=f'{x:x},{y:x},1000,{rt:x}'
@@ -107,9 +108,14 @@ class Native:
                 self.sock.settimeout(20);self.sock.setsockopt(socket.IPPROTO_TCP,socket.TCP_NODELAY,1)
                 self.stream=self.sock.makefile('rb');break
             except OSError: time.sleep(.05)
-        if self.sock is None: raise RuntimeError('debug listener not ready')
+        if self.sock is None:
+            code=self.proc.poll()
+            self.close()
+            raise RuntimeError(f'debug listener not ready (process exit={code})')
         while time.monotonic()<deadline:
-            ram,frame=self.snapshot()
+            try:ram,frame=self.snapshot()
+            except Exception:
+                self.close();raise
             if ram[0xf600]==12 and u16(ram,0xfe04)>=(40 if args.kind in ('enemies','bosses','mechanics') else 180): break
             # Let the input-script clock run normally during menu boot.
             # run_frames advances simulation without ticking that script.
