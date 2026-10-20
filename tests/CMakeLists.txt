@@ -3,6 +3,10 @@ add_executable(campaign_save_test runtime/campaign_save_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
 target_include_directories(campaign_save_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME campaign_save COMMAND campaign_save_test)
+add_executable(campaign_shadow_test runtime/campaign_shadow_test.c
+    "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
+target_include_directories(campaign_shadow_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+add_test(NAME campaign_shadow COMMAND campaign_shadow_test)
 add_executable(campaign_mighty_test runtime/campaign_mighty_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_mighty.c")
 target_include_directories(campaign_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
@@ -19,6 +23,10 @@ add_executable(megamix_mighty_test runtime/megamix_mighty_test.c)
 target_include_directories(megamix_mighty_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
 add_test(NAME megamix_mighty COMMAND megamix_mighty_test)
+add_executable(megamix_shadow_test runtime/megamix_shadow_test.c)
+target_include_directories(megamix_shadow_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
+add_test(NAME megamix_shadow COMMAND megamix_shadow_test)
 add_executable(megamix_presentation_test runtime/megamix_presentation_test.c)
 target_include_directories(megamix_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")

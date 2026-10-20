@@ -17,6 +17,8 @@ int g_split_sp_popped;
 static int pending;
 int *g_rte_pending_ptr=&pending;
 int s3_stage_pack_mighty=1,s3_stage_pack_megamix=1,s3_stage_pack_enabled=1;
+int s3_stage_pack_shadow,tri_shadow_selected;
+uint32_t tri_shadow_descriptor(void){return 0;}
 static unsigned calls[16],call_count,queued;
 uint32_t tri_dir(void){return 0;}
 uint8_t tri_rd8(uint32_t a)

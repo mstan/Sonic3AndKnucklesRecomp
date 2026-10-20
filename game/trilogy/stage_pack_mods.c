@@ -8,6 +8,7 @@
 
 int s3_stage_pack_enabled,s3_stage_pack_sonic1,s3_stage_pack_sonic2;
 int s3_stage_pack_megamix,s3_stage_pack_mighty;
+int s3_stage_pack_shadow;
 int s3_pack_requested[3],s3_pack_available[3];
 char s3_pack_paths[3][1024],s3_stage_pack_path[1024];
 static char s_settings[1024],s_error[256],s_status[3][256];
@@ -22,6 +23,7 @@ void s3_pack_refresh(void)
     s3_stage_pack_sonic1=s3_pack_available[0];
     s3_stage_pack_sonic2=s3_pack_available[1];
     s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
+    s3_stage_pack_shadow=0; /* enrolled after the loaded bank's versioned graph */
     s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix;
 }
 void s3_stage_pack_load(const char *settings)
@@ -72,11 +74,11 @@ const char *s3_stage_pack_sram(void) { return NULL; }
 #include "recomp_launcher.h"
 #define COPY(dst,src) snprintf(dst,sizeof(dst),"%s",src)
 static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix"};
-static const char *names[]={"Sonic 1 stages (Experimental)","Sonic 2 stages (Experimental)","Sonic Megamix + Mighty (Experimental)"};
+static const char *names[]={"Sonic 1 stages (Experimental)","Sonic 2 stages (Experimental)","Sonic Megamix + Mighty + Shadow (Experimental)"};
 static const char *descs[]={
     "Add all Sonic 1 stages before Sonic 3 & Knuckles. Works independently or with the other campaign packs.",
     "Add all Sonic 2 stages before Sonic 3 & Knuckles, after Sonic 1 when installed.",
-    "Add all 19 Megamix v3 acts after Sonic 3 & Knuckles and always add Mighty and Mighty & Tails to character selection. Works independently of Sonic 1 and Sonic 2 packs."};
+    "Add all 19 Megamix v3 acts after Sonic 3 & Knuckles, plus Mighty and Shadow with optional Tails partners. Shadow requires an updated converted resource. Works independently of Sonic 1 and Sonic 2 packs."};
 static const RecompLauncherCModProvider *base;
 static int index_of(const char *p) { if(p)for(int i=0;i<3;i++)if(!strcmp(p,ids[i]))return i;return -1; }
 static int own(const char *p,const char *f) { return index_of(p)>=0 && f && !strcmp(f,"campaign"); }

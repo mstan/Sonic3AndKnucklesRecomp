@@ -33,7 +33,11 @@ def native_frame(mappings,dplc,art,index):
     return pieces,bytes(tiles)
 
 def convert_mighty(rom):
-    frames=rom.mighty_frames();maps=[];plcs=[];art=bytearray();seen={}
+    return convert_character(rom, MIGHTY)
+
+
+def convert_character(rom, character):
+    frames=rom.character_frames(character);maps=[];plcs=[];art=bytearray();seen={}
     for pieces,tiles in frames:
         mapping=bytearray(struct.pack('>H',len(pieces)))
         for p in pieces:
@@ -57,7 +61,7 @@ def convert_mighty(rom):
             raise ValueError(f'Native Mighty frame {index:02X} differs from the v3 source')
     animations,animation_source=rom.mighty_animations()
     result=dict(mappings=mappings,dplc=dplc,art=art,
-                palette=rom.palette(MIGHTY['palette'])[1],animation_source=animation_source)
+                palette=rom.palette(character['palette'])[1],animation_source=animation_source)
     report=dict(frames=len(frames),animation_entries=len(animations),native_art_tiles=len(art)//32,
         source_frame_art_sha256=hashlib.sha256(b''.join(t for _,t in frames)).hexdigest(),
         payloads={k:dict(bytes=len(v),sha256=hashlib.sha256(v).hexdigest()) for k,v in result.items()},

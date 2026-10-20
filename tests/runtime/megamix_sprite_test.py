@@ -6,6 +6,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools'))
 from megamix.mighty import convert_mighty,native_frame,table
 
 class Donor:
+    def character_frames(self, character):return self.mighty_frames()
     def mighty_frames(self):
         piece=dict(x=-127,y=-128,width=4,height=4,tile=15,x_flip=True,y_flip=True,attributes=0xA000)
         tiles=bytes(i&255 for i in range(31*32))
