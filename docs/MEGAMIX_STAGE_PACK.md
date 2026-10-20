@@ -1,4 +1,4 @@
-# Optional Megamix v3 stages and Mighty
+# Optional Megamix v3 stages, Mighty and Shadow
 
 `feature/megamix-after-s3k` extends the audited Sonic 1/2 pack with all
 **19 Mega Drive Megamix v3 acts** and selectable **Mighty**. Campaign order:
@@ -12,9 +12,17 @@ This child starts from `c2d9f37eaec2e1befd025d8fcb637b8057e24de9` on
 
 ## Enable and convert
 
-On recomp-ui's Mods page, enable **Sonic Megamix + Mighty (Experimental)**.
-Mighty and Mighty & Tails are always included with this mod. Sonic 1 and
-Sonic 2 are separate independent mods; either, both or neither may be active.
+On recomp-ui's Mods page, **Sonic Megamix stages (Experimental)**,
+**Mighty (Experimental)** and **Shadow (Experimental)** have independent
+checkboxes. Enable either character without adding stages, or stages without
+adding either character. Sonic 1 and Sonic 2 remain independent too.
+
+All three Megamix entries require your own **Sonic Megamix v3 ROM**. Choose
+its raw BIN/MD/GEN file; extract ZIP archives first. This path and the locally
+converted content-pack path are shared automatically across all three entries.
+The ROM is checked at selection and every boot (1,283,224 bytes, CRC32
+`66ECB4F4`). Missing/invalid ROMs cannot be replaced by a converted pack;
+settings and saved identities stay parked until the ROM returns.
 
 No ROM or converted donor graphics/music is distributed. First build the
 base bank with `tools/build_stage_pack.py`, then extend it:
@@ -25,7 +33,7 @@ python tools/build_megamix_pack.py --base-bank sonic1-2-stages.bin --s1 sonic1.b
 
 Export `mods/megamix-stages.pak` with
 `python tools/split_campaign_packs.py --bank sonic-megamix-stages.bin --content megamix --out mods`
-and select it as this mod's resource. Use `--content all` to export all three
+and select it as the shared **Campaign content pack** resource. Use `--content all` to export all three
 self-contained packs from the extended bank. The converter accepts a ZIP or
 raw BIN donor. The donor is 1,283,224 bytes, CRC32 `66ECB4F4`, SHA256
 `85d9e9ba79f0035d5854618666ff198871abe1931558496e6563b1cd90e5cdbe`, matching
@@ -33,7 +41,7 @@ the [official v3 download](https://www.headcannon.com/TeamMegamix/builds/S1MM%20
 Supported S3K CRC32: `63522553`. Inputs are never changed.
 
 Existing SPK2 banks can retain all their converted stages and gain the new
-Mighty menu/HUD data and original-ROM water/background resources without the
+Mighty and Shadow menu/HUD data and original-ROM water/background resources without the
 Sonic 1 input:
 
 ```text
@@ -42,9 +50,9 @@ python tools/build_megamix_pack.py --upgrade-presentation --base-bank sonic-mega
 
 SPK2 checks length, CRC, complete directory, geometry, sprites and versioned
 MDI/MDY metadata. SPK1 remains supported for the base campaign, but cannot
-enable Megamix or Mighty on its own. Invalid/missing resources are skipped,
+enable any Megamix addition on its own. Invalid/missing resources are skipped,
 retaining their configuration and progress. The visual fixes require MDI
-version 4 and MDY3; older extended banks must be upgraded before exporting.
+version 5, MDY3 and MSW1 for Shadow; older extended banks must be upgraded before exporting.
 
 ## Gameplay and controls
 
@@ -236,3 +244,14 @@ original legacy file remains byte-identical, native SRAM checksums and
 level/character bounds are valid, and the companion journal is present.
 Audio remains at 100 percent and widescreen remains adaptive Fit to screen.
 These are seeded clear files for playtesting, not earned completion evidence.
+
+## Independent character controls and saves
+
+See [Shadow source audit and controls](SHADOW_CHARACTER.md). Settings format 3
+stores `mighty` and `shadow` independently from `megamix` (stages), plus a single
+`megamix_rom` path and `megamix_bank` path. Existing combined settings migrate
+their three requests together once; the newly required ROM still has to be
+selected. Changing a resource never changes any checkbox. Disabling stages
+parks their stable campaign cursor while keeping enabled characters available
+in native, Sonic 1 and Sonic 2 stages. Disabling one character parks only that
+identity. Native SRAM always contains retail character values.

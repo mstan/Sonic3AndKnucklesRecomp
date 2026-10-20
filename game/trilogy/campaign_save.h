@@ -10,7 +10,7 @@ int campaign_stable(unsigned mask,int display);
 int campaign_display(unsigned mask,int stable);
 typedef struct CampaignSave {
     uint8_t slots[8][64],view[80];
-    unsigned mask;
+    unsigned mask,capabilities;
     int pending,loaded,version,read_only;
     char path[1200];
 } CampaignSave;

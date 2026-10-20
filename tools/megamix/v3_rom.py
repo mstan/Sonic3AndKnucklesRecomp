@@ -59,6 +59,8 @@ BINDINGS = {
 }
 MIGHTY = dict(selector=1, mappings=0x2A9D6, dplc=0x2C3D2,
               art=0xA9364, palette=0x15, animation=0x1AA1C)
+SHADOW = dict(selector=2, mappings=0x2B6A4, dplc=0x2CA1C,
+              art=0xBE2E4, palette=0x16, animation=0x1AA1C)
 ZONES = ('Sunny Shores', 'Misty Maze', 'Dark Fortress', 'Starry Night',
          'City Outskirts', 'Metallic Base')
 ORDER = tuple((z,a) for z in (0,2,4,1,3) for a in range(3)) + ((5,0),(5,1),(1,3),(5,2))
@@ -162,7 +164,10 @@ class MegamixV3:
                     object_ids={f'{k:02X}':v for k,v in sorted(Counter(o['id'] for o in objects).items())})
 
     def mighty_frames(self):
-        maps,dplc=MIGHTY['mappings'],MIGHTY['dplc']
+        return self.character_frames(MIGHTY)
+
+    def character_frames(self, character):
+        maps,dplc=character['mappings'],character['dplc']
         frames=self.word(maps)//2
         if self.word(dplc)//2!=frames:
             raise ValueError('Mighty map/DPLC frame counts disagree')
@@ -179,7 +184,7 @@ class MegamixV3:
             tiles=bytearray()
             for i in range(n):
                 entry=self.word(p+1+i*2)
-                tiles+=self.blob(MIGHTY['art']+(entry&0xFFF)*32,((entry>>12)+1)*32)
+                tiles+=self.blob(character['art']+(entry&0xFFF)*32,((entry>>12)+1)*32)
             if any(o['tile']+o['width']*o['height']>len(tiles)//32 for o in pieces):
                 raise ValueError(f'Mighty frame {frame} references missing dynamic tiles')
             result.append((pieces,bytes(tiles)))

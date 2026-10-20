@@ -19,9 +19,9 @@ sys.path.insert(0,str(ROOT/'tools/trilogy'))
 import build_bank as bb
 from mdcodecs import nemesis_decode,kosinski_encode,kosm_encode
 from tilepack import Packer
-from megamix.v3_rom import MegamixV3,load_rom,ORDER,CRC32
+from megamix.v3_rom import MegamixV3,load_rom,ORDER,CRC32,SHADOW
 from megamix.geometry import convert_geometry
-from megamix.mighty import convert_mighty
+from megamix.mighty import convert_mighty,convert_character
 from megamix.presentation import presentation
 from megamix.signpost import signpost
 from megamix.objects import MegamixObjects,ZONE_NAMES
@@ -31,6 +31,30 @@ from s1_objects import asset_mappings,_piece_ranges,_retile,ASSET_COUNT,ASSET_RE
 
 NAMES={0x34:'SUNNY SHORES',0x35:'MISTY MAZE',0x36:'DARK FORTRESS',
        0x37:'STARRY NIGHT',0x38:'CITY OUTSKIRTS',0x39:'METALLIC BASE',0x3A:'FINAL FIGHT'}
+
+def shadow_descriptor(bank,donor,s3k):
+    # Selectors from the exact v3 cartridge, never the 2005 disassembly or
+    # a later CD build. Fail before publishing if any binding differs.
+    proofs={0x18776:'0c380002ffbb6608217c0002b6a40004',
+            0x1AC0E:'0c380002ffbb670845f90002c3d2',
+            0x1AC1E:'45f90002ca1c',0x1AC7A:'0681000be2e4',
+            0x53B4:'70166100ce6c',0x52BE:'701a0c380003fe116602701c',
+            0x1A7F4:'43f90001aa1c0c380001ffbb670c4a38fe19670643f90001ab5e',
+            0x11C8EC:'41f90011cb7c',0x11C942:'41f90011ccfc'}
+    for p,code in proofs.items():
+        if donor.blob(p,len(code)//2)!=bytes.fromhex(code):raise ValueError(f'Unproven Shadow binding ${p:X}')
+    sprite,report=convert_character(donor,SHADOW)
+    ui=presentation(donor,s3k,SHADOW)
+    palettes=[donor.palette(p)[1] for p in (0x16,0x1A,0x1C)]
+    record=struct.pack('>4s7I2H',b'MSW1',bank.add(sprite['mappings']),bank.add(sprite['dplc']),
+        bank.add(sprite['art']),bank.add(palettes[0]),bank.add(sprite['animation_source']),
+        len(sprite['art']),len(sprite['animation_source']),report['frames'],report['animation_entries'])
+    record+=struct.pack('>4I',bank.add(palettes[1]),bank.add(palettes[2]),
+        bank.add(donor.blob(0x11CB7C,128)),bank.add(donor.blob(0x11CCFC,128)))
+    record+=struct.pack('>3I',*(bank.add(struct.pack('>IHH',bank.add(pal),0xFC00,7)) for pal in palettes))
+    record+=struct.pack('>6I',bank.add(ui['menu_mappings']),bank.add(ui['menu_art']),len(ui['menu_art']),
+        bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings']))
+    return bank.add(record)
 
 def level_vram(donor,zone,act):
     header=donor.header(zone,act);vram=bytearray(65536)
@@ -246,9 +270,10 @@ def extend(source,donor,retail,s3k):
             pos=table+2+i*6+2
             struct.pack_into('>H',sbz,pos,bb.be16(sbz,pos)-0x130)
     overrides[31]=bank.add(sbz)
-    descriptor=bank.add(struct.pack('>4sIHHIIIIIII',b'MDI1',CRC32,len(stages),4,mighty_ptr,music_ptr,order,
+    shadow=shadow_descriptor(bank,donor,s3k)
+    descriptor=bank.add(struct.pack('>4sIHHIIIIIIII',b'MDI1',CRC32,len(stages),5,mighty_ptr,music_ptr,order,
                         bank.add(b''.join(struct.pack('>I',p) for p in overrides)),
-                        bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),signpost(bank,donor)))
+                        bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),signpost(bank,donor,True),shadow))
     struct.pack_into('>I',bank.data,0x24,descriptor)
     blobs[39]=bank.add(extpal);blobs[1]=bank.add(animals);blobs[2]=bank.add(animal_plcs)
     struct.pack_into('>I',bank.data,0x20,bank.add(b''.join(struct.pack('>I',p) for p in blobs)))
@@ -286,9 +311,10 @@ def upgrade_presentation(source,donor,s3k):
         bank.add(ui['hud_head']),bank.add(ui['hud_name']),bank.add(ui['hud_mappings']))
     new=bank.add(record)
     metadata=bytearray(source[info:info+28])
-    struct.pack_into('>H',metadata,10,4)
+    struct.pack_into('>H',metadata,10,5)
     struct.pack_into('>I',metadata,12,new)
-    metadata+=struct.pack('>III',bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),signpost(bank,donor))
+    metadata+=struct.pack('>IIII',bank.add(donor.blob(0x9FF2,256)),bank.add(donor.blob(0x1AE1C,256)),
+        signpost(bank,donor,True),shadow_descriptor(bank,donor,s3k))
     struct.pack_into('>I',bank.data,0x24,bank.add(metadata))
     data=bytes(bank.data)
     return data+struct.pack('>4sII',b'SPK2',len(data),zlib.crc32(data))

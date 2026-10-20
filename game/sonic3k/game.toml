@@ -905,6 +905,12 @@ kind = "game_hook"
 addr = 0x011900 # Megamix Sonic_ShieldMoves
 kind = "game_hook"
 [[widescreen_site]]
+addr = 0x0117DA # Megamix Sonic_Jump
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0118BC # Megamix Sonic_JumpHeight
+kind = "game_hook"
+[[widescreen_site]]
 addr = 0x01222A # Megamix Player_TouchFloor+AC
 kind = "game_hook"
 [[widescreen_site]]

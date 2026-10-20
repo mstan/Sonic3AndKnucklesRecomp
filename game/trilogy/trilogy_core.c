@@ -17,7 +17,7 @@ static uint32_t s_bank_size;
 static uint8_t *s_banks[4];
 static uint32_t s_sizes[4];
 static int s_selected=-1;
-static uint32_t s_mighty[4];
+static uint32_t s_mighty[4],s_shadow[4];
 static ScdPack s_cd_pack;
 static uint16_t s_cd_level=0xFFFF;
 static int s_cd_dirty;
@@ -41,6 +41,8 @@ void tri_scd_wr16(uint32_t address,uint16_t value)
 }
 uint32_t tri_mighty_descriptor(void)
 { return s_selected>=0?s_mighty[s_selected]:0; }
+uint32_t tri_shadow_descriptor(void)
+{ return s_selected>=0?s_shadow[s_selected]:0; }
 
 int tri_bank_select(int content)
 {
@@ -61,7 +63,7 @@ int tri_stage_content(uint16_t stage)
 void tri_bank_level(void)
 {
     uint16_t stage=r16(RAM_Current_zone_and_act);int c=tri_stage_content(stage);
-    if(c && (!s_banks[c-1] || (c==4 && !tri_scd_map(stage)))) {
+    if(c && (!s_banks[c-1] || (c==3 && !s3_stage_pack_megamix) || (c==4 && !tri_scd_map(stage)))) {
         fprintf(stderr,"[stage-pack] unavailable stage %04X; resuming Angel Island\n",stage);
         w16(RAM_Current_zone_and_act,0);w16(RAM_Apparent_zone_and_act,0);
         w8(RAM_Last_star_post_hit,0);c=0;
@@ -79,7 +81,7 @@ void tri_campaign_suspend(void)
     extern void scd_audio_close(void);scd_audio_close();
     s_bank=NULL;s_bank_size=0;s_selected=-1;g_rom_ext=NULL;g_rom_ext_size=0;
     s3_stage_pack_enabled=s3_stage_pack_sonic1=s3_stage_pack_sonic2=0;
-    s3_stage_pack_megamix=s3_stage_pack_mighty=0;
+    s3_stage_pack_megamix=s3_stage_pack_mighty=s3_stage_pack_shadow=0;
     s3_stage_pack_cd=0;
 }
 
@@ -126,9 +128,14 @@ void trilogy_init(void)
         uint32_t info=((uint32_t)s_banks[2][0x24]<<24)|((uint32_t)s_banks[2][0x25]<<16)|((uint32_t)s_banks[2][0x26]<<8)|s_banks[2][0x27];
         const uint8_t *p=s_banks[2]+info-TRI_BANK_BASE+12;
         s_mighty[2]=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        if(s_banks[2][info-TRI_BANK_BASE+11]>=5) {
+            p=s_banks[2]+info-TRI_BANK_BASE+40;
+            s_shadow[2]=((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];
+        }
         for(int i=0;i<4;i++)if(i!=2 && s_banks[i]) {
             s_mighty[i]=campaign_mighty_copy(&s_banks[i],&s_sizes[i],s_banks[2],s_sizes[2]);
-            if(!s_mighty[i]) {
+            if(s_shadow[2])s_shadow[i]=campaign_shadow_copy(&s_banks[i],&s_sizes[i],s_banks[2],s_sizes[2]);
+            if(!s_mighty[i] || (s_shadow[2] && !s_shadow[i])) {
                 fprintf(stderr,"[stage-pack] content %d cannot attach Mighty resources; pack skipped\n",i+1);
                 free(s_banks[i]);s_banks[i]=NULL;s_sizes[i]=0;s3_pack_available[i]=0;
             }
@@ -145,9 +152,11 @@ void trilogy_init(void)
         }
     }
     s3_stage_pack_sonic1=s3_pack_available[0];s3_stage_pack_sonic2=s3_pack_available[1];
-    s3_stage_pack_megamix=s3_stage_pack_mighty=s3_pack_available[2];
+    s3_stage_pack_megamix=s3_pack_requested[2] && s3_pack_available[2];
+    s3_stage_pack_mighty=s3_pack_mighty_requested && s_mighty[2]!=0;
+    s3_stage_pack_shadow=s3_pack_shadow_requested && s_shadow[2]!=0;
     s3_stage_pack_cd=s3_pack_available[3];
-    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_cd;
+    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_cd||s3_stage_pack_mighty||s3_stage_pack_shadow;
     if(!s3_stage_pack_enabled)return;
     tri_screen_register();
     extern int tri_obj_audit_bank(void);
@@ -159,7 +168,7 @@ void trilogy_init(void)
             free(s_banks[3]);s_banks[3]=NULL;s_sizes[3]=0;s3_pack_available[3]=s3_stage_pack_cd=0;
         }
     }
-    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_cd;
+    s3_stage_pack_enabled=s3_stage_pack_sonic1||s3_stage_pack_sonic2||s3_stage_pack_megamix||s3_stage_pack_cd||s3_stage_pack_mighty||s3_stage_pack_shadow;
     tri_bank_select(0);
     fprintf(stderr, "[trilogy] expansion bank mapped at $400000 (%u bytes)\n", s_bank_size);
 }
@@ -285,6 +294,7 @@ int trilogy_instruction(uint32_t pc)
         return 1;
     if (tri_mighty_presentation_hook(pc))return 1;
     if (tri_mighty_hook(pc))return 1;
+    if (tri_shadow_hook(pc))return 1;
     if (tri_screen_hook(pc))
         return 1;
     if (tri_titlecard_hook(pc))

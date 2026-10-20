@@ -72,7 +72,7 @@ class Native:
             port=reservation.getsockname()[1]
         self.args,self.case,self.port=args,case,port
         self.case.mkdir(parents=True,exist_ok=True)
-        self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False))
+        self.runtime=self.case/'runtime';runtime_files(args.exe,args.bank,self.runtime,port,mighty=getattr(args,'mighty',False),shadow=getattr(args,'character',0)>=6)
         if getattr(args,'pack_mask',None) is not None:
             names=('sonic1','sonic2','megamix','sonic_cd');paths=args.packs
             (self.runtime/'sonic3k-stage-pack.ini').write_text('format=2\n'+''.join(

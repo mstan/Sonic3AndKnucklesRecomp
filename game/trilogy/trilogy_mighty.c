@@ -18,13 +18,15 @@ static uint16_t super_colors[2][4];
 static int palette_cycling;
 static uint32_t descriptor(void)
 {
-    return tri_mighty_descriptor();
+    return tri_shadow_selected?tri_shadow_descriptor():tri_mighty_descriptor();
 }
 static int active(void)
 {
-    return s3_stage_pack_mighty && tri_mighty_selected && r16(RAM_Player_mode)<2 && descriptor();
+    return ((tri_mighty_selected && s3_stage_pack_mighty) || (tri_shadow_selected && s3_stage_pack_shadow)) && r16(RAM_Player_mode)<2 && descriptor();
 }
-int tri_mighty_active(void) { return active(); }
+int tri_character_active(void) { return active(); }
+int tri_mighty_active(void) { return active() && tri_mighty_selected; }
+int tri_shadow_active(void) { return active() && tri_shadow_selected && s3_stage_pack_shadow; }
 uint16_t tri_mighty_color(int wet,unsigned color)
 {
     uint32_t d=descriptor();
@@ -119,7 +121,10 @@ static void animate(uint32_t p,uint32_t d)
         old_native=native;source_anim=ani;cursor=0;timer=0;
         w8(p+0x21,(uint8_t)native);
     }
-    uint32_t base=tri_rd32(d+20),script=base+tri_rd16(base+source_anim*2u);
+    uint32_t base=tri_rd32(d+20);
+    int shadow_super=tri_shadow_active() && r8(RAM_Super_Sonic_Knux_flag);
+    if(shadow_super)base+=0x142; /* v3 $1AB5E vs normal $1AA1C */
+    uint32_t script=base+(int16_t)tri_rd16(base+source_anim*2u);
     int delay=(int8_t)tri_rd8(script),offset=0,speed=(int16_t)r16(p+OBJ_ground_vel);
     if(speed<0)speed=-speed;
     unsigned facing=r8(p+OBJ_status)&1,flips=facing;
@@ -128,18 +133,22 @@ static void animate(uint32_t p,uint32_t d)
         if(!facing)angle=(~angle)&255;
         angle=(angle+16)&255;flips=facing^((angle&128)?3:0);
         if(r8(p+OBJ_status)&0x20) {
-            script=base+0x78;delay=(0x800-speed)>0?(0x800-speed)>>6:0;
+            script=base+(shadow_super?0x60:0x78);delay=(0x800-speed)>0?(0x800-speed)>>6:0;
         } else {
             offset=(angle>>4)&6;
-            if(speed<0x600){script=base+0x58;offset=offset*3;}
+            if(shadow_super) {
+                if(speed<0x800){script=base+0x4C;offset*=4;}
+                else {script=base+0x56;offset>>=1;}
+            } else if(speed<0x600){script=base+0x58;offset=offset*3;}
             else {script=base+0x60;offset*=2;}
             delay=(0x800-speed)>0?(0x800-speed)>>8:0;
         }
     } else if(delay==-2) {
-        script=base+(speed<0x600?0x68:0x70);
+        /* The v3 rolling branch uses normal roll scripts even when Super. */
+        script=tri_rd32(d+20)+(speed<0x600?0x68:0x70);
         delay=(0x400-speed)>0?(0x400-speed)>>8:0;
     } else if(delay==-3) {
-        script=base+0x78;delay=(0x800-speed)>0?(0x800-speed)>>6:0;
+        script=base+(shadow_super?0x60:0x78);delay=(0x800-speed)>0?(0x800-speed)>>6:0;
     }
     w8(p+OBJ_render,(r8(p+OBJ_render)&0xFC)|flips);
     if(--timer>=0)return;
@@ -188,7 +197,7 @@ static void super_palette(uint32_t d)
         palette_cycling=0;
         w8(0xFFF65F,0);pal_tick=0;return;
     }
-    unsigned frame=((unsigned)pal_tick++/4)&15;
+    unsigned frame=tri_shadow_active()?6+((unsigned)pal_tick++/8)%9:((unsigned)pal_tick++/4)&15;
     for(unsigned wet=0;wet<2;wet++) {
         uint32_t src=tri_rd32(d+(wet?48:44))+frame*8;
         for(unsigned i=0;i<4;i++)super_colors[wet][i]=tri_rd16(src+i*2);
@@ -245,11 +254,10 @@ static void basic_super_attack(void)
     w16(p+OBJ_x_vel,0);w16(p+OBJ_y_vel,0);w16(p+OBJ_ground_vel,0);
     o_sfx(0x41);
 }
-static int jump_ability(void)
+int tri_character_transform(void)
 {
     uint32_t p=RAM_Player_1;
     unsigned pressed=r8(RAM_Ctrl_1_pressed_logical),held=r8(RAM_Ctrl_1_held_logical);
-    if(!(pressed&0x70))return done();
     if((held&0x30)==0x30 && (pressed&0x30)) {
         if(r8(RAM_Super_Sonic_Knux_flag)) {
             /* The native revert block is an interior label, not a callable
@@ -267,6 +275,14 @@ static int jump_ability(void)
             tri_jsr(0x119D2);A(4)=a4;w8(p+0x2F,4);return done();
         }
     }
+    return 0;
+}
+static int jump_ability(void)
+{
+    uint32_t p=RAM_Player_1;
+    unsigned pressed=r8(RAM_Ctrl_1_pressed_logical),held=r8(RAM_Ctrl_1_held_logical);
+    if(!(pressed&0x70))return done();
+    if(tri_character_transform())return done();
     if(pressed&0x40) {
         if(r8(RAM_Super_Sonic_Knux_flag)) {if(!r8(p+0x2F))basic_super_attack();}
         else swap_shield(held);
@@ -303,7 +319,7 @@ int tri_mighty_hook(uint32_t pc)
     }
     if(pc==MG_PC_MONITOR_BUBBLE && r8(A(0)+OBJ_subtype)==0x84) {
         uint32_t p=A(1)&0xFFFFFF;
-        if(active() && p==RAM_Player_1) {
+        if(tri_mighty_active() && p==RAM_Player_1) {
             if(r8(RAM_Super_Sonic_Knux_flag)){super_pickup(1);w16(A(2),r16(A(2))+1);return done();}
             store(shield());
         }
@@ -322,21 +338,21 @@ int tri_mighty_hook(uint32_t pc)
     case TH_LEVEL_ENTRY:
         old_native=source_anim=last_frame=-1;cursor=timer=pal_tick=bubble_bounce=0;
         palette_cycling=0;return 0;
-    case TH_LVL_PRE_SPRITES:frame();return 0;
+    case TH_LVL_PRE_SPRITES:if(tri_mighty_active())frame();return 0;
     case MG_PC_MIGHTY_ANIMATE:
         if(p==RAM_Player_1){animate(p,d);return done();}return 0;
     case MG_PC_MIGHTY_PLC:case MG_PC_MIGHTY_PLC2:
         if(p==RAM_Player_1){load_frame(p,d);return done();}return 0;
     case MG_PC_MIGHTY_SUPER_PAL:super_palette(d);return done();
     case MG_PC_MIGHTY_SHIELD:
-        if(p==RAM_Player_1)return jump_ability();return 0;
+        if(p==RAM_Player_1 && tri_mighty_active())return jump_ability();return 0;
     case MG_PC_MIGHTY_LAND:
-        if(p==RAM_Player_1 && r8(RAM_Super_Sonic_Knux_flag) && bubble_bounce) {
+        if(tri_mighty_active() && p==RAM_Player_1 && r8(RAM_Super_Sonic_Knux_flag) && bubble_bounce) {
             bubble_bounce=0;tri_jsr(0x12232);
         }
         return 0;
     case MG_PC_MONITOR_FIRE:case MG_PC_MONITOR_LIGHTNING:case MG_PC_MONITOR_BUBBLE:
-        if((A(1)&0xFFFFFF)==RAM_Player_1) {
+        if(tri_mighty_active() && (A(1)&0xFFFFFF)==RAM_Player_1) {
             if(r8(RAM_Super_Sonic_Knux_flag)) {
                 unsigned next=pc==MG_PC_MONITOR_FIRE?2:pc==MG_PC_MONITOR_LIGHTNING?4:8;
                 super_pickup((uint8_t)next);

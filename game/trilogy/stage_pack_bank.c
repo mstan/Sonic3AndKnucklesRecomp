@@ -17,6 +17,38 @@ static uint32_t crc32(const uint8_t *p, size_t n)
     while (n--) { c ^= *p++; for (int i=0;i<8;i++) c=(c>>1)^(0xEDB88320u & (0u-(c&1))); }
     return ~c;
 }
+static int character_graph(const uint8_t *data,uint32_t size,uint32_t descriptor)
+{
+    if(!range(descriptor,88,size))return 0;
+    const uint8_t *m=data+descriptor-0x400000u;
+    if(memcmp(m,"MSW1",4) || m[32] || m[33]!=176 || m[34] || m[35]!=38 ||
+       be32(m+24)>0x20000 || be32(m+28)!=480 || be32(m+72)>0x400)return 0;
+    const unsigned fields[]={4,8,12,16,20,36,40,44,48,64,68,76,80,84};
+    for(unsigned k=0;k<14;k++) {
+        unsigned f=fields[k],count=f==4||f==8?176:f==64?36:f==84?6:0;
+        uint32_t p=be32(m+f),bytes=count?count*2:f==12?be32(m+24):f==20?480:
+            f==44||f==48?128:f==68?be32(m+72):f==76?128:f==80?192:32;
+        if(!range(p,bytes,size))return 0;
+        for(unsigned i=0;i<count;i++) {
+            const uint8_t *offset=data+p-0x400000u+i*2;
+            unsigned off=((unsigned)offset[0]<<8)|offset[1];
+            if(off<count*2 || !range(p+off,2,size))return 0;
+            const uint8_t *entry=data+p+off-0x400000u;
+            unsigned n=((unsigned)entry[0]<<8)|entry[1];
+            if(n>80 || !range(p+off,2+n*(f==8?2:6),size))return 0;
+            if(f==8)for(unsigned j=0;j<n;j++) {
+                unsigned v=((unsigned)entry[2+j*2]<<8)|entry[3+j*2];
+                if(((v&4095)+((v>>12)+1))*32>be32(m+24))return 0;
+            }
+        }
+    }
+    for(unsigned i=0;i<3;i++) {
+        uint32_t p=be32(m+52+i*4);if(!range(p,8,size))return 0;
+        const uint8_t *plc=data+p-0x400000u;
+        if(!range(be32(plc),32,size) || plc[6] || plc[7]!=7)return 0;
+    }
+    return 1;
+}
 int s3_pack_validate(const char *path, int content, char *error, unsigned capacity)
 {
     if(content==4)return scd_pack_validate(path,error,capacity);
@@ -65,7 +97,8 @@ int s3_pack_validate(const char *path, int content, char *error, unsigned capaci
         uint32_t payload=(uint32_t)size-12;
         if(p>payload-28 || memcmp(data+p,"MDI1",4) ||
            be32(data+p+4)!=0x66ECB4F4 || data[p+8]!=0 || data[p+9]!=19 ||
-           data[p+10]!=0 || data[p+11]<2 || data[p+11]>4)goto done;
+           data[p+10]!=0 || data[p+11]<2 || data[p+11]>5)goto done;
+        if(data[p+11]>=5 && (p>payload-44 || !character_graph(data,payload,be32(data+p+40))))goto done;
         if(data[p+11]>=3) {
             if(p>payload-36 || !range(be32(data+p+28),256,payload) ||
                !range(be32(data+p+32),256,payload))goto done;
@@ -74,10 +107,11 @@ int s3_pack_validate(const char *path, int content, char *error, unsigned capaci
             goto done;
         }
         if(data[p+11]>=4) {
-            if(p>payload-40 || !range(be32(data+p+36),52,payload))goto done;
+            unsigned characters=data[p+11]>=5?3:2;
+            if(p>payload-40 || !range(be32(data+p+36),12+characters*20,payload))goto done;
             const uint8_t *sign=data+be32(data+p+36)-0x400000u;
-            if(memcmp(sign,"MGS1",4) || !range(be32(sign+4),10,payload) || !range(be32(sign+8),28,payload))goto done;
-            for(unsigned c=0;c<2;c++) {
+            if(memcmp(sign,data[p+11]>=5?"MGS2":"MGS1",4) || !range(be32(sign+4),10,payload) || !range(be32(sign+8),28,payload))goto done;
+            for(unsigned c=0;c<characters;c++) {
                 const uint8_t *r=sign+12+c*20;
                 if(be32(r+4)!=58*32 || !range(be32(r),58*32,payload))goto done;
                 for(unsigned k=8;k<20;k+=4)if(!range(be32(r+k),32,payload))goto done;
@@ -140,3 +174,25 @@ done:
 }
 int s3_stage_pack_validate(const char *path,char *error,unsigned capacity)
 { return s3_pack_validate(path,0,error,capacity); }
+
+/* Require the owner's actual donor at selection and each boot, even when a
+ * previously converted pack is installed. Never infer ownership from a pack. */
+int s3_megamix_rom_validate(const char *path,char *error,unsigned capacity)
+{
+    const char *message="Select your Sonic Megamix v3 ROM (extract ZIP archives first)";
+    FILE *f=path && *path?fopen(path,"rb"):NULL;
+    int ok=0;
+    if(f) {
+        if(!fseek(f,0,SEEK_END) && ftell(f)==1283224L) {
+            rewind(f);uint8_t *data=malloc(1283224);
+            if(data) {
+                ok=fread(data,1,1283224,f)==1283224 && fgetc(f)==EOF && crc32(data,1283224)==0x66ECB4F4u;
+                free(data);
+            }
+        }
+        fclose(f);
+        message=ok?"Verified Sonic Megamix v3 ROM (shared by all three mods)":"Expected raw Megamix v3: 1,283,224 bytes, CRC32 66ECB4F4";
+    }
+    if(error && capacity)snprintf(error,capacity,"%s",message);
+    return ok;
+}
