@@ -41,7 +41,8 @@ def filesystem():
 
 
 def raw(sectors):
-    return b''.join(bytes(16) + s + bytes(288) for s in sectors)
+    header = b'\0' + b'\xff' * 10 + b'\0' + bytes(3) + b'\1'
+    return b''.join(header + s + bytes(288) for s in sectors)
 
 
 class DiscTests(unittest.TestCase):
@@ -159,6 +160,27 @@ class DiscTests(unittest.TestCase):
         (self.root / 'disc.bin').write_bytes(b'')
         with self.assertRaises(ValueError):
             d.read('PROBE.TXT')
+
+    def test_shared_sgcd_matches_cue_and_rejects_corruption(self):
+        from disc_image import convert
+        cue = self.image()
+        image = self.root / 'disc.sgcd'
+        convert(cue, image)
+        original, shared = Disc(cue), Disc(image)
+        self.assertEqual(shared.files, original.files)
+        self.assertEqual(shared.sector(0, 24), original.sector(0, 24))
+        self.assertEqual(shared.read('PROBE.TXT'), b'proof')
+        blob = bytearray(image.read_bytes())
+        blob[-1] ^= 1
+        image.write_bytes(blob)
+        with self.assertRaisesRegex(ValueError, 'SHA-256'):
+            Disc(image)
+
+    def test_rejects_invalid_raw_sector_header(self):
+        data = bytearray(raw(self.sectors))
+        data[16 * RAW + 15] = 2
+        with self.assertRaises(ValueError):
+            Disc(self.image(data))
 
 
 if __name__ == '__main__':

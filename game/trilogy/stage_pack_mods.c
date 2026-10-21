@@ -1,8 +1,10 @@
 #include "stage_pack.h"
 #include "scd_resource.h"
+#include "scd_import.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -18,6 +20,7 @@ static char s_settings[1024],s_error[256],s_status[4][256];
 static int s_checked[4],s_verified[4],s_rom_verified;
 static char s_rom_status[256],s_music_status[256];
 static int s_music_checked,s_music_verified;
+static char s_cd_disc_path[1024];
 static const char *keys[]={"sonic1","sonic2","megamix","sonic_cd"};
 static void read_path(char dst[1024],const char *src)
 {
@@ -46,7 +49,7 @@ void s3_stage_pack_load(const char *settings)
 {
     memset(s3_pack_requested,0,sizeof s3_pack_requested);
     s3_pack_mighty_requested=s3_pack_shadow_requested=0;s3_megamix_rom_path[0]=0;
-    s3_cd_audio_path[0]=0;s_music_checked=0;s3_cd_ufo_practice=0;
+    s3_cd_audio_path[0]=s_cd_disc_path[0]=0;s_music_checked=0;s3_cd_ufo_practice=0;
     memset(s3_pack_paths,0,sizeof s3_pack_paths);s3_stage_pack_path[0]=0;
     snprintf(s_settings,sizeof s_settings,"%s",settings?settings:"settings.ini");
     char *a=strrchr(s_settings,'/'),*b=strrchr(s_settings,'\\');
@@ -62,6 +65,7 @@ void s3_stage_pack_load(const char *settings)
         if(!strncmp(line,"shadow=",7))s3_pack_shadow_requested=atoi(line+7)!=0;
         if(!strncmp(line,"megamix_rom=",12))read_path(s3_megamix_rom_path,line+12);
         if(!strncmp(line,"sonic_cd_audio=",15))read_path(s3_cd_audio_path,line+15);
+        if(!strncmp(line,"sonic_cd_disc=",14))read_path(s_cd_disc_path,line+14);
         if(!strncmp(line,"sonic_cd_ufo_practice=",22)) {
             int value=atoi(line+22);if(value>=0 && value<=8)s3_cd_ufo_practice=value;
         }
@@ -123,7 +127,7 @@ static const char *descs[]={
     "Add all Sonic 1 stages before Sonic 3 & Knuckles. Works independently or with the other campaign packs.",
     "Add all Sonic 2 stages before Sonic 3 & Knuckles, after Sonic 1 when installed.",
     "Add all 19 Megamix v3 acts after Sonic 3 & Knuckles. Requires your Megamix v3 ROM and locally converted content pack, shared with Mighty and Shadow.",
-    "Add Sonic CD between Sonic 2 and Sonic 3 & Knuckles, with time travel and UFO special stages. Works independently of the other campaign packs.",
+    "Play Sonic CD stages with S3K characters and abilities, between Sonic 2 and Sonic 3 & Knuckles. Select your owned US disc to import stages and music together. No Sega CD BIOS required.",
     "Add Mighty and Mighty & Tails to Data Select, independently of Megamix stages and Shadow. Requires your Megamix v3 ROM and locally converted content pack.",
     "Add Shadow and Shadow & Tails to Data Select, independently of Megamix stages and Mighty. Requires your Megamix v3 ROM and an updated locally converted content pack."};
 static const RecompLauncherCModProvider *base;
@@ -165,19 +169,34 @@ static int set_enabled(void *c,const char *p,int on)
 static int feature_enable(void *c,const char *p,const char *f,int on)
 { return index_of(p)<0?base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on):own(p,f)&&set_enabled(c,p,on); }
 static int resource_count(void *c,const char *p,const char *f)
-{ (void)c;return index_of(p)>=0?(own(p,f)?(index_of(p)>=2?2:1):0):base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0; }
+{ (void)c;return index_of(p)>=0?(own(p,f)?(index_of(p)==3?3:index_of(p)>=2?2:1):0):base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0; }
+static void check_music(void)
+{
+    if(s_music_checked)return;
+    ScdResource music={0};s_music_verified=scd_resource_open(&music,s3_cd_audio_path,1,s_music_status,sizeof s_music_status);
+    scd_resource_close(&music);s_music_checked=1;
+}
 static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncherCModResource *o)
 {
     (void)c;int i=index_of(p);if(i<0)return base&&base->feature_resource_get&&base->feature_resource_get(base->ctx,p,f,n,o);
-    if(!own(p,f)||n<0||n>=(i>=2?2:1)||!o)return 0;
+    if(!own(p,f)||n<0||n>=(i==3?3:i>=2?2:1)||!o)return 0;
+    if(i==3 && n==0) {
+        memset(o,0,sizeof *o);COPY(o->id,"cd-disc");COPY(o->label,"Sonic CD (US) disc");
+        COPY(o->description,"Select your owned CUE/BIN disc or the same .sgcd image used by SonicCDRecomp. Stages and all CD music are imported together. Extract archives first.");
+        COPY(o->path,s_cd_disc_path);COPY(o->file_patterns,"*.cue,*.sgcd");
+        COPY(o->file_description,"Sonic CD disc");o->import_on_select=1;
+        if(!s_checked[3]){s_verified[3]=s3_pack_validate(s3_pack_paths[3],4,s_status[3],sizeof s_status[3]);s_checked[3]=1;}
+        check_music();o->verified=*s_cd_disc_path && s_verified[3] && s_music_verified;
+        COPY(o->status,o->verified?"Imported stages and music are ready":*s_cd_disc_path?
+             "Imported resources unavailable; select the disc to restore them":"Select your disc to import stages and music");
+        return 1;
+    }
+    if(i==3)n--; /* keep the two manually converted resource choices */
     if(i==3 && n==1) {
         memset(o,0,sizeof *o);COPY(o->id,"cd-music");COPY(o->label,"CD music");
         COPY(o->description,"Present and future music from your converted disc. Missing music leaves stages, past music and voices available.");
         COPY(o->path,s3_cd_audio_path);COPY(o->file_patterns,"*.pak");COPY(o->file_description,"Converted Sonic CD music");
-        if(!s_music_checked) {
-            ScdResource music={0};s_music_verified=scd_resource_open(&music,s3_cd_audio_path,1,s_music_status,sizeof s_music_status);
-            scd_resource_close(&music);s_music_checked=1;
-        }
+        check_music();
         o->required=0;o->verified=s_music_verified;
         COPY(o->status,s_music_verified?"Verified music resource":"Music unavailable; stage progress retained");return 1;
     }
@@ -202,11 +221,15 @@ static int resource_set(void *c,const char *p,const char *f,const char *r,const 
 {
     (void)c;int i=index_of(p);s_error[0]=0;
     if(i<0)return base&&base->feature_resource_set_path&&base->feature_resource_set_path(base->ctx,p,f,r,path);
+    if(i==3 && own(p,f) && r && !strcmp(r,"cd-disc")) {
+        if(!path || *path){COPY(s_error,"Use the disc importer to prepare stages and music together.");return 0;}
+        s_cd_disc_path[0]=0;return 1; /* clearing a source never deletes imported resources */
+    }
     if(i==3 && own(p,f) && r && !strcmp(r,"cd-music")) {
         if(!path || strlen(path)>=1024 || strchr(path,'\n') || strchr(path,'\r'))return 0;
         ScdResource music={0};
         if(*path && !scd_resource_open(&music,path,1,s_error,sizeof s_error))return 0;
-        scd_resource_close(&music);snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"%s",path);s_music_checked=0;return 1;
+        scd_resource_close(&music);snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"%s",path);s_cd_disc_path[0]=0;s_music_checked=0;return 1;
     }
     if(!own(p,f)||!r||!path||strlen(path)>=1024||strchr(path,'\n')||strchr(path,'\r'))return 0;
     if((i==2 || i>=4) && !strcmp(r,"megamix-rom")) {
@@ -216,6 +239,7 @@ static int resource_set(void *c,const char *p,const char *f,const char *r,const 
     if(strcmp(r,"stage-bank"))return 0;
     i=i<4?i:2;
     if(*path&&!s3_pack_validate(path,i+1,s_error,sizeof s_error))return 0;
+    if(i==3)s_cd_disc_path[0]=0;
     snprintf(s3_pack_paths[i],1024,"%s",path);s3_pack_refresh();return 1;
 }
 static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCModOption *o)
@@ -250,6 +274,7 @@ static int commit(void *c,const char *image)
     fprintf(f,"format=3\nmighty=%d\nshadow=%d\nmegamix_rom=%s\n",s3_pack_mighty_requested,s3_pack_shadow_requested,s3_megamix_rom_path);
     for(int i=0;i<4;i++)fprintf(f,"%s=%d\n%s_bank=%s\n",keys[i],s3_pack_requested[i],keys[i],s3_pack_paths[i]);
     fprintf(f,"sonic_cd_audio=%s\nsonic_cd_ufo_practice=%d\n",s3_cd_audio_path,s3_cd_ufo_practice);
+    fprintf(f,"sonic_cd_disc=%s\n",s_cd_disc_path);
     int ok=!ferror(f);if(fclose(f))ok=0;
 #ifdef _WIN32
     if(ok)ok=MoveFileExA(tmp,s_settings,MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)!=0;
@@ -266,6 +291,30 @@ static int commit_netplay(void *c,const char *image)
 }
 static const char *last_error(void *c)
 { (void)c;return *s_error?s_error:base&&base->last_error?base->last_error(base->ctx):""; }
+static int resource_import(void *c,const char *p,const char *f,const char *r,
+                           const char *path,const char *image,
+                           void (*progress)(void *,float,const char *),void *user,
+                           char *error,size_t capacity)
+{
+    (void)c;
+    if(index_of(p)!=3 || !own(p,f) || !r || strcmp(r,"cd-disc"))
+        return base&&base->feature_resource_import&&base->feature_resource_import(
+            base->ctx,p,f,r,path,image,progress,user,error,capacity);
+    if(!path||strlen(path)>=sizeof s_cd_disc_path||strchr(path,'\n')||strchr(path,'\r')) {
+        snprintf(error,capacity,"Invalid Sonic CD disc path.");return 0;
+    }
+    char content[1024],music[1024];
+    if(!s3_cd_import(path,image,s_settings,content,music,error,capacity,progress,user))return 0;
+    unsigned error_capacity=capacity>UINT_MAX?UINT_MAX:(unsigned)capacity;
+    ScdResource audio={0};
+    if(!s3_pack_validate(content,4,error,error_capacity))return 0;
+    if(!scd_resource_open(&audio,music,1,error,error_capacity))return 0;
+    scd_resource_close(&audio);
+    /* Adopt the complete verified pair together, preserving every mod switch
+     * and all in-game progress. A failed conversion never reaches this point. */
+    COPY(s_cd_disc_path,path);COPY(s3_pack_paths[3],content);COPY(s3_cd_audio_path,music);
+    s_music_checked=0;s3_pack_refresh();return 1;
+}
 const RecompLauncherCModProvider *s3_stage_pack_mods(const RecompLauncherCModProvider *common)
 {
     static RecompLauncherCModProvider p;base=common;if(common)p=*common;else memset(&p,0,sizeof p);
@@ -273,6 +322,7 @@ const RecompLauncherCModProvider *s3_stage_pack_mods(const RecompLauncherCModPro
     p.feature_count=features;p.feature_get=feature_get;p.feature_enable=feature_enable;
     p.feature_option_get=option_get;p.feature_choice_get=choice_get;p.feature_set_option=set_option;
     p.feature_resource_count=resource_count;p.feature_resource_get=resource_get;p.feature_resource_set_path=resource_set;
+    p.feature_resource_import=resource_import;
     p.commit=commit;p.commit_netplay=commit_netplay;p.last_error=last_error;return &p;
 }
 #else
