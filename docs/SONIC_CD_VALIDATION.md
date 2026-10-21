@@ -1,5 +1,45 @@
 # Sonic CD validation ledger
 
+## Integration follow-up, 2026-10-21
+
+The campaign remains an S3K adaptation. Standalone SonicCDRecomp now supplies
+the original-program reference; earlier notes that its general backend was
+still pending are historical. The follow-up shares its upstream media/ISO
+readers, adds CUE/SGCD input parity, imports content and music as one atomic
+installation, and exposes a background owned-disc import in recomp-ui.
+Gameplay code, resource formats and persistent campaign progress are unchanged.
+The historical gameplay/visual results below retain their original scope.
+New evidence is private under
+`G:/Temp/Codex/segagenesisrecomp/sonic3k-cd-integration`:
+
+| Result | Check | Scope / evidence |
+| --- | --- | --- |
+| PASS | Shared owned-media input | Synthetic CUE/SGCD program-area parity includes stored/virtual pregaps and postgaps; 15 disc tests cover corrupt SGCD payloads, invalid MODE1 sectors and bounded reads. Native SGCD/ISO extraction has seven independent tests. |
+| PASS | Complete owned import | Real native wrapper/provider imports the qualified US SGCD into both resources. Content SHA256 is `fe8055c36f6c2836d7dc6427da8aee1ad483ef363ae51c50011f03052cf73c02`; music is `1f2318b96cc08a78a6c20852a74398b2a9c298472ccafc6244a9b5843ea68fab`. Both exactly match the previously qualified packs. `owned-import.log`. |
+| PASS | Failure and persistence | Failed retry retains both paths; settings commit/reload preserves the complete installation and other mod switches. Transaction tests cover audio failure, atomic publication, reuse and corrupt-cache rejection. |
+| PASS | Launcher completion | Actual hidden, muted launcher imports the owned disc, shows progress, restores resource controls and re-enables Play. `candidate-ui/{disc-resource,import-progress,import-complete}.png`, `qa-driver-ui-final.log`. |
+| PASS | Process completion | Windows and Linux tests spawn an importer descendant retaining stdout. Both success and failure return on the actual importer exit, retaining final progress/error output. `linux-import-pipe.log`; CTest `scd_import_process`. |
+| PASS | Installed Python selection | Real Windows `py -3` dispatch rejects a missing input with literal shell metacharacters without invoking a shell or the Windows Store Python alias. |
+| PASS | Existing feature combinations | All 64 actual stage/character provider configurations pass using the rebuilt resources and shared owned Megamix donor. `provider-matrix`. |
+| PASS | Final visual comparison | Palmtree Panic with Shadow matches the qualified prior campaign build exactly in RGB at 320x224 and 398x224. Independently inspected against standalone native CD's `docs/assets/games/sonic-cd-wide.png`: terrain patterns, foliage, background and palette agree; character art/HUD, camera and animation phase intentionally differ. Launcher dashboard layout also matches the prior build; the new resource/progress/completion views were inspected. `visual-comparison.png`, `qa-report.json`. |
+| PASS | Focused regressions | Nine focused CTests pass, plus the real UI worker/poll unit on Windows and Linux. Linux component compilation includes the POSIX importer. `linux-checks.log`, `linux-import-pipe.log`. |
+| PASS | Public converter payload | Production staging includes the importer, shared media readers and graph validator (47 allowlisted files); both CLIs resolve their packaged tools outside the source checkout. No owned inputs are staged. `distribution-check.log`. |
+| REUSED | Audio, controls, campaign/save mechanics | Gameplay/audio implementations and both generated resources are unchanged. The earlier qualified checks below retain their scope; no new full 70-variant playthrough or durable-save matrix is claimed. |
+| UNVERIFIED | Linux graphical import | Linux worker/process/component checks pass; a full graphical Linux game/import run was not repeated for this follow-up. |
+
+The initial visible automated launcher was not an owner handoff. It exposed a
+completion polling gate restricted to first-run-wizard titles; cartridge mods
+now poll and display import progress too. Process handling also no longer waits
+for pipe EOF from inherited descendant handles. Earlier GUI attempts failed;
+the final hidden run passed. An earlier capture used the executable's existing
+save directory instead of its working directory; isolated executable copies
+fixed QA provenance before the reported visual comparisons.
+
+No campaign mechanics were deferred by this importer change. Existing
+adaptation limits remain: S3K movement/HUD/ordinary character art, shared Sonic
+art in UFO/warp scenes, some monitor reward substitutions and the S3K campaign
+ending flow. Original-program behavior remains in standalone SonicCDRecomp.
+
 This ledger records campaign qualification and its explicit limits; it is not a
 main/master merge declaration. The owner goal
 is campaign completion and a commit on the CD branch, followed by a general

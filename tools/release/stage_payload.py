@@ -10,6 +10,32 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def stage_campaign_tools(dest, build, system):
+    """Copy the complete public converter, including shared upstream media IO."""
+    tools = dest / "tools"
+    tools.mkdir(exist_ok=True)
+    for name in ("build_stage_pack.py", "build_megamix_pack.py",
+                 "split_campaign_packs.py", "build_sonic_cd_pack.py", "import_sonic_cd.py"):
+        shutil.copy2(ROOT / "tools" / name, tools / name)
+    for directory in ("trilogy", "megamix"):
+        tracked = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--",
+            f"tools/{directory}"], text=True).splitlines()
+        for relative in tracked:
+            src = ROOT / relative
+            if src.suffix.lower() not in (".py", ".json", ".txt", ".png"):
+                continue
+            target = tools / src.relative_to(ROOT / "tools")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, target)
+    media_tools = tools / "segacd"
+    media_tools.mkdir(exist_ok=True)
+    for name in ("disc_image.py", "sgcd_owned_extract.py", "owned_media.py"):
+        shutil.copy2(ROOT / "segagenesisrecomp/tools/segacd" / name, media_tools / name)
+    helper = "scd_pack_validate" + (".exe" if system == "Windows" else "")
+    assert (build / helper).is_file(), "Build the public scd_pack_validate target"
+    shutil.copy2(build / helper, dest / helper)
+
+
 def font_notices(path):
     """Read copyright/license name records without a packaging-only dependency."""
     data = path.read_bytes()
@@ -74,24 +100,7 @@ def stage(build, dest, version, mode):
         for name in ("STAGE_PACKS.md", "MEGAMIX_STAGE_PACK.md", "SHADOW_CHARACTER.md",
                      "SONIC_CD.md", "SONIC_CD_VALIDATION.md"):
             shutil.copy2(ROOT / "docs" / name, docs / name)
-        tools = dest / "tools"
-        tools.mkdir(exist_ok=True)
-        for name in ("build_stage_pack.py", "build_megamix_pack.py",
-                     "split_campaign_packs.py", "build_sonic_cd_pack.py"):
-            shutil.copy2(ROOT / "tools" / name, tools / name)
-        for directory in ("trilogy", "megamix"):
-            tracked = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--",
-                f"tools/{directory}"], text=True).splitlines()
-            for relative in tracked:
-                src = ROOT / relative
-                if src.suffix.lower() not in (".py", ".json", ".txt", ".png"):
-                    continue
-                target = tools / src.relative_to(ROOT / "tools")
-                target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, target)
-        helper = "scd_pack_validate" + (".exe" if info["system"] == "Windows" else "")
-        assert (build / helper).is_file(), "Build the public scd_pack_validate target"
-        shutil.copy2(build / helper, dest / helper)
+        stage_campaign_tools(dest, build, info["system"])
     assets = build / "assets"
     assert (assets / "fonts/LatoLatin-Regular.ttf").is_file(), "Missing launcher font"
     assert (assets / "img" / spec["boxart"]).is_file(), "Missing mode box art"

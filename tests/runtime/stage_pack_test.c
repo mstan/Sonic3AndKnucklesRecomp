@@ -5,6 +5,8 @@
 #include <string.h>
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix","sonic3.sonic-cd","sonic3.mighty","sonic3.shadow"};
+static void import_progress(void *ctx,float pct,const char *message)
+{ (void)ctx;printf("import %.2f %s\n",pct,message);fflush(stdout); }
 int main(int argc,char **argv)
 {
     remove("sonic3k-stage-pack.ini");s3_stage_pack_load("settings.ini");
@@ -26,6 +28,35 @@ int main(int argc,char **argv)
             CHECK(!p->feature_resource_set_path(NULL,ids[i],"campaign",r.id,"missing.bin"));
         }
         CHECK(p->feature_enable(NULL,ids[i],"campaign",0));
+    }
+    if(argc==4 && (!strcmp(argv[1],"--import") || !strcmp(argv[1],"--reject-import"))) {
+        char error[256],content[1024],music[1024];RecompLauncherCModResource resource;
+        CHECK(p->feature_resource_count(NULL,ids[3],"campaign")==3);
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",0,&resource));
+        CHECK(!strcmp(resource.id,"cd-disc") && resource.import_on_select);
+        CHECK(p->feature_enable(NULL,ids[3],"campaign",1));
+        int imported=p->feature_resource_import(NULL,ids[3],"campaign","cd-disc",argv[2],argv[3],
+                                                import_progress,NULL,error,sizeof error);
+        if(!strcmp(argv[1],"--reject-import")) {
+            CHECK(!imported && strstr(error,"missing") && !strstr(error,"Install Python"));
+            CHECK(!s3_stage_pack_cd);remove("sonic3k-stage-pack.ini");
+            printf("Owned-input rejection through the installed Python launcher passed: %s\n",error);return 0;
+        }
+        if(!imported)fprintf(stderr,"import failed: %s\n",error);
+        CHECK(imported);
+        CHECK(s3_stage_pack_cd && !s3_stage_pack_mighty && !s3_pack_shadow_requested);
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",1,&resource) && resource.verified);
+        snprintf(content,sizeof content,"%s",resource.path);
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",2,&resource) && resource.verified);
+        snprintf(music,sizeof music,"%s",resource.path);
+        CHECK(!p->feature_resource_import(NULL,ids[3],"campaign","cd-disc","missing-disc.cue",argv[3],
+                                         import_progress,NULL,error,sizeof error));
+        CHECK(!strcmp(content,s3_pack_paths[3]) && !strcmp(music,s3_cd_audio_path));
+        CHECK(p->commit(NULL,NULL));s3_stage_pack_load("settings.ini");
+        CHECK(s3_stage_pack_cd && !strcmp(content,s3_pack_paths[3]) && !strcmp(music,s3_cd_audio_path));
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",0,&resource));
+        CHECK(resource.verified && !strcmp(resource.path,argv[2]));
+        printf("Imported content: %s\nImported music: %s\n",content,music);
     }
     /* A same-size impostor must fail too, without requiring any donor data. */
     FILE *bad=fopen("invalid-megamix.bin","wb");CHECK(bad);
@@ -80,5 +111,7 @@ int main(int argc,char **argv)
     }
     for(int i=0;i<6;i++)CHECK(p->feature_enable(NULL,ids[i],"campaign",0));
     CHECK(!s3_stage_pack_state_reason());CHECK(p->commit_netplay(NULL,NULL));
-    remove("sonic3k-stage-pack.ini");puts("Independent mods: six defaults, shared required donor, rejection, 64 permutations, migration and removal/reinstall passed");return 0;
+    remove("sonic3k-stage-pack.ini");
+    puts(argc==6?"Independent mods: six defaults, shared required donor, rejection, 64 permutations, migration and removal/reinstall passed":
+                 "Independent mod defaults and rejection checks passed; owned combinations require five input arguments");return 0;
 }

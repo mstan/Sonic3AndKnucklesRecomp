@@ -67,12 +67,15 @@ target_include_directories(megamix_hooks_test PRIVATE "${CMAKE_SOURCE_DIR}/game/
 add_test(NAME megamix_hooks COMMAND megamix_hooks_test)
 add_executable(stage_pack_test runtime/stage_pack_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_mods.c"
+    "${CMAKE_SOURCE_DIR}/game/trilogy/scd_import.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_resource.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_bank.c")
 target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${CMAKE_SOURCE_DIR}/recomp-ui/src")
-target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1)
+target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1
+    S3_CD_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py"
+    S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
 add_test(NAME stage_pack COMMAND stage_pack_test)
 
 add_executable(sonic3_mods_test runtime/sonic3_mods_test.c "${S3_GAME_COMMON}/sonic3_mods.c")
@@ -114,12 +117,25 @@ endif()
 
 find_package(Python3 QUIET COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
+    add_executable(scd_import_process_test runtime/scd_import_process_test.c
+        "${CMAKE_SOURCE_DIR}/game/trilogy/scd_import.c")
+    target_include_directories(scd_import_process_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
+    target_compile_definitions(scd_import_process_test PRIVATE
+        S3_CD_IMPORT_SOURCE="${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_process_fixture.py"
+        S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
+    file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/import-process")
+    add_test(NAME scd_import_process COMMAND scd_import_process_test
+        "${CMAKE_CURRENT_BINARY_DIR}/import-process/settings.ini")
+    set_tests_properties(scd_import_process PROPERTIES TIMEOUT 15
+        ENVIRONMENT "SONIC3K_PYTHON=${Python3_EXECUTABLE}")
     add_test(NAME trilogy_hook_ownership COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/check_trilogy_hook_ownership.py")
     add_test(NAME scd_resource COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_resource_test.py" --validator "$<TARGET_FILE:scd_resource_test>")
     add_test(NAME scd_disc COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_disc_test.py")
+    add_test(NAME scd_import_transaction COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_test.py")
     add_test(NAME megamix_sprite_formats COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/megamix_sprite_test.py")
     if(EXISTS "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin")

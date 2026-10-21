@@ -30,6 +30,7 @@ release-linux/
 # Owner ROMs live at game/<mode>/<rom>.bin (covered by *.bin above).
 **/generated/
 **/__pycache__/
+sonic-cd-imports/
 *.gpr
 *.rep/
 *.lock

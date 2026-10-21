@@ -145,7 +145,8 @@ special-stage entrance/return routes, all-character interaction coverage,
 reference host-state serialization remain
 follow-up work.
 
-Sonic CD is excluded: the cited stage-port reference has no CD stage layer.
+That original S1/S2 audit excludes Sonic CD. The separately implemented CD
+campaign now has its own [conversion, adaptation and validation guide](SONIC_CD.md).
 Megamix v3 stages and Mighty are implemented in the third independent mod;
 see [the Megamix guide](MEGAMIX_STAGE_PACK.md) for conversion and audit bounds.
 

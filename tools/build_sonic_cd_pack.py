@@ -29,18 +29,23 @@ def source_identity(disc):
     return digest.hexdigest()
 
 
-def main(argv=None):
+def main(argv=None, *, source=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--cue', type=Path, required=True)
+    ap.add_argument('--disc', '--cue', dest='cue', type=Path, required=True,
+                    help='owned CUE/BIN disc or the shared .sgcd image')
     ap.add_argument('--out', type=Path, required=True)
     ap.add_argument('--kind', choices=('content', 'audio'), default='content')
     ap.add_argument('--s3k', type=Path)
     ap.add_argument('--validator', type=Path, help='scd_pack_validate executable (required for content)')
     args = ap.parse_args(argv)
     try:
-        disc = Disc(args.cue)
+        # A combined import shares one verified media/ISO instance across the
+        # content and music passes, avoiding repeated full SGCD verification.
+        disc = source if source is not None else Disc(args.cue)
+        if disc.media.path != args.cue.resolve():
+            raise ValueError('shared disc does not match the requested input')
         output = args.out.resolve()
-        inputs = {args.cue.resolve()} | {t.path for t in disc.track_info}
+        inputs = disc.input_paths.copy()
         if args.s3k:
             inputs.add(args.s3k.resolve())
         if output in inputs:
