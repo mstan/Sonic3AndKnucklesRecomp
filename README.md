@@ -1,9 +1,24 @@
 # Sonic 3 & Knuckles — Recompiled
 
-Native x64 static recompilation of **Sonic the Hedgehog 3** and **Sonic &
-Knuckles** for the Sega Genesis / Mega Drive, built on the shared
-[`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
-runner.
+Play **Sonic 3 & Knuckles** on your PC, with Sonic, Tails and Knuckles.
+Optional mods bring in more adventures and let Mighty and Shadow join the fun.
+Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
+
+## Download and play
+
+1. Download your game's package from [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases).
+   Choose **Sonic3KRecomp** for the combined game and the extra campaign options.
+2. Extract the complete Windows ZIP, then open the game. On Linux, make the
+   AppImage executable and open it.
+3. Select your own matching game ROM in the launcher.
+4. Check your controls, then select **PLAY**.
+
+Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
+the separate versions need their corresponding ROMs. Download availability
+varies by release: v0.5.3 has Windows packages; Linux packages are in v0.5.2.
+
+**The extra campaigns, Mighty and Shadow shown below are newer than v0.5.3.**
+They are currently available in source builds, ahead of the next release.
 
 ## Every zone, across the campaigns
 
@@ -87,240 +102,72 @@ Metallic Base · Final Fight.
 
 </details>
 
-## Experimental campaign mods
+## Extra campaigns and characters
 
-The combined **Sonic3KRecomp** target includes six independent, default-off
-experimental mods: **Sonic 1 stages**, **Sonic 2 stages**, **Sonic CD stages**,
-**Sonic Megamix stages**, **Mighty**, and **Shadow**. Enabled campaigns run in
-the order Sonic 1, Sonic 2, Sonic CD, native Sonic 3 & Knuckles, then Megamix.
-Each extra character can be enabled without Megamix stages or the other
-character. All three Megamix additions require your own raw Megamix v3 ROM
-and locally converted content pack. Select
-them once in any of the three Mods entries; their paths fill automatically
-in the other two. Extract ZIP archives before selecting the ROM. No ROMs or
-converted packs are distributed.
+In **Sonic3KRecomp**, open **Mods** to choose your additions. Each has its own
+checkbox, and all are **experimental** and off by default.
 
-**Sonic CD stages (Experimental)** adapts all 70 stage/time variants to S3K
-characters and abilities. Supply your owned supported US disc to import its
-stages and music together; this mod does not need a Sega CD BIOS. See
-[Sonic CD setup and adaptation limits](docs/SONIC_CD.md). The separate
-[SonicCDRecomp](https://github.com/mstan/SonicCDRecomp) runs the original CD
-programs.
+| Mod | What you need |
+| --- | --- |
+| Sonic 1 stages | Your own supported Sonic 1 ROM and a prepared stage pack |
+| Sonic 2 stages | Your own supported Sonic 2 ROM and a prepared stage pack |
+| Sonic CD stages | Your own supported Sonic CD (US) disc image |
+| Sonic Megamix stages | Your own Sonic Megamix v3 ROM and a prepared content pack |
+| Mighty | The same Megamix ROM and content pack |
+| Shadow | The same Megamix ROM and content pack |
 
-Saves retain native-compatible SRAM and keep addon progress in a companion
-journal. Removing a pack safely parks its progress; adding it back restores
-the saved stage and character. Keep the SRAM, its `.campaign` companion and
-backup together. See [setup, credits and validation limits](docs/STAGE_PACKS.md)
-and [Megamix conversion and gameplay](docs/MEGAMIX_STAGE_PACK.md).
+Enable whichever campaigns you want. They play in this order:
+**Sonic 1 → Sonic 2 → Sonic CD → Sonic 3 & Knuckles → Megamix**.
+You can enable Mighty or Shadow without enabling Megamix stages. Selecting
+the Megamix files once fills them in for all three options.
 
-## Opt-in widescreen experiment
+For **Sonic CD**, select your disc under the mod's **Files** and wait for the
+import to finish before pressing PLAY. **No Sega CD BIOS is needed for this
+mod.** It uses Sonic 3 & Knuckles' characters and abilities. For the original
+Sonic CD experience, see [SonicCDRecomp](https://github.com/mstan/SonicCDRecomp).
 
-The custom renderer is available in all three targets, developed first on
-**Sonic3KRecomp** (the combined cartridge). Open **Mods**, enable **Widescreen**, and select **Adaptive**, **16:9**,
-**21:9** or **32:9**. Native rendering remains the default. Adaptive follows
-the window beyond 32:9; the same settings are available in the in-game overlay.
+Stage packs must be prepared from your own game files before use. Follow the
+[Sonic 1/2 setup guide](docs/STAGE_PACKS.md#build-your-stage-bank),
+[Megamix setup guide](docs/MEGAMIX_STAGE_PACK.md#enable-and-convert), or
+[Sonic CD setup guide](docs/SONIC_CD.md#convert-your-owned-disc).
+The CD import currently also needs Python and Pillow, as explained in its guide.
 
-The experiment expands stage/background rendering, object activation, rings
-and the screen-anchored HUD, with optional gameplay CPU headroom. It does not
-rewrite stage collision or decompression. Initial validation covers Angel
-Island and Mushroom Hill routes, not every stage or boss. Blue Spheres now has
-an expanded ground/sphere projection and edge-anchored counters; its native
-board, movement and collection logic are unchanged. Combined-cartridge save
-replays cover turning, collection, jumping and the exit fade.
-See [renderer notes](game/common/CUSTOM-VIDEO.md) for implementation,
-validation and known limits. Existing build caches may need
-`-DRECOMP_UI_ENABLE_MODS=ON` to expose the Mods page.
+## Make it your own
 
-## Knuckles & Knuckles (opt-in gag)
+- **Controls:** set up your keyboard or controller in the launcher.
+- **Widescreen:** enable **Mods → Widescreen** and choose **Adaptive** to fit
+  the game to your window, or select a fixed screen shape.
+- **Knuckles & Knuckles:** enable the mod and play as Knuckles with a crowd
+  following you. Choose 1–74 extras; additional local controllers can join in.
+  Available in Sonic 3 & Knuckles and Sonic & Knuckles.
 
-In **Sonic3KRecomp** and **SonicAndKnucklesRecomp**, enable **Mods →
-Knuckles & Knuckles** and play as Knuckles. Type **1-74** in **Extra Knuckles**
-(default **16**) to choose how many follow you. Busy stages may temporarily
-use fewer extras. A controller on player 2-4 drives the matching extra; the rest
-use Tails-style CPU following. S3K's title shows a still Knuckles and
-**KNUCKLES 3**, and empty save files default to Knuckles. Existing save files
-keep their character. Both titles get the "Knuckles & Knuckles" treatment.
-Local play only, off by default. See
-[docs/KNUCKLES_ARMY.md](docs/KNUCKLES_ARMY.md).
+## Your progress
 
-Sonic 3 and Sonic & Knuckles shipped as two separate ~2 MB cartridges; **"Sonic
-3 & Knuckles"** is the 4 MB **lock-on** combination of the two (S&K boots at
-`$000000`, Sonic 3 maps in at `$200000`). They share one engine, so this repo
-hosts all three as **build modes** — each a native target plus a paired
-`_oracle` (interpreter parity-reference) target:
+Use the game's normal save slots to keep your progress. When upgrading or
+moving the game, keep all your save files and settings together.
+Disabling an extra campaign or character keeps its progress for
+when you enable it again.
 
-| Target | Game / ROM | Ports (native/oracle) | Status |
-|---|---|---|---|
-| `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, saves) |
-| `SonicAndKnucklesRecomp` | Sonic & Knuckles alone, 2 MB (MD5 `4ea493ea…`) | 4388 / 4389 | Bring-up |
-| `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Playable; campaign mods experimental |
+With extra campaign mods enabled, save states, rewind and online play are
+currently unavailable. Use the normal in-game saves instead.
 
-> **Prebuilt Sonic 3 binaries are on the
-> [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases) page —
-> supply your own ROM.** Release binaries are AGPL-free clean-room builds
-> (PolyForm Noncommercial 1.0.0 + permissive third-party notices). The AGPL
-> clownmdemu core is used only by unshipped development/oracle targets; see
-> `segagenesisrecomp/RELEASING.md`.
+## Help and feedback
 
-## Building from source
+These optional campaigns and characters are still experimental. If something
+goes wrong, [report an issue](https://github.com/mstan/Sonic3AndKnucklesRecomp/issues)
+with your game version, enabled mods and a screenshot if possible.
 
-**Prerequisites**
-- A C compiler — Windows: Visual Studio 2022 (MSVC); macOS: Apple Clang (Xcode
-  CLT); Linux: Clang/GCC. Plus CMake 3.16+ (and Ninja on macOS/Linux).
-- SDL2 2.28+ — bundled on Windows; `brew install sdl2` (macOS); `libsdl2-dev` (Linux).
-- Your own legally-obtained ROM(s); ROMs are gitignored and never committed.
+Want to build or contribute? See the [build guide](docs/BUILDING.md) and
+[release guide](RELEASING.md).
 
-**1. Clone.** The shared engine (`segagenesisrecomp`) is a git submodule, so a
-recursive clone is self-contained:
+## Credits and license
 
-```bash
-git clone --recursive https://github.com/mstan/Sonic3AndKnucklesRecomp.git
-cd Sonic3AndKnucklesRecomp
-# (cloned without --recursive? run: git submodule update --init --recursive)
-```
-
-`Skipping submodule 'clownmdemu-core'` in that output is expected and correct.
-That core is AGPL and dev-only; nothing you build needs it, and CMake skips the
-dev-only `_oracle` targets automatically when it is absent.
-
-**2. Supply your own ROM(s).** Either pass the ROM path on the command line, or
-drop it into this repo's per-mode game dir so the build copies it next to the exe:
-
-| Mode | Place ROM at | Identity |
-|---|---|---|
-| Sonic 3 alone | `game/sonic3/sonic3.bin` | CRC32 `9BC192CE` |
-| Sonic & Knuckles alone | `game/sandk/sandk.bin` | MD5 `4ea493ea…` (2 MB) |
-| S3 & Knuckles | `game/sonic3k/sonic3k.bin` | 4 MB combined |
-
-**3. Build the mode you want, then run.** Generated C is ignored build output;
-CMake builds the current recompiler and regenerates the selected mode whenever
-its ROM, configuration/discovery inputs, or the recompiler changes.
-
-Windows (MSVC):
-```cmd
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --target Sonic3Recomp           :: Sonic 3 alone
-cmake --build build --config Release --target SonicAndKnucklesRecomp  :: S&K alone
-cmake --build build --config Release --target Sonic3KRecomp           :: S3&K combined
-build\Release\Sonic3Recomp.exe          :: the build copies the ROM next to the exe
-```
-
-macOS / Linux (Ninja + Clang/GCC):
-```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C build Sonic3Recomp Sonic3KRecomp
-./build/Sonic3Recomp "path/to/Sonic 3.bin"
-```
-
-> **Local dev across games:** clone `segagenesisrecomp` once at the workspace root
-> and run `scripts/link-engine.sh` (or `.bat`) to share ONE engine checkout; CMake
-> prefers the gitignored `engine-local` symlink over the submodule.
-
-Each mode also has an `_oracle` target (e.g. `Sonic3Recomp_oracle`) that runs
-the clown68000 interpreter for native↔interpreter parity debugging; it needs
-`debug.ini` next to the exe.
-
-### Optional statically recompiled sound Z80
-
-Native targets normally retain the embedded Z80 interpreter. For development,
-the sound driver can instead use the flat static backend from
-[`smsggrecomp`](https://github.com/mstan/smsggrecomp).
-The generated code consumes the framework's pinned
-[`z80-recomp-core`](https://github.com/mstan/z80-recomp-core) submodule.
-Capture and generate the ROM-derived `<game>_step.c` locally as described in
-[`docs/Z80_STATIC_RECOMP.md`](segagenesisrecomp/docs/Z80_STATIC_RECOMP.md), then
-configure with:
-
-```bash
-cmake -S . -B build-z80 \
-  -DGENESIS_Z80_RECOMP=ON \
-  -DGENESIS_Z80_AOT_SOURCE=/path/to/generated/s3kz80_step.c
-cmake --build build-z80 --config Release --target Sonic3KRecomp
-```
-
-The capture and generated C contain ROM-derived data and remain uncommitted.
-Opcode shapes are statically decoded; mutable driver operands are read live,
-with one-instruction interpreter fallback only for unmatched code. Turbo mode
-silences speaker playback while preserving headless WAV capture.
-
-## Layout
-
-This repo owns the Sonic 3 family implementation; only reusable framework
-code comes from the pinned `segagenesisrecomp` submodule
-(see [docs/REPOSITORY_OWNERSHIP.md](docs/REPOSITORY_OWNERSHIP.md)):
-
-```
-Sonic3AndKnucklesRecomp/
-├── CMakeLists.txt              ← three build modes
-├── game/
-│   ├── common/                 ← shared renderer (sonic3_video.c, Blue Spheres)
-│   ├── sonic3/ sonic3k/ sandk/ ← game.toml, discovery inputs, <mode>_spec.c, ROM
-│   └── skdisasm/               ← pinned source disassembly submodule
-├── ghidra/annotations/         ← reproducible annotation exports
-├── tests/, tools/, docs/       ← game-owned validation, tooling, documentation
-└── segagenesisrecomp/          ← submodule (shared engine)
-```
-
-## Manually regenerate the C from a ROM
-
-Use the configured build's generation targets (a normal build also runs them
-automatically):
-
-```
-cmake --build build --config Release --target genesisrecomp_generate_sonic3
-cmake --build build --config Release --target genesisrecomp_generate_sandk
-cmake --build build --config Release --target genesisrecomp_generate_sonic3k
-```
-
-> Sonic & Knuckles alone shares the S&K master boot path with the combined cart,
-> so its disasm data is regenerated from the same byte-perfect `skdisasm`
-> `sonic3k.lst` at offset 0 — see `game/sandk/game.toml`.
-
-## Sonic 3 & Knuckles (combined) mode — why it's harder
-
-The combined 4 MB target is early bring-up. Beyond the standalone Sonic 3 work,
-it has to handle:
-
-1. **RAM-installed IRQ handlers.** VBlank/HBlank vectors point into 68K RAM
-   (`$FFFFFFF0` / `$FFFFFFF6`); boot code copies trampolines into RAM at
-   runtime, which a static call-graph walk can't follow without a hook/directive.
-2. **Sega lock-on memory map.** S&K at `$000000–$1FFFFF`, Sonic 3 at
-   `$200000–$3FFFFF`; S&K code JSRs into the Sonic 3 bank. The runtime must
-   honor the lock-on mapping.
-3. **Battery SRAM** (`$200001–$203FFF`, odd bytes) for combined save data.
-4. **Header quirks**: SSP = `$00000000` (boot sets it), header checksum covers
-   only the original 2 MB, and one `NBCD` (`$4300`) opcode appears at `$3000EE`.
-
-See `ISSUES.md` / `FEATURES.md` (currently focused on the Sonic-3-alone mode).
-
-## Audio & video enhancements (opt-in)
-
-The runner includes an optional **verified-enhancement shadow** layer — QoL
-audio/video improvements that run alongside the authentic hardware emulation and
-substitute only after continuously proving they still match it (reverting loudly
-if they ever stop). **Off by default** (output is byte-identical to raw hardware
-emulation); enable per-run via environment variables:
-
-| Variable | Values | Effect |
-|----------|--------|--------|
-| `GENESIS_SCREEN` | `raw` (default), `crt`, `trinitron`, `composite`, `linear` | Present-time color model — maps the Genesis 9-bit gamut through a CRT/phosphor model (gamma + lifted black). `raw` is bit-identical passthrough. |
-| `GENESIS_AUDIO_SHADOW` | `0` (default) / `1` | Arms the YM2612 FM shadow — a parallel `ymfm` chip with a relaxed output low-pass that keeps the cleaner, less-aliased highs. |
-| `GENESIS_FM_LADDER` | unset (default) / `off` | With `off`, renders the FM shadow through ymfm's ladder-free `ym3438` (no YM2612 DAC crossover crunch). Needs `GENESIS_AUDIO_SHADOW=1`. |
-
-```bash
-GENESIS_AUDIO_SHADOW=1 GENESIS_FM_LADDER=off GENESIS_SCREEN=crt ./Sonic3KRecomp sonic3k.bin
-```
-
-Full design, verifier algorithm, and rationale: `segagenesisrecomp/docs/SHADOW_ENHANCEMENTS.md`.
-
-## License & ROM
-
-This project's own code: [PolyForm Noncommercial](LICENSE.md) (the recompiler /
-build wiring). **Third-party engine components are separately licensed and
-mostly AGPL-3.0** — see
-`../SonicTheHedgehogRecomp/segagenesisrecomp/THIRD-PARTY-LICENSES.md`.
-
-ROM files are **not** included — supply your own legally-obtained copy.
+Sonic and the original games belong to SEGA. Campaign and character additions
+build on [SonicTrilogy](https://github.com/sonsegajp/SonicTrilogy) and
+[Team Megamix](https://www.headcannon.com/TeamMegamix/).
+This project uses [segagenesisrecomp](https://github.com/mstan/segagenesisrecomp).
+Project code is under the [PolyForm Noncommercial license](LICENSE.md);
+third-party notices accompany the downloads.
 
 ---
 
