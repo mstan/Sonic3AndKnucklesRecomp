@@ -49,7 +49,11 @@ baseline; older distributions and Steam Deck require separate validation.
    and its end cards, and Knuckles
    gameplay. Linux `--reference` can point at the Windows evidence to compare
    every captured pixel and RAM/VRAM byte. Add `--launcher` to capture launcher
-   and controller pages (using Xvfb on Linux). Pillow is required.
+   and controller pages (hidden; Xvfb on Linux). Pillow is required. For
+   Sonic3KRecomp also pass `--sonic-cd-disc`, `--megamix-rom`, `--sonic1-rom`
+   and `--sonic2-rom` (owner inputs, Python 3.11+): the package's own tools
+   import/convert them, the CD import must match the qualified hashes, and the
+   game must enter each campaign/character and stay stock with switches off.
 2. Smoke-test the packaged launcher on both platforms with its assets. Confirm
    Windows starts with a system-only PATH and Linux passes state/ROM discovery,
    relocation and read-only payload checks. Keep evidence under `build*/`.
