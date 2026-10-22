@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import zipfile
 from PIL import Image, ImageChops
 
@@ -26,12 +27,20 @@ def main():
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--reference", type=Path)
     p.add_argument("--launcher", action="store_true", help="Also capture the actual launcher (uses Xvfb on Linux)")
+    campaign = p.add_argument_group("optional S3K campaign checks (owner inputs; nothing is packaged)")
+    campaign.add_argument("--sonic-cd-disc", type=Path, help="Owned Sonic CD (US) CUE or SGCD")
+    campaign.add_argument("--megamix-rom", type=Path, help="Owned Sonic Megamix v3 ROM (CRC32 66ECB4F4)")
+    campaign.add_argument("--sonic1-rom", type=Path, help="Owned Sonic 1 REV01 ROM")
+    campaign.add_argument("--sonic2-rom", type=Path, help="Owned Sonic 2 REV00 ROM")
     args = p.parse_args()
+    campaign_inputs = (args.sonic_cd_disc, args.megamix_rom, args.sonic1_rom, args.sonic2_rom)
+    if any(campaign_inputs) and (args.mode != "sonic3k" or not all(campaign_inputs)):
+        p.error("campaign checks need --mode sonic3k and all four owned campaign inputs")
     spec, out = MODES[args.mode], args.out.resolve()
     out.mkdir(parents=True, exist_ok=False)
     report = {"package_sha256": hashlib.sha256(args.package.read_bytes()).hexdigest(), "cases": {}}
 
-    def run(name, script=None, mod=False, wide=False, save=None, launcher=False):
+    def run(name, script=None, mod=False, wide=False, save=None, launcher=False, files=None, check=None):
         dest = out / name
         dest.mkdir()
         if args.package.suffix == ".zip":
@@ -52,6 +61,8 @@ def main():
             (dest / f"{args.mode}-mods.ini").write_text(f"[knuckles-army]\nenabled={int(mod)}\nsize=16\n")
         if save:
             shutil.copy2(save, dest / "sonic3k.srm")
+        for relative, data in (files or {}).items():
+            (dest / relative).write_bytes(data if isinstance(data, bytes) else data.encode())
         if launcher:
             (dest / f"rom-{spec['short']}.cfg").write_text(str(args.rom.resolve()) + "\n")
             command += ["--launcher"]
@@ -111,6 +122,8 @@ def main():
                     else:
                         assert actual.read_bytes() == expected.read_bytes(), (name, suffix)
             report["cases"][name] = {"size": Image.open(dest / "scene.png").size, "reference_equal": bool(args.reference)}
+            if check:
+                report["cases"][name].update(check(dest))
         else:
             # The benchmark's stable state/audio fingerprints, excluding timings.
             lines = [line.split(" ", 1)[1] for line in log.splitlines() if line.startswith("GENESISRECOMP_BENCHMARK {")]
@@ -165,8 +178,124 @@ def main():
         run("knuckles-level", "WAIT 700\nPRESS DOWN 2\nWAIT 40\nPRESS START 2\n"
             "WAIT_RAM8 FFB02E 83\nWAIT_RAM8 FFB02E 00\nWAIT_RAM8 FFF600 0C\nWAIT 180\n",
             mod=True, wide=True)
+    if all(campaign_inputs):
+        verify_campaigns(args, out, report, run)
     (out / "verification.json").write_text(json.dumps(report, indent=2))
     print(f"PASS packaged release: {out / 'verification.json'}")
+
+
+# Qualified outputs of the supported Sonic CD (US) disc; see docs/SONIC_CD_VALIDATION.md.
+SONIC_CD_US = {"sonic-cd-stages.pak": "fe8055c36f6c2836d7dc6427da8aee1ad483ef363ae51c50011f03052cf73c02",
+               "sonic-cd-audio.pak": "1f2318b96cc08a78a6c20852a74398b2a9c298472ccafc6244a9b5843ea68fab"}
+BOOT = "WAIT 700\nPRESS START 2\nWAIT 90\nPRESS START 2\nWAIT 400\n"
+NEW_GAME = "PRESS START 2\nWAIT_RAM8 FFF600 0C\nWAIT 600\n"
+
+
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def legacy_megamix_save(code, character):
+    """A pre-format-3 Megamix profile save; the game migrates it once."""
+    raw, block = bytearray(16384), bytearray(b"\xff" * 80 + b"BD\0\0")
+    block[:10] = bytes([0, 0, character << 4, code, 0, 0, 0xFF, 0xFC, 9, 3])
+    crc = 0
+    for i in range(0, 82, 2):
+        crc ^= int.from_bytes(block[i:i + 2], "big")
+        carry, crc = crc & 1, crc >> 1
+        if carry:
+            crc ^= 0x8810
+    block[82:84] = crc.to_bytes(2, "big")
+    for offset in (0x281, 0x32D):
+        raw[offset:offset + 168:2] = block
+    return bytes(raw)
+
+
+def verify_campaigns(args, out, report, run):
+    """Convert owned inputs with the PACKAGED tools, then boot every addition."""
+    work = out / "campaign-tools"
+    work.mkdir()
+    if args.package.suffix == ".zip":
+        with zipfile.ZipFile(args.package) as z:
+            z.extractall(work)
+        payload, validator = work, work / "scd_pack_validate.exe"
+    else:
+        app = work / args.package.name
+        shutil.copy2(args.package, app)
+        app.chmod(0o755)
+        subprocess.run([str(app), "--appimage-extract"], cwd=work, check=True,
+                       stdout=subprocess.DEVNULL, timeout=600)
+        app.unlink()
+        payload = work / "squashfs-root/usr/bin"
+        validator = payload / "scd_pack_validate"
+    tools, packs = payload / "tools", out / "campaign-packs"
+    s3k = args.rom.resolve()
+
+    def convert(label, *command):
+        with (out / f"campaign-{label}.log").open("w") as log:
+            r = subprocess.run([sys.executable, *map(str, command)], cwd=work, stdout=log,
+                               stderr=subprocess.STDOUT, timeout=7200)
+        assert r.returncode == 0, ("packaged converter failed", label, out / f"campaign-{label}.log")
+
+    # Sonic CD: the launcher's importer, run from the package with its validator.
+    convert("sonic-cd", tools / "import_sonic_cd.py", "--disc", args.sonic_cd_disc.resolve(),
+            "--s3k", s3k, "--validator", validator, "--out", packs / "sonic-cd")
+    bundles = [d for d in (packs / "sonic-cd").iterdir() if d.is_dir() and not d.name.startswith(".")]
+    assert len(bundles) == 1, bundles
+    cd = bundles[0]
+    hashes = {name: sha256(cd / name) for name in SONIC_CD_US}
+    assert hashes == SONIC_CD_US, ("Sonic CD import differs from the qualified resources", hashes)
+    # Sonic 1/2 base bank, Megamix extension and the independent packs.
+    base, extended = packs / "sonic1-2-stages.bin", packs / "sonic-megamix-stages.bin"
+    convert("stage-bank", tools / "build_stage_pack.py", "--s1", args.sonic1_rom.resolve(),
+            "--s2", args.sonic2_rom.resolve(), "--s3k", s3k, "--out", base)
+    convert("megamix-bank", tools / "build_megamix_pack.py", "--base-bank", base,
+            "--s1", args.sonic1_rom.resolve(), "--s3k", s3k, "--megamix", args.megamix_rom.resolve(),
+            "--out", extended)
+    convert("split", tools / "split_campaign_packs.py", "--bank", extended, "--content", "all", "--out", packs)
+    resources = {name: packs / f"{name}-stages.pak" for name in ("sonic1", "sonic2", "megamix")}
+    resources["sonic_cd"] = cd / "sonic-cd-stages.pak"
+    report["campaign_resources"] = {"sonic_cd": hashes, "megamix_rom": sha256(args.megamix_rom),
+                                    **{n: sha256(p) for n, p in resources.items() if n != "sonic_cd"}}
+
+    def settings(**on):
+        text = "format=3\n" + "".join(f"{n}={int(on.get(n, False))}\n{n}_bank={p.as_posix()}\n"
+                                      for n, p in resources.items())
+        return text + (f"mighty={int(on.get('mighty', False))}\nshadow={int(on.get('shadow', False))}\n"
+                       f"megamix_rom={args.megamix_rom.resolve().as_posix()}\n"
+                       f"sonic_cd_audio={(cd / 'sonic-cd-audio.pak').as_posix()}\n")
+
+    def expect(zone, identity, custom):
+        def check(dest):
+            ram = (dest / "scene.ram").read_bytes()
+            slot = int.from_bytes(ram[0xE660:0xE664], "big") & 0xFFFF
+            mapping = int.from_bytes(ram[0xB00C:0xB010], "big")
+            got = {"zone": ram[0xFE10], "game_mode": ram[0xF600], "identity": ram[slot + 2] >> 4,
+                   "custom_player_art": mapping >= 0x400000}
+            want = {"zone": zone, "game_mode": 0x0C, "identity": identity, "custom_player_art": custom}
+            assert got == want, (dest.name, got, want)
+            return {"campaign": got}
+        return check
+
+    # On a new slot, Mighty is five Up presses; Shadow follows Mighty at seven.
+    def up(n):
+        return "PRESS UP 2\nWAIT 8\n" * n
+    cases = (
+        ("campaign-all-off", {}, BOOT + NEW_GAME, None, (0x00, 0, False)),
+        ("campaign-sonic-cd", {"sonic_cd": True}, BOOT + NEW_GAME, None, (0x40, 0, False)),
+        ("campaign-sonic-cd-mighty", {"sonic_cd": True, "mighty": True}, BOOT + up(5) + NEW_GAME, None,
+         (0x40, 5, True)),
+        ("campaign-sonic1-shadow", {"sonic1": True, "mighty": True, "shadow": True}, BOOT + up(7) + NEW_GAME,
+         None, (0x20, 7, True)),
+        ("campaign-sonic2", {"sonic2": True}, BOOT + NEW_GAME, None, (0x28, 0, False)),
+        ("campaign-megamix-resume", {"megamix": True, "mighty": True}, BOOT + NEW_GAME,
+         legacy_megamix_save(35, 4), (0x35, 4, True)),
+    )
+    for name, on, script, legacy, (zone, identity, custom) in cases:
+        files = {"sonic3k-stage-pack.ini": settings(**on)}
+        if legacy:
+            files["sonic3k-megamix.srm"] = legacy
+        run(name, script, wide=True, files=files, check=expect(zone, identity, custom))
 
 
 if __name__ == "__main__":
