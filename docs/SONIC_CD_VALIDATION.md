@@ -1,5 +1,20 @@
 # Sonic CD validation ledger
 
+## Experimental main integration, 2026-10-21
+
+The owner accepted the corrected `5c00831` playtest and authorized main/master
+integration. Sonic CD retains the launcher name **Sonic CD stages (Experimental)**,
+the experimental feature channel and its disabled-by-default setting. README
+and setup instructions now explicitly identify it as experimental. The
+qualified engine `64c1ffb` and UI `4261bad` pins are retained.
+
+All 15 focused integration checks pass: ten game/provider/save/render/import
+checks and five shared audio/device/media/build-identity checks. Evidence is
+`ctest-main-integration.log` and `ctest-engine-main-integration.log` under the
+existing private evidence root. Earlier full content/visual qualification and
+the actual 70-entry wrap checks below are reused; the final integration changes
+only documentation. No owned ROM, disc, converted pack or save is added.
+
 ## Corrected owner request: original ZONE text and 70-entry wrap, 2026-10-21
 
 The owner rejected the CD/S3K caption change below. Original ZONE text, font
