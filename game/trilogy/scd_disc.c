@@ -4,6 +4,7 @@
 #include "scd_internal.h"
 #include "scd_pack.h"
 #include "stage_pack.h"
+#include "audio.h"
 #include <stdio.h>
 #include <string.h>
 extern const ScdPack *tri_scd_pack(void);
@@ -18,6 +19,9 @@ const ScdTrack *scd_track_info(int number)
 {
     if(!tried) {
         tried=1;char error[256];
+        /* Integrity checking can outlast the device queue on a busy drive.
+         * Retire its old waveform before this explicit loading boundary. */
+        audio_discard_playback();
         if(scd_resource_open(&music,s3_cd_audio_path,1,error,sizeof error)) {
             for(unsigned i=0;i<34;i++) {
                 tracks[i].number=(int)i+2;tracks[i].audio=1;

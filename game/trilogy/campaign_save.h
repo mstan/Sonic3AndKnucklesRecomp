@@ -8,6 +8,8 @@
 int campaign_count(unsigned mask);
 int campaign_stable(unsigned mask,int display);
 int campaign_display(unsigned mask,int stable);
+/* Selected replay caption, including its game and local stage number. */
+void campaign_stage_label(unsigned mask,int display,char out[8]);
 typedef struct CampaignSave {
     uint8_t slots[8][64],view[80];
     unsigned mask,capabilities;
