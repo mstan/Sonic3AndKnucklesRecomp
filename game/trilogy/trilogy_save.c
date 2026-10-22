@@ -208,9 +208,21 @@ int tri_save_hook(uint32_t pc)
         w16(RAM_Current_zone_and_act, tri_code_to_za(0));
         w16(RAM_Apparent_zone_and_act, tri_code_to_za(0));
         return 0;
-    case TH_DS_ZONE_MAX:                             /* a finished file picks from every zone before */
-        D(6) = (D(6) & 0xFFFF0000u) | (uint16_t)(CODE_CLEAR-1);
+    case TH_DS_ZONE_MAX: {
+        unsigned mask=tri_campaign_mask();
+        int count=campaign_count(mask);
+        if((mask&15u)==8u) {
+            /* CD-only replay contains its 70 variants, not the following
+             * native campaign. Keep CLEAR's saved/global cursor intact until
+             * an arrow is pressed, then let the retail loop handle 0..69. */
+            count=70;
+            uint32_t cursor=(A(0)&0xFFFFFFu)+0x36u;
+            if((r8(RAM_Ctrl_1_pressed)&3u) && r16(cursor)>=(unsigned)count)
+                w16(cursor,(uint16_t)count);
+        }
+        D(6) = (D(6) & 0xFFFF0000u) | (uint16_t)(count-1);
         return 0;
+    }
     case TH_DS_CODE_TO_ZONE: {
         {extern void tri_cd_save_select(void);tri_cd_save_select();}
         int code = D(0) & 0xFF;

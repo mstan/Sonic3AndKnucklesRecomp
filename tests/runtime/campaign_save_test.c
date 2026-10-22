@@ -22,17 +22,6 @@ int main(void)
         CHECK(campaign_count(mask)==n);
         for(int d=0;d<=n;d++){int c=campaign_stable(mask,d);CHECK(c>=0&&c<=109);CHECK(campaign_display(mask,c)==d);}
         CHECK(campaign_stable(mask,n+1)==-1);
-        char label[8];
-        campaign_stage_label(mask,campaign_display(mask,31),label);CHECK(!strcmp(label,"S3K 14"));
-        campaign_stage_label(mask,n,label);CHECK(!label[0]);
-        campaign_stage_label(mask,-1,label);CHECK(!label[0]);
-        if(mask&1){campaign_stage_label(mask,campaign_display(mask,6),label);CHECK(!strcmp(label,"S1 7"));}
-        if(mask&2){campaign_stage_label(mask,campaign_display(mask,17),label);CHECK(!strcmp(label,"S2 11"));}
-        if(mask&4){campaign_stage_label(mask,campaign_display(mask,38),label);CHECK(!strcmp(label,"MM 7"));}
-        if(mask&8) {
-            campaign_stage_label(mask,campaign_display(mask,40),label);CHECK(!strcmp(label,"CD 1"));
-            campaign_stage_label(mask,campaign_display(mask,109),label);CHECK(!strcmp(label,"CD 70"));
-        }
         CHECK((campaign_display(mask,40)>=0)==!!(mask&8));
         if(mask&8) {
             int cd=campaign_display(mask,40),base=campaign_display(mask,18);

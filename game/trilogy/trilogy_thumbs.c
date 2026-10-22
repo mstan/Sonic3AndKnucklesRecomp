@@ -494,9 +494,6 @@ static int s_nframes, s_frames_code = -1;
 static uint32_t s_argb[256];
 static int s_t, s_live;                              /* playback clock; frames since a card was asked for */
 static int s_cx, s_cy;                               /* the card's top-left, native screen pixels */
-static char s_caption[8];
-static int s_caption_live;
-static uint32_t s_caption_ink;
 
 static void load_file(void)
 {
@@ -550,8 +547,6 @@ static void thumb_show(int code)
     uint32_t slot = A(0) & 0xFFFFFFu;
     s_cx = (int16_t)r16(slot + OBJ_x_pos) - 40 - 128;
     s_cy = (int16_t)r16(slot + OBJ_y_pos) - 120 - 128;
-    campaign_stage_label(tri_campaign_mask(),code,s_caption);
-    s_caption_live = s_caption[0] ? 2 : 0;
     if (load_frames(campaign_stable(tri_campaign_mask(),code))) {
         s_t++;
         s_live = 2;
@@ -580,65 +575,15 @@ void tri_thumb_show(int code)
 void tri_thumb_vblank(void)
 {
     if (s_live > 0) s_live--;
-    if (s_caption_live > 0) s_caption_live--;
     if (!s_pending) return;
     s_pending = 0;
     memcpy(&g_machine.vdp.vram[CARD_TILE * 32], s_tiles, sizeof s_tiles);
 }
 
-/* Compact five-bit rows for the replay caption. */
-static unsigned caption_row(char ch,int row)
-{
-    static const uint8_t digits[10][7]={
-        {14,17,19,21,25,17,14},{4,12,4,4,4,4,14},
-        {14,17,1,2,4,8,31},{30,1,1,14,1,1,30},
-        {2,6,10,18,31,2,2},{31,16,16,30,1,1,30},
-        {14,16,16,30,17,17,14},{31,1,2,4,8,8,8},
-        {14,17,17,14,17,17,14},{14,17,17,15,1,1,14}};
-    static const uint8_t letters[5][7]={
-        {15,16,16,16,16,16,15}, /* C */
-        {30,17,17,17,17,17,30}, /* D */
-        {15,16,16,14,1,1,30},   /* S */
-        {17,18,20,24,20,18,17}, /* K */
-        {17,27,21,21,17,17,17}};/* M */
-    if(ch>='0' && ch<='9')return digits[ch-'0'][row];
-    static const char glyphs[]="CDSKM";
-    const char *found=strchr(glyphs,ch);
-    return found ? letters[found-glyphs][row] : 0;
-}
-
-static void caption_overlay(int line,uint32_t *out,int width)
-{
-    int y=line-s_cy-65;
-    if(!s_caption_live || y<0 || y>=7)return;
-    int x0=s_cx+(width-320)/2;
-    if(x0+16<0 || x0+64>width)return;
-    /* Original ZONE is six pixels high. Sample its first row once per frame
-     * so our seventh row keeps its ink, including during palette fades. */
-    uint32_t paper=out[x0+47]; /* gap between ZONE and its digits */
-    if(y==0) {
-        int best=0;
-        s_caption_ink=paper;
-        for(int x=16;x<64;x++) {
-            uint32_t c=out[x0+x];
-            int red=(int)((c>>16)&255)*2-(int)((c>>8)&255)-(int)(c&255);
-            if(red>best){best=red;s_caption_ink=c;}
-        }
-    }
-    for(int x=16;x<64;x++)out[x0+x]=paper;
-    int n=(int)strlen(s_caption),left=x0+(CARD_W-(n*6-1))/2;
-    for(int i=0;i<n;i++) {
-        unsigned bits=caption_row(s_caption[i],y);
-        for(int x=0;x<5;x++)if(bits&(16u>>x))out[left+i*6+x]=s_caption_ink;
-    }
-}
-
-/* The frame overlay also names the selected campaign's replay entry. */
+/* the frame overlay (trilogy_menu.c chains it): the recorded frame where the key shows */
 void tri_thumb_overlay(int line, uint32_t *out, int width)
 {
-    if ((r8(RAM_Game_mode) & 0x7F) != 0x4C) return;
-    caption_overlay(line,out,width);
-    if (!s_live || !s_frames) return;
+    if (!s_live || !s_frames || (r8(RAM_Game_mode) & 0x7F) != 0x4C) return;
     int y = line - s_cy;
     if (y < 0 || y >= CARD_H) return;
     uint32_t key = genesis_dac_cram_to_argb(KEY_CRAM, GENESIS_DAC_NORMAL);

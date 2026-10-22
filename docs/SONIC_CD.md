@@ -81,11 +81,12 @@ UFOs through actual jumps to earn one of seven Time Stones. Generator and
 projector progress is saved separately from native Chaos/Super Emeralds.
 The optional No Save UFO practice selection does not award campaign progress.
 
-Completed files select from the combined campaign catalog. With CD enabled
-alone, it contains 70 CD variants followed by 14 S3K stages; each game's zone
-numbers restart at 1. The selected card names the game, for example **CD 70**
-or **S3K 14**. From CLEAR, Up selects CD variant 1, while Down wraps to
-S3K stage 14. Fifteen Down presses from CLEAR reach CD variant 70.
+With Sonic CD as the only enabled stage pack, completed files replay **ZONE 1**
+through **ZONE 70** using the original menu text and artwork. From CLEAR, Up
+selects Zone 1 and Down selects Zone 70. Down from Zone 1 wraps to Zone 70;
+Up from Zone 70 wraps to Zone 1. Mighty and Shadow do not change this range.
+Other stage-pack combinations retain their combined campaign catalog.
+Campaign progression and saved progress are independent of this replay limit.
 
 The first CD music request verifies the music pack; each newly requested song
 also measures its playback loudness once per process. On a busy drive this can
