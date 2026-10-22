@@ -1,7 +1,7 @@
-# Sonic CD campaign preview
+# Experimental Sonic CD campaign mod
 
-Enable **Sonic CD stages** in Mods. It is independent of the other five
-campaign/character switches and defaults off. Enabled campaigns run in this
+Enable **Sonic CD stages (Experimental)** in Mods. It is independent of the
+other five campaign/character switches and defaults off. Enabled campaigns run in this
 order: Sonic 1, Sonic 2, Sonic CD, Sonic 3 & Knuckles, Megamix.
 
 This preview adapts CD's stages, objects, bosses, time travel, UFO stages and
@@ -24,7 +24,7 @@ does not require a BIOS.
 Install Python 3.11 or later and Pillow (`python -m pip install Pillow`). Then:
 
 1. Select your supported S3K cartridge in the launcher.
-2. Enable **Sonic CD stages** in Mods.
+2. Enable **Sonic CD stages (Experimental)** in Mods.
 3. Under its Files, select **Sonic CD (US) disc**.
 4. Wait for the import progress window. Both **Campaign content pack** and
    **CD music** fill automatically after the complete installation is verified.
