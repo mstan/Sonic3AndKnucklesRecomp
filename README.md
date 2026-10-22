@@ -5,6 +5,88 @@ Knuckles** for the Sega Genesis / Mega Drive, built on the shared
 [`segagenesisrecomp`](https://github.com/mstan/segagenesisrecomp) recompiler +
 runner.
 
+## Every zone, across the campaigns
+
+![Gameplay across Sonic 1, Sonic 2, Sonic CD, Sonic 3, Sonic and Knuckles, and Megamix, with different playable characters](docs/images/zones/showcase.png)
+
+The combined campaign brings together **46 zones**, including the final boss
+areas. These are actual **Sonic3KRecomp** captures, mixing Sonic, Tails,
+Knuckles, Mighty and Shadow, including their Tails pairings. Imported stages
+use S3K movement and abilities. Extra campaigns and characters are experimental
+and require your own supported game inputs.
+
+| Campaign order | Zones | Content |
+| --- | ---: | --- |
+| Sonic the Hedgehog | 7 | 19 acts, including Final Zone |
+| Sonic the Hedgehog 2 | 11 | 20 acts, through Death Egg |
+| Sonic CD | 7 | 70 act/time variants; Present, Past, Good Future and Bad Future |
+| Sonic 3 & Knuckles | 14 | Both original campaigns, through The Doomsday |
+| Sonic Megamix v3 | 7 | 19 acts, including Final Fight |
+
+Expand a game to see every zone. Sonic 3 and Sonic & Knuckles have separate
+galleries below. Screenshots use **16:9 widescreen**, except The Doomsday,
+which is shown at native aspect because its widescreen player rendering needs
+a fix. CD captions identify the time period pictured.
+
+<details>
+<summary><b>Sonic the Hedgehog — all 7 zones</b></summary>
+
+Green Hill · Marble · Spring Yard · Labyrinth · Star Light · Scrap Brain ·
+Final Zone.
+
+![All seven Sonic 1 zones with Shadow, Tails, Mighty, Knuckles and Sonic](docs/images/zones/sonic1.png)
+
+</details>
+
+<details>
+<summary><b>Sonic the Hedgehog 2 — all 11 zones</b></summary>
+
+Emerald Hill · Chemical Plant · Aquatic Ruin · Casino Night · Hill Top ·
+Mystic Cave · Oil Ocean · Metropolis · Sky Chase · Wing Fortress · Death Egg.
+
+![All eleven Sonic 2 zones with a mix of the playable characters and Tails pairings](docs/images/zones/sonic2.png)
+
+</details>
+
+<details>
+<summary><b>Sonic CD — all 7 zones, sampling all four time periods</b></summary>
+
+Palmtree Panic · Collision Chaos · Tidal Tempest · Quartz Quadrant ·
+Wacky Workbench · Stardust Speedway · Metallic Madness.
+
+![All seven Sonic CD zones, showing Present, Past, Good Future and Bad Future with S3K characters](docs/images/zones/sonic-cd.png)
+
+</details>
+
+<details>
+<summary><b>Sonic the Hedgehog 3 — all 6 zones</b></summary>
+
+Angel Island · Hydrocity · Marble Garden · Carnival Night · IceCap · Launch Base.
+
+![All six Sonic 3 zones, including Mighty in Angel Island and Shadow snowboarding in IceCap](docs/images/zones/sonic3.png)
+
+</details>
+
+<details>
+<summary><b>Sonic &amp; Knuckles — all 8 zones</b></summary>
+
+Mushroom Hill · Flying Battery · Sandopolis · Lava Reef · Hidden Palace ·
+Sky Sanctuary · Death Egg · The Doomsday.
+
+![All eight Sonic and Knuckles zones, with varied characters and Hyper Sonic in The Doomsday](docs/images/zones/sonic-knuckles.png)
+
+</details>
+
+<details>
+<summary><b>Sonic Megamix v3 — all 7 zones</b></summary>
+
+Sunny Shores · Dark Fortress · City Outskirts · Misty Maze · Starry Night ·
+Metallic Base · Final Fight.
+
+![All seven Megamix v3 zones, with Shadow, Knuckles, Tails, Mighty and Sonic](docs/images/zones/megamix.png)
+
+</details>
+
 ## Experimental campaign mods
 
 The combined **Sonic3KRecomp** target includes six independent, default-off
@@ -71,7 +153,7 @@ hosts all three as **build modes** — each a native target plus a paired
 |---|---|---|---|
 | `Sonic3Recomp` | Sonic 3 alone, 2 MB (CRC32 `9BC192CE`) | 4384 / 4385 | **Playable bring-up** (Angel Island, saves) |
 | `SonicAndKnucklesRecomp` | Sonic & Knuckles alone, 2 MB (MD5 `4ea493ea…`) | 4388 / 4389 | Bring-up |
-| `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Scaffold / early bring-up |
+| `Sonic3KRecomp` | Sonic 3 & Knuckles combined, 4 MB | 4386 / 4387 | Playable; campaign mods experimental |
 
 > **Prebuilt Sonic 3 binaries are on the
 > [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases) page —
