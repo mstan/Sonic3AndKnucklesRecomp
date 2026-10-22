@@ -14,11 +14,11 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. Download availability
-varies by release: v0.5.3 has Windows packages; Linux packages are in v0.5.2.
+the separate versions need their corresponding ROMs. The latest release,
+v0.6.0, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
-**The extra campaigns, Mighty and Shadow shown below are newer than v0.5.3.**
-They are currently available in source builds, ahead of the next release.
+**The extra campaigns, Mighty and Shadow shown below are included in v0.6.0**
+as experimental, off-by-default options in **Sonic3KRecomp**.
 
 ## Every zone, across the campaigns
 
@@ -163,7 +163,9 @@ Want to build or contribute? See the [build guide](docs/BUILDING.md) and
 ## Credits and license
 
 Sonic and the original games belong to SEGA. Campaign and character additions
-build on [SonicTrilogy](https://github.com/sonsegajp/SonicTrilogy) and
+build on [Sonic Anthology](https://github.com/sonsegajp/SonicAnthology) by
+sonsegajp (formerly SonicTrilogy), whose Sonic 1, Sonic 2 and Sonic CD work is
+adapted here with attribution, and on Sonic Megamix by
 [Team Megamix](https://www.headcannon.com/TeamMegamix/).
 This project uses [segagenesisrecomp](https://github.com/mstan/segagenesisrecomp).
 Project code is under the [PolyForm Noncommercial license](LICENSE.md);
