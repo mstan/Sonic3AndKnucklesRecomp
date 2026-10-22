@@ -72,6 +72,8 @@ def main():
         if launcher:
             env["LNG_SCRIPT"] = (f"wait:15;shot:{dest.as_posix()}/launcher.png;"
                                  f"view:controller;wait:10;shot:{dest.as_posix()}/controls.png;quit")
+            # Scripted captures never show a window or take desktop focus.
+            env["LNG_TEST_HIDDEN"] = "1"
             if os.name != "nt":
                 env["SDL_VIDEODRIVER"] = "x11"
                 command = ["xvfb-run", "-a"] + command

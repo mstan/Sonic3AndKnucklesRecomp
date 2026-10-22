@@ -106,7 +106,8 @@ state and network behavior with the pack disabled.
 ## Source and validation
 
 Stage conversion, object behavior, bosses, events, music and rendering support
-are adapted from [sonsegajp/SonicTrilogy](https://github.com/sonsegajp/SonicTrilogy)
+are adapted from [sonsegajp/SonicAnthology](https://github.com/sonsegajp/SonicAnthology)
+(formerly SonicTrilogy)
 at `b55d4be26ebe68de228906263bbf979391646d99`. The optional expansion-ROM and
 palette support originates in
 [sonsegajp/segagenesisrecomp](https://github.com/sonsegajp/segagenesisrecomp)

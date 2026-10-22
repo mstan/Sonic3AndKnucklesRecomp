@@ -1,4 +1,4 @@
-Sonic 3 & Knuckles Recomp v0.5.2
+Sonic 3 & Knuckles Recomp v0.6.0
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -45,6 +45,8 @@ tools. CD-DA music is a separate optional resource. See docs/SONIC_CD.md.
 The CD campaign has 70 act/time variants and its own Time Stone progress.
 See docs/STAGE_PACKS.md, MEGAMIX_STAGE_PACK.md and SHADOW_CHARACTER.md for
 other conversions and character controls. No ROM, BIOS or bank is included.
+Campaign additions adapt Sonic Anthology by sonsegajp
+(https://github.com/sonsegajp/SonicAnthology) and Sonic Megamix by Team Megamix.
 
 Keep the .srm save and its .srm.campaign companion, .bak and migration backups
 together. Disabled/missing campaigns and characters park their progress for
