@@ -154,8 +154,8 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     memset(o,0,sizeof *o);COPY(o->id,"campaign");COPY(o->package_id,p.id);COPY(o->package_name,p.name);
     COPY(o->name,names[i]);COPY(o->package_version,p.version);COPY(o->author,p.author);
     COPY(o->description,descs[i]);COPY(o->group,i>=4?"Additional characters":"Stages");COPY(o->status,p.status);
-    COPY(o->source_name,(i==2 || i>=4)?"Team Megamix v3":"SonicTrilogy stage reference");
-    COPY(o->source_url,(i==2 || i>=4)?"https://www.headcannon.com/TeamMegamix/":"https://github.com/sonsegajp/SonicTrilogy");
+    COPY(o->source_name,(i==2 || i>=4)?"Team Megamix v3":"Sonic Anthology by sonsegajp");
+    COPY(o->source_url,(i==2 || i>=4)?"https://www.headcannon.com/TeamMegamix/":"https://github.com/sonsegajp/SonicAnthology");
     o->enabled=requested(i);o->channel=RECOMP_MOD_CHANNEL_EXPERIMENTAL;o->option_count=i==3?1:0;return 1;
 }
 static int set_enabled(void *c,const char *p,int on)
