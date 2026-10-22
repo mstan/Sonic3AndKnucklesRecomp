@@ -16,3 +16,6 @@ ScdBg *scd_bg_create(void);
 void scd_bg_destroy(ScdBg *);
 int scd_bg_reset(ScdBg *,uint16_t stage,const ScdBgInput *);
 int scd_bg_step(ScdBg *,const ScdBgInput *,ScdBgOutput *);
+/* Presentation offsets/resizes can exceed the native signed 8.8 delta.
+ * Preserve the profile's accumulators and animation phase across that move. */
+int scd_bg_step_wide(ScdBg *,const ScdBgInput *,ScdBgOutput *,int32_t delta_x);

@@ -9238,7 +9238,7 @@ static void bg_51a_scrbinit(ScdBg *bg_ctx, int16_t sXpos, int16_t sYpos) {
     lYwk.l = (uint32_t)lYwk.l >> 2;
   } else {
     lYwk.l = (uint32_t)lYwk.l >> 1;
-    lYwk.l += (lYwk.l >> (lYwk.l + 2)) >> 3;
+    lYwk.l += bg_asr(bg_asr(lYwk.l, (uint32_t)lYwk.l + 2u), 3);
   }
   bg_ctx->scrb_v_posit.l = lYwk.l;
   bg_ctx->scrc_v_posit.words[bg_hi()] = lYwk.words[bg_hi()];

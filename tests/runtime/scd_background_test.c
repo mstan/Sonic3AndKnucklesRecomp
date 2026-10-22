@@ -14,6 +14,20 @@ int main(void)
 {
     ScdBg *s = scd_bg_create();
     if (!s) return 1;
+    /* MMZ3 Bad's first 224 lines move at half the horizontal camera rate.
+     * Initial expansion and resize must not wrap an 8.8 signed delta, and
+     * returning to the original camera must restore its exact phase. */
+    const int offsets[]={39,101,238,736};
+    for(unsigned n=0;n<sizeof offsets/sizeof offsets[0];n++) {
+        ScdBgInput in={0};ScdBgOutput out;int offset=offsets[n];
+        if(!scd_bg_reset(s,0x5B02,&in))return 5;
+        in.camera_x=(int16_t)offset;
+        if(!scd_bg_step_wide(s,&in,&out,offset*256))return 6;
+        for(unsigned line=0;line<224;line++)if(out.hscroll[line]!=-(112+offset/2))return 7;
+        in.camera_x=0;
+        if(!scd_bg_step_wide(s,&in,&out,-offset*256))return 8;
+        for(unsigned line=0;line<224;line++)if(out.hscroll[line]!=-112)return 9;
+    }
     for (unsigned replay = 0; replay < 2; replay++) {
         for (unsigned n = 0; n < sizeof vectors / sizeof *vectors; n++) {
             ScdBgInput in = {0}; ScdBgOutput out;

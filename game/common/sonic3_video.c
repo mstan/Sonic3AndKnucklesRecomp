@@ -368,6 +368,11 @@ static int view_left(int camera, int w)
     if (left<0) left=0;
     return left>end ? end : left;
 }
+int s3_video_presentation_camera_x(int camera)
+{
+    if(s_mode==VIDEO_OFF || s_requested_width<=320)return camera;
+    return view_left(camera,s_requested_width)+(s_requested_width-320)/2;
+}
 static void activation_bounds(int camera,int w,int *lo,int *hi)
 {
     int left=view_left(camera,w);
@@ -829,6 +834,13 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     }
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
+    /* CD's line-scroll profiles already position its background. Clamping
+     * the expanded foreground at a level edge moves its native viewport
+     * across the canvas; sharing that changing origin with B adds a second,
+     * reversible pan near the boundary. Keep CD's backdrop on the centered
+     * canvas while foreground, actors and HUD retain the bounded view. */
+    int cd_background=level && s_frame_zone>=0x40 && s_frame_zone<=0x5B;
+    int bg_origin=cd_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
      * on the full-screen Window ($E000, 64 tiles per row), while B ($C000)
@@ -918,7 +930,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         bg_width=512;
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
-        int reference_bx=nx-hs_b,bx=reference_bx;
+        int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
         /* Title/menu backgrounds only initialize the visible 40 tile
          * columns; repeat that composition, not the stale 512px name table. */
         if(!level && !special && !file_select){bx%=nw;if(bx<0)bx+=nw;}
@@ -1024,7 +1036,12 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
                 if(bad && s_bad_y<0){s_bad_x=wx;s_bad_y=line;s_bad_attr=a;s_bad_expected=expected;s_bad_world_y=wy;s_bad_hscroll=hs_a;}
                 s_terrain_errors+=bad;
             }
-            if(bg_world && s_frame_zone==0 && s_frame_act==0 && s_frame_bg_event==4) {
+            if(cd_background && bg_origin!=origin) {
+                /* This edge presentation intentionally moves B relative to
+                 * the native foreground window. Its same-column pixels are
+                 * not a presentation oracle until the view is centered. */
+                ++s_bg_unstreamed;
+            } else if(bg_world && s_frame_zone==0 && s_frame_act==0 && s_frame_bg_event==4) {
                 /* Native intro->forest refresh uploads two rows per frame.
                  * Until finished, the old name table is not an oracle for
                  * the new world layout, which the opt-in renderer shows. */

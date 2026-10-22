@@ -19,6 +19,17 @@ static int32_t bg_shl(int32_t value,unsigned shift)
 {
     return shift<32?(int32_t)((uint32_t)value<<shift):0;
 }
+/* One Windows-source initializer uses a variable signed shift count. Match
+ * its qualified x86 count masking without an undefined C shift or relying
+ * on the host's right-shift treatment of negative signed values. */
+static int32_t bg_asr(int32_t value,uint32_t shift)
+{
+    shift&=31;
+    if(!shift)return value;
+    uint32_t bits=(uint32_t)value>>shift;
+    if(value<0)bits|=UINT32_MAX<<(32-shift);
+    return (int32_t)bits;
+}
 /* DIVU.W followed by EXT.L. A 68000 quotient overflow leaves its dividend
  * unchanged; then EXT.L sign-extends the low word. MMZ3 Good uses that path
  * for its negative initial foreground/background difference. */
@@ -52,7 +63,8 @@ struct ScdBg {
     int_union *lphscrollbuff,output[1024];
     int_union scra_h_posit,scra_v_posit,scrb_h_posit,scrb_v_posit;
     int_union scrc_h_posit,scrc_v_posit,scrz_h_posit,scrz_v_posit,vscroll;
-    int16_t scra_hz,scra_vz,waterposi;
+    int32_t scra_hz;
+    int16_t scra_vz,waterposi;
     uint8_t scrb_h_count,scrb_v_count,scrc_h_count,scrz_h_count;
     ushort_union scrflaga,scrflagb,scrflagc,scrflagz;
     short_union scroll_start,waterdirec;
@@ -91,11 +103,13 @@ int scd_bg_reset(ScdBg *s,uint16_t stage,const ScdBgInput *in)
     s->profile=(int)(((zone-0x40)>>2)*10+(act<2?act*4:8)+(act<2?(zone&3):(zone&3)-2));
     input(s,in);profiles[s->profile].init(s,in->camera_x,in->camera_y);return 1;
 }
-int scd_bg_step(ScdBg *s,const ScdBgInput *in,ScdBgOutput *out)
+int scd_bg_step_wide(ScdBg *s,const ScdBgInput *in,ScdBgOutput *out,int32_t delta_x)
 {
     if(!s || !in || !out || s->profile<0 || s->profile>=70)return 0;
-    input(s,in);profiles[s->profile].step(s);
+    input(s,in);s->scra_hz=delta_x;profiles[s->profile].step(s);
     out->y=s->scrb_v_posit.words[bg_hi()];
     for(unsigned i=0;i<224;i++)out->hscroll[i]=s->output[i].words[1-bg_hi()];
     return 1;
 }
+int scd_bg_step(ScdBg *s,const ScdBgInput *in,ScdBgOutput *out)
+{ return scd_bg_step_wide(s,in,out,in?in->delta_x:0); }

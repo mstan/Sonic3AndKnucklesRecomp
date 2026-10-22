@@ -133,7 +133,7 @@ static ScdBgInput cd_bg_input(void)
 {
     extern int scd_qqz_bg_frame(void);
     ScdBgInput in = {0};
-    in.camera_x = (int16_t)r16(RAM_Camera_X_pos_copy);
+    in.camera_x = (int16_t)s3_video_presentation_camera_x((int16_t)r16(RAM_Camera_X_pos_copy));
     in.camera_y = (int16_t)r16(RAM_Camera_Y_pos_copy);
     in.delta_x = (int16_t)((int32_t)(int16_t)(in.camera_x - s_cd_camx) * 256);
     in.delta_y = (int16_t)((int32_t)(int16_t)(in.camera_y - s_cd_camy) * 256);
@@ -156,6 +156,10 @@ static void cd_bg_init(void)
     if (!s_cd_bg) s_cd_bg = scd_bg_create();
     s_cd_stage = (uint16_t)((tri_zone() << 8) | tri_act());
     ScdBgInput in = cd_bg_input();
+    /* Initialize at the original camera, then apply the presentation offset
+     * through the ordinary first delta. This preserves fractional parallax
+     * accumulators and autonomous animation phase when the view widens. */
+    in.camera_x = (int16_t)r16(RAM_Camera_X_pos_copy);
     s_cd_camx = in.camera_x; s_cd_camy = in.camera_y;
     in.delta_x = in.delta_y = 0;
     if (!scd_bg_reset(s_cd_bg, s_cd_stage, &in)) s_cd_stage = 0xFFFF;
@@ -167,7 +171,10 @@ static void cd_bg_event(void)
     if (stage != s_cd_stage) cd_bg_init();
     ScdBgInput in = cd_bg_input();
     ScdBgOutput out;
-    if (!scd_bg_step(s_cd_bg, &in, &out)) { bg_default_event(); return; }
+    int ok=s3_video_canvas_width()>320?
+        scd_bg_step_wide(s_cd_bg,&in,&out,(int32_t)(int16_t)(in.camera_x-s_cd_camx)*256):
+        scd_bg_step(s_cd_bg,&in,&out);
+    if (!ok) { bg_default_event(); return; }
     s_cd_camx = in.camera_x; s_cd_camy = in.camera_y;
     for (int y = out.y & ~15; y < (out.y & ~15) + 256; y += 16) {
         int line = y - out.y;
@@ -175,7 +182,7 @@ static void cd_bg_event(void)
         if (line > 223) line = 223;
         bg_band(y, y + 16, -(int)out.hscroll[line]);
     }
-    uint32_t fg = (uint32_t)(uint16_t)-in.camera_x << 16;
+    uint32_t fg = (uint32_t)(uint16_t)-r16(RAM_Camera_X_pos_copy) << 16;
     for (unsigned line = 0; line < 224; line++)
         w32(RAM_H_scroll_buffer + line * 4u, fg | (uint16_t)out.hscroll[line]);
     w16(RAM_Camera_X_pos_BG_copy, (uint16_t)-out.hscroll[0]);
