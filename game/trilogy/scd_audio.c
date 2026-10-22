@@ -717,6 +717,10 @@ static float measure_lufs(const ScdTrack *t)
 {
     FILE *f = fopen(t->path, "rb");
     if (!f) return 0;
+    /* This cold-track scan is host preparation, not emulated playback.
+     * With no producer samples, concealment must not loop the selection
+     * sound throughout the scan. Keep guest audio and the WAV tap intact. */
+    audio_discard_playback();
     const double fs = CD_RATE, pi = 3.14159265358979323846;
     Biquad sh[2], hp[2];                             /* (the pre-filter's shelf, then RLB: libebur128's design) */
     {

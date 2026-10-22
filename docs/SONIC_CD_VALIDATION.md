@@ -1,5 +1,37 @@
 # Sonic CD validation ledger
 
+## Replay captions and cold-load audio, 2026-10-21
+
+Issue `beads-tdq.3.22`: completed-save replay still includes the installed
+combined campaign. Its selected card now says **CD 70**, **S3K 14**, etc.,
+instead of showing an ambiguous bare ZONE number. Catalog order, input
+navigation and save records are unchanged. The original CLEAR card is retained.
+
+Cold music-pack integrity verification and first-song loudness measurement
+blocked the producer while device stall concealment repeated its last sound.
+Both explicit loading boundaries now call the existing host playback-discard
+API. Guest audio, integrity validation, loudness normalization and generated
+samples are retained. Warm requests for the already-playing song do not reset
+playback. This fixes the stuck tone; it does not promise to remove cold I/O or
+CPU preparation time.
+
+Evidence under `G:/Temp/Codex/segagenesisrecomp/sonic3k-cd-integration`:
+
+| Result | Check | Scope / evidence |
+| --- | --- | --- |
+| PASS | Actual device output | Normal-speed, muted SDL disk-device capture of real Down/Start input into CD 70. The baseline repeats a 1242 Hz tone for 24 consecutive seconds. Both corrected captures reach the stage without that stationary tone, and stage music resumes. `audio-before`, `audio-after`, `audio-delivery`, `device-analysis.json`. |
+| PASS | Generated audio preserved | All 7,680,456 stereo PCM frames match exactly before/after, SHA256 `652aea226ffa54de77a659ccfd558792529eb5ce293bc8a4fd7c549e537792a2`. Script EXIT leaves the WAV header length zero; comparison explicitly reads the actual nonempty data payload. `audio-comparison.json`. |
+| PASS | Replay UI and visuals | Actual input selects S3K 14, CD 1 and CD 70 at native and 398-pixel widths. CLEAR remains original. Native pixels outside the selected 48x7 caption field are identical. Final caption alignment, ink and complete seven-row glyphs were inspected. `replay-captions-final2`, `menu-audio-visual-comparison.json`. |
+| PASS | Gameplay visual regression | Final CD 70 stage image is RGB-identical to the baseline at 398x224. Independently inspected against original CD `qa-cd-original-settled-starts-1/R83D/start.png`: terrain, background art and palette agree; S3K HUD/characters and camera/animation phase differences remain intentional. |
+| PASS | Focused Windows/Linux checks | Audio loop, scene/native pause, resume, fade and one-shot tests pass, including cold preparation and same-track playback. Journal tests pass all 16 catalogs, game-specific captions, removal/restoration and durable-save recovery. `menu-audio-linux-final.log`. |
+| UNVERIFIED | Identical cold-load duration | Baseline took 122 seconds wall time for the entire scripted session; corrected sessions took about 37. File cache and machine load differ, so this is not a qualified loading-speed improvement. No caches were flushed or drives scanned. |
+
+Earlier caption experiments in `replay-captions*` had alignment or final-row
+ink defects and are not delivery evidence. The script's `clear-return` image
+actually selects CD 1 after wrapping the replay list; only `clear.png` is the
+initial CLEAR-card check. Device captures use no speakers; owner playtests
+retain normal audio. Original profile saves are not reseeded by this fix.
+
 ## Owner-reported starting-area background movement, 2026-10-21
 
 Issue `beads-tdq.3.21`: adaptive widescreen used the foreground's changing

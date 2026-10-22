@@ -83,8 +83,14 @@ The optional No Save UFO practice selection does not award campaign progress.
 
 Completed files select from the combined campaign catalog. With CD enabled
 alone, it contains 70 CD variants followed by 14 S3K stages; each game's zone
-numbers restart at 1. From CLEAR, Up selects CD variant 1, while Down wraps to
-S3K Zone 14. Fifteen Down presses from CLEAR reach CD variant 70.
+numbers restart at 1. The selected card names the game, for example **CD 70**
+or **S3K 14**. From CLEAR, Up selects CD variant 1, while Down wraps to
+S3K stage 14. Fifteen Down presses from CLEAR reach CD variant 70.
+
+The first CD music request verifies the music pack; each newly requested song
+also measures its playback loudness once per process. On a busy drive this can
+pause stage entry. These loading boundaries clear old device playback samples,
+so the selection sound is not held as a buzzing tone while preparation runs.
 
 Keep `sonic3k.srm`, `sonic3k.srm.campaign`, its `.bak` and immutable migration
 backups together. The journal retains disabled or temporarily missing campaign

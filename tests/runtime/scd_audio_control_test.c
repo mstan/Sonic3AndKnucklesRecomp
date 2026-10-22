@@ -2,6 +2,8 @@
 #include "../../game/trilogy/scd_audio.c"
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 void audio_set_extra_source(AudioExtraSource source) { (void)source; }
+static unsigned discarded;
+void audio_discard_playback(void) { discarded++; }
 int scd_disc_open(void) { return 0; }
 void scd_disc_close(void) {}
 const ScdTrack *scd_track_info(int number) { (void)number;return NULL; }
@@ -16,8 +18,17 @@ static void stream(int loop)
 }
 int main(void)
 {
+    /* Cold-track preparation retires device history, but never discards
+     * generated samples or interrupts a request for the already playing song. */
+    ScdTrack missing={0};strcpy(missing.path,"missing-audio-fixture.bin");
+    CHECK(!measure_lufs(&missing) && !discarded);
+    FILE *source=fopen("loudness-fixture.bin","wb");CHECK(source);
+    int16_t silence[64]={0};CHECK(fwrite(silence,1,sizeof silence,source)==sizeof silence);fclose(source);
+    ScdTrack track={0};strcpy(track.path,"loudness-fixture.bin");track.size=sizeof silence;
+    CHECK(!measure_lufs(&track) && discarded==1);remove(track.path);
     int16_t out[32]={0};
     stream(1);mix(out,6,44100);
+    scd_cd_play(2,1);CHECK(discarded==1);
     static const int16_t expected[]={1000,-2000,3000,-4000,5000,-6000,7000,-8000,1000,-2000,3000,-4000};
     CHECK(!memcmp(out,expected,sizeof expected));CHECK(s_cd.pos==2);
     uint8_t fake_bank=0;s_bank=&fake_bank;s_bank_size=1;s_pcm_frac=.25;s_pcm_count=17;
