@@ -1,6 +1,33 @@
 # Sonic CD validation ledger
 
-## Replay captions and cold-load audio, 2026-10-21
+## Corrected owner request: original ZONE text and 70-entry wrap, 2026-10-21
+
+The owner rejected the CD/S3K caption change below. Original ZONE text, font
+and thumbnail rendering are restored exactly from `c98be0a`. With CD as the
+only enabled stage pack, the completed-save replay selector now wraps only
+through its 70 CD variants. The original CLEAR cursor is normalized only when
+an arrow is pressed, preserving the untouched CLEAR card. This also fixes the
+first Down press from CLEAR; changing the maximum alone would still subtract
+from the old global CLEAR cursor. Native campaign progression, journal IDs,
+save records and the cold-load buzzing fix are retained.
+
+`cd-zone-wrap/report.json` under the existing private evidence root records:
+
+- PASS: actual Down input visits precisely all 70 CD codes, then wraps
+  Zone 1 -> Zone 70. Actual Up input wraps Zone 70 -> Zone 1. Both native and
+  398-pixel menu runs pass. No replay cursor or success flags are written by QA.
+- PASS: a single Down/Start from CLEAR enters original CD variant 70 (`5B02`);
+  a single Up/Start enters variant 1 (`4000`). Existing completed owner saves
+  are the declared navigation prerequisite, copied into private test profiles.
+- PASS: final native/wide ZONE 70, ZONE 19 and ZONE 1 images were inspected
+  against the original pre-caption menu. The original font/artwork is restored.
+- PASS: Windows/Linux journal and audio-control tests still pass, covering
+  all 16 catalogs and the retained loading-audio behavior. `zone-wrap-linux.log`.
+
+Issue `beads-tdq.3.22` was reopened for this correction. The earlier caption
+evidence below is historical and does not represent the requested UI.
+
+## Superseded replay captions; retained cold-load audio fix, 2026-10-21
 
 Issue `beads-tdq.3.22`: completed-save replay still includes the installed
 combined campaign. Its selected card now says **CD 70**, **S3K 14**, etc.,

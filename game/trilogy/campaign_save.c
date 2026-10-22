@@ -47,15 +47,6 @@ int campaign_display(unsigned mask,int stable)
     }
     return stable==39?n:-1;
 }
-void campaign_stage_label(unsigned mask,int display,char out[8])
-{
-    static const char *names[]={"S1","S2","S3K","MM","CD"};
-    int stable=campaign_stable(mask,display);
-    out[0]=0;
-    if(stable<0 || stable==39)return;
-    unsigned c=content(stable);
-    snprintf(out,8,"%s %u",names[c],(unsigned)stable-starts[c]+1);
-}
 static unsigned active_bits(unsigned mask)
 { return 4|(mask&3)|((mask&4)?8:0)|((mask&8)?16:0); }
 static int available(unsigned mask,unsigned ch)
