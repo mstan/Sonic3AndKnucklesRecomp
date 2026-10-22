@@ -67,6 +67,9 @@ def main():
             (dest / f"rom-{spec['short']}.cfg").write_text(str(args.rom.resolve()) + "\n")
             command += ["--launcher"]
         else:
+            # Scripted runs read only their script: host keyboards/controllers
+            # (including a desktop user's) must not leak into the evidence.
+            (dest / "settings.ini").write_text("".join(f"[input.p{i}]\ndevice=0\n" for i in range(1, 7)))
             command += [str(args.rom.resolve()), "--no-launcher"]
             # Benchmarks intentionally disable SRAM writes. Input routes need
             # normal autosave so the next process can verify an existing file.
