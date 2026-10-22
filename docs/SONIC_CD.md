@@ -81,6 +81,11 @@ UFOs through actual jumps to earn one of seven Time Stones. Generator and
 projector progress is saved separately from native Chaos/Super Emeralds.
 The optional No Save UFO practice selection does not award campaign progress.
 
+Completed files select from the combined campaign catalog. With CD enabled
+alone, it contains 70 CD variants followed by 14 S3K stages; each game's zone
+numbers restart at 1. From CLEAR, Up selects CD variant 1, while Down wraps to
+S3K Zone 14. Fifteen Down presses from CLEAR reach CD variant 70.
+
 Keep `sonic3k.srm`, `sonic3k.srm.campaign`, its `.bak` and immutable migration
 backups together. The journal retains disabled or temporarily missing campaign
 progress and character identities. Restoring the same supported packs makes

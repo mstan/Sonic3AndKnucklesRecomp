@@ -174,6 +174,45 @@ static void test_world_snapshot(void)
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static unsigned hud_fixture(void) { return 0x3000; }
+static int cd_edge_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)y;
+    *cell=background?(uint16_t)(1+((x>>4)&1)):0;
+    return 1;
+}
+static void test_cd_background_edges(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],baseline[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("16:9"));g_ram[0xF600]=12;write32(0xB000,0x1234);
+    word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(cd_edge_cell);
+    const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
+    const unsigned zones[]={0x40,0x5B};
+    for(unsigned z=0;z<2;z++)for(unsigned w=0;w<4;w++) {
+        g_ram[0xFE10]=(uint8_t)zones[z];int canvas=widths[w];
+        word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
+        for(unsigned c=0;c<sizeof cameras/sizeof cameras[0];c++) {
+            int camera=cameras[c];word(g_ram,0xEE80,camera);word(v.vram,0xF000,(unsigned)-camera);
+            scanline(&v,0,native,320,out,canvas);
+            if(!c)memcpy(baseline,out,(size_t)canvas*sizeof *out);
+            else CHECK(!memcmp(baseline,out,(size_t)canvas*sizeof *out));
+            CHECK(s_left==view_left(camera,canvas) && s_native_x==camera-s_left);
+            CHECK(s3_video_presentation_camera_x(camera)==s_left+(canvas-320)/2);
+        }
+        /* Genuine line-scroll movement remains visible at the edge. */
+        word(g_ram,0xEE80,0);word(v.vram,0xF000,0);word(v.vram,0xF002,(unsigned)-8);
+        scanline(&v,0,native,320,out,canvas);
+        for(int x=0;x<canvas-8;x++)CHECK(out[x]==baseline[x+8]);
+    }
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 static void test_hud_mapping(void)
 {
     memset(g_ram,0,sizeof g_ram);write32(0xB000,0x123456);
@@ -209,6 +248,7 @@ int main(int argc,char **argv)
         printf("palette %04x %04x\n",s_aiz_intro.colors[2],s_aiz_main.colors[2]);
         return 0;
     }
+    test_cd_background_edges();
     /* Bounded host decoding: literals, overlapping dictionary matches,
      * truncation, a reference before the output and insufficient capacity. */
     const uint8_t compressed[]={0xAF,0,'A','B','C','D',0xFC,0xFA,0,0xF8,0};

@@ -1,5 +1,49 @@
 # Sonic CD validation ledger
 
+## Owner-reported starting-area background movement, 2026-10-21
+
+Issue `beads-tdq.3.21`: adaptive widescreen used the foreground's changing
+bounded origin for CD's background, and drove parallax from the native camera
+while the wider view was still clamped. CD now samples B from the centered
+canvas and drives its original scroll profiles from the displayed camera.
+Foreground/player simulation retains its native camera. Initial offsets and
+resizes use a full-width horizontal delta, preserving fractional accumulators
+and autonomous animation without wrapping the native signed 8.8 delta.
+
+Private evidence is under
+`G:/Temp/Codex/segagenesisrecomp/sonic3k-cd-integration`:
+
+- `bg-shift-before-v2-*` and `bg-shift-after-v2-*`: actual Right/Left movement
+  in CD variant 70, at native width and 398 pixels. All 42 native captures are
+  pixel-identical. Player/camera observations are identical at both widths.
+  Widescreen background X stays fixed while the starting view is clamped,
+  including the return trip; every capture beyond that edge is unchanged.
+  Initial origin-only experiments remain separate as `after-v1` and were
+  insufficient because the native camera still drove parallax.
+- `bg-shift-*-v2-ppp-*` repeats the same actual movement in Palmtree Panic
+  Present. All 42 native captures and the widescreen interior captures remain
+  identical; player/camera observations match. Its autonomous background
+  animation remains active. Comparisons are `bg-shift-comparison*.json`.
+- Renderer tests cover the first/last CD stage families, both bounds and
+  320/398/523/796-pixel canvases, and retain genuine line-scroll motion.
+  MMZ3 original half-speed vectors cover forward/reverse offsets through
+  736 pixels without 8.8 overflow. All 70 original 64-frame scroll vectors
+  still pass, including reset/context reuse.
+- Windows and Linux combined/standalone renderer tests pass. Linux's kernel
+  also passes UBSan with the production fixed-width wrap policy. That check
+  found an existing QQZ Present variable shift with an out-of-range count;
+  runtime and generator now explicitly preserve the qualified Windows count
+  mask. Original-vector results are unchanged.
+- Final moving/return images were inspected against the prior native captures
+  and the independent original CD `qa-cd-original-settled-starts-1/R83D` image.
+  Widescreen edge framing intentionally differs; terrain, palette, background
+  artwork and ordinary parallax remain intact.
+
+The completed-file selector separately passed actual Up/Down/Start probes:
+CLEAR Down -> S3K Zone 14 (`0C00`), CLEAR Up -> CD variant 1 (`4000`), and
+CLEAR Down 15 times -> CD variant 70 (`5B02`). This is a combined 84-entry
+catalog with per-game numbering, not a 14-entry limit. `menu-boundaries`.
+
 ## Integration follow-up, 2026-10-21
 
 The campaign remains an S3K adaptation. Standalone SonicCDRecomp now supplies

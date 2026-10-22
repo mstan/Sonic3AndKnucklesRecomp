@@ -57,6 +57,10 @@ def corrections(src,level):
     return src
 
 def fixed_width(body):
+    # QQZ Present's Windows initializer uses an x86-masked variable count.
+    # Keep its qualified value while making both signed shifts portable C.
+    body=body.replace('(lYwk.l >> (lYwk.l + 2)) >> 3',
+                      'bg_asr(bg_asr(lYwk.l, (uint32_t)lYwk.l + 2u), 3)')
     # Left-shifting a negative signed value is undefined in C, unlike the
     # original register operation. These atomic operands have no side effects.
     atom=r'(?:[A-Za-z_]\w*|1)(?:(?:\.|->)\w+|\[[^\[\]]*\])*'
