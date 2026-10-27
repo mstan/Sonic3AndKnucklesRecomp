@@ -24,6 +24,8 @@ void cmd_send_response(const char *json){(void)json;}
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static void word(uint8_t *p,unsigned a,unsigned v){p[a]=(uint8_t)(v>>8);p[a+1]=(uint8_t)v;}
 static void longword(uint8_t *p,unsigned a,unsigned v){word(p,a,v>>16);word(p,a+2,v);}
+static unsigned native_row_calls;
+static const uint32_t *test_native_row(void *row){++native_row_calls;return row;}
 static void test_sprite_atlas(void)
 {
     GVDP v={0};SceneFrame scene={0};uint32_t out[64],pal[64]={0};
@@ -171,6 +173,14 @@ static void test_world_snapshot(void)
      * into another act while that frame is being displayed. */
     g_ram[0xFE10]=0x20;g_ram[0xFFF0]=0;
     scanline(&v,1,native,320,out,398);CHECK(out[0]==0xFFFF0000);
+    uint32_t lazy[398];native_row_calls=0;
+    scanline_lazy(&v,1,320,lazy,398,test_native_row,native);
+    CHECK(!native_row_calls && !memcmp(out,lazy,sizeof out));
+    /* An unsupported mode must fetch the original row exactly once and
+     * produce the same centered image as the eager entry point. */
+    v.reg[12]=7;scanline(&v,0,native,320,out,398);native_row_calls=0;
+    scanline_lazy(&v,0,320,lazy,398,test_native_row,native);
+    CHECK(native_row_calls==1 && !memcmp(out,lazy,sizeof out));
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static unsigned hud_fixture(void) { return 0x3000; }
@@ -550,80 +560,36 @@ int main(int argc,char **argv)
             ((x>=234 && x<238)||(x>=558 && x<562))?0xFFFF0000:0xFF000000;
         CHECK(out[x]==expected);
     }
-    /* Blue Spheres' forward and inverse projections agree on the same
-     * surface, including expanded margins. Behind-horizon points are not
-     * mistaken for the near intersection. */
-    for(int stretch=1;stretch<=6;++stretch)for(int z=0;z<5;++z)for(int x=-3;x<=3;++x) {
-        double px,py,d;
-        CHECK(ss_project(x,z,stretch,&px,&py,&d));
-        SSPoint p=ss_intersect(px,py,stretch);
-        CHECK(fabs(p.x-x)<.0001 && fabs(p.z-z)<.0001 && fabs(p.depth-d)<.0001);
-    }
-    CHECK(!ss_intersect(0,0,1).depth);
-    CHECK(ss_intersect(-790,200,5).depth>0);
-    double px,py,depth;
-    CHECK(ss_project(0,0,1,&px,&py,&depth));
-    CHECK(fabs(px)<.001 && fabs(py-(112+ss_focal*ss_ground_lift/ss_distance))<.001);
-    CHECK(ss_project(2,1,1,&px,&py,&depth));
-    CHECK(fabs(px-155)<3);
-    CHECK(!ss_project(100,0,1,&px,&py,&depth));
-    /* Full native board, more than 80 host spheres, and no guest writes.
-     * Test without copyrighted assets using synthetic mappings/art. */
-    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-    write32(SS_EXTRA+16,0x1000);word(g_ram,SS_EXTRA+20,0x4002);
-    for(unsigned i=0;i<16;++i)word(g_rom,0x1000+i*2,32);
-    word(g_rom,0x1020,1);g_rom[0x1022]=240;g_rom[0x1023]=15;
-    word(g_rom,0x1024,0);word(g_rom,0x1026,65520);
-    memset(v.vram+64,0x11,512);memset(g_ram+0xF100,2,1024);
-    g_ram[0xF600]=0x34;ss_capture();
-    static uint8_t before[65536];memcpy(before,g_ram,sizeof before);
-    ss_begin(&v,1603);CHECK(ss_ready && ss_count>80 && ss_margin_count>80);
-    CHECK(!memcmp(before,g_ram,sizeof before));
-    CHECK(ss_texture[2][0][32*64+32]==33);
-    write16(0xE422,512);ss_begin(&v,1603);CHECK(ss_x==0); /* no mixed publication */
-    ss_capture();ss_begin(&v,1603);CHECK(ss_x==2);
-    ss_begin(&v,398);CHECK(ss_ready && ss_width==398);
-    ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
-    /* A sprite's visible base stays on its actual board intersection while
-     * moving, turning and resizing. This would fail with the old separate
-     * sphere-camera lift even though the ground's inverse test passed. */
-    uint32_t checker[1600],checker_colors[64]={0};
-    checker_colors[56]=0xFF00FFFF;checker_colors[60]=0xFFFF00FF;
-    for(unsigned turn=0;turn<8;++turn)for(unsigned motion=0;motion<3;++motion)
-    for(int canvas=320;canvas<=1600;canvas+=320) {
-        double angle=turn*6.2831853071795864769/8;
-        int ix=(int)round(-2*sin(angle)),iy=(int)round(-2*cos(angle));
-        memset(g_ram+0xF100,0,1024);
-        g_ram[0xF100+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
-        word(g_ram,0xE422,motion*32);word(g_ram,0xE424,motion*16);g_ram[0xE426]=(uint8_t)(turn*32);
-        ss_capture();ss_begin(&v,canvas);CHECK(ss_ready && ss_count>=1);
-        double dx=ix-ss_x,dy=iy-ss_y;
-        CHECK(ss_project(dx*ss_cos-dy*ss_sin,-dx*ss_sin-dy*ss_cos,ss_stretch,&px,&py,&depth));
-        /* Very wide views can see the periodic board again. Select this
-         * cell's nearest projected copy, not an arbitrary depth-sort slot. */
-        const SSSphere *sphere=NULL;double nearest=1e30;
-        for(unsigned n=0;n<ss_count;++n) {
-            double distance=fabs(ss_spheres[n].x+ss_spheres[n].w*.5-(px+(canvas-1)*.5));
-            if(distance<nearest){nearest=distance;sphere=&ss_spheres[n];}
+    /* The native special-stage row is the visual oracle. Preserve every
+     * pixel, including sphere placement, operator sprites and HUD, across
+     * all rows and canvas sizes. Both interfaces must produce the same row;
+     * the lazy interface fetches the native composition exactly once. */
+    static const int ss_canvases[]={320,398,523,796,1603};
+    uint32_t ss_native[320],ss_output[1605],ss_eager[1603];
+    static uint8_t before[65536];
+    for(unsigned mode=0;mode<2;++mode)for(unsigned size=0;size<5;++size) {
+        int canvas=ss_canvases[size],origin=(canvas-320)/2;
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        g_ram[0xF600]=(uint8_t)(mode?0x48:0x34);
+        v.reg[1]=64;v.reg[12]=8;v.cram[1]=14;
+        memcpy(before,g_ram,sizeof before);
+        for(int y=0;y<224;++y) {
+            for(int x=0;x<320;++x)ss_native[x]=0xFF000000u|((unsigned)y<<16)|((unsigned)x*193u);
+            ss_output[0]=ss_output[canvas+1]=0xDEADBEEFu;
+            native_row_calls=0;
+            scanline_lazy(&v,y,320,ss_output+1,canvas,test_native_row,ss_native);
+            CHECK(native_row_calls==1 && ss_output[0]==0xDEADBEEFu && ss_output[canvas+1]==0xDEADBEEFu);
+            scanline(&v,y,ss_native,320,ss_eager,canvas);
+            CHECK(!memcmp(ss_eager,ss_output+1,(size_t)canvas*sizeof *ss_eager));
+            for(int x=0;x<canvas;++x)
+                CHECK(ss_output[x+1]==(x>=origin && x<origin+320?ss_native[x-origin]:0xFF000000u));
         }
-        CHECK(sphere!=NULL);
-        CHECK(ss_texture_floor[2][sphere->lod]==48);
-        CHECK(fabs(sphere->x+sphere->w*.5-(px+(canvas-1)*.5))<=.501);
-        CHECK(fabs(sphere->y+48*sphere->h/64.0-py)<=.501);
-        /* Render the four quadrants around this object's board position.
-         * Opposite quadrants must match and adjacent ones must differ. This
-         * checks the actual checkerboard phase, not just projection algebra. */
-        unsigned count=ss_count;ss_count=0;
-        for(int qy=0;qy<2;++qy)for(int qx=0;qx<2;++qx) {
-            double wx=ix+(qx?.1:-.1)-ss_x,wy=iy+(qy?.1:-.1)-ss_y;
-            CHECK(ss_project(wx*ss_cos-wy*ss_sin,-wx*ss_sin-wy*ss_cos,ss_stretch,&px,&py,&depth));
-            int col=(int)floor(px+(canvas-1)*.5+.5),row=(int)floor(py+.5);
-            CHECK(col>=0 && col<canvas && row>=32 && row<224);
-            ss_scanline(&v,row,checker,canvas,checker_colors,checker_colors,0);
-            unsigned parity=(ix-(qx==0)+iy-(qy==0))&1;
-            CHECK(checker[col]==checker_colors[parity?60:56]);
-        }
-        ss_count=count;
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        /* The original globe remains visible while native video retains
+         * shadow/highlight during the special-stage exit fade. */
+        g_ram[0xF600]=0x0C;
+        scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native);
+        CHECK(s_frame_special);
     }
     test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only F2 replay: host-only Blue Spheres must not change native state.
+"""Read-only replay: Blue Spheres preserves the complete native composition.
 
 Supply a user-owned save and pristine pre-change executable. Every run has
 isolated SRAM. Never overwrite the input save, edit RAM, or pause the CPU.
@@ -72,6 +72,13 @@ def main():
                 angles.add(ram[0xE426])
             if mode == "off":
                 assert (case / f"{name}.png").read_bytes() == (reference / f"{name}.png").read_bytes(), (name, "native output changed")
+            elif ram[0xF600] in (0x34, 0x48):
+                native = Image.open(reference / f"{name}.png").convert("RGB")
+                image = Image.open(case / f"{name}.png").convert("RGB")
+                left = (image.width - native.width) // 2
+                assert image.crop((left, 0, left + native.width, native.height)).tobytes() == native.tobytes(), (mode, name, "native special-stage pixels changed")
+                assert not any(image.crop((0, 0, left, image.height)).tobytes()), (mode, name, "left aspect margin")
+                assert not any(image.crop((left + native.width, 0, image.width, image.height)).tobytes()), (mode, name, "right aspect margin")
         assert checked >= 10 and len(angles) > 1 and len(counters) > 1, ("insufficient replay coverage", checked, angles, counters)
         expected = 320 if mode == "off" else max(320, round(224 * float(mode.split(":")[0]) / float(mode.split(":")[1])))
         assert widths == {expected}, (mode, widths, expected)

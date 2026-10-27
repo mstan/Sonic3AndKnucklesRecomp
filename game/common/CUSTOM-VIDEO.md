@@ -1,5 +1,17 @@
 # Sonic 3 family custom video experiment
 
+## Current special-stage behavior (2026-10-27)
+
+Blue Spheres uses the original native rendering at its original aspect,
+centered within the selected canvas. Main levels keep expanded widescreen.
+The earlier host globe projection described in the historical sections below
+was visually inaccurate during play and has been removed (`beads-tdq.3.26`).
+The native board, sphere distance frames, sprites, shadow/highlight operators,
+HUD, movement and exit fade now remain one original composition. There are
+no projected margin spheres or guest changes. Tests compare every native
+pixel through both renderer interfaces and multiple canvas sizes; runtime
+checks compare against independently entered native special stages.
+
 The combined **Sonic 3 & Knuckles** target was implemented first. Standalone
 Sonic 3 and Sonic & Knuckles share the renderer, with a separately verified
 S3 address profile. S3's object-index table is ROM-based and its competition

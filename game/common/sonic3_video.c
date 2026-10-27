@@ -7,6 +7,7 @@
 #include "genesis_runtime.h"
 #include "video/genesis_vdp.h"
 #include "video/genesis_dac.h"
+#include "video/genesis_tile_row.h"
 #include "cmd_server.h"
 #include "sonic3_state.h"
 #include "sonic3_state_io.h"
@@ -65,7 +66,6 @@ static int s_frame_bg_band[2];
 static int s_bg_draw_at_vblank[2],s_bg_draw_ready;
 static unsigned s_bg_draw_zone;
 static void scene_mode_changed(int was_enabled);
-static void ss_capture(void);
 
 /* AIZ reuses its intro's VRAM and block definitions for the forest, and
  * temporarily installs Knuckles' palette during the emerald cutscene.
@@ -319,7 +319,6 @@ static int s_tick_was_active;
 static unsigned s_tick_last,s_tick_zone,s_tick_serial;
 void s3_video_vblank(void)
 {
-    if(enabled())ss_capture();
     unsigned tick=ram16(0xFE04),zone=ram16(0xFE10);
     /* The following V-int uploads this completed tile queue. Main-thread
      * deformation may advance its RAM counters again before scanline zero,
@@ -621,7 +620,6 @@ int s3_video_hook(uint32_t pc)
     }
 }
 
-#include "sonic3_blue_spheres.inc"
 
 static uint8_t *s_priority;
 static int s_priority_capacity;
@@ -733,8 +731,9 @@ static void aiz_palette(const AizArt *art,const GVDP *v,uint32_t *out)
     }
 }
 
-static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
-                     uint32_t *out, int width)
+static void render_scanline(const GVDP *v, int line, const uint32_t *native, int nw,
+                            uint32_t *out, int width,
+                            GameVideoNativeRow native_row, void *native_ctx)
 {
     /* Publish one immutable art/scroll snapshot per frame. Palettes stay
      * live so water-line HBlank colour changes are retained. */
@@ -754,9 +753,8 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
         s_frame_level=level_ready();
         /* The native special-stage exit changes mode before its 60-frame
          * fade. Keep the globe until its shadow/highlight video mode ends. */
-        s_frame_special=(g_ram[0xF600]&127)==0x34 ||
+        s_frame_special=(g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48 ||
             (s_frame_special && (v->reg[12]&8) && (v->reg[1]&64));
-        if(s_frame_special)ss_begin(v,width);
         s_frame_zone=g_ram[0xFE10];
         s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
         s_frame_tree_reveal=ram16(0xEEC4);
@@ -803,6 +801,7 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
      * A rare unsupported mode also retains the selected output dimensions. */
     if((nw!=320 && nw!=256) || !(v->reg[1]&64) || (v->reg[12]&6) ||
        ((v->reg[12]&8) && !s_frame_special) || s_priority_capacity<width) {
+        if(!native)native=native_row(native_ctx);
         uint32_t fill=!(v->reg[1]&64)?native[0]:backdrop;
         for(int x=0;x<width;++x)out[x]=fill;
         int x0=(width-nw)/2;
@@ -814,9 +813,19 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     int hmode=v->reg[11]&3,hi=hmode==0?0:hmode==2?line&~7:line;
     int hs_a=(int16_t)vram16(v,hsbase+(unsigned)hi*4);
     int hs_b=(int16_t)vram16(v,hsbase+(unsigned)hi*4+2);
-    if(s_frame_special && ss_ready) {
+    if(s_frame_special) {
+        /* The prerecorded globe and native sphere-distance frames are one
+         * authored projection. A fitted host globe changes their placement
+         * relative to the board during movement and turns. Keep the complete
+         * native composition at its original aspect, including its sprites,
+         * shadow/highlight operators, HUD and exit fade. Main levels retain
+         * their independent expanded world renderer. */
+        if(!native)native=native_row(native_ctx);
+        int origin=(width-nw)/2;
+        for(int x=0;x<width;++x)out[x]=0xFF000000u;
+        int first=origin<0?-origin:0,last=origin+nw>width?width-origin:nw;
+        if(last>first)memcpy(out+origin+first,native+first,(size_t)(last-first)*sizeof *out);
         if(line==0){++s_frames;s_native_x=(width-nw)/2;}
-        ss_scanline(v,line,out,width,palette,shadow,hs_b);
         return;
     }
     int level=s_frame_level,special=s_frame_special;
@@ -928,6 +937,9 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
      * is the close, collidable boss arena entered by the later events. */
     if(bg_world && s_frame_zone==22 && !s_frame_act && !s_frame_bg_event)
         bg_width=512;
+    int background_x=-bg_origin-hs_b;
+    if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
+    GenesisTileRow fg={0},bg={0};
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -935,12 +947,16 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
          * columns; repeat that composition, not the stale 512px name table. */
         if(!level && !special && !file_select){bx%=nw;if(bx<0)bx+=nw;}
 
-        int background_x=bx;
-        if(bg_width>0) { background_x%=bg_width;if(background_x<0)background_x+=bg_width; }
-        uint16_t a=level?world_attr(s_world_frame,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
-        uint16_t b=bg_world?world_attr(s_background_frame,background_x,by,1):plane_attr(v,base_b,bx,by);
-        uint8_t ap=pattern_pixel(v,a,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
-        uint8_t bp=pattern_pixel(v,b,bg_world?background_x:bx,by);
+        if(!fg.remaining) {
+            uint16_t attr=level?world_attr(s_world_frame,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
+            gtile_row_begin(&fg,v->vram,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+        }
+        if(!bg.remaining) {
+            uint16_t attr=bg_world?world_attr(s_background_frame,background_x,by,1):plane_attr(v,base_b,bx,by);
+            gtile_row_begin(&bg,v->vram,attr,bg_world?background_x:bx,by);
+        }
+        uint16_t a=fg.attr,b=bg.attr;
+        uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
         if(file_select) {
             /* Reflect only the portrait at its edges, retaining its native
              * pixel scale and a continuous backdrop at every aspect ratio.
@@ -1071,8 +1087,11 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
             }
 
         }
+        ++background_x;
+        if(bg_width>0 && background_x==bg_width)background_x=0;
     }
     if(!level) {
+        if(!native)native=native_row(native_ctx);
         /* Logos/copyright/menus remain centered at their original pixel
          * scale. The full-width background follows the live scene palette. */
         if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof(uint32_t));
@@ -1086,9 +1105,20 @@ static void scanline(const GVDP *v, int line, const uint32_t *native, int nw,
     } else {
         /* No matching DMA yet (e.g. load/fade): preserve the live native
          * scene while the host display list catches its next publication. */
+        if(!native)native=native_row(native_ctx);
         int first=origin<0?-origin:0,last=origin+nw>width?width-origin:nw;
         if(last>first)memcpy(out+origin+first,native+first,(size_t)(last-first)*sizeof(uint32_t));
     }
+}
+
+static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)
+{
+    render_scanline(v,line,native,nw,out,width,NULL,NULL);
+}
+static void scanline_lazy(const GVDP *v,int line,int nw,uint32_t *out,int width,
+                          GameVideoNativeRow native_row,void *native_ctx)
+{
+    render_scanline(v,line,NULL,nw,out,width,native_row,native_ctx);
 }
 
 void s3_video_command(int id, const char *json)
@@ -1115,7 +1145,7 @@ void s3_video_command(int id, const char *json)
         pattern_pixel(&s_aiz_main.video,0x582C,0x1300,0x390),
         s_bg_bad_x,s_bg_bad_y,s_bg_bad_a,s_bg_bad_expected,s_frame_bg_event,
         s_tick_samples,s_tick_updates,s_tick_lag,s_tick_multi,s_publication_lag,
-        s_frame_special && ss_ready,ss_count,ss_margin_count);
+        s_frame_special,0u,0u);
     cmd_send_response(reply);
 }
 static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
@@ -1154,7 +1184,7 @@ void s3_video_state(S3StateIO *io)
     S3_STATE(io, s_visible_count); S3_STATE(io, s_background_frame);
     if (io->mode == 2) {
         s_display = display ? &s_display_frame : NULL;
-        s_frame_special = ss_ready = ss_latched = 0;
+        s_frame_special = 0;
     }
 }
 static S3VideoFrameOverlay s_frame_overlay;
@@ -1164,4 +1194,4 @@ static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int 
     (void)v;
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
-const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline };
+const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline, scanline_lazy };
