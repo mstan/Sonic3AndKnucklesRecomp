@@ -3,7 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$Version,
   [string]$BuildDir = 'build-release/Release',
   [string]$Python = 'python',
-  [string[]]$RuntimeBinDir = @()
+  [string[]]$RuntimeBinDir = @(),
+  [string]$EngineRoot = ''
 )
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$') { throw 'Invalid version' }
@@ -23,7 +24,9 @@ foreach ($mode in @('sonic3','sonic3k','sandk')) {
   Copy-Item -LiteralPath (Join-Path $build "$target.exe") -Destination $stage
   Copy-Item -LiteralPath (Join-Path $build 'SDL2.dll') -Destination $stage
   $ErrorActionPreference = 'Continue'
-  & $Python "$PSScriptRoot/release/stage_payload.py" --build $build --dest $stage --version $Version --mode $mode
+  $payloadArgs = @('--build', $build, '--dest', $stage, '--version', $Version, '--mode', $mode)
+  if ($EngineRoot) { $payloadArgs += @('--engine-root', $EngineRoot) }
+  & $Python "$PSScriptRoot/release/stage_payload.py" @payloadArgs
   $payloadExit = $LASTEXITCODE
   $ErrorActionPreference = 'Stop'
   if ($payloadExit) { throw 'Release payload validation failed' }

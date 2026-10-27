@@ -10,7 +10,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def stage_campaign_tools(dest, build, system):
+def stage_campaign_tools(dest, build, system, engine):
     """Copy the complete public converter, including shared upstream media IO."""
     tools = dest / "tools"
     tools.mkdir(exist_ok=True)
@@ -30,7 +30,7 @@ def stage_campaign_tools(dest, build, system):
     media_tools = tools / "segacd"
     media_tools.mkdir(exist_ok=True)
     for name in ("disc_image.py", "sgcd_owned_extract.py", "owned_media.py"):
-        shutil.copy2(ROOT / "segagenesisrecomp/tools/segacd" / name, media_tools / name)
+        shutil.copy2(engine / "tools/segacd" / name, media_tools / name)
     helper = "scd_pack_validate" + (".exe" if system == "Windows" else "")
     assert (build / helper).is_file(), "Build the public scd_pack_validate target"
     shutil.copy2(build / helper, dest / helper)
@@ -55,7 +55,8 @@ def font_notices(path):
     raise ValueError(f"No font notices in {path}")
 
 
-def stage(build, dest, version, mode):
+def stage(build, dest, version, mode, engine_root=None):
+    engine = (engine_root or ROOT / "segagenesisrecomp").resolve()
     modes = json.loads((ROOT / "tools/release/modes.json").read_text())
     spec = modes[mode]
     metadata = build / f"build-info-{mode}.json"
@@ -64,8 +65,10 @@ def stage(build, dest, version, mode):
     assert info["mode"] == mode and info["target"] == spec["target"], "Wrong build mode"
     for key in ("trace", "reverse_debug", "dev_trace", "cosim"):
         assert info[key] == "OFF", f"Development option enabled: {key}"
-    for key, repo in (("source_commit", ROOT), ("engine_commit", ROOT / "segagenesisrecomp"),
-                      ("ui_commit", ROOT / "recomp-ui"), ("disasm_commit", ROOT / "game/skdisasm")):
+    for key, repo, relative in (("source_commit", ROOT, None),
+            ("engine_commit", engine, "segagenesisrecomp"),
+            ("ui_commit", ROOT / "recomp-ui", "recomp-ui"),
+            ("disasm_commit", ROOT / "game/skdisasm", "game/skdisasm")):
         head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
         assert info[key] == head, f"Stale build: {key}"
         # Check each repository's own inputs here; the pinned engine/UI/game
@@ -75,7 +78,6 @@ def stage(build, dest, version, mode):
             "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules=all"], text=True)
         assert not dirty.strip(), f"Uncommitted release inputs in {repo}:\n{dirty}"
         if repo != ROOT:
-            relative = repo.relative_to(ROOT).as_posix()
             pin = subprocess.check_output(["git", "-C", str(ROOT), "rev-parse", f"HEAD:{relative}"], text=True).strip()
             assert pin == head, f"Unpinned submodule: {relative}"
     binary = build / (spec["target"] + (".exe" if info["system"] == "Windows" else ""))
@@ -92,7 +94,7 @@ def stage(build, dest, version, mode):
     license_text = license_path.read_text().upper()
     assert "POLYFORM NONCOMMERCIAL" in license_text and "AFFERO GENERAL PUBLIC LICENSE" not in license_text
     shutil.copy2(license_path, dest / "LICENSE")
-    shutil.copy2(ROOT / "segagenesisrecomp/THIRD-PARTY-LICENSES.md", dest)
+    shutil.copy2(engine / "THIRD-PARTY-LICENSES.md", dest)
     shutil.copy2(metadata, dest / "build-info.json")
     if mode == "sonic3k":
         docs = dest / "docs"
@@ -100,7 +102,7 @@ def stage(build, dest, version, mode):
         for name in ("STAGE_PACKS.md", "MEGAMIX_STAGE_PACK.md", "SHADOW_CHARACTER.md",
                      "SONIC_CD.md", "SONIC_CD_VALIDATION.md"):
             shutil.copy2(ROOT / "docs" / name, docs / name)
-        stage_campaign_tools(dest, build, info["system"])
+        stage_campaign_tools(dest, build, info["system"], engine)
     assets = build / "assets"
     assert (assets / "fonts/LatoLatin-Regular.ttf").is_file(), "Missing launcher font"
     assert (assets / "img" / spec["boxart"]).is_file(), "Missing mode box art"
@@ -129,14 +131,15 @@ def stage(build, dest, version, mode):
         "SIL-Open-Font-License-1.1": "tools/release/OFL-1.1.txt",
         "CC-BY-SA-4.0": "tools/release/CC-BY-SA-4.0.txt",
     }.items():
-        shutil.copy2(ROOT / rel, notices / f"{label}.txt")
+        source = engine / rel.removeprefix("segagenesisrecomp/") if rel.startswith("segagenesisrecomp/") else ROOT / rel
+        shutil.copy2(source, notices / f"{label}.txt")
     for name in ("stb_image", "stb_image_write", "stb_truetype"):
         src = (ROOT / f"recomp-ui/src/third_party/{name}.h").read_text(encoding="utf-8")
         text = src[src.rindex("/*", 0, src.rindex("ALTERNATIVE A - MIT License")):]
         (notices / f"{name}.txt").write_text(text, encoding="utf-8")
     src = (ROOT / "recomp-ui/src/third_party/tinyfiledialogs.c").read_text(encoding="utf-8")
     (notices / "tinyfiledialogs.txt").write_text(src[:src.index("*/")+2], encoding="utf-8")
-    src = (ROOT / "segagenesisrecomp/runner/external/minicoro/minicoro.h").read_text(encoding="utf-8")
+    src = (engine / "runner/external/minicoro/minicoro.h").read_text(encoding="utf-8")
     start = src.index("Copyright (C) 2004-2016 Mike Pall")
     (notices / "LuaCoco.txt").write_text(src[start:src.index("*/", start)], encoding="utf-8")
     for src in (assets / "fonts").glob("*.ttf"):
@@ -150,5 +153,6 @@ if __name__ == "__main__":
     parser.add_argument("--dest", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--mode", choices=("sonic3", "sonic3k", "sandk"), required=True)
+    parser.add_argument("--engine-root", type=Path, help="Same pinned engine override used by CMake")
     args = parser.parse_args()
-    stage(args.build, args.dest, args.version, args.mode)
+    stage(args.build, args.dest, args.version, args.mode, args.engine_root)
