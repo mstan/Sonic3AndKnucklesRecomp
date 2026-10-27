@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.6.0 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.6.1 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -10,7 +10,7 @@ set(GENESIS_GAME_VERSION "${S3_BUILD_VERSION}")
 set(CMAKE_C_STANDARD 11)
 
 # ---------------------------------------------------------------------------
-# Sonic 3 & Knuckles — native static recompilation.
+# Sonic 3 & Knuckles â€” native static recompilation.
 #
 # Sonic 3 and Sonic & Knuckles are two separate ~2 MB ROMs; "Sonic 3 &
 # Knuckles" is the 4 MB lock-on UNION of the two (S&K boots at $000000, Sonic 3
@@ -103,7 +103,7 @@ endforeach()
 # ---------------------------------------------------------------------------
 # YM2612 FM = vendored ymfm (Aaron Giles, BSD-3) behind the stable ym2612_*
 # API (runner/audio/ym2612.h). Replaced clownmdemu's FM (AGPL) 2026-06-05 as
-# part of the AGPL-free runtime initiative — see segagenesisrecomp/LICENSING.md
+# part of the AGPL-free runtime initiative â€” see segagenesisrecomp/LICENSING.md
 # (teardown item #2). enable_language(CXX) because ymfm is C++.
 # ---------------------------------------------------------------------------
 enable_language(CXX)
@@ -135,7 +135,7 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/audio.c"
     ${GEN_TRACE_SOURCES}
     "${RUNNER_ROOT}/glue.c"
-    "${RUNNER_ROOT}/fiber_compat.c"   # cross-platform fiber shim (Win32 Fibers / POSIX ucontext) — glue.c depends on it
+    "${RUNNER_ROOT}/fiber_compat.c"   # cross-platform fiber shim (Win32 Fibers / POSIX ucontext) â€” glue.c depends on it
     "${RUNNER_ROOT}/crash_report.c"
     "${RUNNER_ROOT}/input_script.c"
     "${RUNNER_ROOT}/reverse_debug.c"
@@ -156,7 +156,7 @@ set(RUNNER_SOURCES
     "${RUNNER_ROOT}/video/color_lut.c"      # present-time 9-bit CRT/composite LUT
 )
 
-# Clean-room own backend (VDP+bus+Z80 scheduler) — the only backend.
+# Clean-room own backend (VDP+bus+Z80 scheduler) â€” the only backend.
 set(OWN_BACKEND_SOURCES
     "${RUNNER_ROOT}/video/genesis_vdp.c"
     "${RUNNER_ROOT}/video/genesis_bus.c"
@@ -254,7 +254,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${RUNNER_ROOT}/m68k_interp.c"
         "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
         "${RECOMP_ROOT}/recompiler/src/rom_parser.c")
-    # Nothing third-party beyond ymfm/superzazu/clowncommon — that is the
+    # Nothing third-party beyond ymfm/superzazu/clowncommon â€” that is the
     # enforcement that no AGPL header can be compiled into a release binary
     # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
     set(INCLUDES_NATIVE
@@ -273,7 +273,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${GENESIS_Z80_AOT_DIR}")
     endif()
 
-    # Native — recompiled 68K + clean-room own backend (AGPL-free; no clown
+    # Native â€” recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
     add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
     add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
@@ -360,13 +360,13 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     endif()
 endfunction()
 
-# --- Mode: Sonic 3 alone (2 MB @ $000000) — playable bring-up ---------------
+# --- Mode: Sonic 3 alone (2 MB @ $000000) â€” playable bring-up ---------------
 add_recomp_mode(Sonic3Recomp  sonic3  sonic3  sonic3.bin  4384 4385)
 
-# --- Mode: Sonic 3 & Knuckles combined (4 MB lock-on) — scaffold ------------
+# --- Mode: Sonic 3 & Knuckles combined (4 MB lock-on) â€” scaffold ------------
 add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 
-# --- Mode: Sonic & Knuckles alone (2 MB @ $000000) — bring-up ----------------
+# --- Mode: Sonic & Knuckles alone (2 MB @ $000000) â€” bring-up ----------------
 # Standalone S&K: byte-identical to the low 2 MB of the combined cart, so it
 # shares the S&K master boot path and the S&K-half disasm (org 0). Data lives in
 # game/sandk/ (game.toml + discovery files regenerated from skdisasm
@@ -406,7 +406,7 @@ foreach(_mode sonic3 sonic3k sandk)
         INPUT "${CMAKE_BINARY_DIR}/release-${_mode}.json" TARGET ${_target})
 endforeach()
 
-# Shared recomp-ui (Dear ImGui) pre-boot launcher — added to ALL THREE native
+# Shared recomp-ui (Dear ImGui) pre-boot launcher â€” added to ALL THREE native
 # targets (each is its own game/exe sharing this repo's output dir). Each stages
 # its OWN box art under a distinct name (BOXART_NAME); the runner's seam selects
 # it per mode via g_game_spec.boxart -> assets/img/boxart-<mode>.tga. Defines
