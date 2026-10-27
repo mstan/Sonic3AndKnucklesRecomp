@@ -6,8 +6,9 @@ interfaces are allowed; game-specific implementation belongs here. Epic:
 `beads-tdq.3`. This relocation moves the Sonic 3 family out of engine
 `dcf77ffb3b5f185990a164077eb85668cf3460e2` without changing gameplay.
 
-- `game/common/`: `sonic3_video.{c,h}`, `sonic3_blue_spheres.inc` (the
-  opt-in family renderer linked by all three modes) and `CUSTOM-VIDEO.md`.
+- `game/common/`: `sonic3_video.{c,h}` (the opt-in family renderer linked by
+  all three modes) and `CUSTOM-VIDEO.md`. Blue Spheres uses the original
+  native composition; the inaccurate host globe projection has been removed.
 - `game/sonic3/`, `game/sonic3k/`, `game/sandk/`: per-mode `game.toml`,
   discovery inputs (`*.disasm_labels*.toml`, `*.disasm_jumptables*.toml`,
   `*.code_addrs.txt`, `annotations_from_disasm.csv`, S3K's

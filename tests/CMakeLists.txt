@@ -90,11 +90,6 @@ function(s3_video_test name)
     target_include_directories(${name}_test PRIVATE
         "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
     target_compile_definitions(${name}_test PRIVATE ${ARGN})
-    # Blue Spheres' projection uses the C math library. Unlike the Windows
-    # CRT, Unix toolchains require this dependency explicitly at link time.
-    if(UNIX)
-        target_link_libraries(${name}_test PRIVATE m)
-    endif()
     add_test(NAME ${name} COMMAND ${name}_test)
 endfunction()
 
@@ -123,6 +118,7 @@ if(Python3_Interpreter_FOUND)
     target_compile_definitions(scd_import_process_test PRIVATE
         S3_CD_IMPORT_SOURCE="${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_process_fixture.py"
         S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
+    add_dependencies(scd_import_process_test scd_pack_validate)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/import-process")
     add_test(NAME scd_import_process COMMAND scd_import_process_test
         "${CMAKE_CURRENT_BINARY_DIR}/import-process/settings.ini")
@@ -136,6 +132,10 @@ if(Python3_Interpreter_FOUND)
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_disc_test.py")
     add_test(NAME scd_import_transaction COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_test.py")
+    # The Python media reader supports the same explicit engine override as
+    # the C/C++ build. Isolated worktrees need not initialize a second engine.
+    set_property(TEST scd_resource scd_disc scd_import_transaction APPEND
+        PROPERTY ENVIRONMENT "GENESIS_RECOMP_ROOT=${RECOMP_ROOT}")
     add_test(NAME megamix_sprite_formats COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/megamix_sprite_test.py")
     if(EXISTS "${CMAKE_SOURCE_DIR}/game/sonic3k/sonic3k.bin")
