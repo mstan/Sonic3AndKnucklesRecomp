@@ -54,6 +54,10 @@ add_executable(megamix_presentation_test runtime/megamix_presentation_test.c)
 target_include_directories(megamix_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME megamix_presentation COMMAND megamix_presentation_test)
+add_executable(trilogy_cd_presentation_test runtime/trilogy_cd_presentation_test.c)
+target_include_directories(trilogy_cd_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+add_test(NAME trilogy_cd_presentation COMMAND trilogy_cd_presentation_test)
 add_executable(megamix_sat_test runtime/megamix_sat_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/trilogy_megamix_sprites.c")
 target_include_directories(megamix_sat_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
@@ -72,7 +76,7 @@ add_executable(stage_pack_test runtime/stage_pack_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/scd_pack.c"
     "${CMAKE_SOURCE_DIR}/game/trilogy/stage_pack_bank.c")
 target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
-    "${CMAKE_SOURCE_DIR}/recomp-ui/src")
+    "${CMAKE_SOURCE_DIR}/recomp-ui/src" "${RUNNER_ROOT}" "${RUNNER_ROOT}/external/superzazu")
 target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1
     S3_CD_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py"
     S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
