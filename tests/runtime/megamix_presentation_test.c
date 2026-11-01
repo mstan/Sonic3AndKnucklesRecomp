@@ -15,6 +15,8 @@ GenesisMachine g_machine;M68KState g_cpu;
 int g_split_sp_popped;static int rte;int *g_rte_pending_ptr=&rte;
 int s3_stage_pack_mighty=1,s3_stage_pack_megamix=1,s3_stage_pack_enabled=1;
 int s3_stage_pack_shadow,tri_shadow_selected;
+static uint8_t donor_hud[384];static int donor_hud_valid;
+const uint8_t *s3_megamix_shadow_hud(void){return donor_hud_valid?donor_hud:NULL;}
 uint32_t tri_shadow_descriptor(void){return s3_stage_pack_shadow?0x400E00:0;}
 int tri_character_active(void){return tri_mighty_active();}
 int tri_mighty_selected;static int player_active=1,atlas_calls;
@@ -162,5 +164,20 @@ int main(void)
         unsigned color=(x&1)?b&15:b>>4;
         CHECK(color==((y<2 || y>=14)?0:1+x/4));
     }
+    /* A validated donor supplies authored icon/font/X bytes even with an old
+     * converted descriptor. Keep both live decimal tiles outside this copy. */
+    for(unsigned i=0;i<384;i++)donor_hud[i]=(uint8_t)(i*37u+3u);
+    donor_hud_valid=1;tri_shadow_selected=1;player_active=1;
+    w8(RAM_Game_mode,0x0C);memset(g_machine.vdp.vram,0x5A,65536);
+    CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
+    CHECK(!memcmp(g_machine.vdp.vram+0x7D4*32,donor_hud,128));
+    for(unsigned i=0;i<4;i++)CHECK(!memcmp(g_machine.vdp.vram+(0x7D8+i)*32,donor_hud+(4+i*2)*32,32));
+    for(unsigned i=0;i<32;i++)CHECK(!g_machine.vdp.vram[0x7DC*32+i]);
+    CHECK(!memcmp(g_machine.vdp.vram+0x7DE*32,donor_hud+7*32,32));
+    CHECK(tiles[0x7D8]==(GVDP_EXT_SPRITE_FORCE|3) && tiles[0x7DC]==(GVDP_EXT_SPRITE_FORCE|3));
+    CHECK(tiles[0x7DE]==(GVDP_EXT_SPRITE_FORCE|3) && !tiles[0x7DD] && !tiles[0x7DF]);
+    CHECK(g_machine.vdp.vram[0x7DD*32]==0x5A && g_machine.vdp.vram[0x7DF*32]==0x5A);
+    player_active=0;CHECK(!tri_mighty_presentation_frame(tiles,top,bottom));
+    CHECK(!tiles[0x7D8] && !tiles[0x7DC] && !tiles[0x7DE]);
     puts("Mighty selection, save identity, menu atlas, palette isolation and HUD digits passed");return 0;
 }

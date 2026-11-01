@@ -9,8 +9,36 @@ static int replay_playing;
 int genesis_replay_playing(void) { return replay_playing; }
 static void import_progress(void *ctx,float pct,const char *message)
 { (void)ctx;printf("import %.2f %s\n",pct,message);fflush(stdout); }
+static void hud_decode_test(void)
+{
+    uint8_t encoded[160],out[384];
+    for(unsigned mode=0;mode<2;mode++) {
+        memset(encoded,0,sizeof encoded);encoded[0]=(uint8_t)(mode?128:0);encoded[1]=12;encoded[2]=255;
+        unsigned bit=24;
+        for(unsigned row=0;row<96;row++) {
+            unsigned v=(63u<<7)|0x70u|((row%15)+1);
+            for(int k=12;k>=0;k--,bit++)encoded[bit/8]|=(uint8_t)(((v>>k)&1)<<(7-(bit&7)));
+        }
+        CHECK(bit==159*8 && s3_megamix_hud_decode(encoded,159,out));
+        uint32_t previous=0;
+        for(unsigned row=0;row<96;row++) {
+            uint32_t value=((row%15)+1)*0x11111111u;if(mode)value^=previous;
+            previous=value;
+            for(unsigned i=0;i<4;i++)CHECK(out[row*4+i]==(uint8_t)(value>>(24-i*8)));
+        }
+        for(unsigned n=0;n<159;n++)CHECK(!s3_megamix_hud_decode(encoded,n,out));
+    }
+    /* A real prefix table, not just inline runs: eight repeated nibbles
+     * encoded by one zero bit per row. */
+    memset(encoded,0,sizeof encoded);encoded[1]=12;encoded[2]=0x85;
+    encoded[3]=0x71;encoded[4]=0;encoded[5]=255;
+    CHECK(s3_megamix_hud_decode(encoded,18,out));
+    for(unsigned i=0;i<384;i++)CHECK(out[i]==0x55);
+    encoded[3]=0x79;CHECK(!s3_megamix_hud_decode(encoded,18,out));
+}
 int main(int argc,char **argv)
 {
+    hud_decode_test();
     remove("sonic3k-stage-pack.ini");s3_stage_pack_load("settings.ini");
     const RecompLauncherCModProvider *p=s3_stage_pack_mods(NULL);
     CHECK(p->package_count(NULL)==6 && p->feature_count(NULL)==6);

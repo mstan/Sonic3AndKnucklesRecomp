@@ -8,6 +8,10 @@ extern int s3_stage_pack_shadow;
 extern int s3_pack_mighty_requested,s3_pack_shadow_requested;
 extern char s3_megamix_rom_path[1024];
 int s3_megamix_rom_validate(const char *path,char *error,unsigned capacity);
+/* Authored Shadow life/name/X strip from the already required verified donor.
+ * Cached at media validation, never loaded from disk during rendering. */
+const uint8_t *s3_megamix_shadow_hud(void);
+int s3_megamix_hud_decode(const uint8_t *src, size_t size, uint8_t out[384]);
 extern int s3_stage_pack_sonic1, s3_stage_pack_sonic2;
 extern int s3_stage_pack_cd;
 extern int s3_cd_ufo_practice;
