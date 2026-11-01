@@ -426,6 +426,21 @@ int tri_water_hook(uint32_t pc)
         if (lz_water() || (s2_water() && tri_zone() != TRI_S2_ARZ))
             D(0) = (D(0) & 0xFFFF0000u) | (uint16_t)(D(0) + (r8(RAM_Oscillating_table + 2) >> 1));
         return 0;
+    case TH_S1_WATER_COUNT3:
+    case TH_S1_WATER_COUNT4:
+    case TH_S1_WATER_COUNT5:
+    case TH_S1_WATER_COUNT6: {
+        uint32_t e = tri_dir();
+        /* S1 REV01 HBlank ($1126) copies all 64 colours. S3K's gradual
+         * three-colour list truncates below line 200, leaving LZ's brown
+         * scenery in the submerged strip. Retain the complete list in both
+         * normal/reverse and slow/fast handlers. Only this subtraction's
+         * input changes; the native waterline, interrupt and fades do not. */
+        if (e && tri_rd8(e + TD_GAME) == TRI_GAME_S1 &&
+            tri_source_zone() == S1_LZ && (D(0) & 0xFFu) > 200u)
+            D(0) = (D(0) & 0xFFFFFF00u) | 200u;
+        return 0;
+    }
     default:
         return 0;
     }

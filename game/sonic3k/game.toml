@@ -674,6 +674,18 @@ kind = "game_hook"
 addr = 0x006C5C # trilogy WATER_LEVEL (Handle_Onscreen_Water_Height)
 kind = "game_hook"
 [[widescreen_site]]
+addr = 0x000E16 # trilogy S1_WATER_COUNT3 (HInt3)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x000F3E # trilogy S1_WATER_COUNT4 (HInt4)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x000EAA # trilogy S1_WATER_COUNT5 (HInt5)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x000FD0 # trilogy S1_WATER_COUNT6 (HInt_6)
+kind = "game_hook"
+[[widescreen_site]]
 addr = 0x01B6CA # trilogy OBJ_INDEX (loc_1B6CA)
 kind = "game_hook"
 [[widescreen_site]]
