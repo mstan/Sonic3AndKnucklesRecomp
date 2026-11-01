@@ -525,6 +525,23 @@ class Sonic1:
         for ch in chunks:
             for i in range(64):
                 used_blocks.add(be16(ch, i * 2) & 0x3FF)
+        if name == 'MZ':
+            # The gated windows use Sonic's black/greys (1/8/9). Those
+            # indices are identical on the common line, whereas L0_MAP
+            # merges black and dark grey and tints the lighter grey. Use
+            # the existing exact palette before packing; no art or shared
+            # palette entries change. Older lossy packs need reconversion.
+            common = self.palette_lines(self.header(z)['pal'])[:16]
+            for b in used_blocks:
+                for k in range(4):
+                    o = b * 8 + k * 2
+                    w = be16(blocks, o)
+                    if w & 0x6000:
+                        continue
+                    tile = self._vram[(w & 0x7FF) * 32:((w & 0x7FF) + 1) * 32]
+                    colors = {c for px in tile for c in (px >> 4, px & 15) if c}
+                    if colors and all(S1_SONIC[c] == common[c] for c in colors):
+                        struct.pack_into('>H', blocks, o, w | 0x2000)
         for b in range(len(blocks) // 8):
             for k in range(4):
                 o = b * 8 + k * 2
