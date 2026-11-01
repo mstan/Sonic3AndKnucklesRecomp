@@ -14,6 +14,52 @@ static int ready,projected,loaded_valid;
 static CampaignCdState cd_state;
 static int cd_slot=-1;
 static int cd_selection_pending;
+/* The feedback recorder needs the exact on-disk startup journal and legacy
+ * inputs too. Its replay profile is isolated; never overwrite an existing
+ * destination when importing this build-specific opaque context. */
+typedef struct FeedbackSaveFile { uint32_t size;uint8_t data[16384]; } FeedbackSaveFile;
+static void feedback_path(char *out,size_t size,unsigned index)
+{
+    if(index<2)snprintf(out,size,"%s.campaign%s",save_path,index?".bak":"");
+    else {
+        snprintf(out,size,"%s",save_path);
+        char *a=strrchr(out,'/'),*b=strrchr(out,'\\');
+        char *name=a&&(!b||a>b)?a+1:b?b+1:out;
+        snprintf(name,size-(size_t)(name-out),"%s",index==2?"sonic3k-stage-pack.srm":"sonic3k-megamix.srm");
+    }
+}
+size_t tri_save_feedback_context(void *data,size_t size,int load)
+{
+    const size_t bytes=4*sizeof(FeedbackSaveFile);
+    if(!data && !size && !load)return bytes;
+    if(!data || size!=bytes || !save_path[0])return 0;
+    FeedbackSaveFile *files=data;
+    if(load) {
+        /* Validate the entire set before changing the fresh replay profile. */
+        for(unsigned i=0;i<4;i++) {
+            if(files[i].size!=UINT32_MAX && files[i].size>sizeof files[i].data)return 0;
+            char path[1240];feedback_path(path,sizeof path,i);
+            FILE *f=fopen(path,"rb");if(f){fclose(f);return 0;}
+        }
+    } else memset(data,0,bytes);
+    for(unsigned i=0;i<4;i++) {
+        char path[1240];feedback_path(path,sizeof path,i);
+        if(load) {
+            if(files[i].size==UINT32_MAX)continue;
+            FILE *f=fopen(path,"wb");if(!f)return 0;
+            int ok=fwrite(files[i].data,1,files[i].size,f)==files[i].size;
+            if(fclose(f))ok=0;
+            if(!ok)return 0;
+        } else {
+            FILE *f=fopen(path,"rb");
+            if(!f){files[i].size=UINT32_MAX;continue;}
+            files[i].size=(uint32_t)fread(files[i].data,1,sizeof files[i].data,f);
+            int ok=!ferror(f) && fgetc(f)==EOF;fclose(f);
+            if(!ok)return 0;
+        }
+    }
+    return bytes;
+}
 static int current_slot(void)
 {
     uint32_t p=r32(0xFFE660u)&0xFFFFFFu;

@@ -19,7 +19,9 @@ Source base: game main `ddafabc479`, engine `252535d124` plus the existing
 uncommitted replay-diagnostics changes. Work is solo. Reuse the supported CMake
 consumer and existing TCP/state/stage-audit helpers. Preserve original native
 saves, use isolated muted runtimes, and do not write the outcomes being tested.
-No commits or publication are authorized by this request.
+The original investigation was local. The owner subsequently authorized a new
+release with these fixes and diagnostics before work on the next reports.
+Release v0.6.3 integrates onto the shipped v0.6.2 source and engine base.
 
 Seven reports have fixes with built-runtime evidence; the intermittent signpost
 report remains open. No claim of reproducing all eight is made.

@@ -13,6 +13,7 @@
  */
 #pragma once
 #include <stdint.h>
+#include <stddef.h>
 #include "trilogy_syms.h"
 #include "trilogy_hooks.h"
 #include "scd_geometry_sites.h"
@@ -322,3 +323,4 @@ void tri_obj_upload_art(void);
 
 /* Shared water art after title cards and CD warp arrivals. */
 void tri_water_load_bubbles(void);
+size_t tri_save_feedback_context(void *data,size_t size,int load);

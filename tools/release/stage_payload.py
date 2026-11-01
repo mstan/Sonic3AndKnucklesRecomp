@@ -96,6 +96,10 @@ def stage(build, dest, version, mode, engine_root=None):
     shutil.copy2(license_path, dest / "LICENSE")
     shutil.copy2(engine / "THIRD-PARTY-LICENSES.md", dest)
     shutil.copy2(metadata, dest / "build-info.json")
+    (dest / "docs").mkdir(exist_ok=True)
+    (dest / "tools").mkdir(exist_ok=True)
+    shutil.copy2(engine / "docs/PLAYER_FEEDBACK.md", dest / "docs/PLAYER_FEEDBACK.md")
+    shutil.copy2(engine / "tools/replay_diagnostic.py", dest / "tools/replay_diagnostic.py")
     if mode == "sonic3k":
         docs = dest / "docs"
         docs.mkdir(exist_ok=True)
