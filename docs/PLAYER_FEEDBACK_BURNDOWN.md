@@ -4,35 +4,36 @@ Release first: [Sonic family v0.6.3](https://github.com/mstan/Sonic3AndKnucklesR
 
 ## Burndown
 
-Count only a reproduced fix with relevant built-runtime acceptance as closed. Prepared code, builds and instrumentation do not reduce the remaining count. New scope increases the total explicitly.
+Count only a reproduced fix with relevant built-runtime acceptance as fixed. The owner subsequently instructed: when bounded attempts cannot reproduce a report and no diagnostics exist, defer it and close it out for this pass; revisit if it recurs with logs. Track those dispositions separately from fixes. Prepared code, builds and instrumentation are not fixes. New scope increases the total explicitly.
 
 ```mermaid
 xychart-beta
-    title "Player reports remaining"
-    x-axis ["Reported scope", "v0.6.3 published"]
-    y-axis "Open reports" 0 --> 22
-    line [22, 15]
+    title "Player reports awaiting disposition"
+    x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass"]
+    y-axis "Reports remaining" 0 --> 22
+    line [22, 15, 13]
 ```
 
-| Checkpoint | Total reports | Validated closed | Remaining |
-| --- | ---: | ---: | ---: |
-| Scope reported before publication | 22 | 0 | 22 |
-| v0.6.3 published | 22 | 7 | 15 |
+| Checkpoint | Total reports | Fixed | Deferred this pass | Remaining |
+| --- | ---: | ---: | ---: | ---: |
+| Scope reported before publication | 22 | 0 | 0 | 22 |
+| v0.6.3 published | 22 | 7 | 0 | 15 |
+| Bounded reproduction, owner deferral instruction | 22 | 7 | 2 | 13 |
 
-| Work group | Total | Closed | Open |
-| --- | ---: | ---: | ---: |
-| Original Sonic 3 family reports | 8 | 7 | 1 |
-| Next Sonic 3 & Knuckles / imported campaigns | 8 | 0 | 8 |
-| Sonic 3 Alone additions | 2 | 0 | 2 |
-| Sonic 2, later | 4 | 0 | 4 |
+| Work group | Total | Fixed | Deferred | Remaining |
+| --- | ---: | ---: | ---: | ---: |
+| Original Sonic 3 family reports | 8 | 7 | 1 | 0 |
+| Next Sonic 3 & Knuckles / imported campaigns | 8 | 0 | 1 | 7 |
+| Sonic 3 Alone additions | 2 | 0 | 0 | 2 |
+| Sonic 2, later | 4 | 0 | 0 | 4 |
 
 ## Sonic 3 family — next
 
-Prioritize LZ2 progression, then related water defects; retain individual dispositions. Use native inputs and cheats/teleports only for prerequisites, without setting the result under test. Preserve native saves and use muted isolated profiles.
+Continue with the reproducible water/presentation defects; retain individual dispositions. Use native inputs and cheats/teleports only for prerequisites, without setting the result under test. Preserve native saves and use muted isolated profiles.
 
 | ID | Report | State | Acceptance / evidence needed |
 | --- | --- | --- | --- |
-| S3-09 | LZ conveyor platforms do not spawn; LZ2 cannot be completed | Open — highest priority | Reach actual conveyor placements, observe spawning/collision, cross the blocked route and trigger the real act transition. |
+| S3-09 | LZ conveyor platforms do not spawn; LZ2 cannot be completed | Deferred this pass — not reproduced | Published v0.6.3 spawns both groups (16 platforms) at native and 32:9 widths, including an approach visiting the earlier act; 47 occupied object slots, no pool exhaustion. No fix claimed. Reopen with future logs if it recurs. |
 | S3-10 | LZ water briefly flickers orange | Open | Capture the affected water transition and verify underwater palette selection remains stable. |
 | S3-11 | LZ underwater objects shift slightly | Open | Compare object world positions and waterline rendering across successive frames; remove unintended displacement while preserving water effects. |
 | S3-12 | LZ water push uses HCZ bar-grab behavior | Open | Exercise the native imported current; verify intended movement and animation without a bar-grab state. |
@@ -40,7 +41,7 @@ Prioritize LZ2 progression, then related water defects; retain individual dispos
 | S3-14 | Blue Spheres has no widescreen | Open | Real side content at adaptive widths, with correct projection and unchanged central gameplay/physics; native margins alone do not pass. |
 | S3-15 | Shadow uses Sonic sprites in Blue Spheres | Open | Enter Blue Spheres as Shadow; verify appropriate Shadow frames through turning, running, jumping and results. |
 | S3-16 | Competition menu background wraps in widescreen | Open | Inspect the actual menu at native and wide aspects; no opposite-edge wrap or repeated central menu art. |
-| S3-05 | GHZ1 signpost sometimes spins forever as Sonic & Tails | Open — not reproduced | Obtain the failing route/replay, reproduce the hang, then observe ordinary signpost completion and the real next act. Prior eight approach variants passed; no forced timeout patch. |
+| S3-05 | GHZ1 signpost sometimes spins forever as Sonic & Tails | Deferred this pass — not reproduced | Prior eight approach variants passed. Closed for this pass per owner instruction; no fix or forced timeout patch. Reopen with future logs if it recurs. |
 
 ## Sonic 3 Alone — same burndown
 
@@ -85,3 +86,5 @@ These are requested enhancements, not completed bug fixes and not part of the 22
 | F-03 | Infinite time | Opt-in gameplay enhancement, with an explicit Mods control and normal behavior when disabled; exercise timer expiry and stage transitions. |
 | F-04 | Audio-filter toggle in Sonic 3 & Knuckles | Expose an option to disable filtering for clearer emulation-style audio. Verify that toggling changes only the intended presentation filter and does not interrupt or accelerate audio/gameplay. |
 | F-05 | Drop dash and peel-out, possible Origins sprite/sound reference | **STOP AND CHECK IN WITH OWNER BEFORE STARTING THIS STRETCH WORK OR INTRODUCING ASSETS.** Return with a concrete scope/assets proposal after the preceding work is handled. No implementation or asset import is currently authorized. |
+
+Conveyor reproduction evidence: `C:/temp/Codex/sonic-feedback-release-20261101/server-lz-baseline`, `server-lz-wide-baseline` and `server-lz-prefix-baseline`. Direct/approach probes use stage/player positioning as a prerequisite bypass; they establish spawning, not an end-to-end LZ2 completion. This limitation is retained in the deferral.
