@@ -184,6 +184,28 @@ static void test_world_snapshot(void)
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static unsigned hud_fixture(void) { return 0x3000; }
+static int hud_object_fixture(unsigned object) { return object==0xB0DE; }
+static void test_hud_object_anchor(void)
+{
+    static GVDP v;uint32_t out[398],pal[64]={0};
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("fit"));
+    write32(0xB0DE,0x1234);write32(0xB0DE+0xC,0x6000);
+    word(g_ram,0xB0DE+0x10,128+68);word(g_ram,0xB0DE+0x14,128+210);
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB0DE);
+    word(g_rom,0x6000,2);word(g_rom,0x6002,1);word(g_rom,0x6004,0);
+    word(g_rom,0x6006,0);word(g_rom,0x6008,0);
+    s3_video_set_hud_object(hud_object_fixture);capture_objects();
+    CHECK(s_build.count==1 && s_build.sprites[0].hud==1);
+    const SceneFrame *old=s_display;s_display=&s_build;
+    memset(v.vram,0x11,32);pal[1]=0xFFFFFFFFu;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/sizeof *out);
+    draw_scene_sprites(&v,210,out,398,39,pal);
+    CHECK(out[68]==pal[1] && !out[68+39]);
+    s_display=old;s3_video_set_hud_object(NULL);capture_objects();
+    CHECK(s_build.count==1 && s_build.sprites[0].hud==2);
+    CHECK(configure("off"));
+}
 static int deformed_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     (void)ram;(void)x;(void)y;*cell=background?0:1;return 1;
@@ -628,6 +650,7 @@ int main(int argc,char **argv)
     }
     test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
     test_deformation_keeps_actors_still();
+    test_hud_object_anchor();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

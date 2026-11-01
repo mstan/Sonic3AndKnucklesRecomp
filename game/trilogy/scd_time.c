@@ -18,6 +18,7 @@
 #include "trilogy_obj.h"
 #include "trilogy_hooks.h"
 #include "scd.h"
+#include "sonic3_video.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -401,6 +402,8 @@ void cd_time_post(uint32_t o)
 }
 
 /* ObjTimeIcon: P or F in the HUD while a post's warp is on, flashing at the end */
+static int time_hud_object(unsigned object)
+{ return s_icon && (s_icon&65535u)==object; }
 void cd_time_icon(uint32_t o)
 {
     if (!s_dir || o != s_icon) { if (o == s_icon) s_icon = 0; o_delete(o); return; }
@@ -413,6 +416,7 @@ void cd_time_icon(uint32_t o)
         SET16(o, OBJ_y_pos, 210 + 128);
     }
     SET8(o, OBJ_frame, s_dir < 0 ? 0x12 : 0x13);
+    s3_video_set_hud_object(time_hud_object);
     if (s_timer >= 90 && (r8(RAM_Level_frame_counter + 1) & 1)) return;
     o_draw(o);
 }
