@@ -403,7 +403,10 @@ void cd_time_post(uint32_t o)
 
 /* ObjTimeIcon: P or F in the HUD while a post's warp is on, flashing at the end */
 static int time_hud_object(unsigned object)
-{ return s_icon && (s_icon&65535u)==object; }
+{
+    return s_icon && (s_icon&65535u)==object &&
+        r32(0xFF0000u|object)==NATIVE_CD_BASE+SLOT_TIMEICON*4u;
+}
 void cd_time_icon(uint32_t o)
 {
     if (!s_dir || o != s_icon) { if (o == s_icon) s_icon = 0; o_delete(o); return; }

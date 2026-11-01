@@ -197,7 +197,7 @@ static void test_hud_object_anchor(void)
     word(g_rom,0x6006,0);word(g_rom,0x6008,0);
     s3_video_set_hud_object(hud_object_fixture);capture_objects();
     CHECK(s_build.count==1 && s_build.sprites[0].hud==1);
-    const SceneFrame *old=s_display;s_display=&s_build;
+    const SceneFrame *old=s_display;s_display=&s_build;s_build.scene=1;
     memset(v.vram,0x11,32);pal[1]=0xFFFFFFFFu;
     memset(out,0,sizeof out);memset(s_priority,0,sizeof out/sizeof *out);
     draw_scene_sprites(&v,210,out,398,39,pal);
