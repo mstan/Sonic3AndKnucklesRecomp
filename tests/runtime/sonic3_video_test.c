@@ -81,6 +81,43 @@ static void test_object_zoom(void)
     CHECK(s_build.sprites[0].zoom==128);
     s3_video_set_object_zoom(NULL);CHECK(!enabled());
 }
+static void test_native_bonus(void)
+{
+    static GVDP v;uint32_t native[320],out[796];
+    static uint8_t before[65536];
+#ifdef SONIC3_STANDALONE
+    const unsigned last=0x13;
+#else
+    const unsigned last=0x15;
+#endif
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    for(unsigned zone=0x13;zone<=last;zone++) {
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)zone;g_ram[0xF711]=1;
+        write32(0xB000,0x123456);word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+        CHECK(bonus_stage() && !gameplay() && !level_ready());
+        CHECK(s3_video_main_cpu_divisor()==1);
+        g_cpu.D[0]=0x12345678;g_cpu.A[1]=0x87654321;g_cpu.A[4]=0x76543210;
+        s3_video_hook(S3_RING_RANGE);s3_video_hook(S3_RING_STATUS);s3_video_hook(0x1A8D2);
+        CHECK(g_cpu.D[0]==0x12345678 && g_cpu.A[1]==0x87654321 && g_cpu.A[4]==0x76543210);
+        capture_objects();CHECK(s_build.scene==3 && !s_build.count);publish_sprites();
+        memcpy(before,g_ram,sizeof before);
+        for(int y=0;y<224;y++) {
+            for(int x=0;x<320;x++)native[x]=0xFF000000u|((unsigned)y<<16)|(unsigned)x;
+            native_row_calls=0;scanline_lazy(&v,y,320,out,796,test_native_row,native);
+            CHECK(native_row_calls==1);
+            for(int x=0;x<796;x++)CHECK(out[x]==(x>=238 && x<558?native[x-238]:0xFF000000u));
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        /* The outgoing bonus publication survives a mode/zone change before
+         * the next native SAT upload, including a fully white fade. */
+        g_ram[0xFE10]=0;g_ram[0xF600]=0x8C;
+        for(unsigned i=0;i<64;i++)v.cram[i]=0xEEE;
+        scanline(&v,0,native,320,out,796);
+        CHECK(s_frame_bonus && out[0]==0xFF000000u && out[238]==native[0]);
+    }
+    CHECK(configure("off"));
+}
 static void test_file_select(void)
 {
     static GVDP v;
@@ -651,6 +688,7 @@ int main(int argc,char **argv)
     test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
     test_deformation_keeps_actors_still();
     test_hud_object_anchor();
+    test_native_bonus();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

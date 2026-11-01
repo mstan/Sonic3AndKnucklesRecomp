@@ -59,7 +59,7 @@ static GVDP s_video_frame;
  * top of work RAM. Publish the full address space with the terrain snapshot. */
 static uint8_t s_world_frame[0x10000];
 static uint8_t s_background_frame[0x10000];
-static int s_frame_level,s_frame_special,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
+static int s_frame_level,s_frame_special,s_frame_bonus,s_frame_fg_x,s_frame_fg_y,s_frame_bg_y;
 static unsigned s_frame_zone,s_frame_act,s_frame_bg_event;
 static unsigned s_frame_tree_reveal;
 static int s_frame_bg_band[2];
@@ -162,10 +162,20 @@ static uint16_t vram16(const GVDP *v, unsigned a)
 {
     return (uint16_t)((v->vram[a & 0xFFFFu] << 8) | v->vram[(a + 1) & 0xFFFFu]);
 }
+static int bonus_stage(void)
+{
+    int mode=g_ram[0xF600]&127,zone=g_ram[0xFE10];
+#ifdef SONIC3_STANDALONE
+    return (mode==8 || mode==12) && zone==0x13;
+#else
+    return (mode==8 || mode==12) && zone>=0x13 && zone<=0x15;
+#endif
+}
 static int gameplay(void)
 {
     int mode=g_ram[0xF600]&127;
-    return (mode==8 || mode==12) && (ram16(0xB000)||ram16(0xB002)) && !ram16(S3_COMPETITION);
+    return (mode==8 || mode==12) && !bonus_stage() &&
+        (ram16(0xB000)||ram16(0xB002)) && !ram16(S3_COMPETITION);
 }
 static int stage_width(void)
 {
@@ -307,7 +317,7 @@ typedef struct {
     SceneSprite sprites[SCENE_SPRITES];
     unsigned count, serial;
     uint8_t sat[640];
-    int scene; /* 1 level, 2 special, 0 menu */
+    int scene; /* 1 level, 2 special, 3 native bonus, 0 menu */
     int camera_x, camera_y; /* coordinates used when capturing world sprites */
 } SceneFrame;
 static SceneFrame s_build, s_history[3], s_display_frame;
@@ -520,7 +530,11 @@ static unsigned rings_end(void)
 static void capture_objects(void)
 {
     s_build.count=0;s_visible_count=0;++s_scene_tick;
-    s_build.scene=level_ready()?1:0;
+    s_build.scene=bonus_stage()?3:level_ready()?1:0;
+    /* These stages stream machine/reel art independently of world layouts.
+     * Publish only their native SAT identity so entry/exit fades retain the
+     * correct composition; never add ordinary stage rings or mappings. */
+    if(s_build.scene==3)return;
     int cam=ram16(0xEE80),cy=ram16(0xEE84);
     s_build.camera_x=cam;s_build.camera_y=cy;
     int left=gameplay()?view_left(cam,s_requested_width):cam-(s_requested_width-320)/2;
@@ -646,7 +660,7 @@ static void select_scene(const GVDP *v)
     }
     if(!s_display) {
         ++s_scene_misses;
-        int scene=level_ready()?1:(g_ram[0xF600]&127)==0x34?2:0;
+        int scene=bonus_stage()?3:level_ready()?1:(g_ram[0xF600]&127)==0x34?2:0;
         /* An in-progress native SAT is not a custom-scene publication. Keep
          * the completed scene until its replacement is ready, without
          * flashing the native centered HUD or dropping host-only rings. */
@@ -790,8 +804,21 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
             if(p){s_priority=p;s_priority_capacity=width;}
         }
         select_scene(v);
+        s_frame_bonus=bonus_stage() || (s_display && s_display->scene==3);
     }
     v=&s_video_frame;
+    if(s_frame_bonus) {
+        /* Bonus machines have a finite authored arena, not a stage layout.
+         * Keep native DMA timing, sprites and palettes across every scanline
+         * and fade, with stable clean margins at any requested aspect. */
+        if(!native)native=native_row(native_ctx);
+        int origin=(width-nw)/2;
+        for(int x=0;x<width;++x)out[x]=0xFF000000u;
+        int first=origin<0?-origin:0,last=origin+nw>width?width-origin:nw;
+        if(last>first)memcpy(out+origin+first,native+first,(size_t)(last-first)*sizeof *out);
+        if(line==0){++s_frames;s_native_x=origin;}
+        return;
+    }
     uint32_t backdrop=palette[v->reg[7]&63];
     /* During a completed fade the game can clear/reload name tables before
      * retiring its old player/display list. A flat palette displays no stage
