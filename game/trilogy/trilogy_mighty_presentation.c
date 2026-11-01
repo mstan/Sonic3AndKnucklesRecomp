@@ -175,7 +175,7 @@ static void shadow_head_art(uint32_t d)
 }
 int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
 {
-    for(unsigned i=0;i<2048;i++)if(tiles[i]==3)tiles[i]=0;
+    for(unsigned i=0;i<2048;i++)if(tiles[i]==3 || tiles[i]==(GVDP_EXT_SPRITE_FORCE|3))tiles[i]=0;
     uint32_t d=data();
     int menu=(r8(RAM_Game_mode)&127)==0x4C;
     int player=(r8(RAM_Game_mode)&127)==0x0C && tri_character_active();
@@ -193,13 +193,26 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
     }
     if(player) {
         memset(tiles+0x680,3,32);
-        if(tri_shadow_selected) {
+        const uint8_t *native=tri_shadow_selected?s3_megamix_shadow_hud():NULL;
+        if(native) {
+            /* Reuse the donor's authored 16x16 icon and compact lettering,
+             * including existing converted packs; never shrink a body pose. */
+            memcpy(g_machine.vdp.vram+0x7D4*32,native,128);
+            for(unsigned col=0;col<4;col++)
+                memcpy(g_machine.vdp.vram+(0x7D8+col)*32,native+(4+col*2)*32,32);
+            memset(g_machine.vdp.vram+0x7DC*32,0,32);
+            memcpy(g_machine.vdp.vram+0x7DE*32,native+7*32,32);
+            memset(tiles+0x7D8,GVDP_EXT_SPRITE_FORCE|3,5);
+            tiles[0x7DE]=GVDP_EXT_SPRITE_FORCE|3;
+        } else if(tri_shadow_selected) {
             shadow_head_art(d);
             if(shadow_head_source==d)memcpy(g_machine.vdp.vram+0x7D4*32,shadow_head,128);
             else upload(tri_rd32(d+76),0x7D4*32,128);
         } else upload(tri_rd32(d+76),0x7D4*32,128);
-        upload(tri_rd32(d+80),0x7D8*32,160);
-        upload(tri_rd32(d+80)+160,0x7DE*32,32);
+        if(!native) {
+            upload(tri_rd32(d+80),0x7D8*32,160);
+            upload(tri_rd32(d+80)+160,0x7DE*32,32);
+        }
         memset(tiles+0x7D4,3,4);
     }
     /* Native fades own the shared CRAM. Match their per-channel envelope

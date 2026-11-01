@@ -17,6 +17,50 @@ static uint32_t crc32(const uint8_t *p, size_t n)
     while (n--) { c ^= *p++; for (int i=0;i<8;i++) c=(c>>1)^(0xEDB88320u & (0u-(c&1))); }
     return ~c;
 }
+static uint8_t shadow_hud[384];
+static int shadow_hud_valid;
+const uint8_t *s3_megamix_shadow_hud(void) { return shadow_hud_valid?shadow_hud:NULL; }
+typedef struct HudBits { const uint8_t *src; size_t size, bit; int ok; } HudBits;
+static unsigned hud_bits(HudBits *s,unsigned count)
+{
+    unsigned value=0;
+    if(s->bit>s->size*8 || count>s->size*8-s->bit){s->ok=0;return 0;}
+    while(count--){value=(value<<1)|((s->src[s->bit>>3]>>(7-(s->bit&7)))&1u);++s->bit;}
+    return value;
+}
+/* Same Nemesis semantics as tools/trilogy/mdcodecs.py, bounded to the original
+ * twelve-tile life strip. No artwork is compiled into the executable. */
+int s3_megamix_hud_decode(const uint8_t *src,size_t size,uint8_t out[384])
+{
+    uint8_t runs[512]={0},colors[512]={0};
+    if(!src || !out || size<3 || size>1283224 || (((unsigned)src[0]<<8|src[1])&0x7FFF)!=12)return 0;
+    size_t p=2;unsigned nib=0;
+    while(p<size && src[p]!=255) {
+        unsigned entry=src[p++];
+        if(entry&128){nib=entry&15;continue;}
+        unsigned length=entry&15,run=((entry>>4)&7)+1;
+        if(!length || length>8 || p>=size || src[p]>=(1u<<length))return 0;
+        unsigned index=(1u<<length)|src[p++];runs[index]=(uint8_t)run;colors[index]=(uint8_t)nib;
+    }
+    if(p>=size)return 0;
+    HudBits bits={src,size,(p+1)*8,1};unsigned used=0;
+    memset(out,0,384);
+    while(used<768 && bits.ok) {
+        unsigned code=0,run=0,color=0;
+        for(unsigned length=1;length<=8 && bits.ok;length++) {
+            code=(code<<1)|hud_bits(&bits,1);
+            if(length==6 && code==63){unsigned v=hud_bits(&bits,7);run=(v>>4)+1;color=v&15;break;}
+            unsigned index=(1u<<length)|code;
+            if(runs[index]){run=runs[index];color=colors[index];break;}
+        }
+        if(!bits.ok || !run || run>768-used)return 0;
+        while(run--){out[used/2]|=(uint8_t)(color<<((used&1)?0:4));++used;}
+    }
+    if(!bits.ok || used!=768)return 0;
+    if(src[0]&128)for(unsigned row=1;row<96;row++)
+        for(unsigned byte=0;byte<4;byte++)out[row*4+byte]^=out[(row-1)*4+byte];
+    return 1;
+}
 static int character_graph(const uint8_t *data,uint32_t size,uint32_t descriptor)
 {
     if(!range(descriptor,88,size))return 0;
@@ -179,6 +223,7 @@ int s3_stage_pack_validate(const char *path,char *error,unsigned capacity)
  * previously converted pack is installed. Never infer ownership from a pack. */
 int s3_megamix_rom_validate(const char *path,char *error,unsigned capacity)
 {
+    shadow_hud_valid=0;
     const char *message="Select your Sonic Megamix v3 ROM (extract ZIP archives first)";
     FILE *f=path && *path?fopen(path,"rb"):NULL;
     int ok=0;
@@ -187,6 +232,9 @@ int s3_megamix_rom_validate(const char *path,char *error,unsigned capacity)
             rewind(f);uint8_t *data=malloc(1283224);
             if(data) {
                 ok=fread(data,1,1283224,f)==1283224 && fgetc(f)==EOF && crc32(data,1283224)==0x66ECB4F4u;
+                /* Exact v3 $4BA6/$4BC4 selects PLC $21 for Shadow. Its entry
+                 * at verified PLC table $266D0 loads $3BAF4 at VRAM $FA80. */
+                if(ok)shadow_hud_valid=s3_megamix_hud_decode(data+0x3BAF4,1283224-0x3BAF4,shadow_hud);
                 free(data);
             }
         }
