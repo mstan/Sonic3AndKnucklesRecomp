@@ -41,6 +41,7 @@ void s1_boss_defeated(uint32_t o)
 
 static void zone_music(void)
 {
+    w8(RAM_Boss_flag,0);
     tri_music_zone();
 }
 

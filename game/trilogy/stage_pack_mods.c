@@ -119,6 +119,7 @@ const char *s3_stage_pack_sram(void) { return NULL; }
 
 #if RECOMP_LAUNCHER
 #include "recomp_launcher.h"
+#include "diagnostic_replay.h"
 #define COPY(dst,src) snprintf(dst,sizeof(dst),"%s",src)
 enum { MOD_COUNT=6 };
 static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix","sonic3.sonic-cd","sonic3.mighty","sonic3.shadow"};
@@ -222,6 +223,11 @@ static int resource_set(void *c,const char *p,const char *f,const char *r,const 
     (void)c;int i=index_of(p);s_error[0]=0;
     if(i<0)return base&&base->feature_resource_set_path&&base->feature_resource_set_path(base->ctx,p,f,r,path);
     if(i==3 && own(p,f) && r && !strcmp(r,"cd-disc")) {
+        /* Feedback restores the verified converted stage/audio resources
+         * separately. The original disc path is informational and need not
+         * exist on the reproducer's machine; never run the importer here. */
+        if(genesis_replay_playing() && path && *path && strlen(path)<sizeof s_cd_disc_path &&
+           !strchr(path,'\n') && !strchr(path,'\r'))return 1;
         if(!path || *path){COPY(s_error,"Use the disc importer to prepare stages and music together.");return 0;}
         s_cd_disc_path[0]=0;return 1; /* clearing a source never deletes imported resources */
     }
