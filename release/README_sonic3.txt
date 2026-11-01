@@ -1,4 +1,4 @@
-Sonic 3 Recomp v0.6.0
+Sonic 3 Recomp v0.6.3
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -30,3 +30,8 @@ Third-party notices: THIRD-PARTY-LICENSES.md and licenses/.
 Exact source and dependency commits: build-info.json.
 Source: https://github.com/mstan/Sonic3AndKnucklesRecomp
 This project is not affiliated with or endorsed by SEGA.
+
+REPLAYABLE FEEDBACK
+Enabled by default in Mods > Diagnostics. Reports stay local. After a bug, quit
+normally and send logs/*-feedback.replay with its .sav, .config.ini and .mods.txt
+sidecars. Nothing uploads automatically. See docs/PLAYER_FEEDBACK.md.

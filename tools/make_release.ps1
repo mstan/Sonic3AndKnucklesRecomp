@@ -36,7 +36,7 @@ foreach ($mode in @('sonic3','sonic3k','sandk')) {
   $files = @(Get-ChildItem -LiteralPath $stage -File -Recurse | Sort-Object FullName)
   foreach ($file in $files) {
     $rel = $file.FullName.Substring($stage.Length + 1).Replace('\', '/')
-    if ($rel -match '\.(bin|gen|smd|srm|ram|vram|log|map|pdb)$' -or
+    if ($rel -match '\.(bin|gen|smd|srm|ram|vram|log|map|pdb|sav|replay(?:\..*)?)$' -or
         $rel -match '(?i)(settings\.ini|rom.*\.cfg|mods\.ini|savestate|ramdump)') {
       throw "Forbidden release file: $rel"
     }
