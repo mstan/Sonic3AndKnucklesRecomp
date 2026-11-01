@@ -6,6 +6,63 @@
  */
 #define TRILOGY_INTERNAL 1
 #include "trilogy.h"
+#include "video/genesis_machine.h"
+#include "video/genesis_vdp.h"
+#include <string.h>
+
+/* CD's independently converted pack has no S1/S2 blob table. Reuse the
+ * repository's existing numeral, after the native digit's queued DMA, while
+ * its card object is alive. No pack rebuild or new artwork is required. */
+void tri_titlecard_vblank(void)
+{
+    static const uint8_t digit[512] = {
+#include "trilogy_act3_tiles.inc"
+    };
+    if ((r8(RAM_Game_mode) & 0x7F) != 0x0C ||
+        !tri_cd_zone(tri_zone()) || r8(RAM_Apparent_act) != 2 || !tri_dir()) return;
+    for (unsigned slot = 0; slot < 110; slot++) {
+        uint32_t code = r32(0xFFB000u + slot * 0x4Au);
+        if (code == S3K_Obj_TitleCard)
+            memcpy(g_machine.vdp.vram + 0x53D * 32, digit, sizeof digit);
+        else if (code == S3K_Obj_LevelResults)
+            memcpy(g_machine.vdp.vram + 0x568 * 32, digit, sizeof digit);
+    }
+}
+
+/* The borrowed HUD and tally text keep their original S3K palette. CD's
+ * scenery and Amy can replace every entry of CRAM line 1, so use the spare
+ * host sprite line 2 for these particular patterns only. Lines 1 and 3 stay
+ * with CD actors and the selected Mighty/Shadow character respectively. */
+int tri_scd_ui_frame(uint8_t *tiles, uint16_t *top, uint16_t *bottom)
+{
+    const unsigned line = GVDP_EXT_SPRITE_FORCE | 2u;
+    for (unsigned i = 0; i < 2048; i++) if (tiles[i] == line) tiles[i] = 0;
+    if ((r8(RAM_Game_mode) & 0x7F) != 0x0C || !tri_cd_zone(tri_zone()) || !tri_dir()) return 0;
+    /* Render_HUD's score/time/rings labels and number patterns. Life digits
+     * retain the separately qualified PPZ adaptation; character icons and
+     * names retain their own line. */
+    memset(tiles + 0x6CA, line, 0x36);
+    for (unsigned slot = 0; slot < 110; slot++)
+        if (r32(0xFFB000u + slot * 0x4Au) == S3K_Obj_LevelResults) {
+            memset(tiles + 0x520, line, 0x14); /* tally numbers */
+            memset(tiles + 0x53A, line, 0x10); /* time/ring bonus and total */
+            break;
+        }
+    unsigned hi[3] = {0}, lo[3] = {14,14,14};
+    for (unsigned i = 0; i < 64; i++) for (unsigned channel = 0; channel < 3; channel++) {
+        unsigned v = (r16(RAM_Normal_palette + i * 2) >> (channel * 4)) & 14;
+        if (v > hi[channel]) hi[channel] = v;
+        if (v < lo[channel]) lo[channel] = v;
+    }
+    for (unsigned i = 0; i < 16; i++) {
+        unsigned source = tri_rd16(S3K_Pal_SonicTails + 32 + i * 2), color = 0;
+        for (unsigned channel = 0; channel < 3; channel++)
+            color |= (((lo[channel] + ((source >> (channel * 4)) & 14) *
+                       (hi[channel] - lo[channel]) / 14) & 14) << (channel * 4));
+        top[i] = bottom[i] = (uint16_t)color;
+    }
+    return 1;
+}
 
 static uint32_t act3_numeral(void)
 {
