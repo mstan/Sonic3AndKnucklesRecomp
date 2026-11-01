@@ -42,6 +42,15 @@ int tri_scd_ui_frame(uint8_t *tiles, uint16_t *top, uint16_t *bottom)
      * retain the separately qualified PPZ adaptation; character icons and
      * names retain their own line. */
     memset(tiles + 0x6CA, line, 0x36);
+    /* Diagonal springs keep the borrowed art's shape, but CD's red cap
+     * should not have S3K's orange highlights. Its red 10-tile cap uses
+     * colours 1/6/7/8/9; none of the complete HUD/tally fonts use 6..9.
+     * Only converted stages with the native diagonal-spring PLC reserve
+     * these patterns. The yellow cap and grey coil remain untouched. */
+    extern uint32_t tri_scd_plc(unsigned id);
+    uint32_t plc = tri_scd_plc(TRI_PLC_CD);
+    if (tri_zone() <= 0x43 && plc && tri_rd32(plc + 2) == 0x190B4Cu && tri_rd16(plc + 6) == 0x43A * 32)
+        memset(tiles + 0x43A, line, 10);
     for (unsigned slot = 0; slot < 110; slot++)
         if (r32(0xFFB000u + slot * 0x4Au) == S3K_Obj_LevelResults) {
             memset(tiles + 0x520, line, 0x14); /* tally numbers */
@@ -56,6 +65,8 @@ int tri_scd_ui_frame(uint8_t *tiles, uint16_t *top, uint16_t *bottom)
     }
     for (unsigned i = 0; i < 16; i++) {
         unsigned source = tri_rd16(S3K_Pal_SonicTails + 32 + i * 2), color = 0;
+        if (i >= 6 && i <= 9)
+            source = tri_rd16(S3K_Pal_SonicTails + (i & 1 ? 7 : 6) * 2);
         for (unsigned channel = 0; channel < 3; channel++)
             color |= (((lo[channel] + ((source >> (channel * 4)) & 14) *
                        (hi[channel] - lo[channel]) / 14) & 14) << (channel * 4));

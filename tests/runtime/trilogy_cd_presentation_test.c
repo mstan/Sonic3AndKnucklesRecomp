@@ -11,8 +11,11 @@
 uint8_t g_ram[65536],g_rom[0x400000];
 GenesisMachine g_machine;M68KState g_cpu;
 static int enabled=1;
+static int diagonal;
+static const uint8_t diagonal_plc[8]={0,0,0,0x19,0x0B,0x4C,0x87,0x40};
 uint32_t tri_dir(void) { return enabled?0x500000:0; }
-uint8_t tri_rd8(uint32_t a) { return a<sizeof g_rom?g_rom[a]:0; }
+uint32_t tri_scd_plc(unsigned id) { return diagonal && id==TRI_PLC_CD?0x480100:0; }
+uint8_t tri_rd8(uint32_t a) { return a>=0x480100 && a<0x480108?diagonal_plc[a-0x480100]:a<sizeof g_rom?g_rom[a]:0; }
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)(tri_rd8(a)<<8|tri_rd8(a+1)); }
 uint32_t tri_rd32(uint32_t a) { return (uint32_t)tri_rd16(a)<<16|tri_rd16(a+2); }
 void tri_jsr(uint32_t a) { (void)a; }
@@ -30,12 +33,21 @@ int main(void)
     w8(RAM_Game_mode,12);w16(RAM_Current_zone_and_act,0x4000);
     w16(RAM_Normal_palette+2,0xEEE);
     g_rom[S3K_Pal_SonicTails+32+10]=0;g_rom[S3K_Pal_SonicTails+32+11]=0xEE;
+    g_rom[S3K_Pal_SonicTails+13]=0xE;g_rom[S3K_Pal_SonicTails+15]=8;
     tiles[0x410]=1;tiles[0x680]=3;tiles[0x7D4]=3;tiles[0x7DD]=0;
     memcpy(before,g_ram,sizeof before);
     CHECK(tri_scd_ui_frame(tiles,top+16,bottom+16));
     CHECK(top[21]==0xEE && bottom[21]==0xEE);
     CHECK(top[5]==0xACE && top[37]==0xACE && tiles[0x410]==1 && tiles[0x680]==3 && tiles[0x7D4]==3);
     CHECK(tiles[0x6CA]==0x82 && tiles[0x6FF]==0x82 && !tiles[0x700] && !tiles[0x7DD]);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    diagonal=1;CHECK(tri_scd_ui_frame(tiles,top+16,bottom+16));
+    CHECK(tiles[0x43A]==0x82 && tiles[0x443]==0x82 && !tiles[0x444] && !tiles[0x455]);
+    CHECK(top[22]==0xE && top[23]==8 && top[24]==0xE && top[25]==8 && top[21]==0xEE);
+    w16(RAM_Current_zone_and_act,0x4800); /* other rounds retain their own water tint */
+    CHECK(tri_scd_ui_frame(tiles,top+16,bottom+16) && !tiles[0x43A]);
+    w16(RAM_Current_zone_and_act,0x4000);
+    diagonal=0;CHECK(tri_scd_ui_frame(tiles,top+16,bottom+16) && !tiles[0x43A]);
     CHECK(!memcmp(before,g_ram,sizeof before));
     w16(RAM_Current_zone_and_act,0x4400);w16(RAM_Normal_palette+32+10,0x0E0);
     CHECK(tri_scd_ui_frame(tiles,top+16,bottom+16) && top[21]==0xEE);
