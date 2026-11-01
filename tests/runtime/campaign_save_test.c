@@ -29,6 +29,19 @@ int main(void)
         }
         if(mask&4)CHECK(campaign_display(mask,32)==n-7);
     }
+    /* A cleared native import stays CLEAR as optional campaigns are enabled.
+     * Merely projecting/saving it must not certify those unplayed campaigns. */
+    uint8_t cleared[80];memset(cleared,0xFF,sizeof cleared);memset(cleared,0,10);
+    cleared[0]=3;cleared[3]=14;cleared[6]=0xFF;cleared[7]=0xFC;cleared[8]=99;
+    for(unsigned mask=0;mask<16;mask++) {
+        CHECK(!campaign_load(&t,"campaign-test-absent.sav",cleared,1,mask));
+        campaign_view(&t,view);
+        CHECK((view[0]&3)==3 && view[3]==campaign_count(mask) && view[8]==99);
+        CHECK(t.slots[0][31]==4 && t.slots[0][30]==39);
+        campaign_capture(&t,view,projection);
+        CHECK(!memcmp(projection,cleared,80) && t.slots[0][31]==4);
+        t.mask=0;campaign_view(&t,view);CHECK((view[0]&3)==3 && view[3]==14);
+    }
     CHECK(!campaign_load(&s,"campaign-test.sav",native,1,39));campaign_view(&s,view);
     CHECK(view[3]==20);view[2]=0x40;view[3]=35;view[8]=9;
     campaign_capture(&s,view,projection);CHECK(projection[3]==14 && (projection[0]&3));CHECK((projection[2]>>4)==0);

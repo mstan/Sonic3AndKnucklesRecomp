@@ -78,7 +78,12 @@ void campaign_view(CampaignSave *s,uint8_t out[80])
             if(r[RESUME]==39 && present(s->mask,4) && !(r[DONE]&16))stable=40;
             display=campaign_display(s->mask,stable);
         }
-        unsigned complete=(r[DONE]&active_bits(s->mask))==active_bits(s->mask);
+        /* Importing a finished cartridge file must retain its CLEAR card.
+         * Installing an unplayed campaign does not turn that file into a
+         * new game at the addon's first zone. Its completion bits remain
+         * separate; an explicit replay selection can still visit addons. */
+        unsigned complete=(r[RESUME]==39 && (r[DONE]&4)) ||
+            (r[DONE]&active_bits(s->mask))==active_bits(s->mask);
         p[0]=(uint8_t)((p[0]&0xFC)|(complete?(r[COMMON]&3?r[COMMON]&3:1):0));
         p[3]=(uint8_t)(complete?campaign_count(s->mask):display);
         if(!available(s->mask,p[2]>>4))p[2]=(uint8_t)((p[2]&15)|(fallback(p[2]>>4)<<4));
@@ -100,7 +105,7 @@ void campaign_capture(CampaignSave *s,const uint8_t view[80],uint8_t native[80])
         memcpy(r+COMMON,p,10);
         /* A temporary Sonic fallback must not erase parked Mighty identity. */
         if(!available(s->mask,ch) && p[2]==old[2])r[COMMON+2]=(uint8_t)((p[2]&15)|(ch<<4));
-        if(p[0]&3)r[DONE]|=(uint8_t)active_bits(s->mask);
+        if((p[0]&3) && (changed || code!=39))r[DONE]|=(uint8_t)active_bits(s->mask);
         if(changed && code!=39) {
             unsigned c=content(code);
             /* Crossing a campaign boundary certifies the preceding active
