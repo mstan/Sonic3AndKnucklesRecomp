@@ -394,6 +394,17 @@ int tri_flow_hook(uint32_t pc)
             return tri_ss_ring_half_pipe();
         }
         return ss_go();
+    case TH_S1_STARPOST_INIT: {
+        uint32_t e = tri_dir();
+        if (e && tri_rd8(e + TD_GAME) == TRI_GAME_S1) {
+            /* S1 Lamp frame 0 ends at y+19; S3K's foot ends at y+23.
+             * Correct the authored origin before contact, orbit-child and
+             * checkpoint-save initialization. Routine 0 runs only once. */
+            uint32_t o = A(0) & 0xFFFFFFu;
+            SET16(o, OBJ_y_pos, (uint16_t)(OB16(o, OBJ_y_pos) - 4));
+        }
+        return 0;
+    }
     case TH_STARPOST_STARS:         /* blo.s: S1 has giant rings; S2's stars come at 50 rings */
         if (tri_dir()) {
             extern int tri_ss_stars_wanted(void);
