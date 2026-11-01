@@ -205,8 +205,12 @@ static void ghz_event(void)
 {
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy);
     int camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
-    int32_t shift = (int32_t)(int16_t)(camx - s_bg.last_camx) << 8;   /* v_scrshiftx */
-    s_bg.last_camx = (int16_t)camx;
+    /* The expanded view stops at the level boundary while the original
+     * player-follow camera can still move inside it. Parallax follows the
+     * actual view, as CD does; foreground scroll keeps its native camera. */
+    int bgcamx = s3_video_presentation_camera_x(camx);
+    int32_t shift = (int32_t)(int16_t)(bgcamx - s_bg.last_camx) * 256;
+    s_bg.last_camx = (int16_t)bgcamx;
     /* block 3 - distant mountains: shift*$30 ; block 2 - hills: shift*$80 */
     s_bg.bg3x += (shift << 5) + (shift << 6);
     s_bg.bg2x += shift << 7;
@@ -244,7 +248,7 @@ static void ghz_event(void)
     for (int i = 0; i < 0x30; i++) PUT(-bg3);
     for (int i = 0; i < 0x28; i++) PUT(-bg2);
     /* water: interpolate bg2 -> camera across $48+d4 lines */
-    int32_t d2 = (int32_t)(int16_t)(camx - bg2);
+    int32_t d2 = (int32_t)(int16_t)(bgcamx - bg2);
     d2 = (d2 << 8) / 0x68;
     d2 = (int32_t)(int16_t)d2 << 8;
     uint32_t d3 = (uint32_t)(uint16_t)bg2;           /* integer in low word, frac in high */

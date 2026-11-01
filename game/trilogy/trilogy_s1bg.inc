@@ -25,8 +25,9 @@ static void s1_bg_reset(int bgy)
 /* camera deltas as S1 v_scrshiftx/y (pixels << 8) */
 static void s1_shift(int32_t *sx, int32_t *sy)
 {
-    int camx = (int16_t)r16(RAM_Camera_X_pos_copy), camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
-    *sx = (int32_t)(int16_t)(camx - s1.last_camx) << 8;
+    int camx = s3_video_presentation_camera_x((int16_t)r16(RAM_Camera_X_pos_copy));
+    int camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
+    *sx = (int32_t)(int16_t)(camx - s1.last_camx) * 256;
     *sy = (int32_t)(int16_t)(camy - s1.last_camy) << 8;
     s1.last_camx = (int16_t)camx;
     s1.last_camy = (int16_t)camy;
@@ -83,6 +84,7 @@ static void s1_lz_event(void)
     int misty=megamix_misty();
     if(!misty) {s1.bg1x += sx << 7;s1.bgy += sy << 7;}
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy), camy = (int16_t)r16(RAM_Camera_Y_pos_copy);
+    int bgcamx = s3_video_presentation_camera_x(camx);
     int bgx = (int16_t)(s1.bg1x >> 16), bgy = (int16_t)(s1.bgy >> 16);
     uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
     uint32_t wob = t ? tri_rd32(t + TRI_BLOB_S1_LZ_WOBBLE * 4) : 0;
@@ -100,11 +102,11 @@ static void s1_lz_event(void)
     int y = camy;
     for (int y0 = bgy & ~15; y0 < bgy + 240; y0 += 16) {
         int line=y0-bgy;
-        int camera=misty?-tri_megamix_lz_scroll(camx,(unsigned)(line<0?0:line)):bgx;
+        int camera=misty?-tri_megamix_lz_scroll(bgcamx,(unsigned)(line<0?0:line)):bgx;
         bg_band(y0,y0+16,camera);
     }
     for (int l = 0; l < 224; l++, y++, d2++, d3++) {
-        int fg = -camx, bg = misty?tri_megamix_lz_scroll(camx,(unsigned)l):-bgx;
+        int fg = -camx, bg = misty?tri_megamix_lz_scroll(bgcamx,(unsigned)l):-bgx;
         if (y >= water && wob && scr) {
             fg += (int8_t)tri_rd8(scr + d3);
             bg += (int8_t)tri_rd8(wob + d2);
@@ -127,7 +129,7 @@ static void s1_mz_event(void)
     int bgy = 0x200, d1 = camy - 0x1C8;
     if (d1 >= 0) bgy += (d1 * 3) >> 2;
     int16_t rows[32];
-    int n = 0, d2 = -camx;
+    int n = 0, d2 = -s3_video_presentation_camera_x(camx);
     n += s1_interp(rows + n, 5, d2 >> 1, s1_step((d2 >> 2) - d2, 5, 3));
     for (int i = 0; i < 2; i++) rows[n++] = (int16_t)-(s1.bg3x >> 16);
     for (int i = 0; i < 9; i++) rows[n++] = (int16_t)-(s1.bg2x >> 16);
@@ -150,7 +152,7 @@ static void s1_slz_event(void)
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy);
     int bgy = (int16_t)(s1.bgy >> 16);
     int16_t rows[64];
-    int n = 0, d2 = -camx;
+    int n = 0, d2 = -s3_video_presentation_camera_x(camx);
     n += s1_interp(rows + n, 0x1C, d2, s1_step((d2 >> 3) - d2, 0x1C, 4));
     int d0 = (d2 >> 3);
     d0 += d0 >> 1;
@@ -174,7 +176,7 @@ static void s1_syz_event(void)
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy);
     int bgy = (int16_t)(s1.bgy >> 16);
     int16_t rows[64];
-    int n = 0, d2 = -camx;
+    int n = 0, d2 = -s3_video_presentation_camera_x(camx);
     n += s1_interp(rows + n, 8, d2 >> 1, s1_step((d2 >> 3) - d2, 8, 3));
     for (int i = 0; i < 5; i++) rows[n++] = (int16_t)(d2 >> 3);
     for (int i = 0; i < 6; i++) rows[n++] = (int16_t)(d2 >> 2);
@@ -207,7 +209,7 @@ static void s1_sbz_event(void)
     s1.bgy += sy << 5;
     int bgy = (int16_t)(s1.bgy >> 16);
     int16_t rows[40];
-    int n = 0, d2 = (-camx) >> 2;
+    int n = 0, d2 = (-s3_video_presentation_camera_x(camx)) >> 2;
     n += s1_interp(rows + n, 4, d2, s1_step((d2 >> 1) - d2, 4, 3));
     for (int i = 0; i < 10; i++) rows[n++] = (int16_t)-(s1.bg3x >> 16);
     for (int i = 0; i < 7; i++) rows[n++] = (int16_t)-(s1.bg2x >> 16);
