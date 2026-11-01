@@ -296,6 +296,11 @@ static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
     int nibble = fx & 1 ? byte & 15 : byte >> 4;
     return nibble ? (uint8_t)(((attr >> 9) & 48) | nibble) : 0;
 }
+static uint32_t plane_color(int line,uint16_t attr,unsigned pixel,const uint32_t *palette)
+{
+    int ext=pixel && !(attr&0x6000u)?gvdp_ext_line(attr&2047u):0;
+    return ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,pixel&15u),GENESIS_DAC_NORMAL):palette[pixel];
+}
 static int plane_tiles(int bits) { return bits == 1 ? 64 : bits == 3 ? 128 : 32; }
 static uint16_t plane_attr(const GVDP *v, unsigned base, int x, int y)
 {
@@ -797,7 +802,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             /* extended sprite lines (game-added art keeping its own colours) */
             int ext=gvdp_sprite_palette_line(s->size,cell&2047u,p>>4);
             uint32_t c=ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):palette[p];
-            if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
+            /* Screen-relative coordinates are not HUD priority: AIZ2's
+             * small Eggman must still pass behind the high tree canopy. */
+            if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
         }
     }
 }
@@ -888,8 +895,9 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
                             GameVideoNativeRow native_row, void *native_ctx,
                             const GVDPRasterRow *raster)
 {
-    /* Publish one immutable art/scroll snapshot per frame. Palettes stay
-     * live so water-line HBlank colour changes are retained. */
+    /* Publish one immutable art/scroll snapshot per frame. Palettes and the
+     * scripted foreground VSRAM switch remain live across native HBlank. */
+    unsigned live_fg_scroll=v->vsram[0];
     uint32_t palette[64],shadow[64],intro_palette[64],forest_palette[64];
     int uniform_palette=1;
     for(int i=0;i<64;++i) {
@@ -1046,8 +1054,19 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
      * list/planes reach VBlank. */
     if(s_display && s_display->scene!=1)level=0;
     int missing_scroll=0;
-    int camera=level?unwrap(-hs_a,s_frame_fg_x):ram16(0xEE78);
-    int camera_y=unwrap(v->vsram[0],s_frame_fg_y);
+    /* AIZ2's battleship borrows the top of A for a second world camera.
+     * HInt6 restores ordinary foreground VSRAM below that band. Unwrapping
+     * either camera against the other, or holding line-zero VSRAM below the
+     * interrupt, samples the forest instead of the ship/ground. Use the
+     * installed scroll identity, not a guessed scanline or frame count. */
+    int aiz_ship=level && !s_frame_zone && s_frame_act==1 &&
+        ((s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7]);
+    int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
+    int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
+    unsigned fg_scroll=aiz_ship?live_fg_scroll:v->vsram[0];
+    int ship_band=aiz_ship && !((fg_scroll^(unsigned)ship_y)&1023u);
+    int camera=level?unwrap(-hs_a,ship_band?ship_x:s_frame_fg_x):ram16(0xEE78);
+    int camera_y=unwrap((int)fg_scroll,ship_band?ship_y:s_frame_fg_y);
     if(line==0) {
         if(level) {
             int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
@@ -1262,7 +1281,9 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         int fire_curtain=aiz_fire && (nx<0 || nx>=nw) && (b&0x8000) && bp;
         int foreground=ap && !fire_curtain && ((a&0x8000) || !bp || !(b&0x8000));
         uint8_t p=foreground?ap:bp;
-        out[x]=p?(foreground?apalette[p]:bpalette[p]):backdrop;
+        uint32_t ac=ap?plane_color(line,a,ap,apalette):backdrop;
+        uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
+        out[x]=foreground?ac:bc;
         /* Outside a native special-stage projection only planes are drawn,
          * so plane priority alone
          * determines shadow; native operator sprites remain in the center. */
@@ -1275,7 +1296,7 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
             if(level && !native_terrain_streamed(wy,s_frame_fg_y)) {
                 ++s_terrain_unstreamed;
             } else if(level && !aiz_fire_fg) {
-                uint16_t expected=plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
+                uint16_t expected=plane_attr(v,base_a,nx-hs_a,line+(fg_scroll&1023));
                 ++s_terrain_checks;
                 int bad=attributes_differ(v,a,expected,wx,wy);
                 if(bad && s_bad_y<0){s_bad_x=wx;s_bad_y=line;s_bad_attr=a;s_bad_expected=expected;s_bad_world_y=wy;s_bad_hscroll=hs_a;}

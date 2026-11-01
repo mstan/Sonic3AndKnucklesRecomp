@@ -3,7 +3,8 @@
 uint8_t g_ram[65536],g_rom[0x400000];
 uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
-int gvdp_ext_line(unsigned tile) { (void)tile; return 0; }
+static int test_private_planes;
+int gvdp_ext_line(unsigned tile) { return test_private_planes && tile>=1 && tile<=2?(int)tile:0; }
 static uint8_t test_atlas[128];
 static int test_atlas_enabled;
 const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
@@ -12,7 +13,9 @@ const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
 }
 int gvdp_sprite_pattern_line(unsigned flags,unsigned tile) { (void)flags;return gvdp_ext_line(tile); }
 int gvdp_sprite_palette_line(unsigned flags,unsigned tile,unsigned source) { (void)source;return gvdp_sprite_pattern_line(flags,tile); }
-uint16_t gvdp_ext_color(int row,int line,int nib) { (void)row;(void)line;(void)nib;return 0; }
+uint16_t gvdp_ext_color(int row,int line,int nib) {
+    return test_private_planes && nib==1?(uint16_t)(line==1?(row>=80?0xE0:0xE):line==2?0xE00:0):0;
+}
 M68KState g_cpu;
 void m68k_write8(uint32_t a,uint8_t v){g_ram[a&65535]=v;}
 void m68k_write16(uint32_t a,uint16_t v){m68k_write8(a,v>>8);m68k_write8(a+1,v);}
@@ -367,6 +370,23 @@ static int deformed_cell(const uint8_t *ram,int x,int y,int background,uint16_t 
 {
     (void)ram;(void)x;(void)y;*cell=background?0:1;return 1;
 }
+static void test_screen_actor_priority(void)
+{
+    static GVDP v;SceneFrame scene={0};uint32_t out[398],pal[64]={0};
+    const SceneFrame *previous=s_display;
+    memset(&v,0,sizeof v);memset(v.vram+32,0x11,32);pal[1]=0xFFFF0000u;
+    scene.scene=1;scene.count=1;scene.sprites[0]=(SceneSprite){20,0,1,0,2};s_display=&scene;
+    for(unsigned phase=0;phase<3;phase++) {
+        for(unsigned x=0;x<398;x++){out[x]=0xFF00FF00u;s_priority[x]=(uint8_t)(phase!=0 && x!=61);}
+        scene.sprites[0].attr=(uint16_t)(phase==2?0x8001:1);
+        draw_scene_sprites(&v,0,out,398,39,pal);
+        for(unsigned x=0;x<398;x++) {
+            int visible=x>=59 && x<67 && (phase!=1 || x==61);
+            CHECK(out[x]==(visible?0xFFFF0000u:0xFF00FF00u));
+        }
+    }
+    s_display=previous;
+}
 static void test_deformation_keeps_actors_still(void)
 {
     static GVDP v;uint32_t native[320]={0},out[398],plane[2];
@@ -403,6 +423,75 @@ static int cd_edge_cell(const uint8_t *ram,int x,int y,int background,uint16_t *
     (void)ram;(void)y;
     *cell=background?(uint16_t)(1+((x>>4)&1)):0;
     return 1;
+}
+static int ship_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;
+    if(background){*cell=0;return 1;}
+    /* Original AIZ2 second-camera coordinates must not be unwrapped into
+     * the ordinary camera's neighboring 1024px page. */
+    CHECK(y>=0xA00 || (y>=0x1C0 && y<0x300));
+    if(y>=0xA00){CHECK(x>=0x3E00 && x<0x4300);*cell=1;}
+    else {CHECK(x>=0x4100 && x<0x4600);*cell=2;}
+    return 1;
+}
+static int private_plane_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)x;(void)y;*cell=background?2:1;return 1;
+}
+static void test_private_plane_colors(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[398];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("fit"));width(398,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xFE10]=0x26;write32(0xB000,0x1234);
+    word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xEEE;v.cram[17]=0xE00;
+    memset(v.vram+32,0x11,64);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(private_plane_cell);test_private_planes=1;
+    for(unsigned phase=0;phase<4;phase++) {
+        uint16_t fa=phase==2?0x2001:phase==3?0:1,ba=phase==1?0x8002:2;
+        for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,fa);word(g_ram,0x9010+i*2,ba);}
+        for(unsigned row=0;row<=80;row+=80) {
+            scanline(&v,0,native,320,out,398);
+            scanline(&v,(int)row,native,320,out,398);
+            uint32_t color=phase?0xFF0000FFu:row>=80?0xFF00FF00u:0xFFFF0000u;
+            for(unsigned x=0;x<398;x++)CHECK(out[x]==color);
+        }
+    }
+    test_private_planes=0;s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
+static void test_aiz2_ship_cameras(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xFE11]=1;write32(0xB000,0x1234);
+    word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x4288);word(g_ram,0xEE84,0x1C0);
+    word(g_ram,0xEE98,0x3FB5);word(g_ram,0xEE9C,0xAB3);word(g_ram,0xEED6,0xFF00);
+    word(g_ram,0xEEC2,0x14);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    for(unsigned y=0;y<224;y++)word(v.vram,0xF000+y*4,(unsigned)-(y<65?0x3FB5:0x4288));
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(ship_cell);
+    v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+    scanline(&v,64,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+    /* The actual VDP interrupt changes only live VSRAM; the published RAM,
+     * camera, art, and actor origin stay immutable for this frame. */
+    v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    CHECK(s_camera==0x4288 && s_camera_y==0x1C0);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_campaign_background_edges(void)
 {
@@ -811,6 +900,9 @@ int main(int argc,char **argv)
     }
     test_sprite_atlas();test_object_zoom();test_file_select();test_menu_layers();test_world_snapshot();test_hud_mapping();
     test_deformation_keeps_actors_still();
+    test_screen_actor_priority();
+    test_aiz2_ship_cameras();
+    test_private_plane_colors();
     test_hud_object_anchor();
     test_native_bonus();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
