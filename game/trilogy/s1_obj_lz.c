@@ -779,7 +779,9 @@ static void waterfall(uint32_t o)
     uint8_t r = OB8(o, OBJ_routine);
     if (r == 0) {
         r = 4;
-        o_init(o, S1A_WFALL, 4, 1, 0x18, 0x20);
+        /* Static slope pieces never call AnimateSprite, which normally copies
+         * the placement's flip bits into render_flags. Keep them here too. */
+        o_init(o, S1A_WFALL, 4 | (OB8(o, OBJ_status) & 3), 1, 0x18, 0x20);
         uint8_t sub = OB8(o, OBJ_subtype);
         if (sub & 0x80) SET16(o, OBJ_art_tile, OB16(o, OBJ_art_tile) | 0x8000);
         SET8(o, OBJ_frame, sub & 0x0F);
