@@ -1,6 +1,6 @@
 # Player-feedback burndown — 2026-11-01
 
-Release first: [Sonic family v0.6.3](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.3) is published at game `5303dfe1a51f9afaa7191a4b4073b04c53c02f60`, engine `6d14f65868c2c355c8249c87638b68ca9ed2a57f`. Seven original reports have validated fixes; the intermittent signpost report remains open. Source, package and replay evidence is retained at `C:/temp/Codex/sonic-feedback-release-20261101`; the original investigation is described in [PLAYER_REPORTS_20261101.md](PLAYER_REPORTS_20261101.md).
+Release first: [Sonic family v0.6.3](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.3) is published at game `5303dfe1a51f9afaa7191a4b4073b04c53c02f60`, engine `6d14f65868c2c355c8249c87638b68ca9ed2a57f`. Seven original reports initially passed validation; the owner subsequently reopened three, and closed the unreproduced signpost report for this pass. Source, package and replay evidence is retained at `C:/temp/Codex/sonic-feedback-release-20261101`; the original investigation is described in [PLAYER_REPORTS_20261101.md](PLAYER_REPORTS_20261101.md).
 
 ## Burndown
 
@@ -10,8 +10,8 @@ Count only a reproduced fix with relevant built-runtime acceptance as fixed. The
 xychart-beta
     title "Player reports awaiting disposition"
     x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up"]
-    y-axis "Reports remaining" 0 --> 32
-    line [22, 15, 13, 12, 24]
+    y-axis "Reports remaining" 0 --> 44
+    line [22, 15, 13, 12, 34]
 ```
 
 | Checkpoint | Total reports | Fixed | Deferred this pass | Remaining |
@@ -21,6 +21,7 @@ xychart-beta
 | Bounded reproduction, owner deferral instruction | 22 | 7 | 2 | 13 |
 | LZ2 water-art fix qualified | 22 | 8 | 2 | 12 |
 | Owner follow-up: ten new reports, three reopened, one explicitly deferred | 32 | 5 | 3 | 24 |
+| Further owner follow-up: twelve reports, binding reset and low-priority sprite deferral | 44 | 5 | 5 | 34 |
 
 | Work group | Total | Fixed | Deferred | Remaining |
 | --- | ---: | ---: | ---: | ---: |
@@ -28,7 +29,7 @@ xychart-beta
 | Next Sonic 3 & Knuckles / imported campaigns | 8 | 1 | 1 | 6 |
 | Sonic 3 Alone additions | 2 | 0 | 0 | 2 |
 | Sonic 2, later | 4 | 0 | 0 | 4 |
-| Sonic 3 family follow-up reports | 10 | 0 | 1 | 9 |
+| Sonic 3 family follow-up reports | 22 | 0 | 3 | 19 |
 
 ## Sonic 3 family — next
 
@@ -53,8 +54,8 @@ Continue with the reproducible water/presentation defects; retain individual dis
 
 | ID | Report | State | Acceptance / evidence needed |
 | --- | --- | --- | --- |
-| S3A-01 | Some AIZ level objects are missing | Open | Compare the ledge with shoes/ring monitors in the owner screenshot against the original Sonic 3 layout. The owner notes the remembered platform may be an AIR difference. Then verify actual spawning/interactions; do not add an object solely from that recollection. |
-| S3A-02 | Characters and level objects constantly shift/jitter slightly | Open | Capture consecutive standalone gameplay frames and correlate world/camera/sprite positions; correct unintended motion at native and wide aspects. |
+| S3A-01 | Some AIZ level objects are missing | Open | Compare two reported sites against the original layouts: the ledge with shoes/ring monitors (possible platform) and the cave ledge under spikes near the balloon (possible spring). The latter was reported in both Sonic 3 Alone and S3&K. The reporter may remember AIR differences; verify actual placements/spawning before adding objects. |
+| S3A-02 | Characters and level objects constantly shift/jitter slightly | Open | Also reported in S3&K after AIZ bombing, possibly with heat deformation. Correlate world/camera/sprite positions across consecutive native and wide frames; preserve intended background deformation while removing actor jitter. |
 
 ## Sonic 2 — later burndown
 
@@ -69,12 +70,12 @@ Begin after the Sonic 3 family work. The diagnostics-release integration is a se
 
 ## Sonic 3 family follow-up
 
-These include reopened release claims above; the following six reports are additional scope.
+Reopened release claims remain in their original rows above. These twenty-two reports are additional scope.
 
 | ID | Report | State | Acceptance / evidence needed |
 | --- | --- | --- | --- |
 | S3-17 | Shadow still uses Sonic life/continue icons in save select | Deferred by owner | Explicitly deferred because new generated assets are unwanted. Do not generate or import replacement art for this task. Revisit only when the owner reopens it. |
-| S3-18 | Controller A, mapped to the Genesis A button, plays a switch sound instead of jumping | Open | Test the logical A action and actual binding path as Sonic and Shadow; distinguish a mapping error from a character ability intercept. A mapped jump must behave consistently with the intended controls. |
+| S3-18 | Controller A, mapped to the Genesis A button, plays a switch sound instead of jumping | Closed this pass - intended Shadow control / binding reset | Owner reset bindings and no longer reproduced the sound. Source reserves logical A for Shadow's ground boost; fewer than five rings produces sound $5B, while B/C jump. No speculative control remapping or fix claimed. Reopen a genuine binding failure with logs. |
 | S3-19 | The OW in SHADOW on the HUD looks wrong | Open | Reproduce from the owner screenshot; verify the complete donor-derived name and its tile boundaries. |
 | S3-20 | The X between the HUD head and life count is corrupted | Open | Verify the multiplication glyph and count alongside the updated head/name, including a life-count change. |
 | S3-21 | Launcher sample-rate selection does not persist | Open | Change/apply the selection, exit/reopen and verify both persisted settings and the selected/actual audio rate. |
@@ -83,6 +84,18 @@ These include reopened release claims above; the following six reports are addit
 | S3-24 | Slot-machine graphics themselves are corrupt | Open | Verify the machine, reels, player and palette against the original stage while idle and spinning. |
 | S3-25 | Slot-machine bonus soft-locks the player | Open - priority | Reproduce from a normal entrance, then exercise the real spin/reward and exit path without forcing completion flags. Reported in the attached Discord image. |
 | S3-26 | Slot-machine life-count text looks red instead of grey | Open - compare original first | Determine whether the tint matches vanilla, as the reporter suspects; fix only a demonstrated mismatch. |
+| S3-27 | AIZ1 intro has black graphic lines at the left edge in widescreen | Open | Capture the full intro and compare native composition; clean the extended edge through the affected seconds and transition. |
+| S3-28 | Gumball bonus has corrupt graphics at the extreme left/right edges | Open | Exercise the real bonus entrance, play and fade at native and wide aspects. |
+| S3-29 | Gumball machine balls and player graphics corrupt during use | Open | Verify fake balls inside the machine and player animation through actual machine operation. Reporter confirms the stage mechanics work; this is a visual report. |
+| S3-30 | AIZ2 Flying Battery chase replaces the view with repeated trees | Open | Capture the chase before, during and after the ship passes; preserve the scripted plane composition and visible actors throughout. Reporter says the view recovers when the ship disappears. |
+| S3-31 | Life display changes from about 99 to a misplaced 0 and 1, then stays wrong | Open | Compare actual RAM life count with displayed digits before/during/after the AIZ2 chase; distinguish a count over 99 from damaged glyphs or a counter reset. Preserve native progress. |
+| S3-32 | Trees disappear/glitch when Eggman flies behind them in AIZ2 | Open | Exercise the real boss scene; verify foreground occlusion and tree tiles as Eggman crosses them. |
+| S3-33 | Imported cleared S3&K save becomes Zone 1: Palmtree Panic and enters PPZ1 Present after a freeze | Open - priority | Use a valid cleared native SRAM fixture; preserve its cleared status, zone selection and progress with campaigns disabled/enabled. Never reset owner saves to hide the defect. |
+| S3-34 | Knuckles pops into existence at the widescreen edge during AIZ-to-HCZ cutscene | Open | Capture the actual cutscene and extend actor visibility smoothly before entering the native viewport. |
+| S3-35 | HCZ1 initial bar-grab section briefly glitches edge graphics | Open | Exercise appearance/disappearance of that section's graphics at wide aspects; compare native behavior. |
+| S3-36 | Sonic/Tails use ordinary running/rolling sprites on Palmtree Panic's 3D ramp | Deferred by owner - low priority | Later research suitable existing online perspective sprites and provenance. No asset search, import or implementation this pass; report is retained for a future asset task. |
+| S3-37 | Palmtree Panic life-count text is orange | Open - compare palette | Compare the imported CD palette and native HUD color; correct a demonstrated palette conflict without changing stage colors. |
+| S3-38 | CD time-period label is too far from the life/name HUD | Open | Keep the period label adjacent to the life HUD across native/adaptive widths, including Past/Present/Future changes. |
 
 S3-01 retains these separate reproduction checks under one original menu-presentation report:
 
@@ -95,9 +108,11 @@ S3-01 retains these separate reproduction checks under one original menu-present
 | T5 | Extended edges behave inconsistently across fades in general | Open |
 | T6 | Save-select margins contain distorted/stretched graphics | Open |
 | T7 | Save-select-to-AIZ fade is out of sync on the right edge | Open |
+| T8 | AIZ2-to-HCZ title-card fade glitches both widescreen edges | Open |
 
 Owner images are retained under the task evidence root as `owner-feedback-20261101.webp` (HUD/background), `owner-save-previews-20261101.png`, and `owner-aiz-platform-20261101.png`. They are private reproduction evidence, not release assets.
 The slot-machine report and its soft-lock/tint notes are retained as `owner-slot-machine-20261101.png`.
+Further private evidence: `owner-aiz-heat-spring-20261101.png`, `owner-bindings-features-20261101.png`, `owner-gumball-20261101.png`, `owner-aiz2-chase-20261101.png`, `owner-aiz2-trees-20261101.png`, `owner-cleared-save-20261101.png` and `owner-cd-hud-20261101.png`. The tester also confirmed a quick GHZ1 signpost pass and normal Sonic/Tails act-clear victory poses; these confirmations do not establish unrelated checks.
 
 ## Default-on diagnostics release coverage
 
@@ -106,16 +121,18 @@ The slot-machine report and its soft-lock/tint notes are retained as `owner-slot
 | Sonic 3 | Windows ZIP + Linux AppImage v0.6.3 published; default-on capture observed. |
 | Sonic 3 & Knuckles, including its enabled campaign/character variants | Windows ZIP + Linux AppImage v0.6.3 published; native, existing-campaign and fresh-campaign replay checks passed. |
 | Sonic & Knuckles | Windows ZIP + Linux AppImage v0.6.3 published; default-on capture observed. |
-| Sonic 1 and its release variants | Integration/release pending. |
-| Sonic 2 and its release variants | Integration/release pending. |
+| Sonic 1 and its release variants | [Windows ZIP v0.7.4 published](https://github.com/mstan/SonicTheHedgehogRecomp/releases/tag/v0.7.4); default-on capture and playback verified. Linux packaging pipeline carries the helper/guide; no new Linux artifact published. |
+| Sonic 2 and its release variants | [Windows ZIP v0.9.3 published](https://github.com/mstan/SonicTheHedgehog2Recomp/releases/tag/v0.9.3); native, party and new/existing campaign replays passed. Linux packaging pipeline carries the helper/guide; no new Linux artifact published. |
 
 Production checks for v0.6.3: 108 Windows tests, 111 Linux tests; all six actual package suites passed. Windows/Linux pixels, RAM/VRAM and state/audio fingerprints match for the scripted cases. Actual stripped Linux payload replay matched all 601 recorded executions. Final Windows native/old-campaign/new-campaign replays matched 1874/1888/1888 executions respectively. Production gameplay confirmed submerged bubble monitor, both Shadow/Tails runoff and GHZ2 transition, and failed special stages 0 then 1 with a real return to SYZ2.
+
+Sonic 1 v0.7.4 passed 78 tests and native/wide production replay checks; Sonic 2 v0.9.3 passed 90 tests plus native/party/new-campaign/existing-campaign replays at normal pacing (1512/1545/1647/1647 executions). Existing campaign input was removed before playback to verify self-contained restoration; playback did not write native saves. Both published ZIP digests and remote tags/branches match the validated artifacts. Engine `bc6a3209ba8fc6a29de8cc8c85371d3e3a4ef60a` is published and pinned in both releases.
 
 Central Beads is unavailable: the existing client reports database `beads` missing on port 3307. Do not replace the database or interrupt its unrelated service. Backfill the owning game issues, hierarchy and dispositions when the central tracker returns. This file is the durable interim record.
 
 ## Features — only after the gameplay burndowns
 
-These are requested enhancements, not completed bug fixes and not part of the 22-report count. Finish the outstanding gameplay reports and default-on diagnostics release coverage before starting them.
+These are requested enhancements, not completed bug fixes and not part of the report count. Finish or explicitly dispose the gameplay reports before starting them. Default-on diagnostics releases above are delivered.
 
 | Order | Feature | Scope / acceptance |
 | --- | --- | --- |
@@ -124,7 +141,10 @@ These are requested enhancements, not completed bug fixes and not part of the 22
 | F-03 | Infinite time | Opt-in gameplay enhancement, with an explicit Mods control and normal behavior when disabled; exercise timer expiry and stage transitions. |
 | F-04 | Audio-filter toggle in Sonic 3 & Knuckles | Expose an option to disable filtering for clearer emulation-style audio. Verify that toggling changes only the intended presentation filter and does not interrupt or accelerate audio/gameplay. |
 | F-05 | Direct owner-media import from Mods | Review the Anthology import workflow. Select a Sonic 1, Sonic 2 or Megamix ROM, or Sonic CD disc image, directly in Mods; handle validation, conversion, caching and setup automatically, with clear progress/errors. Preserve working mods and native saves on failure. No manual unpacking or conversion steps. |
-| F-06 | Drop dash and peel-out, possible Origins sprite/sound reference | **STOP AND CHECK IN WITH OWNER BEFORE STARTING THIS STRETCH WORK OR INTRODUCING ASSETS.** Return with a concrete scope/assets proposal after the preceding work is handled. No implementation or asset import is currently authorized. |
+| F-06 | Easier level-select access | Provide a discoverable opt-in entry without requiring a hidden code; preserve normal progression and native saves. |
+| F-07 | Easier debug-mode access | Provide an explicit opt-in control and verify normal gameplay when disabled. |
+| F-08 | Super/Hyper transformation while holding an elemental shield | Opt-in behavior with unambiguous controls; verify transformation and shield handling without consuming unrelated inputs. |
+| F-09 | Drop dash and peel-out, possible Origins sprite/sound reference | **STOP AND CHECK IN WITH OWNER BEFORE STARTING THIS STRETCH WORK OR INTRODUCING ASSETS.** Return with a concrete scope/assets proposal after the preceding work is handled. No implementation or asset import is currently authorized. |
 
 Conveyor reproduction evidence: `C:/temp/Codex/sonic-feedback-release-20261101/server-lz-baseline`, `server-lz-wide-baseline` and `server-lz-prefix-baseline`. Direct/approach probes use stage/player positioning as a prerequisite bypass; they establish spawning, not an end-to-end LZ2 completion. This limitation is retained in the deferral.
 
