@@ -184,6 +184,41 @@ static void test_world_snapshot(void)
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static unsigned hud_fixture(void) { return 0x3000; }
+static int deformed_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)x;(void)y;*cell=background?0:1;return 1;
+}
+static void test_deformation_keeps_actors_still(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[398],plane[2];
+    CHECK(configure("off"));CHECK(configure("fit"));width(398,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xFE10]=1;
+    word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,64);word(g_ram,0xEE84,100);
+    for(unsigned i=0;i<4;i++)word(g_ram,0x9008+i*2,2);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xEEE;v.cram[2]=0xE;v.cram[3]=0xE0;
+    memset(v.vram+32,0x11,32);
+    for(unsigned y=0;y<8;y++)for(unsigned x=0;x<4;x++)v.vram[64+y*4+x]=x<2?0x22:0x33;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
+    s_build.camera_x=64;s_build.camera_y=100;
+    s_build.sprites[0]=(SceneSprite){40,20,0x8001,0,0};s_visible_count=0;
+    publish_sprites();s3_video_set_world_cell(deformed_cell);
+    for(unsigned phase=0;phase<2;phase++) {
+        word(v.vram,0xF000,(unsigned)(-64+(int)phase*4));v.vsram[0]=100+phase*3;
+        scanline(&v,0,native,320,out,398);
+        for(int y=19;y<=28;y++) {
+            scanline(&v,y,native,320,out,398);
+            for(int x=78;x<=87;x++)
+                CHECK((out[x]==0xFFFFFFFFu)==(y>=20 && y<28 && x>=79 && x<87));
+        }
+        plane[phase]=out[0];
+    }
+    CHECK(plane[0]!=plane[1]); /* plane deformation is still visible */
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 static int cd_edge_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     (void)ram;(void)y;
@@ -592,6 +627,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
+    test_deformation_keeps_actors_still();
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }

@@ -838,8 +838,13 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
     int camera_y=unwrap(v->vsram[0],s_frame_fg_y);
     if(line==0) {
         if(level)s_stage_width=stage_width();
-        s_camera=camera;s_camera_y=camera_y;++s_frames;
-        s_left=level?view_left(camera,width):camera-(width-nw)/2;
+        /* HScroll/VScroll include heat and underwater deformation. Those
+         * offsets belong to the planes, never to the object camera or the
+         * bounded viewport. Keep sampling the deformed planes below while
+         * projecting actors against the same camera used by Render_Sprites. */
+        s_camera=level?s_frame_fg_x:camera;
+        s_camera_y=level?s_frame_fg_y:camera_y;++s_frames;
+        s_left=level?view_left(s_camera,width):camera-(width-nw)/2;
     }
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
