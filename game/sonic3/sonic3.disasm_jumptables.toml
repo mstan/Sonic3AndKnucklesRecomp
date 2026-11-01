@@ -9,8 +9,8 @@
 #   [game]
 #   discovery_files = ["sonic3.disasm_jumptables.toml"]
 
-# Tables found: 234 pcrel16, 12 abs, 26 bra-trampoline
-# Unique targets: 1448
+# Tables found: 234 pcrel16, 12 abs, 27 bra-trampoline
+# Unique targets: 1460
 
 [[jump_table]]
 start  = 0x000864
@@ -1495,6 +1495,12 @@ stride = 2
 format = "bra_s"   # 8 entries, first=Eni_Decomp_00
 
 [[jump_table]]
+start  = 0x0096F8
+end    = 0x0096FE
+stride = 2
+format = "bra_s"   # 3 entries, first=loc_9706
+
+[[jump_table]]
 start  = 0x00C576
 end    = 0x00C58E
 stride = 4
@@ -1676,6 +1682,7 @@ extra = [
     0x001BDE,   # Eni_Decomp_101
     0x001BE0,   # Eni_Decomp_110
     0x001BE2,   # Eni_Decomp_111
+    0x001BE4,   # terminal inline case
     0x002444,   # AnPal_None
     0x002446,   # AnPal_AIZ1
     0x002504,   # AnPal_AIZ2
@@ -1707,6 +1714,13 @@ extra = [
     0x008C40,   # Touch_SSSprites_Ring
     0x008C70,   # Touch_SSSprites_BlueSphere
     0x009530,   # Competition_Menu
+    0x0096F8,   # loc_9706
+    0x0096FA,   # loc_9724
+    0x0096FC,   # loc_9744
+    0x0096FE,   # terminal inline case
+    0x009706,   # loc_9706
+    0x009724,   # loc_9724
+    0x009744,   # loc_9744
     0x0099FC,   # Competition_LevelSelect
     0x00A164,   # Competition_PlayerSelect
     0x00A994,   # Competition_Results
@@ -1718,7 +1732,7 @@ extra = [
     0x00C582,   # loc_C66C
     0x00C586,   # loc_C68C
     0x00C58A,   # loc_C6AC
-    0x00C58E,   # loc_C58E
+    0x00C58E,   # terminal inline case
     0x00C5AA,   # loc_C5AA
     0x00C5D4,   # loc_C5D4
     0x00C66C,   # loc_C66C
@@ -1827,6 +1841,7 @@ extra = [
     0x019CFC,   # loc_19D0A
     0x019D00,   # loc_19DD0
     0x019D04,   # loc_19DD0
+    0x019D08,   # terminal inline case
     0x019D0A,   # loc_19D0A
     0x019DD0,   # loc_19DD0
     0x01A908,   # AIZ1_Resize
@@ -2063,7 +2078,7 @@ extra = [
     0x03AD20,   # AIZ1BGE_FireTransition
     0x03AD24,   # AIZ1BGE_FireRefresh
     0x03AD28,   # AIZ1BGE_Finish
-    0x03AD2C,   # AIZ1BGE_Intro
+    0x03AD2C,   # terminal inline case
     0x03AD86,   # AIZ1BGE_NormalRefresh
     0x03ADA2,   # AIZ1BGE_Normal
     0x03ADF8,   # AIZ1BGE_FireTransition
@@ -2074,7 +2089,7 @@ extra = [
     0x03B2A4,   # AIZ2SE_ShipDraw
     0x03B2A8,   # AIZ2SE_EndRefresh
     0x03B2AC,   # AIZ2SE_End
-    0x03B2B0,   # AIZ2SE_Normal
+    0x03B2B0,   # terminal inline case
     0x03B2EC,   # AIZ2SE_ShipRefresh
     0x03B34C,   # AIZ2SE_ShipDraw
     0x03B394,   # AIZ2SE_EndRefresh
@@ -2085,7 +2100,7 @@ extra = [
     0x03B452,   # AIZ2BGE_Normal
     0x03B456,   # AIZ2BGE_ShipRefresh
     0x03B45A,   # AIZ2BGE_ShipMove
-    0x03B45E,   # AIZ2BGE_FireRedraw
+    0x03B45E,   # terminal inline case
     0x03B48E,   # AIZ2BGE_WaitFire
     0x03B56A,   # AIZ2BGE_BGRedraw
     0x03B580,   # AIZ2BGE_Normal
@@ -2095,31 +2110,31 @@ extra = [
     0x03B94C,   # AIZShipBomb_ReadyDrop
     0x03B950,   # AIZShipBomb_Delay
     0x03B954,   # AIZShipBomb_Drop
-    0x03B958,   # AIZShipBomb_ReadyDrop
+    0x03B958,   # terminal inline case
     0x03B96A,   # AIZShipBomb_Delay
     0x03B986,   # AIZShipBomb_Drop
     0x03C2D2,   # HCZ1BGE_Normal
     0x03C2D6,   # HCZ1BGE_DoTransition
-    0x03C2DA,   # HCZ1BGE_Normal
+    0x03C2DA,   # terminal inline case
     0x03C356,   # HCZ1BGE_DoTransition
     0x03C610,   # HCZ2BGE_WallMoveInit
     0x03C614,   # HCZ2BGE_WallMove
     0x03C618,   # HCZ2BGE_NormalTransition
     0x03C61C,   # HCZ2BGE_NormalRefresh
     0x03C620,   # HCZ2BGE_Normal
-    0x03C624,   # HCZ2BGE_WallMoveInit
+    0x03C624,   # terminal inline case
     0x03C628,   # HCZ2BGE_WallMove
     0x03C68E,   # HCZ2BGE_NormalTransition
     0x03C6BC,   # HCZ2BGE_NormalRefresh
     0x03C6D2,   # HCZ2BGE_Normal
     0x03C85C,   # MGZ1BGE_Normal
     0x03C860,   # MGZ1BGE_Transition
-    0x03C864,   # MGZ1BGE_Normal
+    0x03C864,   # terminal inline case
     0x03C8C8,   # MGZ1BGE_Transition
     0x03CA38,   # MGZ2SE_Normal
     0x03CA3C,   # MGZ2SE_Collapse
     0x03CA40,   # MGZ2SE_MoveBG
-    0x03CA44,   # MGZ2SE_Normal
+    0x03CA44,   # terminal inline case
     0x03CA68,   # MGZ2SE_Collapse
     0x03CA86,   # MGZ2SE_MoveBG
     0x03CC12,   # MGZ2_QuakeEventCheck
@@ -2129,7 +2144,7 @@ extra = [
     0x03CC22,   # MGZ2_QuakeEvent1Cont
     0x03CC26,   # MGZ2_QuakeEvent2Cont
     0x03CC2A,   # MGZ2_QuakeEvent3Cont
-    0x03CC2E,   # MGZ2_QuakeEventCheck
+    0x03CC2E,   # terminal inline case
     0x03CC90,   # MGZ2_QuakeEvent1
     0x03CCD4,   # MGZ2_QuakeEvent2
     0x03CD1E,   # MGZ2_QuakeEvent3
@@ -2141,6 +2156,7 @@ extra = [
     0x03CDDC,   # MGZ2_ChunkEvent2_3
     0x03CDE0,   # MGZ2_ChunkEvent2_3
     0x03CDE4,   # MGZ2_ChunkEventReset
+    0x03CDE8,   # terminal inline case
     0x03CDEA,   # MGZ2_ChunkEventCheck
     0x03CE40,   # MGZ2_ChunkEvent1
     0x03CE5E,   # MGZ2_ChunkEvent2_3
@@ -2148,18 +2164,20 @@ extra = [
     0x03D13C,   # MGZ2BGE_GoRefresh
     0x03D140,   # MGZ2BGE_Normal
     0x03D144,   # MGZ2BGE_Refresh
-    0x03D148,   # MGZ2BGE_GoRefresh
+    0x03D148,   # terminal inline case
     0x03D156,   # MGZ2BGE_Normal
     0x03D1B4,   # MGZ2BGE_Refresh
     0x03D1D8,   # loc_3D21E
     0x03D1DC,   # loc_3D1F4
     0x03D1E0,   # loc_3D1EA
+    0x03D1E4,   # terminal inline case
     0x03D1EA,   # loc_3D1EA
     0x03D1F4,   # loc_3D1F4
     0x03D21E,   # loc_3D21E
     0x03D2E8,   # loc_3D376
     0x03D2EC,   # loc_3D348
     0x03D2F0,   # loc_3D310
+    0x03D2F4,   # terminal inline case
     0x03D310,   # loc_3D310
     0x03D348,   # loc_3D348
     0x03D376,   # loc_3D376
@@ -2170,7 +2188,7 @@ extra = [
     0x03D61E,   # CNZ1BGE_FGRefresh
     0x03D622,   # CNZ1BGE_FGRefresh2
     0x03D626,   # CNZ1BGE_DoTransition
-    0x03D62A,   # CNZ1BGE_Normal
+    0x03D62A,   # terminal inline case
     0x03D698,   # CNZ1BGE_BossStart
     0x03D6A4,   # CNZ1BGE_Boss
     0x03D6BE,   # CNZ1BGE_AfterBoss
@@ -2183,7 +2201,7 @@ extra = [
     0x03D924,   # Obj_CNZMinibossScrollSlow
     0x03D928,   # Obj_CNZMinibossScrollWait2
     0x03D92C,   # Obj_CNZMinibossScrollWait3
-    0x03D930,   # Obj_CNZMinibossScrollInit
+    0x03D930,   # terminal inline case
     0x03D960,   # Obj_CNZMinibossScrollMain
     0x03D98A,   # Obj_CNZMinibossScrollWait
     0x03D9A6,   # Obj_CNZMinibossScrollSlow
@@ -2192,7 +2210,7 @@ extra = [
     0x03DA7C,   # loc_3DA88
     0x03DA80,   # loc_3DAB6
     0x03DA84,   # loc_3DACC
-    0x03DA88,   # loc_3DA88
+    0x03DA88,   # terminal inline case
     0x03DAB6,   # loc_3DAB6
     0x03DACC,   # loc_3DACC
     0x03DB12,   # ICZ1SE_Init
@@ -2201,7 +2219,7 @@ extra = [
     0x03DB1E,   # ICZ1SE_Normal
     0x03DB22,   # ICZ1SE_Normal
     0x03DB26,   # ICZ1SE_Normal
-    0x03DB2A,   # ICZ1SE_Init
+    0x03DB2A,   # terminal inline case
     0x03DB34,   # ICZ1SE_WaitQuake
     0x03DB3C,   # ICZ1SE_Normal
     0x03DBC2,   # ICZ1BGE_Intro
@@ -2210,7 +2228,7 @@ extra = [
     0x03DBCE,   # ICZ1BGE_Refresh2
     0x03DBD2,   # ICZ1BGE_Normal
     0x03DBD6,   # ICZ1BGE_Transition
-    0x03DBDA,   # ICZ1BGE_Intro
+    0x03DBDA,   # terminal inline case
     0x03DC20,   # ICZ1BGE_SnowFall
     0x03DC4A,   # ICZ1BGE_Refresh
     0x03DC7A,   # ICZ1BGE_Refresh2
@@ -2219,7 +2237,7 @@ extra = [
     0x03DFA0,   # ICZ2BGE_FromICZ1
     0x03DFA4,   # ICZ2BGE_Normal
     0x03DFA8,   # ICZ2BGE_Refresh
-    0x03DFAC,   # ICZ2BGE_FromICZ1
+    0x03DFAC,   # terminal inline case
     0x03DFBA,   # ICZ2BGE_Normal
     0x03E08C,   # ICZ2BGE_Refresh
     0x03E496,   # LBZ1_LayoutMod1
@@ -2232,11 +2250,11 @@ extra = [
     0x03E4C8,   # LBZ1_LayoutMod4
     0x03E620,   # LBZ1BGE_Normal
     0x03E624,   # LBZ1BGE_DoTransition
-    0x03E628,   # LBZ1BGE_Normal
+    0x03E628,   # terminal inline case
     0x03E6A0,   # LBZ1BGE_DoTransition
     0x03E7FE,   # LBZ2SE_FromTransition
     0x03E802,   # LBZ2SE_Normal
-    0x03E806,   # LBZ2SE_FromTransition
+    0x03E806,   # terminal inline case
     0x03E84A,   # LBZ2SE_Normal
     0x03E88A,   # LBZ2BGE_FromTransition
     0x03E88E,   # LBZ2BGE_Refresh
@@ -2244,7 +2262,7 @@ extra = [
     0x03E896,   # LBZ2BGE_DeathEgg
     0x03E89A,   # LBZ2BGE_PlatformDetach
     0x03E89E,   # LBZ2BGE_Falling
-    0x03E8A2,   # LBZ2BGE_FromTransition
+    0x03E8A2,   # terminal inline case
     0x03E8C2,   # LBZ2BGE_Refresh
     0x03E8D8,   # LBZ2BGE_Normal
     0x03E948,   # LBZ2BGE_DeathEgg
