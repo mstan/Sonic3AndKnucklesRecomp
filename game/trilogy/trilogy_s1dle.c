@@ -26,11 +26,12 @@ static void spawn_boss(int id, int x, int y)
     }
 }
 
-/* S1 f_lockscreen only changes music handling and Sonic's right-edge leeway;
- * the arena itself is held by the level limits. S3K's Scroll_lock would
- * freeze the camera (fatal for the LZ chase up the shaft), so it isn't set. */
+/* Boss_flag supplies S1 f_lockscreen's music/right-edge policy. The arena
+ * itself is held by the level limits: Scroll_lock would freeze the camera
+ * during the LZ chase up the shaft and must remain independent. */
 static void boss_start(void)
 {
+    w8(RAM_Boss_flag,1); /* Native invincibility expiry must keep boss music. */
     if(megamix()) {
         int song=0x8C;
         switch(tri_source_zone()) {

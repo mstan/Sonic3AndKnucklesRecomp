@@ -5,6 +5,8 @@
 #include <string.h>
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
 static const char *ids[]={"sonic3.sonic1-stages","sonic3.sonic2-stages","sonic3.megamix","sonic3.sonic-cd","sonic3.mighty","sonic3.shadow"};
+static int replay_playing;
+int genesis_replay_playing(void) { return replay_playing; }
 static void import_progress(void *ctx,float pct,const char *message)
 { (void)ctx;printf("import %.2f %s\n",pct,message);fflush(stdout); }
 int main(int argc,char **argv)
@@ -13,6 +15,15 @@ int main(int argc,char **argv)
     const RecompLauncherCModProvider *p=s3_stage_pack_mods(NULL);
     CHECK(p->package_count(NULL)==6 && p->feature_count(NULL)==6);
     CHECK(!s3_stage_pack_enabled && !s3_stage_pack_sram());
+    CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
+    replay_playing=1;
+    CHECK(p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
+    CHECK(!s3_stage_pack_cd && !s3_stage_pack_enabled);
+    CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","stage-bank","missing.bin"));
+    CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-music","missing.bin"));
+    CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","bad\npath.cue"));
+    replay_playing=0;
+    CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
     for(int i=0;i<6;i++) {
         RecompLauncherCModFeature f;CHECK(p->feature_get(NULL,i,&f));
         CHECK(!f.enabled && f.channel==RECOMP_MOD_CHANNEL_EXPERIMENTAL);
