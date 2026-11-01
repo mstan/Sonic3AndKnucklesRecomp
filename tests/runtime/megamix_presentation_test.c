@@ -145,5 +145,22 @@ int main(void)
     CHECK(!tri_mighty_presentation_hook(TH_DS_NEWGAME));CHECK(r8(0xFFE6AE)==0x70);
     CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));CHECK(tri_shadow_selected && !tri_mighty_selected);
     w8(RAM_Game_mode,0x4C);CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
+    /* A synthetic 32x24 head has distinct left/right quarters. All four
+     * quarters and its bottom row must survive fitting to 16x16; the old
+     * center crop lost both outer quarters and the lower eight rows. */
+    longword(0xE04,0x400040);longword(0xE08,0x400060);
+    longword(0xE0C,0x400200);longword(0xE14,0x400080);
+    word(0x40,2);word(0x42,2);
+    bank[0x44]=(uint8_t)-20;bank[0x45]=12;word(0x46,0);word(0x48,65520);
+    bank[0x4A]=(uint8_t)-12;bank[0x4B]=13;word(0x4C,4);word(0x4E,65520);
+    word(0x60,2);word(0x62,1);word(0x64,0xB000);
+    word(0x8A,12);bank[0x8C]=15;bank[0x8D]=0;
+    for(unsigned t=0;t<12;t++)memset(bank+0x200+t*32,(1+(t<4?t:(t-4)/2))*17,32);
+    shadow_head_source=0;shadow_head_art(0x400E00);CHECK(shadow_head_source==0x400E00);
+    for(unsigned y=0;y<16;y++)for(unsigned x=0;x<16;x++) {
+        unsigned b=shadow_head[(x/8*2+y/8)*32+(y&7)*4+(x&7)/2];
+        unsigned color=(x&1)?b&15:b>>4;
+        CHECK(color==((y<2 || y>=14)?0:1+x/4));
+    }
     puts("Mighty selection, save identity, menu atlas, palette isolation and HUD digits passed");return 0;
 }

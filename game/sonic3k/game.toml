@@ -851,6 +851,9 @@ kind = "game_hook"
 addr = 0x011702 # Sonic CD RIGHT_BOUND
 kind = "game_hook"
 [[widescreen_site]]
+addr = 0x014F2C # Sonic CD TAILS_RIGHT_BOUND
+kind = "game_hook"
+[[widescreen_site]]
 addr = 0x00F2F2 # Sonic CD FLOOR_NEG
 kind = "game_hook"
 [[widescreen_site]]

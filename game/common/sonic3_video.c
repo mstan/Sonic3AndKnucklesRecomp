@@ -843,13 +843,13 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
     }
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
-    /* CD's line-scroll profiles already position its background. Clamping
+    /* Imported stages' line-scroll profiles position the background. Clamping
      * the expanded foreground at a level edge moves its native viewport
      * across the canvas; sharing that changing origin with B adds a second,
-     * reversible pan near the boundary. Keep CD's backdrop on the centered
+     * reversible pan near the boundary. Keep the backdrop on the centered
      * canvas while foreground, actors and HUD retain the bounded view. */
-    int cd_background=level && s_frame_zone>=0x40 && s_frame_zone<=0x5B;
-    int bg_origin=cd_background?(width-nw)/2:origin;
+    int centered_background=level && s_frame_zone>=0x20 && s_frame_zone<=0x5B;
+    int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
      * on the full-screen Window ($E000, 64 tiles per row), while B ($C000)
@@ -945,7 +945,17 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
         /* Title/menu backgrounds only initialize the visible 40 tile
          * columns; repeat that composition, not the stale 512px name table. */
-        if(!level && !special && !file_select){bx%=nw;if(bx<0)bx+=nw;}
+        if(!level && !special && !file_select){
+            /* Reflect only the title scenery at its boundary. Opposite-edge
+             * wrapping makes a visible seam; stretching one pixel smears the
+             * clouds into horizontal bars. Logos remain in the native center. */
+            if((g_ram[0xF600]&127)==4 && (nx<0 || nx>=nw)) {
+                int ax=nx%(nw*2);if(ax<0)ax+=nw*2;
+                if(ax>=nw)ax=nw*2-1-ax;
+                bx=ax-hs_b;
+            }
+            bx%=nw;if(bx<0)bx+=nw;
+        }
 
         if(!fg.remaining) {
             uint16_t attr=level?world_attr(s_world_frame,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
@@ -958,11 +968,10 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
         if(file_select) {
-            /* Reflect only the portrait at its edges, retaining its native
-             * pixel scale and a continuous backdrop at every aspect ratio.
-             * The carousel is finite: never wrap Delete back to No Save. */
-            int ax=nx%(2*nw);if(ax<0)ax+=2*nw;
-            if(ax>=nw)ax=2*nw-1-ax;
+            /* Keep one portrait, extending only its edge colours. Mirroring
+             * the whole image repeats Sonic's face and DATA SELECT text.
+             * The finite carousel still exposes its original offscreen cards. */
+            int ax=nx<0?0:nx>=nw?nw-1:nx;
             a=vram16(v,0xE000u+(unsigned)(line/8*64+ax/8)*2u);
             ap=pattern_pixel(v,a,ax,line);
             if(bx<0 || bx>=1024)bp=0;
@@ -1052,7 +1061,7 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
                 if(bad && s_bad_y<0){s_bad_x=wx;s_bad_y=line;s_bad_attr=a;s_bad_expected=expected;s_bad_world_y=wy;s_bad_hscroll=hs_a;}
                 s_terrain_errors+=bad;
             }
-            if(cd_background && bg_origin!=origin) {
+            if(centered_background && bg_origin!=origin) {
                 /* This edge presentation intentionally moves B relative to
                  * the native foreground window. Its same-column pixels are
                  * not a presentation oracle until the view is centered. */

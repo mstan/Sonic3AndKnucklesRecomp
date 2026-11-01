@@ -126,9 +126,9 @@ static void test_file_select(void)
         scanline(&v,8,native,320,out,canvas);
         for(int x=0;x<canvas;++x) {
             int nx=x-origin,card=nx+scroll;
-            /* Alternating 320px reflected half-panels: no black seams. */
-            int band=(nx+1600)/160;
-            uint32_t bg=(band%4==1 || band%4==2)?0xFFFF0000:0xFF00FF00;
+            /* The original portrait appears once. Margins extend only its
+             * edge colours; neither the face nor its text is reflected. */
+            uint32_t bg=nx<160?0xFFFF0000:0xFF00FF00;
             uint32_t expected=nx>=0 && nx<320?native[nx]:
                 ((card>=8 && card<16)||(card>=1008 && card<1016))?0xFF0000FF:bg;
             CHECK(out[x]==expected);
@@ -190,7 +190,7 @@ static int cd_edge_cell(const uint8_t *ram,int x,int y,int background,uint16_t *
     *cell=background?(uint16_t)(1+((x>>4)&1)):0;
     return 1;
 }
-static void test_cd_background_edges(void)
+static void test_campaign_background_edges(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],baseline[796];
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
@@ -204,8 +204,8 @@ static void test_cd_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0x40,0x5B};
-    for(unsigned z=0;z<2;z++)for(unsigned w=0;w<4;w++) {
+    const unsigned zones[]={0x20,0x22,0x28,0x34,0x40,0x5B};
+    for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         g_ram[0xFE10]=(uint8_t)zones[z];int canvas=widths[w];
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
         for(unsigned c=0;c<sizeof cameras/sizeof cameras[0];c++) {
@@ -258,7 +258,7 @@ int main(int argc,char **argv)
         printf("palette %04x %04x\n",s_aiz_intro.colors[2],s_aiz_main.colors[2]);
         return 0;
     }
-    test_cd_background_edges();
+    test_campaign_background_edges();
     /* Bounded host decoding: literals, overlapping dictionary matches,
      * truncation, a reference before the output and insufficient capacity. */
     const uint8_t compressed[]={0xAF,0,'A','B','C','D',0xFC,0xFA,0,0xF8,0};

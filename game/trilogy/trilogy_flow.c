@@ -208,6 +208,8 @@ void tri_s1_complete(void)
  * the collapsing floor (s1dle). */
 static void sbz2_after_tally(void)
 {
+    s_runoff = 0;
+    w8(RAM_Disable_death_plane, 0);
     w8(RAM__unkFAA8, 0);
     w8(RAM__unkFABE, 0);
     w8(RAM_Ctrl_1_locked, 0);
@@ -299,7 +301,13 @@ static int results_done(void)
  * ---------------------------------------------------------------------- */
 static int runoff_wanted(void)
 {
-    return tri_dir() && tri_rd8(tri_dir()+TD_GAME)==TRI_GAME_CD;
+    uint32_t e=tri_dir();
+    if(!e)return 0;
+    /* These tallies restore control for the Eggman/falling-floor scene. */
+    uint16_t za=r16(RAM_Current_zone_and_act);
+    if(za==0x2501 || za==0x3901)return 0;
+    int game=tri_rd8(e+TD_GAME);
+    return game==TRI_GAME_S1 || game==TRI_GAME_S2 || game==TRI_GAME_CD || game==TRI_GAME_MEGAMIX;
 }
 
 static int runoff_gone(uint32_t p)                   /* (off the screen: right, or below) */
@@ -341,17 +349,21 @@ int tri_flow_hook(uint32_t pc)
 {
     switch (pc) {
     case TH_ENDING_POSE: {
-        if(!tri_cd_zone(tri_zone()))return 0;
         uint32_t a1 = A(1) & 0xFFFFFFu;
         int bit = a1 == RAM_Player_1 ? 1 : a1 == RAM_Player_2 ? 2 : 0;
         if (!bit || !runoff_wanted()) return 0;
         s_runoff |= bit;
+        /* Imported signs do not run the native end-sign's Tails gate.
+         * Include the existing companion, using his ordinary physics/input. */
+        if(bit==1 && r16(RAM_Player_mode)==0 && r32(RAM_Player_2) &&
+            r8(RAM_Player_2+OBJ_routine)<6 && !(r8(RAM_Player_2+OBJ_status)&0x80))s_runoff|=2;
         SET8(a1, 0x3D, 0);                           /* spin_dash_flag */
         SET8(a1, OBJ_status, OB8(a1, OBJ_status) & ~0x20);   /* (not pushing) */
         runoff_tick();
         return 1;                                    /* (no pose: rts) */
     }
-    case TH_RIGHT_BOUND: {                           /* d0 = Camera_max_X_pos + $128 */
+    case TH_RIGHT_BOUND:
+    case TH_TAILS_RIGHT_BOUND: {                     /* d0 = Camera_max_X_pos + $128 */
         uint32_t a0 = A(0) & 0xFFFFFFu;
         int bit = a0 == RAM_Player_1 ? 1 : a0 == RAM_Player_2 ? 2 : 0;
         extern int scd_mmz3_ending_margin(void);
@@ -370,6 +382,7 @@ int tri_flow_hook(uint32_t pc)
         return 0;
     }
     case TH_LVL_PRE_SPRITES:
+        { extern void tri_water_monitor_frame(void);tri_water_monitor_frame(); }
         runoff_tick();
         return 0;
     case TH_RESULTS_DONE:

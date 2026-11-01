@@ -252,6 +252,83 @@
       ]
     },
     {
+      "name": "TAILS_RIGHT_BOUND",
+      "address": 85804,
+      "anchor": [
+        85768,
+        "Tails_Check_Screen_Boundaries"
+      ],
+      "code": "b041652c4a38f66566144a38f7c666103038ee1a064000e0b06800146d0c4e75",
+      "instructions": [
+        {
+          "address": 85804,
+          "size": 2,
+          "mnemonic": "cmp.w",
+          "operands": "d1, d0"
+        },
+        {
+          "address": 85806,
+          "size": 2,
+          "mnemonic": "bcs.b",
+          "operands": "$14f5c"
+        },
+        {
+          "address": 85808,
+          "size": 4,
+          "mnemonic": "tst.b",
+          "operands": "$f665.w"
+        },
+        {
+          "address": 85812,
+          "size": 2,
+          "mnemonic": "bne.b",
+          "operands": "$14f4a"
+        },
+        {
+          "address": 85814,
+          "size": 4,
+          "mnemonic": "tst.b",
+          "operands": "$f7c6.w"
+        },
+        {
+          "address": 85818,
+          "size": 2,
+          "mnemonic": "bne.b",
+          "operands": "$14f4c"
+        },
+        {
+          "address": 85820,
+          "size": 4,
+          "mnemonic": "move.w",
+          "operands": "$ee1a.w, d0"
+        },
+        {
+          "address": 85824,
+          "size": 4,
+          "mnemonic": "addi.w",
+          "operands": "#$e0, d0"
+        },
+        {
+          "address": 85828,
+          "size": 4,
+          "mnemonic": "cmp.w",
+          "operands": "$14(a0), d0"
+        },
+        {
+          "address": 85832,
+          "size": 2,
+          "mnemonic": "blt.b",
+          "operands": "$14f56"
+        },
+        {
+          "address": 85834,
+          "size": 2,
+          "mnemonic": "rts",
+          "operands": ""
+        }
+      ]
+    },
+    {
       "name": "FLOOR_NEG",
       "address": 62194,
       "anchor": [

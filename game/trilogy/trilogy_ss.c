@@ -55,16 +55,20 @@ static void award(int slot, int super)
     tri_save_emeralds();
 }
 
-/* S3K's Blue Spheres for the next emerald: SK_special_stage_flag and the
- * stage number its own search (loc_8606) starts from */
+/* S3K's Blue Spheres: choose the emerald set and preserve the stage cursor
+ * from which the native uncollected-emerald search (loc_8606) starts. */
 void tri_ss_prepare_blue_spheres(void)
 {
-    int super, slot = tri_ss_next(&super);
+    int super;
+    tri_ss_next(&super);
     if (super)                                       /* (Hidden Palace's conversion: chaos -> waiting for super) */
         for (int i = 0; i < 7; i++)
             if (r8(RAM_Collected_emeralds_array + (uint32_t)i) == 1) w8(RAM_Collected_emeralds_array + (uint32_t)i, 2);
     w8(RAM_SK_special_stage_flag, (uint8_t)super);
-    if (slot >= 0) w8(RAM_Current_special_stage, (uint8_t)slot);
+    /* Native SpecialStage_Results advances this cursor on both success and
+     * failure. Keep it: loc_8606 already skips emeralds that were collected.
+     * Resetting it to the first missing emerald replayed every failed stage. */
+    if (r8(RAM_Current_special_stage) >= 7) w8(RAM_Current_special_stage, 0);
 }
 
 enum { SS_KIND_BLUE_SPHERES, SS_KIND_HALF_PIPE, SS_KIND_UFO };

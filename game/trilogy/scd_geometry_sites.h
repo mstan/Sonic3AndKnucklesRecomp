@@ -3,6 +3,7 @@
 #define TH_RESULTS_MUSIC 0x02DC54u
 #define TH_ENDING_POSE 0x0869C6u
 #define TH_RIGHT_BOUND 0x011702u
+#define TH_TAILS_RIGHT_BOUND 0x014F2Cu
 #define TH_FLOOR_NEG 0x00F2F2u
 #define TH_FLOOR2_NEG 0x00F394u
 #define TH_ROOM_AHEAD_S 0x01138Cu
@@ -10,4 +11,4 @@
 #define TH_ROOM_AHEAD_K 0x0173BEu
 #define TH_SPRING_NEAR 0x02326Cu
 #define TH_SOLIDS_SPLIT 0x0076D0u
-#define CD_GEOMETRY_CASES case 0x02DC54u: case 0x0869C6u: case 0x011702u: case 0x00F2F2u: case 0x00F394u: case 0x01138Cu: case 0x014BB6u: case 0x0173BEu: case 0x02326Cu: case 0x0076D0u:
+#define CD_GEOMETRY_CASES case 0x02DC54u: case 0x0869C6u: case 0x011702u: case 0x014F2Cu: case 0x00F2F2u: case 0x00F394u: case 0x01138Cu: case 0x014BB6u: case 0x0173BEu: case 0x02326Cu: case 0x0076D0u:
