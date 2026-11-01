@@ -9,8 +9,8 @@
 #   [game]
 #   discovery_files = ["sonic3k.disasm_jumptables.toml"]
 
-# Tables found: 339 pcrel16, 25 abs, 54 bra-trampoline
-# Unique targets: 2394
+# Tables found: 339 pcrel16, 25 abs, 68 bra-trampoline
+# Unique targets: 2505
 
 [[jump_table]]
 start  = 0x0005E6
@@ -2203,6 +2203,12 @@ stride = 2
 format = "bra_s"   # 8 entries, first=Eni_Decomp_00
 
 [[jump_table]]
+start  = 0x00AA28
+end    = 0x00AA2E
+stride = 2
+format = "bra_s"   # 3 entries, first=loc_AA36
+
+[[jump_table]]
 start  = 0x00D78C
 end    = 0x00D7A4
 stride = 4
@@ -2219,6 +2225,24 @@ start  = 0x04C3FC
 end    = 0x04C414
 stride = 4
 format = "bra_w"   # 6 entries, first=loc_4C416
+
+[[jump_table]]
+start  = 0x04C5B4
+end    = 0x04C5C4
+stride = 4
+format = "bra_w"   # 4 entries, first=loc_4C602
+
+[[jump_table]]
+start  = 0x04C6F0
+end    = 0x04C6F8
+stride = 4
+format = "bra_w"   # 2 entries, first=loc_4C706
+
+[[jump_table]]
+start  = 0x04C7C8
+end    = 0x04C7D4
+stride = 4
+format = "bra_w"   # 3 entries, first=loc_4C838
 
 [[jump_table]]
 start  = 0x04FB50
@@ -2341,6 +2365,12 @@ stride = 4
 format = "bra_w"   # 4 entries, first=FBZ2SE_Normal
 
 [[jump_table]]
+start  = 0x052E72
+end    = 0x052E7A
+stride = 4
+format = "bra_w"   # 2 entries, first=FBZ2_NoLayoutMod
+
+[[jump_table]]
 start  = 0x053024
 end    = 0x053038
 stride = 4
@@ -2389,6 +2419,12 @@ stride = 4
 format = "bra_w"   # 5 entries, first=loc_54DB0
 
 [[jump_table]]
+start  = 0x05503C
+end    = 0x055050
+stride = 4
+format = "bra_w"   # 5 entries, first=loc_55050
+
+[[jump_table]]
 start  = 0x0551C6
 end    = 0x0551EE
 stride = 4
@@ -2399,6 +2435,12 @@ start  = 0x055A82
 end    = 0x055A9A
 stride = 4
 format = "bra_w"   # 6 entries, first=loc_55A9A
+
+[[jump_table]]
+start  = 0x055F52
+end    = 0x055F5E
+stride = 4
+format = "bra_w"   # 3 entries, first=loc_55F5E
 
 [[jump_table]]
 start  = 0x0561CC
@@ -2413,10 +2455,22 @@ stride = 4
 format = "bra_w"   # 13 entries, first=loc_562D0
 
 [[jump_table]]
+start  = 0x056744
+end    = 0x05675C
+stride = 4
+format = "bra_w"   # 6 entries, first=loc_5675C
+
+[[jump_table]]
 start  = 0x056BC2
 end    = 0x056BD2
 stride = 4
 format = "bra_w"   # 4 entries, first=loc_56BD2
+
+[[jump_table]]
+start  = 0x056DFE
+end    = 0x056E0A
+stride = 4
+format = "bra_w"   # 3 entries, first=loc_56E0A
 
 [[jump_table]]
 start  = 0x057000
@@ -2437,10 +2491,22 @@ stride = 4
 format = "bra_w"   # 4 entries, first=loc_578AA
 
 [[jump_table]]
+start  = 0x057EBA
+end    = 0x057ECA
+stride = 4
+format = "bra_w"   # 4 entries, first=loc_57ECA
+
+[[jump_table]]
 start  = 0x058AB0
 end    = 0x058ACC
 stride = 4
 format = "bra_w"   # 7 entries, first=loc_58ACC
+
+[[jump_table]]
+start  = 0x059082
+end    = 0x05908E
+stride = 4
+format = "bra_w"   # 3 entries, first=loc_5908E
 
 [[jump_table]]
 start  = 0x0593A0
@@ -2485,6 +2551,12 @@ stride = 4
 format = "bra_w"   # 5 entries, first=loc_59C60
 
 [[jump_table]]
+start  = 0x059E5E
+end    = 0x059E7A
+stride = 4
+format = "bra_w"   # 7 entries, first=loc_59E7A
+
+[[jump_table]]
 start  = 0x05A214
 end    = 0x05A224
 stride = 4
@@ -2503,6 +2575,12 @@ stride = 4
 format = "bra_w"   # 9 entries, first=loc_5A57C
 
 [[jump_table]]
+start  = 0x05A696
+end    = 0x05A69E
+stride = 2
+format = "bra_s"   # 4 entries, first=loc_5A69E
+
+[[jump_table]]
 start  = 0x05AAFA
 end    = 0x05AB36
 stride = 4
@@ -2519,6 +2597,12 @@ start  = 0x079C5E
 end    = 0x079C72
 stride = 4
 format = "bra_w"   # 5 entries, first=loc_79C72
+
+[[jump_table]]
+start  = 0x07FF8E
+end    = 0x07FF9A
+stride = 4
+format = "bra_w"   # 3 entries, first=loc_7FF9A
 
 [functions]
 extra = [
@@ -2552,6 +2636,7 @@ extra = [
     0x001954,   # Eni_Decomp_101
     0x001956,   # Eni_Decomp_110
     0x001958,   # Eni_Decomp_111
+    0x00195A,   # terminal inline case
     0x0021BC,   # AnPal_None
     0x0021BE,   # AnPal_AIZ1
     0x00227C,   # AnPal_AIZ2
@@ -2592,6 +2677,13 @@ extra = [
     0x009E04,   # Touch_SSSprites_Ring
     0x009E34,   # Touch_SSSprites_BlueSphere
     0x00A85E,   # Competition_Menu
+    0x00AA28,   # loc_AA36
+    0x00AA2A,   # loc_AA54
+    0x00AA2C,   # loc_AA74
+    0x00AA2E,   # terminal inline case
+    0x00AA36,   # loc_AA36
+    0x00AA54,   # loc_AA54
+    0x00AA74,   # loc_AA74
     0x00AB90,   # Competition_LevelSelect
     0x00B2CC,   # Competition_PlayerSelect
     0x00B74E,   # Competition_Results
@@ -2603,7 +2695,7 @@ extra = [
     0x00D798,   # loc_D884
     0x00D79C,   # loc_D8A4
     0x00D7A0,   # loc_D8C4
-    0x00D7A4,   # loc_D7A4
+    0x00D7A4,   # terminal inline case
     0x00D7C0,   # loc_D7C0
     0x00D7EA,   # loc_D7EA
     0x00D884,   # loc_D884
@@ -2721,6 +2813,7 @@ extra = [
     0x01B69A,   # loc_1B6A8
     0x01B69E,   # loc_1B7F2
     0x01B6A2,   # loc_1B7F2
+    0x01B6A6,   # terminal inline case
     0x01B6A8,   # loc_1B6A8
     0x01B7F2,   # loc_1B7F2
     0x01C456,   # AIZ1_Resize
@@ -3030,12 +3123,34 @@ extra = [
     0x04C408,   # loc_4C540
     0x04C40C,   # loc_4C576
     0x04C410,   # loc_4C6BC
+    0x04C414,   # terminal inline case
     0x04C416,   # loc_4C416
     0x04C462,   # loc_4C462
     0x04C480,   # loc_4C480
     0x04C540,   # loc_4C540
     0x04C576,   # loc_4C576
+    0x04C5B4,   # loc_4C602
+    0x04C5B8,   # loc_4C63E
+    0x04C5BC,   # loc_4C6A8
+    0x04C5C0,   # locret_4C6BA
+    0x04C5C4,   # terminal inline case
+    0x04C602,   # loc_4C602
+    0x04C63E,   # loc_4C63E
+    0x04C6A8,   # loc_4C6A8
+    0x04C6BA,   # locret_4C6BA
     0x04C6BC,   # loc_4C6BC
+    0x04C6F0,   # loc_4C706
+    0x04C6F4,   # loc_4C712
+    0x04C6F8,   # terminal inline case
+    0x04C706,   # loc_4C706
+    0x04C712,   # loc_4C712
+    0x04C7C8,   # loc_4C838
+    0x04C7CC,   # loc_4C80E
+    0x04C7D0,   # loc_4C7E0
+    0x04C7D4,   # terminal inline case
+    0x04C7E0,   # loc_4C7E0
+    0x04C80E,   # loc_4C80E
+    0x04C838,   # loc_4C838
     0x04C97E,   # BlueSpheresTitle
     0x04DA7E,   # BlueSpheresResults
     0x04E1C4,   # Obj_Difficulty_Sonic
@@ -3049,7 +3164,7 @@ extra = [
     0x04FB5C,   # AIZ1BGE_FireTransition
     0x04FB60,   # AIZ1BGE_FireRefresh
     0x04FB64,   # AIZ1BGE_Finish
-    0x04FB68,   # AIZ1BGE_Intro
+    0x04FB68,   # terminal inline case
     0x04FBCA,   # AIZ1BGE_NormalRefresh
     0x04FBEA,   # AIZ1BGE_Normal
     0x04FC46,   # AIZ1BGE_FireTransition
@@ -3060,7 +3175,7 @@ extra = [
     0x04FF2E,   # AIZ2SE_ShipDraw
     0x04FF32,   # AIZ2SE_EndRefresh
     0x04FF36,   # AIZ2SE_End
-    0x04FF3A,   # AIZ2SE_Normal
+    0x04FF3A,   # terminal inline case
     0x04FF74,   # AIZ2SE_ShipRefresh
     0x04FFD4,   # AIZ2SE_ShipDraw
     0x05001C,   # AIZ2SE_EndRefresh
@@ -3071,7 +3186,7 @@ extra = [
     0x0500DE,   # AIZ2BGE_Normal
     0x0500E2,   # AIZ2BGE_ShipRefresh
     0x0500E6,   # AIZ2BGE_ShipMove
-    0x0500EA,   # AIZ2BGE_FireRedraw
+    0x0500EA,   # terminal inline case
     0x05011E,   # AIZ2BGE_WaitFire
     0x0501FE,   # AIZ2BGE_BGRedraw
     0x050216,   # AIZ2BGE_Normal
@@ -3081,31 +3196,31 @@ extra = [
     0x0504BE,   # AIZShipBomb_ReadyDrop
     0x0504C2,   # AIZShipBomb_Delay
     0x0504C6,   # AIZShipBomb_Drop
-    0x0504CA,   # AIZShipBomb_ReadyDrop
+    0x0504CA,   # terminal inline case
     0x0504DC,   # AIZShipBomb_Delay
     0x0504F8,   # AIZShipBomb_Drop
     0x050BC6,   # HCZ1BGE_Normal
     0x050BCA,   # HCZ1BGE_DoTransition
-    0x050BCE,   # HCZ1BGE_Normal
+    0x050BCE,   # terminal inline case
     0x050C4C,   # HCZ1BGE_DoTransition
     0x050EFA,   # HCZ2BGE_WallMoveInit
     0x050EFE,   # HCZ2BGE_WallMove
     0x050F02,   # HCZ2BGE_NormalTransition
     0x050F06,   # HCZ2BGE_NormalRefresh
     0x050F0A,   # HCZ2BGE_Normal
-    0x050F0E,   # HCZ2BGE_WallMoveInit
+    0x050F0E,   # terminal inline case
     0x050F20,   # HCZ2BGE_WallMove
     0x050F86,   # HCZ2BGE_NormalTransition
     0x050FB4,   # HCZ2BGE_NormalRefresh
     0x050FCA,   # HCZ2BGE_Normal
     0x051158,   # MGZ1BGE_Normal
     0x05115C,   # MGZ1BGE_Transition
-    0x051160,   # MGZ1BGE_Normal
+    0x051160,   # terminal inline case
     0x0511C8,   # MGZ1BGE_Transition
     0x0512DC,   # MGZ2SE_Normal
     0x0512E0,   # MGZ2SE_Collapse
     0x0512E4,   # MGZ2SE_MoveBG
-    0x0512E8,   # MGZ2SE_Normal
+    0x0512E8,   # terminal inline case
     0x05130C,   # MGZ2SE_Collapse
     0x05132C,   # MGZ2SE_MoveBG
     0x0514E8,   # MGZ2_QuakeEventCheck
@@ -3115,7 +3230,7 @@ extra = [
     0x0514F8,   # MGZ2_QuakeEvent1Cont
     0x0514FC,   # MGZ2_QuakeEvent2Cont
     0x051500,   # MGZ2_QuakeEvent3Cont
-    0x051504,   # MGZ2_QuakeEventCheck
+    0x051504,   # terminal inline case
     0x051560,   # MGZ2_QuakeEvent1
     0x0515A4,   # MGZ2_QuakeEvent2
     0x05160E,   # MGZ2_QuakeEvent3
@@ -3127,6 +3242,7 @@ extra = [
     0x0516C4,   # MGZ2_ChunkEvent2_3
     0x0516C8,   # MGZ2_ChunkEvent2_3
     0x0516CC,   # MGZ2_ChunkEventReset
+    0x0516D0,   # terminal inline case
     0x0516D2,   # MGZ2_ChunkEventCheck
     0x05172A,   # MGZ2_ChunkEvent1
     0x051748,   # MGZ2_ChunkEvent2_3
@@ -3134,12 +3250,13 @@ extra = [
     0x051900,   # MGZ2BGE_GoRefresh
     0x051904,   # MGZ2BGE_Normal
     0x051908,   # MGZ2BGE_Refresh
-    0x05190C,   # MGZ2BGE_GoRefresh
+    0x05190C,   # terminal inline case
     0x05191A,   # MGZ2BGE_Normal
     0x05198E,   # MGZ2BGE_Refresh
     0x0519DC,   # loc_51A6A
     0x0519E0,   # loc_51A3C
     0x0519E4,   # loc_51A04
+    0x0519E8,   # terminal inline case
     0x051A04,   # loc_51A04
     0x051A3C,   # loc_51A3C
     0x051A6A,   # loc_51A6A
@@ -3150,7 +3267,7 @@ extra = [
     0x051C9E,   # CNZ1BGE_FGRefresh
     0x051CA2,   # CNZ1BGE_FGRefresh2
     0x051CA6,   # CNZ1BGE_DoTransition
-    0x051CAA,   # CNZ1BGE_Normal
+    0x051CAA,   # terminal inline case
     0x051D1A,   # CNZ1BGE_BossStart
     0x051D2E,   # CNZ1BGE_Boss
     0x051D50,   # CNZ1BGE_AfterBoss
@@ -3163,7 +3280,7 @@ extra = [
     0x051FE4,   # Obj_CNZMinibossScrollSlow
     0x051FE8,   # Obj_CNZMinibossScrollWait2
     0x051FEC,   # Obj_CNZMinibossScrollWait3
-    0x051FF0,   # Obj_CNZMinibossScrollInit
+    0x051FF0,   # terminal inline case
     0x052020,   # Obj_CNZMinibossScrollMain
     0x05204A,   # Obj_CNZMinibossScrollWait
     0x052066,   # Obj_CNZMinibossScrollSlow
@@ -3172,13 +3289,13 @@ extra = [
     0x05214E,   # loc_5215A
     0x052152,   # loc_521D2
     0x052156,   # CNZ2SE_Normal
-    0x05215A,   # loc_5215A
+    0x05215A,   # terminal inline case
     0x0521D2,   # loc_521D2
     0x052200,   # CNZ2SE_Normal
     0x05222C,   # loc_52238
     0x052230,   # loc_52266
     0x052234,   # loc_5227C
-    0x052238,   # loc_52238
+    0x052238,   # terminal inline case
     0x052266,   # loc_52266
     0x05227C,   # loc_5227C
     0x052442,   # FBZ1SE_Normal
@@ -3188,7 +3305,7 @@ extra = [
     0x052452,   # FBZ1SE_LayoutMod4
     0x052456,   # FBZ1SE_LayoutMod5
     0x05245A,   # FBZ1SE_LayoutMod6
-    0x05245E,   # FBZ1SE_Normal
+    0x05245E,   # terminal inline case
     0x052486,   # FBZ1SE_LayoutMod1
     0x052522,   # FBZ1SE_LayoutMod2
     0x0525CC,   # FBZ1SE_LayoutMod3
@@ -3200,7 +3317,7 @@ extra = [
     0x0528CE,   # FBZ1BGE_ChangeBottomUp
     0x0528D2,   # FBZ1BGE_ChangeLeftRight
     0x0528D6,   # FBZ1BGE_ChangeRightLeft
-    0x0528DA,   # FBZ1BGE_ChangeTopDown
+    0x0528DA,   # terminal inline case
     0x052900,   # FBZ1BGE_ChangeBottomUp
     0x052926,   # FBZ1BGE_ChangeLeftRight
     0x05294C,   # FBZ1BGE_ChangeRightLeft
@@ -3213,7 +3330,7 @@ extra = [
     0x052AD2,   # FBZ1_BGChange4
     0x052AD6,   # FBZ1_BGChange5
     0x052ADA,   # FBZ1_BGChange6
-    0x052ADE,   # FBZ1_BGChange1
+    0x052ADE,   # terminal inline case
     0x052B30,   # FBZ1_BGChange2
     0x052B82,   # FBZ1_BGChange3
     0x052BD4,   # FBZ1_BGChange4
@@ -3223,7 +3340,11 @@ extra = [
     0x052E48,   # FBZ2SE_BossEvent
     0x052E4C,   # FBZ2SE_BossEventRefresh
     0x052E50,   # FBZ2SE_BossEventEnd
-    0x052E54,   # FBZ2SE_Normal
+    0x052E54,   # terminal inline case
+    0x052E72,   # FBZ2_NoLayoutMod
+    0x052E76,   # FBZ2_LayoutMod1
+    0x052E7A,   # terminal inline case
+    0x052EAE,   # FBZ2_LayoutMod1
     0x052F14,   # FBZ2SE_BossEvent
     0x052F1C,   # FBZ2SE_BossEventRefresh
     0x052F30,   # FBZ2SE_BossEventEnd
@@ -3232,7 +3353,7 @@ extra = [
     0x05302C,   # FBZ2BGE_ChangeTopDown
     0x053030,   # FBZ2BGE_ChangeBottomUp
     0x053034,   # FBZ2BGE_BossEvent
-    0x053038,   # FBZ2BGE_ChangeTopDown
+    0x053038,   # terminal inline case
     0x05305C,   # FBZ2BGE_ChangeBottomUp
     0x053080,   # FBZ2BGE_Init
     0x053096,   # FBZ2BGE_Normal
@@ -3243,7 +3364,7 @@ extra = [
     0x053676,   # ICZ1SE_Normal
     0x05367A,   # ICZ1SE_Normal
     0x05367E,   # ICZ1SE_Normal
-    0x053682,   # ICZ1SE_Init
+    0x053682,   # terminal inline case
     0x0536A0,   # ICZ1SE_WaitQuake
     0x0536A8,   # ICZ1SE_Normal
     0x05372C,   # ICZ1BGE_Intro
@@ -3252,7 +3373,7 @@ extra = [
     0x053738,   # ICZ1BGE_Refresh2
     0x05373C,   # ICZ1BGE_Normal
     0x053740,   # ICZ1BGE_Transition
-    0x053744,   # ICZ1BGE_Intro
+    0x053744,   # terminal inline case
     0x0537A8,   # ICZ1BGE_SnowFall
     0x0537DA,   # ICZ1BGE_Refresh
     0x05380A,   # ICZ1BGE_Refresh2
@@ -3261,16 +3382,16 @@ extra = [
     0x053D5C,   # ICZ2BGE_FromICZ1
     0x053D60,   # ICZ2BGE_Normal
     0x053D64,   # ICZ2BGE_Refresh
-    0x053D68,   # ICZ2BGE_FromICZ1
+    0x053D68,   # terminal inline case
     0x053D78,   # ICZ2BGE_Normal
     0x053E5C,   # ICZ2BGE_Refresh
     0x0541F8,   # LBZ1BGE_Normal
     0x0541FC,   # LBZ1BGE_DoTransition
-    0x054200,   # LBZ1BGE_Normal
+    0x054200,   # terminal inline case
     0x05427C,   # LBZ1BGE_DoTransition
     0x05437C,   # LBZ2SE_FromTransition
     0x054380,   # LBZ2SE_Normal
-    0x054384,   # LBZ2SE_FromTransition
+    0x054384,   # terminal inline case
     0x0543C8,   # LBZ2SE_Normal
     0x05444C,   # LBZ2BGE_FromTransition
     0x054450,   # LBZ2BGE_Refresh
@@ -3278,7 +3399,7 @@ extra = [
     0x054458,   # LBZ2BGE_DeathEgg
     0x05445C,   # LBZ2BGE_PlatformDetach
     0x054460,   # LBZ2BGE_Falling
-    0x054464,   # LBZ2BGE_FromTransition
+    0x054464,   # terminal inline case
     0x054484,   # LBZ2BGE_Refresh
     0x05449A,   # LBZ2BGE_Normal
     0x054508,   # LBZ2BGE_DeathEgg
@@ -3290,11 +3411,20 @@ extra = [
     0x054DA4,   # loc_54E86
     0x054DA8,   # loc_54E9C
     0x054DAC,   # loc_54F64
-    0x054DB0,   # loc_54DB0
+    0x054DB0,   # terminal inline case
     0x054DBE,   # loc_54DBE
     0x054E86,   # loc_54E86
     0x054E9C,   # loc_54E9C
     0x054F64,   # loc_54F64
+    0x05503C,   # loc_55050
+    0x055040,   # loc_55062
+    0x055044,   # loc_55074
+    0x055048,   # loc_55074
+    0x05504C,   # loc_55086
+    0x055050,   # terminal inline case
+    0x055062,   # loc_55062
+    0x055074,   # loc_55074
+    0x055086,   # loc_55086
     0x0551C6,   # loc_551EE
     0x0551CA,   # loc_55236
     0x0551CE,   # loc_55250
@@ -3305,7 +3435,7 @@ extra = [
     0x0551E2,   # loc_5543A
     0x0551E6,   # loc_5545A
     0x0551EA,   # loc_55486
-    0x0551EE,   # loc_551EE
+    0x0551EE,   # terminal inline case
     0x055236,   # loc_55236
     0x055250,   # loc_55250
     0x0552F8,   # loc_552F8
@@ -3322,16 +3452,22 @@ extra = [
     0x055A8E,   # loc_55BCE
     0x055A92,   # loc_55C26
     0x055A96,   # loc_55C84
-    0x055A9A,   # loc_55A9A
+    0x055A9A,   # terminal inline case
     0x055B04,   # loc_55B04
     0x055B70,   # loc_55B70
     0x055BCE,   # loc_55BCE
     0x055C26,   # loc_55C26
     0x055C84,   # loc_55C84
+    0x055F52,   # loc_55F5E
+    0x055F56,   # loc_55F6E
+    0x055F5A,   # loc_55F7C
+    0x055F5E,   # terminal inline case
+    0x055F6E,   # loc_55F6E
+    0x055F7C,   # loc_55F7C
     0x0561CC,   # loc_561D8
     0x0561D0,   # loc_56206
     0x0561D4,   # loc_5621A
-    0x0561D8,   # loc_561D8
+    0x0561D8,   # terminal inline case
     0x056206,   # loc_56206
     0x05621A,   # loc_5621A
     0x05629C,   # loc_562D0
@@ -3347,7 +3483,7 @@ extra = [
     0x0562C4,   # loc_565DE
     0x0562C8,   # loc_56676
     0x0562CC,   # loc_566A4
-    0x0562D0,   # loc_562D0
+    0x0562D0,   # terminal inline case
     0x056300,   # loc_56300
     0x056324,   # loc_56324
     0x056366,   # loc_56366
@@ -3360,35 +3496,61 @@ extra = [
     0x0565DE,   # loc_565DE
     0x056676,   # loc_56676
     0x0566A4,   # loc_566A4
+    0x056744,   # loc_5675C
+    0x056748,   # loc_5678A
+    0x05674C,   # loc_567B0
+    0x056750,   # loc_5680A
+    0x056754,   # loc_5687C
+    0x056758,   # loc_56904
+    0x05675C,   # terminal inline case
+    0x05678A,   # loc_5678A
+    0x0567B0,   # loc_567B0
+    0x05680A,   # loc_5680A
+    0x05687C,   # loc_5687C
+    0x056904,   # loc_56904
     0x0569BA,   # loc_569BA
     0x056BC2,   # loc_56BD2
     0x056BC6,   # loc_56C6E
     0x056BCA,   # loc_56C88
     0x056BCE,   # loc_56CAA
-    0x056BD2,   # loc_56BD2
+    0x056BD2,   # terminal inline case
     0x056C6E,   # loc_56C6E
     0x056C88,   # loc_56C88
     0x056CAA,   # loc_56CAA
+    0x056DFE,   # loc_56E0A
+    0x056E02,   # loc_56E1C
+    0x056E06,   # loc_56E2E
+    0x056E0A,   # terminal inline case
+    0x056E1C,   # loc_56E1C
+    0x056E2E,   # loc_56E2E
     0x057000,   # loc_5700C
     0x057004,   # loc_57040
     0x057008,   # loc_57058
-    0x05700C,   # loc_5700C
+    0x05700C,   # terminal inline case
     0x057040,   # loc_57040
     0x057058,   # loc_57058
     0x0572AE,   # loc_572BA
     0x0572B2,   # loc_57344
     0x0572B6,   # loc_574B0
-    0x0572BA,   # loc_572BA
+    0x0572BA,   # terminal inline case
     0x057344,   # loc_57344
     0x0574B0,   # loc_574B0
     0x05789A,   # loc_578AA
     0x05789E,   # loc_57942
     0x0578A2,   # loc_57960
     0x0578A6,   # loc_579D2
-    0x0578AA,   # loc_578AA
+    0x0578AA,   # terminal inline case
     0x057942,   # loc_57942
     0x057960,   # loc_57960
     0x0579D2,   # loc_579D2
+    0x057EBA,   # loc_57ECA
+    0x057EBE,   # loc_57EDC
+    0x057EC2,   # loc_57F18
+    0x057EC6,   # loc_57F3E
+    0x057ECA,   # terminal inline case
+    0x057EDC,   # loc_57EDC
+    0x057F18,   # loc_57F18
+    0x057F3E,   # loc_57F3E
     0x058AB0,   # loc_58ACC
     0x058AB4,   # loc_58AE0
     0x058AB8,   # loc_58B20
@@ -3396,46 +3558,52 @@ extra = [
     0x058AC0,   # loc_58B9E
     0x058AC4,   # loc_58C42
     0x058AC8,   # loc_58C68
-    0x058ACC,   # loc_58ACC
+    0x058ACC,   # terminal inline case
     0x058AE0,   # loc_58AE0
     0x058B20,   # loc_58B20
     0x058B7C,   # loc_58B7C
     0x058B9E,   # loc_58B9E
     0x058C42,   # loc_58C42
     0x058C68,   # loc_58C68
+    0x059082,   # loc_5908E
+    0x059086,   # loc_590E4
+    0x05908A,   # loc_59194
+    0x05908E,   # terminal inline case
+    0x0590E4,   # loc_590E4
+    0x059194,   # loc_59194
     0x0593A0,   # loc_593A8
     0x0593A4,   # loc_593EC
-    0x0593A8,   # loc_593A8
+    0x0593A8,   # terminal inline case
     0x0593EC,   # loc_593EC
     0x0594A8,   # loc_594B4
     0x0594AC,   # loc_594DA
     0x0594B0,   # loc_594F8
-    0x0594B4,   # loc_594B4
+    0x0594B4,   # terminal inline case
     0x0594DA,   # loc_594DA
     0x0594F8,   # loc_594F8
     0x059526,   # loc_59532
     0x05952A,   # loc_59556
     0x05952E,   # loc_59566
-    0x059532,   # loc_59532
+    0x059532,   # terminal inline case
     0x059556,   # loc_59556
     0x059566,   # loc_59566
     0x0595A0,   # loc_595B0
     0x0595A4,   # loc_595C0
     0x0595A8,   # loc_595EE
     0x0595AC,   # loc_59602
-    0x0595B0,   # loc_595B0
+    0x0595B0,   # terminal inline case
     0x0595C0,   # loc_595C0
     0x0595EE,   # loc_595EE
     0x059602,   # loc_59602
     0x0597A2,   # loc_597AA
     0x0597A6,   # loc_597E4
-    0x0597AA,   # loc_597AA
+    0x0597AA,   # terminal inline case
     0x0597E4,   # loc_597E4
     0x059B0C,   # loc_59B1C
     0x059B10,   # loc_59B46
     0x059B14,   # loc_59B88
     0x059B18,   # loc_59BA4
-    0x059B1C,   # loc_59B1C
+    0x059B1C,   # terminal inline case
     0x059B46,   # loc_59B46
     0x059B88,   # loc_59B88
     0x059BA4,   # loc_59BA4
@@ -3444,23 +3612,37 @@ extra = [
     0x059C54,   # loc_59D02
     0x059C58,   # loc_59D24
     0x059C5C,   # loc_59D74
-    0x059C60,   # loc_59C60
+    0x059C60,   # terminal inline case
     0x059C8C,   # loc_59C8C
     0x059D02,   # loc_59D02
     0x059D24,   # loc_59D24
     0x059D74,   # loc_59D74
     0x059E46,   # loc_59E46
+    0x059E5E,   # loc_59E7A
+    0x059E62,   # loc_59E90
+    0x059E66,   # loc_59EA8
+    0x059E6A,   # loc_59EBE
+    0x059E6E,   # loc_59ED4
+    0x059E72,   # loc_59EE8
+    0x059E76,   # loc_59F00
+    0x059E7A,   # terminal inline case
+    0x059E90,   # loc_59E90
+    0x059EA8,   # loc_59EA8
+    0x059EBE,   # loc_59EBE
+    0x059ED4,   # loc_59ED4
+    0x059EE8,   # loc_59EE8
+    0x059F00,   # loc_59F00
     0x05A214,   # loc_5A224
     0x05A218,   # loc_5A288
     0x05A21C,   # loc_5A2A6
     0x05A220,   # loc_5A30A
-    0x05A224,   # loc_5A224
+    0x05A224,   # terminal inline case
     0x05A288,   # loc_5A288
     0x05A2A6,   # loc_5A2A6
     0x05A30A,   # loc_5A30A
     0x05A492,   # loc_5A49A
     0x05A496,   # loc_5A4C4
-    0x05A49A,   # loc_5A49A
+    0x05A49A,   # terminal inline case
     0x05A4C4,   # loc_5A4C4
     0x05A558,   # loc_5A57C
     0x05A55C,   # loc_5A5B0
@@ -3471,13 +3653,20 @@ extra = [
     0x05A570,   # loc_5A676
     0x05A574,   # loc_5A71A
     0x05A578,   # loc_5A72E
-    0x05A57C,   # loc_5A57C
+    0x05A57C,   # terminal inline case
     0x05A5B0,   # loc_5A5B0
     0x05A5E0,   # loc_5A5E0
     0x05A606,   # loc_5A606
     0x05A61A,   # loc_5A61A
     0x05A662,   # loc_5A662
     0x05A676,   # loc_5A676
+    0x05A696,   # loc_5A69E
+    0x05A698,   # loc_5A6A4
+    0x05A69A,   # loc_5A69E
+    0x05A69C,   # loc_5A6AA
+    0x05A69E,   # terminal inline case
+    0x05A6A4,   # loc_5A6A4
+    0x05A6AA,   # loc_5A6AA
     0x05A71A,   # loc_5A71A
     0x05A72E,   # loc_5A72E
     0x05AAFA,   # loc_5AB36
@@ -3495,7 +3684,7 @@ extra = [
     0x05AB2A,   # loc_5AE90
     0x05AB2E,   # loc_5AEA8
     0x05AB32,   # loc_5AED4
-    0x05AB36,   # loc_5AB36
+    0x05AB36,   # terminal inline case
     0x05AB58,   # loc_5AB58
     0x05AB6E,   # loc_5AB6E
     0x05ABBC,   # loc_5ABBC
@@ -3517,7 +3706,7 @@ extra = [
     0x05AF42,   # loc_5B012
     0x05AF46,   # loc_5B03A
     0x05AF4A,   # loc_5B072
-    0x05AF4E,   # loc_5AF4E
+    0x05AF4E,   # terminal inline case
     0x05AF84,   # loc_5AF84
     0x05AFC4,   # loc_5AFC4
     0x05AFF0,   # loc_5AFF0
@@ -4263,7 +4452,7 @@ extra = [
     0x079C66,   # loc_79CCE
     0x079C6A,   # loc_79CDE
     0x079C6E,   # loc_79CF8
-    0x079C72,   # loc_79C72
+    0x079C72,   # terminal inline case
     0x079CCE,   # loc_79CCE
     0x079CDE,   # loc_79CDE
     0x079CF8,   # loc_79CF8
@@ -4403,6 +4592,12 @@ extra = [
     0x07FEE2,   # loc_7FEE2
     0x07FEF6,   # loc_7FEF6
     0x07FF3E,   # sub_7FF3E
+    0x07FF8E,   # loc_7FF9A
+    0x07FF92,   # loc_7FFB2
+    0x07FF96,   # loc_7FFBC
+    0x07FF9A,   # terminal inline case
+    0x07FFB2,   # loc_7FFB2
+    0x07FFBC,   # loc_7FFBC
     0x07FFD2,   # loc_7FFD2
     0x08001C,   # loc_8001C
     0x080058,   # loc_80058
