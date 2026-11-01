@@ -34,6 +34,7 @@ uint16_t tri_code_to_za(int code);
 static uint8_t s_art[0x10000], s_blocks[0x3000], s_chunks[0x10000], s_layout[0x1000];
 static uint16_t s_pal[64];
 static int s_code = -1, s_ok;
+static int s_aiz_forest;
 static int s_xmin, s_xmax, s_ymin, s_ymax, s_camx;
 static int16_t s_path[0x8000 / PATH_STEP];
 static uint8_t s_lut[512];
@@ -133,6 +134,7 @@ static uint16_t chunk_word(int bg, int x, int y)
 static int pixel(int bg, int x, int y)               /* palette index (line*16+n), 0 = see-through */
 {
     if (bg) { x &= 0x7FFFFFFF; }
+    if(bg && s_aiz_forest && y<0x220)x%=512;
     uint16_t cw = chunk_word(bg, x, y);
     int b = cw & 0x3FF, xf = (cw >> 10) & 1, yf = (cw >> 11) & 1;
     int bx = ((x >> 3) & 1) ^ xf, by = ((y >> 3) & 1) ^ yf;
@@ -265,6 +267,7 @@ static void load_zone(int code)
     memset(&s_cd,0,sizeof s_cd);
     uint16_t za = tri_code_to_za(code);
     int zone = za >> 8, act = za & 0xFF;
+    s_aiz_forest=zone==0 && act==0;
     uint32_t llb, lay, sizes, start;
     if (zone >= TRI_ZONE_BASE) {
         uint32_t dir = tri_dir_for(zone, act);
@@ -294,9 +297,16 @@ static void load_zone(int code)
     memset(s_blocks, 0, sizeof s_blocks);
     memset(s_chunks, 0, sizeof s_chunks);
     uint32_t a0 = tri_rd32(llb) & 0xFFFFFFu, a1 = tri_rd32(llb + 4) & 0xFFFFFFu;
+    /* AIZ1's LLB is the flying intro. The native camera starts at $1308,
+     * where AIZ1_Resize has already installed the forest's replacement art,
+     * blocks and palette. Sampling that forest with the intro bank exposes
+     * missing patterns as the reported diagonal black half-card. Match the
+     * same bank transition used by the expanded world's AizArt snapshots. */
+    if(s_aiz_forest)a1=0x3A944E;
     kosm(a0, s_art, 0, sizeof s_art);
     if (a1 != a0) kosm(a1, s_art, tri_rd16(a0) == 0xA000 ? 0x8000 : tri_rd16(a0), sizeof s_art);
     uint32_t b0 = tri_rd32(llb + 8) & 0xFFFFFFu, b1 = tri_rd32(llb + 12) & 0xFFFFFFu;
+    if(s_aiz_forest)b1=0x3A458A;
     uint32_t n = kos_at(b0, s_blocks, 0, sizeof s_blocks);
     if (b1 != b0) kos_at(b1, s_blocks, n, sizeof s_blocks);
     uint32_t c0 = tri_rd32(llb + 16) & 0xFFFFFFu, c1 = tri_rd32(llb + 20) & 0xFFFFFFu;
@@ -315,6 +325,7 @@ static void load_zone(int code)
     uint32_t src = tri_rd32(pe);
     int dst = (tri_rd16(pe + 4) - 0xFC00) / 2, cnt = (tri_rd16(pe + 6) + 1) * 2;
     for (int k = 0; k < cnt && dst + k < 64; k++) if (dst + k >= 0) s_pal[dst + k] = tri_rd16(src + (uint32_t)k * 2u);
+    if(s_aiz_forest)for(unsigned k=0;k<48;++k)s_pal[16+k]=tri_rd16(0xA8B7C+k*2u);
     s_xmin = (int16_t)tri_rd16(sizes);
     s_xmax = (int16_t)tri_rd16(sizes + 2);
     s_ymin = (int16_t)tri_rd16(sizes + 4);
