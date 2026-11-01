@@ -24,6 +24,8 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
        S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
+       S3_MENU_BG_MAP=0x19D2A2,
+       S3_TITLE_PLANE_SIZE=0x11,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374 };
@@ -33,6 +35,8 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
        S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
+       S3_MENU_BG_MAP=0x39D2A2,
+       S3_TITLE_PLANE_SIZE=1,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C };
@@ -306,6 +310,71 @@ static int file_select_layout(const GVDP *v)
     return (v->reg[12]&1) && (v->reg[2]&56)==0x38 && (v->reg[3]&62)==0x38 &&
         (v->reg[4]&7)==6 && v->reg[18]==0x80 && (v->reg[16]&3)==3;
 }
+enum { MENU_NONE, MENU_TITLE_ANIMATION, MENU_TITLE, MENU_SAVE, MENU_COMPETITION };
+static int s_frame_menu;
+static int title_layout(const GVDP *v)
+{
+    /* TitleAnim_FlipBuffer displays either name table through BOTH planes;
+     * only the completed title splits actor A and scenery B again. */
+    unsigned a=v->reg[2]&56,b=v->reg[4]&7;
+    return (v->reg[12]&1) && (a==0x30 || a==0x38) && (b==6 || b==7) &&
+        v->reg[16]==S3_TITLE_PLANE_SIZE && (v->reg[11]&3)==3 && !v->reg[18];
+}
+static int competition_layout(const GVDP *v)
+{
+    return (v->reg[12]&1) && (v->reg[2]&56)==0x30 &&
+        (v->reg[4]&7)==7 && v->reg[16]==0x11 && !(v->reg[11]&3) && !v->reg[18];
+}
+static int menu_raster_enabled(const GVDP *v)
+{
+    int mode=g_ram[0xF600]&127;
+    int menu=mode==4 || mode==0x38 || mode==0x3C || mode==0x40 || mode==0x44 || mode==0x4C;
+    return (menu || s_frame_menu) &&
+        (file_select_layout(v) || title_layout(v) || competition_layout(v));
+}
+
+/* SaveScreen overwrites the background name table with its finite carousel.
+ * Reconstruct the unobscured, original 40x28 scenery map, using the same ROM
+ * data and resident guest patterns. No guest upload or art replacement occurs. */
+typedef struct { const uint8_t *p; unsigned bit,limit; int error; } MenuBits;
+static unsigned menu_bits(MenuBits *b,unsigned count)
+{
+    unsigned value=0;
+    while(count--) {
+        if(b->bit>=b->limit){b->error=1;return 0;}
+        value=value*2+((b->p[b->bit/8]>>(7-b->bit%8))&1);++b->bit;
+    }
+    return value;
+}
+static unsigned menu_eni_value(MenuBits *b,unsigned width,unsigned flags)
+{
+    unsigned value=0;
+    for(int i=4;i>=0;--i)if(flags&(1u<<i))value|=menu_bits(b,1)<<(11+i);
+    return value+menu_bits(b,width);
+}
+static uint16_t s_menu_map[40*28];
+static int s_menu_map_ready;
+static int load_menu_map(void)
+{
+    if(s_menu_map_ready)return 1;
+    const uint8_t *p=g_rom+S3_MENU_BG_MAP;
+    if(!p[0] || p[0]>11 || p[1]>31)return 0;
+    MenuBits b={p,48,0x202*8,0};unsigned n=0,inc=(p[2]<<8)|p[3],common=(p[4]<<8)|p[5];
+    while(!b.error) {
+        unsigned mode=menu_bits(&b,1)?4+menu_bits(&b,2):menu_bits(&b,1);
+        unsigned count=menu_bits(&b,4)+1;
+        if(mode==7 && count==16){s_menu_map_ready=n==40*28;return s_menu_map_ready;}
+        if(count>40*28-n)return 0;
+        unsigned value=mode==0?inc:mode==1?common:mode==7?0:menu_eni_value(&b,p[0],p[1]);
+        while(count--) {
+            s_menu_map[n++]=(uint16_t)((mode==7?menu_eni_value(&b,p[0],p[1]):value)+1);
+            if(mode==0 || mode==5)++value;
+            if(mode==6)--value;
+        }
+        if(mode==0)inc=value;
+    }
+    return 0;
+}
 
 /* Enhanced scene data lives on the host: no SAT coordinate wrap, 80-piece
  * ceiling, or 20-sprites-per-line ceiling. Native BuildSprites still executes
@@ -318,6 +387,7 @@ typedef struct {
     unsigned count, serial;
     uint8_t sat[640];
     int scene; /* 1 level, 2 special, 3 native bonus, 0 menu */
+    int title; /* provenance survives Game_mode's outgoing fade transition */
     int camera_x, camera_y; /* coordinates used when capturing world sprites */
 } SceneFrame;
 static SceneFrame s_build, s_history[3], s_display_frame;
@@ -397,6 +467,7 @@ static void scene_mode_changed(int was_enabled)
 {
     if(was_enabled!=enabled()) {
         s_display=NULL;s_display_frame.serial=0;
+        s_frame_menu=MENU_NONE;s_frame_level=0;
         for(unsigned n=0;n<3;++n)s_history[n].serial=0;
     }
     /* Once adopted, the host loader also maintains a native-width window
@@ -531,6 +602,7 @@ static void capture_objects(void)
 {
     s_build.count=0;s_visible_count=0;++s_scene_tick;
     s_build.scene=bonus_stage()?3:level_ready()?1:0;
+    s_build.title=!s_build.scene && (g_ram[0xF600]&127)==4;
     /* These stages stream machine/reel art independently of world layouts.
      * Publish only their native SAT identity so entry/exit fades retain the
      * correct composition; never add ordinary stage rings or mappings. */
@@ -605,7 +677,7 @@ static void publish_sprites(void)
     }
     s_build.serial=++s_serial;memcpy(s_build.sat,g_ram+0xF800,640);
     SceneFrame *dst=&s_history[s_serial%3];
-    dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;
+    dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     memcpy(dst->sat,s_build.sat,640);
     memcpy(dst->sprites,s_build.sprites,s_build.count*sizeof(SceneSprite));
@@ -644,8 +716,11 @@ static uint8_t *s_priority;
 static int s_priority_capacity;
 static S3VideoActorOverlay s_actor_overlay;
 void s3_video_set_actor_overlay(S3VideoActorOverlay draw) { s_actor_overlay=draw; }
-static void select_scene(const GVDP *v)
+static void select_scene(const GVDP *v,int retain_level)
 {
+    if(retain_level && s_display_frame.serial && s_display_frame.scene==1) {
+        s_display=&s_display_frame;++s_scene_holds;return;
+    }
     s_display=NULL;
     unsigned sat=(v->reg[5]&127u)<<9;
     /* Keep the front buffer's publication alive even if the producer cycles
@@ -671,6 +746,7 @@ static void select_scene(const GVDP *v)
     /* Keep the selected front buffer immutable for all displayed scanlines. */
     if(s_display && s_display!=&s_display_frame) {
         s_display_frame.count=s_display->count;s_display_frame.scene=s_display->scene;
+        s_display_frame.title=s_display->title;
         s_display_frame.serial=s_display->serial;
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
         memcpy(s_display_frame.sat,s_display->sat,sizeof s_display_frame.sat);
@@ -719,8 +795,8 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             if(!p)continue;
             s_priority[x]|=2;
             /* extended sprite lines (game-added art keeping its own colours) */
-            int ext=p<16?gvdp_sprite_pattern_line(s->size,cell&2047u):0;
-            uint32_t c=ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,p),GENESIS_DAC_NORMAL):palette[p];
+            int ext=gvdp_sprite_palette_line(s->size,cell&2047u,p>>4);
+            uint32_t c=ext?genesis_dac_cram_to_argb(gvdp_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):palette[p];
             if(s->hud==1 || s->hud==2 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
         }
     }
@@ -750,9 +826,67 @@ static void aiz_palette(const AizArt *art,const GVDP *v,uint32_t *out)
     }
 }
 
+static unsigned menu_plane(uint16_t attr,unsigned pixel)
+{ return pixel?(pixel|64u|((attr&0x8000u)?128u:0u)):0; }
+static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
+                        const uint32_t *palette,const GVDPRasterRow *raster)
+{
+    int origin=(width-nw)/2;
+    unsigned hsbase=(v->reg[13]&63u)<<10;
+    int hs_b=(int16_t)vram16(v,hsbase+2);
+    int clean_save=s_frame_menu==MENU_SAVE && load_menu_map();
+    for(int x=0;x<width;++x) {
+        int nx=x-origin,sx=(int)((int64_t)x*nw/width);
+        unsigned a=0,b=0,sp=0,opaque=0,high=0,shadow_op=0,hilite_op=0;
+        if(s_frame_menu==MENU_SAVE) {
+            /* The decoration fills the canvas. Every card and portrait stays
+             * at its original scale, including the full 1024px carousel. */
+            if(clean_save && line<224) {
+                uint16_t attr=s_menu_map[line/8*40+sx/8];
+                b=menu_plane(attr,pattern_pixel(v,attr,sx,line));
+            } else b=raster->plane_b[sx];
+            int bx=nx-hs_b;
+            if(bx>=0 && bx<1024) {
+                uint16_t attr=plane_attr(v,0xC000,bx,line+(v->vsram[1]&1023));
+                if((attr&2047u)>=0x29Fu) {
+                    unsigned p=pattern_pixel(v,attr,bx,line+(v->vsram[1]&1023));
+                    if(p)b=menu_plane(attr,p);
+                }
+            }
+        } else if(s_frame_menu!=MENU_TITLE_ANIMATION) {
+            b=raster->plane_b[sx];
+        }
+        if(nx>=0 && nx<nw) {
+            a=raster->plane_a[nx];
+            if(s_frame_menu==MENU_TITLE_ANIMATION)b=raster->plane_b[nx];
+            sp=raster->sprite[nx];opaque=raster->opaque[nx];high=raster->high[nx];
+            shadow_op=raster->shadow_op[nx];hilite_op=raster->hilite_op[nx];
+        }
+        unsigned ah=(a&192u)==192u,bh=(b&192u)==192u,sh=high&&opaque;
+        unsigned pixel=sh?sp:ah?a&63u:bh?b&63u:opaque?sp:
+            (a&64u)?a&63u:(b&64u)?b&63u:raster->backdrop;
+        unsigned shade=GENESIS_DAC_NORMAL;
+        if(raster->shadow_mode && pixel<64) {
+            int dark=!(ah||bh||sh);
+            if(shadow_op)dark=1;
+            if(hilite_op){if(dark)dark=0;else shade=GENESIS_DAC_HIGHLIGHT;}
+            if(dark)shade=GENESIS_DAC_SHADOW;
+        }
+        out[x]=pixel>=GVDP_HOST_PALETTE_BASE?raster->host_palette[pixel-GVDP_HOST_PALETTE_BASE]:
+            shade==GENESIS_DAC_NORMAL?palette[pixel]:
+            genesis_dac_cram_to_argb(v->cram[pixel],(int)shade);
+        s_priority[x]=(uint8_t)((ah||bh)|(opaque?2u:0u));
+    }
+    draw_scene_sprites(v,line,out,width,origin,palette);
+    if((s_frame_menu==MENU_TITLE || s_frame_menu==MENU_TITLE_ANIMATION) && s_actor_overlay)
+        s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
+    if(!line){++s_frames;s_native_x=origin;}
+}
+
 static void render_scanline(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
-                            GameVideoNativeRow native_row, void *native_ctx)
+                            GameVideoNativeRow native_row, void *native_ctx,
+                            const GVDPRasterRow *raster)
 {
     /* Publish one immutable art/scroll snapshot per frame. Palettes stay
      * live so water-line HBlank colour changes are retained. */
@@ -764,35 +898,56 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         if(palette[i]!=palette[0])uniform_palette=0;
     }
     if(line==0) {
+        /* A mode-changing exit can publish a menu-tagged copy of the same
+         * SAT before its old level fades. Keep the installed level through
+         * that fade while its plane configuration remains unchanged; a flat
+         * palette or disabled display retires it before the next screen. */
+        int retain_level=s_frame_level && !level_ready() && !uniform_palette &&
+            (v->reg[1]&64) && !bonus_stage() &&
+            (!((g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48) || !(v->reg[12]&8)) &&
+            v->reg[2]==s_video_frame.reg[2] && v->reg[4]==s_video_frame.reg[4] &&
+            v->reg[16]==s_video_frame.reg[16];
+        select_scene(v,retain_level);
         memcpy(&s_video_frame,v,sizeof s_video_frame);
-        memcpy(s_world_frame,g_ram,sizeof s_world_frame);
-        if(s_world_publish)s_world_publish(s_world_frame);
+        s_frame_bonus=bonus_stage() || (s_display && s_display->scene==3);
         /* HUD visibility is not level readiness: AIZ hides it for the whole
          * landing/emerald cutscene while displaying the real stage planes. */
-        s_frame_level=level_ready();
-        /* The native special-stage exit changes mode before its 60-frame
-         * fade. Keep the globe until its shadow/highlight video mode ends. */
-        s_frame_special=(g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48 ||
-            (s_frame_special && (v->reg[12]&8) && (v->reg[1]&64));
-        s_frame_zone=g_ram[0xFE10];
-        s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
-        s_frame_tree_reveal=ram16(0xEEC4);
-        if(s_frame_level && !s_frame_zone && !s_frame_act)load_aiz_art();
-        /* The intro queues the main-level block definitions before its
-         * two-row-at-a-time name-table refresh. Keep the outgoing background
-         * definitions intact while Kosinski is overwriting their RAM. */
-        int replacing_intro=s_frame_level && s_frame_zone==0 && s_frame_act==0 &&
-            s_frame_bg_event==0 && ram16(0xEEC6);
-        if(!replacing_intro)memcpy(s_background_frame,s_world_frame,sizeof s_background_frame);
-        s_frame_fg_x=ram16(0xEE80);s_frame_fg_y=ram16(0xEE84);s_frame_bg_y=ram16(0xEE90);
-        /* Draw_BG records each completed coarse draw position in the
-         * second word. The first word can already hold the next deformation
-         * while the game fiber is still preparing its tile-column update. */
-        s_frame_bg_band[0]=(int16_t)ram16(0xA802);
-        s_frame_bg_band[1]=(int16_t)ram16(0xA806);
-        if(s_bg_draw_ready && s_bg_draw_zone==ram16(0xFE10)) {
-            s_frame_bg_band[0]=s_bg_draw_at_vblank[0];
-            s_frame_bg_band[1]=s_bg_draw_at_vblank[1];
+        /* Special-stage mode is selected before the outgoing level fades.
+         * Its projection starts when native SHI video is installed; the exit
+         * likewise retains that projection until the video mode ends. */
+        s_frame_special=(v->reg[12]&8) && (v->reg[1]&64) &&
+            ((g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48 || s_frame_special);
+        int ready=level_ready();
+        /* The title entry clears Current_zone before fading the old level.
+         * Keep its published world/camera as well as its composition until
+         * the native SAT is replaced. CRAM continues to follow every fade. */
+        int hold_level=!ready && !uniform_palette && s_frame_level && s_display && s_display->scene==1 &&
+            (v->reg[1]&64) && !s_frame_special && !s_frame_bonus &&
+            !file_select_layout(v) && !competition_layout(v);
+        s_frame_level=ready || hold_level;
+        if(!hold_level) {
+            memcpy(s_world_frame,g_ram,sizeof s_world_frame);
+            if(s_world_publish)s_world_publish(s_world_frame);
+            s_frame_zone=g_ram[0xFE10];
+            s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
+            s_frame_tree_reveal=ram16(0xEEC4);
+            if(s_frame_level && !s_frame_zone && !s_frame_act)load_aiz_art();
+            /* The intro queues the main-level block definitions before its
+             * two-row-at-a-time name-table refresh. Keep the outgoing background
+             * definitions intact while Kosinski is overwriting their RAM. */
+            int replacing_intro=s_frame_level && s_frame_zone==0 && s_frame_act==0 &&
+                s_frame_bg_event==0 && ram16(0xEEC6);
+            if(!replacing_intro)memcpy(s_background_frame,s_world_frame,sizeof s_background_frame);
+            s_frame_fg_x=ram16(0xEE80);s_frame_fg_y=ram16(0xEE84);s_frame_bg_y=ram16(0xEE90);
+            /* Draw_BG records each completed coarse draw position in the
+             * second word. The first word can already hold the next deformation
+             * while the game fiber is still preparing its tile-column update. */
+            s_frame_bg_band[0]=(int16_t)ram16(0xA802);
+            s_frame_bg_band[1]=(int16_t)ram16(0xA806);
+            if(s_bg_draw_ready && s_bg_draw_zone==ram16(0xFE10)) {
+                s_frame_bg_band[0]=s_bg_draw_at_vblank[0];
+                s_frame_bg_band[1]=s_bg_draw_at_vblank[1];
+            }
         }
         s_width=width;s_requested_width=width;
         s_terrain_checks=s_terrain_errors=s_bg_checks=s_bg_errors=s_bg_unstreamed=0;
@@ -803,8 +958,15 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
             uint8_t *p=(uint8_t *)realloc(s_priority,(size_t)width);
             if(p){s_priority=p;s_priority_capacity=width;}
         }
-        select_scene(v);
-        s_frame_bonus=bonus_stage() || (s_display && s_display->scene==3);
+        s_frame_menu=MENU_NONE;
+        if(!s_frame_level && !s_frame_special && !s_frame_bonus) {
+            if(file_select_layout(v))s_frame_menu=MENU_SAVE;
+            else if(competition_layout(v))s_frame_menu=MENU_COMPETITION;
+            else if(title_layout(v) && ((g_ram[0xF600]&127)==4 ||
+                    (s_display && !s_display->scene && s_display->title)))
+                s_frame_menu=ram16(0xFFAE) || (ram16(0xFFBE)>=12 &&
+                    ((v->reg[2]&56u)<<10)!=((v->reg[4]&7u)<<13))?MENU_TITLE:MENU_TITLE_ANIMATION;
+        }
     }
     v=&s_video_frame;
     if(s_frame_bonus) {
@@ -832,13 +994,31 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
     /* Display-off/fades fill the same full-width canvas, not black sidebars.
      * A rare unsupported mode also retains the selected output dimensions. */
     if((nw!=320 && nw!=256) || !(v->reg[1]&64) || (v->reg[12]&6) ||
-       ((v->reg[12]&8) && !s_frame_special) || s_priority_capacity<width) {
+       ((v->reg[12]&8) && !s_frame_special && !s_frame_menu) || s_priority_capacity<width) {
         if(!native)native=native_row(native_ctx);
         uint32_t fill=!(v->reg[1]&64)?native[0]:backdrop;
         for(int x=0;x<width;++x)out[x]=fill;
         int x0=(width-nw)/2;
         if(x0>=0)memcpy(out+x0,native,(size_t)nw*sizeof(uint32_t));
         if(line==0){++s_fallbacks;s_native_x=x0;}
+        return;
+    }
+    if(s_frame_menu && raster && raster->display && raster->width==(unsigned)nw && raster->start==0) {
+        render_menu(v,line,nw,out,width,palette,raster);
+        return;
+    }
+    if(s_frame_menu) {
+        /* Private host art/palette providers retain their native renderer.
+         * Without its explicit layer masks, never infer transparency from
+         * final colors or stretch its UI. The lazy native image is memoized. */
+        if(!native)native=native_row(native_ctx);
+        int origin=(width-nw)/2;
+        for(int x=0;x<width;++x){out[x]=backdrop;s_priority[x]=0;}
+        if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof *out);
+        draw_scene_sprites(v,line,out,width,origin,palette);
+        if((s_frame_menu==MENU_TITLE || s_frame_menu==MENU_TITLE_ANIMATION) && s_actor_overlay)
+            s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
+        if(!line){++s_frames;s_native_x=origin;}
         return;
     }
     unsigned hsbase=(v->reg[13]&63u)<<10;
@@ -869,7 +1049,10 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
     int camera=level?unwrap(-hs_a,s_frame_fg_x):ram16(0xEE78);
     int camera_y=unwrap(v->vsram[0],s_frame_fg_y);
     if(line==0) {
-        if(level)s_stage_width=stage_width();
+        if(level) {
+            int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
+            s_stage_width=stage>=320 && stage<=32768?stage:320;
+        }
         /* HScroll/VScroll include heat and underwater deformation. Those
          * offsets belong to the planes, never to the object camera or the
          * bounded viewport. Keep sampling the deformed planes below while
@@ -1159,12 +1342,12 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
 
 static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)
 {
-    render_scanline(v,line,native,nw,out,width,NULL,NULL);
+    render_scanline(v,line,native,nw,out,width,NULL,NULL,NULL);
 }
 static void scanline_lazy(const GVDP *v,int line,int nw,uint32_t *out,int width,
-                          GameVideoNativeRow native_row,void *native_ctx)
+                          GameVideoNativeRow native_row,void *native_ctx,const GVDPRasterRow *raster)
 {
-    render_scanline(v,line,NULL,nw,out,width,native_row,native_ctx);
+    render_scanline(v,line,NULL,nw,out,width,native_row,native_ctx,raster);
 }
 
 void s3_video_command(int id, const char *json)
@@ -1240,4 +1423,4 @@ static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int 
     (void)v;
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
-const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline, scanline_lazy };
+const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline, NULL, menu_raster_enabled, scanline_lazy };

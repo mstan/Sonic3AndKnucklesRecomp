@@ -11,6 +11,7 @@ const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
     return *bytes?test_atlas:NULL;
 }
 int gvdp_sprite_pattern_line(unsigned flags,unsigned tile) { (void)flags;return gvdp_ext_line(tile); }
+int gvdp_sprite_palette_line(unsigned flags,unsigned tile,unsigned source) { (void)source;return gvdp_sprite_pattern_line(flags,tile); }
 uint16_t gvdp_ext_color(int row,int line,int nib) { (void)row;(void)line;(void)nib;return 0; }
 M68KState g_cpu;
 void m68k_write8(uint32_t a,uint8_t v){g_ram[a&65535]=v;}
@@ -104,7 +105,7 @@ static void test_native_bonus(void)
         memcpy(before,g_ram,sizeof before);
         for(int y=0;y<224;y++) {
             for(int x=0;x<320;x++)native[x]=0xFF000000u|((unsigned)y<<16)|(unsigned)x;
-            native_row_calls=0;scanline_lazy(&v,y,320,out,796,test_native_row,native);
+            native_row_calls=0;scanline_lazy(&v,y,320,out,796,test_native_row,native,NULL);
             CHECK(native_row_calls==1);
             for(int x=0;x<796;x++)CHECK(out[x]==(x>=238 && x<558?native[x-238]:0xFF000000u));
         }
@@ -121,6 +122,7 @@ static void test_native_bonus(void)
 static void test_file_select(void)
 {
     static GVDP v;
+    GVDPRasterRow raster={0};raster.width=raster.count=320;raster.display=1;
     static uint8_t before[65536];
     uint32_t native[320],out[1792];
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
@@ -130,11 +132,14 @@ static void test_file_select(void)
     v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=3;
     v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;
     for(unsigned tile=1;tile<=4;++tile)memset(v.vram+tile*32,tile*17,32);
+    memset(v.vram+0x29F*32,0x33,32);
     for(unsigned row=0;row<2;++row) {
         for(unsigned col=0;col<40;++col)word(v.vram,0xE000+row*128+col*2,col<20?1:2);
-        word(v.vram,0xC000+row*256+2,0x8003);
-        word(v.vram,0xC000+row*256+252,0x8003);
+        word(v.vram,0xC000+row*256+2,0x829F);
+        word(v.vram,0xC000+row*256+252,0x829F);
     }
+    for(unsigned n=0;n<40*28;++n)s_menu_map[n]=(n%40)<20?1:2;
+    s_menu_map_ready=1;
     for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
     /* Capture a native-queued multi-sprite crossing the right edge and its
      * offscreen child; no SAT wrapping and no extra writes to guest state. */
@@ -154,24 +159,117 @@ static void test_file_select(void)
     for(unsigned w=0;w<sizeof widths/sizeof widths[0];++w)for(int scroll=0;scroll<=704;scroll+=352) {
         int canvas=widths[w],origin=(canvas-320)/2;
         word(v.vram,0xF002,(unsigned)-scroll);
-        scanline(&v,0,native,320,out,canvas);
+        memset(raster.plane_a,0,sizeof raster.plane_a);
+        memset(raster.opaque,0,sizeof raster.opaque);
+        for(unsigned x=316;x<320;x++){raster.opaque[x]=raster.high[x]=1;raster.sprite[x]=4;}
+        native_row_calls=0;
+        scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+        CHECK(!native_row_calls && s_frame_menu==MENU_SAVE && menu_raster_enabled(&v));
         for(int x=0;x<canvas;++x) {
             int nx=x-origin;
-            if(nx>=0 && nx<320)CHECK(out[x]==native[nx]);
             if((nx>=320 && nx<324)||(nx>=330 && nx<338))CHECK(out[x]==0xFFFFFFFF);
         }
-        scanline(&v,8,native,320,out,canvas);
+        memset(raster.opaque,0,sizeof raster.opaque);
+        for(unsigned x=80;x<88;x++)raster.plane_a[x]=0xC3;
+        scanline_lazy(&v,8,320,out,canvas,test_native_row,native,&raster);
         for(int x=0;x<canvas;++x) {
             int nx=x-origin,card=nx+scroll;
-            /* The original portrait appears once. Margins extend only its
-             * edge colours; neither the face nor its text is reflected. */
-            uint32_t bg=nx<160?0xFFFF0000:0xFF00FF00;
-            uint32_t expected=nx>=0 && nx<320?native[nx]:
-                ((card>=8 && card<16)||(card>=1008 && card<1016))?0xFF0000FF:bg;
+            /* Stretch only unobscured scenery. The eight-pixel portrait and
+             * every carousel card remain eight pixels at every canvas size. */
+            uint32_t bg=(int64_t)x*320/canvas<160?0xFFFF0000:0xFF00FF00;
+            uint32_t expected=(nx>=80 && nx<88)||(card>=8 && card<16)||
+                (card>=1008 && card<1016)?0xFF0000FF:bg;
             CHECK(out[x]==expected);
         }
     }
     CHECK(!memcmp(before,g_ram,sizeof before));
+    s_menu_map_ready=0;
+}
+static void test_menu_layers(void)
+{
+    static GVDP v;static uint8_t before[65536];
+    GVDPRasterRow raster={0},saved;uint32_t out[1792],native[320]={0};
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("fit"));
+    g_ram[0xF600]=4;word(g_ram,0xFFBE,12);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[16]=S3_TITLE_PLANE_SIZE;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;
+    memset(&s_build,0,sizeof s_build);s_build.title=1;publish_sprites();
+    raster.width=raster.count=320;raster.display=1;
+    for(unsigned x=0;x<320;x++)raster.plane_b[x]=(uint8_t)(64+(x<160?1:2));
+    for(unsigned x=80;x<88;x++)raster.plane_a[x]=0xC3;
+    /* Red foreground over red native scenery is still opaque when the
+     * widened scenery under it becomes green. Final-color equality is not
+     * an opacity mask. All foreground/sprite spans retain eight pixels. */
+    for(unsigned x=280;x<288;x++)raster.plane_a[x]=0xC1;
+    for(unsigned x=200;x<208;x++) {
+        raster.sprite[x]=4;raster.opaque[x]=raster.high[x]=1;
+    }
+    saved=raster;memcpy(before,g_ram,sizeof before);
+    const int widths[]={320,398,523,796,1792};
+    for(unsigned i=0;i<sizeof widths/sizeof widths[0];i++) {
+        int canvas=widths[i],origin=(canvas-320)/2;
+        for(unsigned phase=0;phase<3;phase++) {
+            /* A new mode is selected before the outgoing title fades. The
+             * installed planes/SAT retain composition, including all edges. */
+            g_ram[0xF600]=(uint8_t)(phase?0x4C:4);
+            v.cram[1]=(uint16_t)(phase==2?6:14);
+            native_row_calls=0;
+            scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+            CHECK(!native_row_calls && s_frame_menu==MENU_TITLE);
+            for(int x=0;x<canvas;x++) {
+                int nx=x-origin,sx=(int)((int64_t)x*320/canvas);
+                unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:
+                    nx>=200&&nx<208?4:sx<160?1:2;
+                CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],GENESIS_DAC_NORMAL));
+            }
+        }
+        /* Early title B is the other page of Sonic's animation. Keep both
+         * actor planes centered so neither page repeats into the margins. */
+        g_ram[0xF600]=4;word(g_ram,0xFFBE,1);v.cram[1]=14;
+        scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+        CHECK(s_frame_menu==MENU_TITLE_ANIMATION);
+        for(int x=0;x<canvas;x++) {
+            int nx=x-origin;
+            unsigned p=nx<0||nx>=320?0:nx>=80&&nx<88?3:nx>=280&&nx<288?1:
+                nx>=200&&nx<208?4:nx<160?1:2;
+            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],GENESIS_DAC_NORMAL));
+        }
+        word(g_ram,0xFFBE,12);
+        /* Every native page-flip pairing is still finite actor art, even
+         * when the next frame counter has already advanced to twelve. */
+        for(unsigned table=0;table<2;table++) {
+            v.reg[2]=(uint8_t)(table?0x38:0x30);v.reg[4]=(uint8_t)(table?7:6);
+            scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+            CHECK(s_frame_menu==MENU_TITLE_ANIMATION && menu_raster_enabled(&v));
+            if(canvas>320)CHECK(out[0]==0xFF000000u && out[canvas-1]==0xFF000000u);
+        }
+        v.reg[2]=0x30;v.reg[4]=7;
+        /* Competition's native shadow/highlight is composed for the whole
+         * canvas. High-priority UI and actors retain normal brightness. */
+        g_ram[0xF600]=0x40;v.reg[11]=0;v.reg[12]=9;v.reg[16]=0x11;raster.shadow_mode=1;
+        scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+        CHECK(s_frame_menu==MENU_COMPETITION);
+        for(int x=0;x<canvas;x++) {
+            int nx=x-origin,sx=(int)((int64_t)x*320/canvas);
+            int ui=(nx>=80&&nx<88)||(nx>=280&&nx<288)||(nx>=200&&nx<208);
+            unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:nx>=200&&nx<208?4:sx<160?1:2;
+            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],ui?GENESIS_DAC_NORMAL:GENESIS_DAC_SHADOW));
+        }
+        v.reg[11]=3;v.reg[12]=1;v.reg[16]=S3_TITLE_PLANE_SIZE;raster.shadow_mode=0;
+    }
+    g_ram[0xF600]=4;
+    CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&saved,&raster,sizeof raster));
+    raster.sprite[200]=GVDP_HOST_PALETTE_BASE+1;raster.host_palette[1]=0xFF123456u;
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,&raster);
+    CHECK(out[238+200]==0xFF123456u); /* private menu art/color stays native size */
+    /* A loading level may share title register geometry and publish an
+     * empty scene. Only an actual title publication can retain title mode. */
+    memset(&s_build,0,sizeof s_build);publish_sprites();g_ram[0xF600]=0x8C;
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,&raster);
+    CHECK(s_frame_menu==MENU_NONE);
+    CHECK(configure("off"));
 }
 static int extended_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
@@ -211,12 +309,34 @@ static void test_world_snapshot(void)
     g_ram[0xFE10]=0x20;g_ram[0xFFF0]=0;
     scanline(&v,1,native,320,out,398);CHECK(out[0]==0xFFFF0000);
     uint32_t lazy[398];native_row_calls=0;
-    scanline_lazy(&v,1,320,lazy,398,test_native_row,native);
+    scanline_lazy(&v,1,320,lazy,398,test_native_row,native,NULL);
     CHECK(!native_row_calls && !memcmp(out,lazy,sizeof out));
+    /* Title entry resets the live zone before fading the old SAT. Keep the
+     * published world and its camera across that transition, using live CRAM. */
+    g_ram[0xF600]=4;g_ram[0xFE10]=0;word(g_ram,0xEE80,0x1234);
+    /* The producer can tag the same still-installed SAT as title before
+     * its outgoing palette fade. Its previous level publication survives. */
+    memset(&s_build,0,sizeof s_build);s_build.title=1;publish_sprites();
+    uint8_t published[65536];memcpy(published,s_world_frame,sizeof published);
+    scanline(&v,0,native,320,lazy,398);
+    CHECK(s_frame_level && s_frame_zone==0x34 && !memcmp(published,s_world_frame,sizeof published));
+    CHECK(!memcmp(out,lazy,sizeof out));
+    /* A giant ring selects SpecialStage while the outgoing world still
+     * fades to white. Retire the wide world only once native SHI is installed. */
+    g_ram[0xF600]=0x34;native_row_calls=0;
+    scanline_lazy(&v,0,320,lazy,398,test_native_row,native,NULL);
+    CHECK(s_frame_level && !s_frame_special && !native_row_calls && !memcmp(out,lazy,sizeof out));
+    for(unsigned i=0;i<64;i++)v.cram[i]=0xEEE;
+    scanline_lazy(&v,0,320,lazy,398,test_native_row,native,NULL);
+    for(unsigned i=0;i<398;i++)CHECK(lazy[i]==0xFFFFFFFFu);
+    v.reg[12]=9;native_row_calls=0;
+    scanline_lazy(&v,0,320,lazy,398,test_native_row,native,NULL);
+    CHECK(s_frame_special && native_row_calls==1);
+    memset(v.cram,0,sizeof v.cram);v.cram[1]=14;g_ram[0xF600]=4;
     /* An unsupported mode must fetch the original row exactly once and
      * produce the same centered image as the eager entry point. */
     v.reg[12]=7;scanline(&v,0,native,320,out,398);native_row_calls=0;
-    scanline_lazy(&v,0,320,lazy,398,test_native_row,native);
+    scanline_lazy(&v,0,320,lazy,398,test_native_row,native,NULL);
     CHECK(native_row_calls==1 && !memcmp(out,lazy,sizeof out));
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
@@ -227,8 +347,8 @@ static void test_hud_object_anchor(void)
     static GVDP v;uint32_t out[398],pal[64]={0};
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
     CHECK(configure("off"));CHECK(configure("fit"));
-    write32(0xB0DE,0x1234);write32(0xB0DE+0xC,0x6000);
-    word(g_ram,0xB0DE+0x10,128+68);word(g_ram,0xB0DE+0x14,128+210);
+    write32(0xB0DE,0x1234);write32(0xB0DE + 0xC,0x6000);
+    word(g_ram,0xB0DE + 0x10,128+68);word(g_ram,0xB0DE + 0x14,128+210);
     word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB0DE);
     word(g_rom,0x6000,2);word(g_rom,0x6002,1);word(g_rom,0x6004,0);
     word(g_rom,0x6006,0);word(g_rom,0x6008,0);
@@ -339,6 +459,9 @@ int main(int argc,char **argv)
     if(argc==2) {
         FILE *rom=fopen(argv[1],"rb");CHECK(rom);
         CHECK(fread(g_rom,1,sizeof g_rom,rom)==S3_ART_BANK+0x200000u);fclose(rom);
+        CHECK(load_menu_map());
+        for(unsigned n=0;n<40*28;n++)CHECK((s_menu_map[n]&2047u)<0x29Fu);
+        s_menu_map_ready=0;
         load_aiz_art();CHECK(s_aiz_art_ready);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
@@ -633,6 +756,7 @@ int main(int argc,char **argv)
     }
     /* A queued title plane survives native 4:3 sprite culling. Paint only
      * its extensions; the authoritative native title pixels stay intact. */
+    CHECK(configure("off"));CHECK(configure("32:9"));
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
     g_ram[0xF600]=4;v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;
     v.reg[5]=0x7C;v.reg[12]=1;v.reg[16]=1;v.cram[1]=0xE;
@@ -671,7 +795,7 @@ int main(int argc,char **argv)
             for(int x=0;x<320;++x)ss_native[x]=0xFF000000u|((unsigned)y<<16)|((unsigned)x*193u);
             ss_output[0]=ss_output[canvas+1]=0xDEADBEEFu;
             native_row_calls=0;
-            scanline_lazy(&v,y,320,ss_output+1,canvas,test_native_row,ss_native);
+            scanline_lazy(&v,y,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
             CHECK(native_row_calls==1 && ss_output[0]==0xDEADBEEFu && ss_output[canvas+1]==0xDEADBEEFu);
             scanline(&v,y,ss_native,320,ss_eager,canvas);
             CHECK(!memcmp(ss_eager,ss_output+1,(size_t)canvas*sizeof *ss_eager));
@@ -682,10 +806,10 @@ int main(int argc,char **argv)
         /* The original globe remains visible while native video retains
          * shadow/highlight during the special-stage exit fade. */
         g_ram[0xF600]=0x0C;
-        scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native);
+        scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_object_zoom();test_file_select();test_world_snapshot();test_hud_mapping();
+    test_sprite_atlas();test_object_zoom();test_file_select();test_menu_layers();test_world_snapshot();test_hud_mapping();
     test_deformation_keeps_actors_still();
     test_hud_object_anchor();
     test_native_bonus();

@@ -768,11 +768,13 @@ int s3_army_hook(uint32_t pc)
 /* ---- Presentation ---------------------------------------------------------- */
 static unsigned lag_ticks, vblank_ticks, last_tick;
 static int was_active;
+static void host_sprites(void *user,const GVDP *v,const GVDPSpriteLayer *layer);
 void s3_army_vblank(void)
 {
     /* The SAT built with this capture is uploaded by this V-int. */
     shown = published;
     s3_title_vblank(&g_machine.vdp, title_enabled());
+    gvdp_set_host_sprites(shown.count || (title_enabled() && s3_title_active()) ? host_sprites : NULL, NULL);
     /* Lag telemetry, sampled at the IRQ like the family renderer's. */
     unsigned tick = rd16(LEVEL_FRAME);
     /* Running gameplay only: loading ($8C), pause and Player 1's own death
@@ -904,7 +906,7 @@ void s3_army_init(void)
         if (knux_art_decode(g_rom, sizeof g_rom, &knux_art_stock, &art, error, sizeof error)) art_ready = 1;
         else fprintf(stderr, "Knuckles & Knuckles unavailable: %s\n", error);
     }
-    gvdp_set_host_sprites(host_sprites, NULL);
+    gvdp_set_host_sprites(NULL, NULL);
 }
 /* Bounded JSON append: a full buffer truncates, never overruns. */
 typedef struct { char *p; size_t size, len; } Json;
