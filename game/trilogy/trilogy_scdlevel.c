@@ -62,6 +62,22 @@ void tri_scd_load_palette(unsigned id)            /* a window palette, into the 
 uint32_t tri_scd_card_art(void) { uint32_t w = window(); return w ? tri_rd32(w + W_CARD) : 0; }
 uint32_t tri_scd_card_map(void) { uint32_t w = window(); return w ? tri_rd32(w + W_CARDMAP) : 0; }
 uint32_t tri_scd_stop_byte(void) { uint32_t w = window(); return w ? w + W_STOP : 0; }
+
+/* S3K's life digits use line-1 colours C/F. Palmtree Panic uses those
+ * entries for scenery; its greys are D/E after L1_PERM. Adapt only the two
+ * digit tiles after native HUD DMA, leaving the level palette and other art
+ * intact. The conversion is idempotent and applies to newly updated counts. */
+void tri_scd_hud_vblank(void)
+{
+    if((r8(RAM_Game_mode)&127)!=12 || tri_zone()<0x40 || tri_zone()>0x43)return;
+    for(unsigned digit=0;digit<2;digit++)for(unsigned i=0;i<32;i++) {
+        uint8_t *p=g_machine.vdp.vram+(0x7DD+digit*2)*32+i;
+        unsigned hi=*p>>4,lo=*p&15;
+        if(hi==12)hi=13;else if(hi==15)hi=14;
+        if(lo==12)lo=13;else if(lo==15)lo=14;
+        *p=(uint8_t)(hi<<4|lo);
+    }
+}
 /* ---- palette cycles: the level's scripts (scd_level.py palette_cycles,
  * header +$EC), run as Level/Palette Cycle Script.asm's CycleColor ------- */
 #define SCD_CYCLES 32
