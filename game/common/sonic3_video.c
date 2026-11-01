@@ -500,6 +500,8 @@ static S3VideoRingLayout s_ring_layout;
 void s3_video_set_ring_layout(S3VideoRingLayout fn) { s_ring_layout = fn; }
 static S3VideoHudMapping s_hud_mapping;
 void s3_video_set_hud_mapping(S3VideoHudMapping fn) { s_hud_mapping = fn; }
+static S3VideoHudObject s_hud_object;
+void s3_video_set_hud_object(S3VideoHudObject fn) { s_hud_object = fn; }
 static unsigned rings_base(void)
 {
     unsigned own=s_ring_layout?s_ring_layout():0;
@@ -556,7 +558,10 @@ static void capture_objects(void)
                 y=((ram16(o+0x14)-cy+height)&mask)-height;
                 if(x+radius<left-cam || x-radius>=left-cam+s_requested_width || y+height<0 || y-height>=224)continue;
                 if(s_visible_count<144)s_visible_objects[s_visible_count++]=o;
-            } else {x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;anchor=2;}
+            } else {
+                x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;
+                anchor=s_hud_object && s_hud_object(o)?1:2;
+            }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
             unsigned zoom=(flags&4) && s_object_zoom?s_object_zoom(o):0;
             /* The title plane is queued even beyond the hardware viewport.

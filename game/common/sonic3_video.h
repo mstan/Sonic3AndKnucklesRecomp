@@ -26,6 +26,10 @@ void s3_video_set_ring_layout(S3VideoRingLayout fn);
  * Return zero to use the cartridge's ordinary mapping table. */
 typedef unsigned (*S3VideoHudMapping)(void);
 void s3_video_set_hud_mapping(S3VideoHudMapping fn);
+/* Additional screen-space HUD objects share the native HUD's left anchor,
+ * rather than the centered anchor used by cutscenes and results panels. */
+typedef int (*S3VideoHudObject)(unsigned object);
+void s3_video_set_hud_object(S3VideoHudObject fn);
 /* Optional object size in 256ths (zero = unchanged). Object zero asks whether
  * the game needs this presentation at native width even with widescreen off.
  * Sampled during scene publication; the callback must not change guest state. */
