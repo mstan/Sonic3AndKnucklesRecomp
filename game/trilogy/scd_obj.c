@@ -77,24 +77,54 @@ void cd_move(uint32_t o, int32_t vx, int32_t vy)
 }
 
 /* ---- $17 signpost (acts 1 and 2) ---------------------------------------
- * Sonic CD's spins when Sonic passes it, then the results. Here S3K's own end
- * sign drops on that spot as he passes (its results, its after-act flow);
- * the camera holds it in view. */
+ * CD's sign stands at its authored location before Sonic passes it. Keep
+ * S3K's existing sign art, DPLC, stub and spin/results mechanics, but enter
+ * its landed spin on the actual crossing instead of its falling entrance.
+ * CD's authored origin is 16 px above the floor. S3K's existing stub extends
+ * 32 px below its origin (24 + 8), so translate the origin up 16 px. The
+ * native falling sign's 30 px floor probe also let its stub enter the floor. */
+#define SCD_SIGN_SLOT          0x083B04u /* ObjSlot_EndSigns */
+#define SCD_SIGN_CHILD         0x083B2Eu /* Child1_EndSignStub */
+#define SCD_SIGN_DPLC          0x083B42u /* PLCPtr_EndSigns */
+#define SCD_SIGN_ANIM          0x083B4Au /* AniRaw_EndSigns1 */
 static void cd_signpost(uint32_t o)
 {
+    if (!OB8(o, OBJ_routine)) {
+        A(0) = RAMPTR(o); A(1) = SCD_SIGN_SLOT;
+        tri_jsr(0x084FA4u);                         /* SetUp_ObjAttributesSlotted */
+        SET8(o, OBJ_routine, 2);
+        SET8(o, OBJ_x_radius, 0x18); SET8(o, OBJ_y_radius, 0x20);
+        SET16(o, OBJ_y_pos, (uint16_t)(OB16(o, OBJ_y_pos) - 16));
+        SET8(o, OBJ_frame, 3);                      /* Eggman before crossing */
+        SET32(o, 0x30, SCD_SIGN_ANIM + (r16(RAM_Player_mode) == 3 ? 14 : 0));
+        w16(0xFFFAA6u, (uint16_t)o);                /* Signpost_addr */
+        A(0) = RAMPTR(o); A(1) = PLC_EndSignStuff;
+        tri_jsr(S3K_Load_PLC_Raw);
+        A(0) = RAMPTR(o); A(2) = SCD_SIGN_CHILD;
+        tri_jsr(0x084060u);                         /* CreateChild1_Normal */
+    }
     uint32_t p = RAM_Player_1;
     int x = OBS16(o, OBJ_x_pos);
-    if (OBS16(p, OBJ_x_pos) < x) return;              /* (waits, unseen) */
-    uint32_t s = o_alloc();
-    if (!s) return;
-    w32(s, S3K_Obj_EndSign);
-    SET16(s, OBJ_x_pos, (uint16_t)x);
-    uint16_t lock = (uint16_t)(x - 160 > 0 ? x - 160 : 0);
-    if ((int16_t)r16(RAM_Camera_min_X_pos) < (int16_t)lock) w16(RAM_Camera_min_X_pos, lock);
-    w16(RAM_Camera_max_X_pos, lock);
-    A(1) = PLC_EndSignStuff;
-    tri_jsr(S3K_Load_PLC_Raw);
-    o_delete(o);
+    if (OBS16(p, OBJ_x_pos) >= x) {
+        SET32(o, OBJ_code, S3K_Obj_EndSign);
+        SET8(o, OBJ_routine, 4);                    /* landed spin, then native tally */
+        SET8(o, 0x38, OB8(o, 0x38) | 1);
+        SET16(o, 0x2E, 0x40);
+        uint16_t lock = (uint16_t)(x - 160 > 0 ? x - 160 : 0);
+        if ((int16_t)r16(RAM_Camera_min_X_pos) < (int16_t)lock) w16(RAM_Camera_min_X_pos, lock);
+        w16(RAM_Camera_max_X_pos, lock);
+        o_sfx(0xB8);                               /* native sign's spin */
+    } else if (cd_despawn(o, OB16(o, OBJ_x_pos))) return;
+    /* The title card reloads spikes/springs over $494-$4C3, including the
+     * sign's $4AC patterns. Refresh its stationary frame once that queued
+     * Nemesis load finishes; subsequent unchanged frames retain native DPLC
+     * caching. A later PLC load similarly invalidates the ready marker. */
+    extern int tri_obj_card_done(void);
+    if (!tri_obj_card_done() || r32(0xFFF680u)) SET8(o, 0x3B, 0);
+    else if (!OB8(o, 0x3B)) { SET8(o, 0x3A, 0xFF); SET8(o, 0x3B, 1); }
+    A(0) = RAMPTR(o); A(2) = SCD_SIGN_DPLC;
+    tri_jsr(0x085022u);                             /* Perform_DPLC */
+    o_draw(o);
 }
 
 /* timeZone: 0 past, 1 present, 2 either future */
