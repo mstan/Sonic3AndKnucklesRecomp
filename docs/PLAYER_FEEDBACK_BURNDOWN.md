@@ -10,8 +10,8 @@ Count only a reproduced fix with relevant built-runtime acceptance as fixed. The
 xychart-beta
     title "Player reports awaiting disposition"
     x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up"]
-    y-axis "Reports remaining" 0 --> 28
-    line [22, 15, 13, 12, 20]
+    y-axis "Reports remaining" 0 --> 32
+    line [22, 15, 13, 12, 24]
 ```
 
 | Checkpoint | Total reports | Fixed | Deferred this pass | Remaining |
@@ -20,7 +20,7 @@ xychart-beta
 | v0.6.3 published | 22 | 7 | 0 | 15 |
 | Bounded reproduction, owner deferral instruction | 22 | 7 | 2 | 13 |
 | LZ2 water-art fix qualified | 22 | 8 | 2 | 12 |
-| Owner follow-up: six new reports, three reopened, one explicitly deferred | 28 | 5 | 3 | 20 |
+| Owner follow-up: ten new reports, three reopened, one explicitly deferred | 32 | 5 | 3 | 24 |
 
 | Work group | Total | Fixed | Deferred | Remaining |
 | --- | ---: | ---: | ---: | ---: |
@@ -28,7 +28,7 @@ xychart-beta
 | Next Sonic 3 & Knuckles / imported campaigns | 8 | 1 | 1 | 6 |
 | Sonic 3 Alone additions | 2 | 0 | 0 | 2 |
 | Sonic 2, later | 4 | 0 | 0 | 4 |
-| Sonic 3 family follow-up reports | 6 | 0 | 1 | 5 |
+| Sonic 3 family follow-up reports | 10 | 0 | 1 | 9 |
 
 ## Sonic 3 family — next
 
@@ -79,6 +79,10 @@ These include reopened release claims above; the following six reports are addit
 | S3-20 | The X between the HUD head and life count is corrupted | Open | Verify the multiplication glyph and count alongside the updated head/name, including a life-count change. |
 | S3-21 | Launcher sample-rate selection does not persist | Open | Change/apply the selection, exit/reopen and verify both persisted settings and the selected/actual audio rate. |
 | S3-22 | Animated save-select stage previews are corrupt, especially Sonic 3 levels | Open | Compare every supported preview source against its intended scene. Owner image shows a partial/broken Angel Island preview. Verify native and widescreen preview updates. |
+| S3-23 | Slot-machine bonus-stage margins are corrupt | Open | Enter the real slot-machine bonus and verify clean side content or a faithful composition at each supported aspect, including fades. |
+| S3-24 | Slot-machine graphics themselves are corrupt | Open | Verify the machine, reels, player and palette against the original stage while idle and spinning. |
+| S3-25 | Slot-machine bonus soft-locks the player | Open - priority | Reproduce from a normal entrance, then exercise the real spin/reward and exit path without forcing completion flags. Reported in the attached Discord image. |
+| S3-26 | Slot-machine life-count text looks red instead of grey | Open - compare original first | Determine whether the tint matches vanilla, as the reporter suspects; fix only a demonstrated mismatch. |
 
 S3-01 retains these separate reproduction checks under one original menu-presentation report:
 
@@ -93,6 +97,7 @@ S3-01 retains these separate reproduction checks under one original menu-present
 | T7 | Save-select-to-AIZ fade is out of sync on the right edge | Open |
 
 Owner images are retained under the task evidence root as `owner-feedback-20261101.webp` (HUD/background), `owner-save-previews-20261101.png`, and `owner-aiz-platform-20261101.png`. They are private reproduction evidence, not release assets.
+The slot-machine report and its soft-lock/tint notes are retained as `owner-slot-machine-20261101.png`.
 
 ## Default-on diagnostics release coverage
 
