@@ -85,6 +85,40 @@ static uint8_t s_cyc_timer[SCD_CYCLES], s_cyc_step[SCD_CYCLES];
 static uint32_t s_cyc_table;
 static uint16_t s_cyc_frame;
 
+/* PPZ3's two four-colour cycles precede the generic CycleColor calls, so
+ * converted packs do not contain them. Transcribed from owned US R13C/D
+ * PaletteCycle ($200184): tables $2001F4 / $200244, timer reloads 7 / 5.
+ * MMD SHA-256: C 3bc8965dc5668a9d1223392f5f7762df41b930b797ebc76aaa5fcf334bc16b4f
+ *             D 27e6c42268ea411d184b2b91b79ed626b39871b2823a5362573216ce29fd9356
+ * These run at the existing native palette-cycle phase and write only the
+ * normal scenery palette, preserving native fade/target ownership. */
+static void ppz3_palcycle(void)
+{
+    if (tri_act() != 2 || (tri_zone() != 0x42 && tri_zone() != 0x43)) return;
+    static const uint16_t colors[2][2][3][4] = {
+        { /* Good Future */
+            {{0xECC,0xECA,0xEEE,0xEA8},{0xEA8,0xECC,0xECC,0xECA},{0xECA,0xEA8,0xECA,0xECC}},
+            {{0xECA,0xEA8,0xC60,0xE86},{0xEA8,0xE86,0xC60,0xECA},{0xE86,0xECA,0xC60,0xEA8}},
+        },
+        { /* Bad Future; its fixed waterfall colour is A44, not base 846. */
+            {{0x888,0x666,0x888,0x444},{0x444,0x888,0x666,0x666},{0x666,0x444,0x444,0x888}},
+            {{0xCAE,0xC8C,0xA44,0xC6A},{0xC8C,0xC6A,0xA44,0xCAE},{0xC6A,0xCAE,0xA44,0xC8C}},
+        },
+    };
+    /* PPZ3 packs have zero/one generic cycles; reuse two free entries of the
+     * existing state so restart, frame rollback and level reset stay shared. */
+    for (unsigned cycle = 0; cycle < 2; cycle++) {
+        unsigned k = 30 + cycle;
+        if ((int8_t)--s_cyc_timer[k] >= 0) continue;
+        s_cyc_timer[k] = cycle ? 5 : 7;
+        s_cyc_step[k] = (uint8_t)((s_cyc_step[k] + 1) % 3);
+        unsigned first = cycle ? 44 : 53;
+        for (unsigned color = 0; color < 4; color++)
+            w16(RAM_Normal_palette + (first + color) * 2,
+                colors[tri_zone() == 0x43][cycle][s_cyc_step[k]][color]);
+    }
+}
+
 int tri_scd_palcycle_step(int k) { return k >= 0 && k < SCD_CYCLES ? s_cyc_step[k] : 0; }
 
 void tri_scd_palcycle(void)
@@ -97,6 +131,7 @@ void tri_scd_palcycle(void)
         s_cyc_table = t;
     }
     s_cyc_frame = fc;
+    if (w) ppz3_palcycle();
     if (!t) return;
     {
         extern int scd_wwz3_palcycle_timers(void);           /* (Wacky Workbench's boss: colchg_stop / start) */
