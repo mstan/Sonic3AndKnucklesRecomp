@@ -148,7 +148,9 @@ void tri_ext_frame(void)
     extern int tri_signpost_frame(uint16_t *,uint16_t *);
     int sign=tri_signpost_frame(top+16,bot+16);
     tri_shadow_menu_colors(top+16,bot+16);
-    if(!actors && !mighty && !sign){gvdp_set_ext_tiles(NULL);return;}
+    extern int tri_scd_ui_frame(uint8_t *,uint16_t *,uint16_t *);
+    int cd_ui=tri_scd_ui_frame(s_tiles,top+16,bot+16);
+    if(!actors && !mighty && !sign && !cd_ui){gvdp_set_ext_tiles(NULL);return;}
     int split = 1 << 20;
     if (r8(RAM_Water_flag))
         split = (int16_t)(r16(RAM_Water_level) - r16(RAM_Camera_Y_pos_copy));

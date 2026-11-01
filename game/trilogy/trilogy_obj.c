@@ -924,6 +924,8 @@ void tri_obj_vblank(void)
     tri_thumb_vblank();
     extern void tri_scd_hud_vblank(void);
     tri_scd_hud_vblank();
+    extern void tri_titlecard_vblank(void);
+    tri_titlecard_vblank();
     tri_ext_frame();
     if (tri_zone() == TRI_S2_OOZ) {                     /* NonWaterEffects: OilSlides */
         extern void s2_ooz_vblank(void);
