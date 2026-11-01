@@ -15,6 +15,8 @@
 /* 0 retail, 1 Mighty, 2 Shadow. Retail code always sees modes 0..3. */
 static uint8_t menu_mighty[9];
 static uint8_t menu_palette_lines[64],menu_art[2048];
+static uint8_t shadow_head[128];
+static uint32_t shadow_head_source;
 static uint32_t data_for(unsigned character)
 {
     uint32_t p=character==2?tri_shadow_descriptor():tri_mighty_descriptor();
@@ -49,6 +51,7 @@ int tri_mighty_presentation_hook(uint32_t pc)
 {
     uint32_t p=A(0)&0xFFFFFFu;
     if(pc==TH_LEVEL_ENTRY) {
+        shadow_head_source=0;
         choose_current();s3_video_set_hud_mapping(hud_mapping);return 0;
     }
     if(pc==TH_DS_NOSAVE_START || pc==TH_DS_NEWGAME) {
@@ -114,6 +117,62 @@ static void upload(uint32_t src,unsigned dst,unsigned bytes)
 {
     for(unsigned i=0;i<bytes;i++)g_machine.vdp.vram[dst+i]=tri_rd8(src+i);
 }
+/* Old MSW1 packs cropped the middle 16 pixels of a 32x24 head. Reconstruct
+ * that verified standing frame and fit its complete head into the native
+ * 16x16 life/1-UP footprint. This also repairs already converted resources. */
+static void shadow_head_art(uint32_t d)
+{
+    if(shadow_head_source==d)return;
+    uint8_t art[1024]={0},canvas[64][64]={{0}};
+    uint32_t anim=tri_rd32(d+20),maps=tri_rd32(d+4),dplc=tri_rd32(d+8);
+    unsigned frame=tri_rd8(anim+tri_rd16(anim+10)+1),used=0;
+    uint32_t pc=dplc+tri_rd16(dplc+frame*2);
+    unsigned count=tri_rd16(pc);pc+=2;
+    for(unsigned i=0;i<count;i++,pc+=2) {
+        unsigned entry=tri_rd16(pc),bytes=((entry>>12)+1)*32;
+        if(bytes>sizeof art-used)return;
+        uint32_t src=tri_rd32(d+12)+(entry&4095)*32;
+        for(unsigned j=0;j<bytes;j++)art[used+j]=tri_rd8(src+j);
+        used+=bytes;
+    }
+    pc=maps+tri_rd16(maps+frame*2);count=tri_rd16(pc);pc+=2;
+    for(unsigned i=0;i<count;i++,pc+=6) {
+        int py=(int8_t)tri_rd8(pc)+32,px=(int16_t)tri_rd16(pc+4)+32;
+        unsigned size=tri_rd8(pc+1),attr=tri_rd16(pc+2);
+        unsigned width=(((size>>2)&3)+1)*8,height=((size&3)+1)*8;
+        for(unsigned y=0;y<height;y++)for(unsigned x=0;x<width;x++) {
+            int dx=px+(int)x,dy=py+(int)y;
+            if(dx<0 || dx>=64 || dy<0 || dy>=64)continue;
+            unsigned sx=(attr&0x800)?width-1-x:x,sy=(attr&0x1000)?height-1-y:y;
+            unsigned tile=(attr&2047)+sx/8*(height/8)+sy/8;
+            unsigned index=tile*32+(sy&7)*4+(sx&7)/2;
+            if(index>=used)continue;
+            unsigned color=(sx&1)?art[index]&15:art[index]>>4;
+            if(color)canvas[dy][dx]=(uint8_t)color;
+        }
+    }
+    int top=64,left=64,right=-1,bottom=-1;
+    for(int y=0;y<64;y++)for(int x=0;x<64;x++)if(canvas[y][x] && y<top)top=y;
+    for(int y=top;y<top+24 && y<64;y++)for(int x=0;x<64;x++)if(canvas[y][x]) {
+        if(x<left)left=x;if(x>right)right=x;bottom=y;
+    }
+    if(right<left)return;
+    int w=right-left+1,h=bottom-top+1,span=w>h?w:h;
+    int ow=w*16/span,oh=h*16/span,ox=(16-ow)/2,oy=(16-oh)/2;
+    memset(shadow_head,0,sizeof shadow_head);
+    for(int y=0;y<oh;y++)for(int x=0;x<ow;x++) {
+        unsigned colors[16]={0},color=0;
+        /* Area sampling retains thin quills and the whole face; transparent
+         * pixels do not erase an opaque feature within a reduced pixel. */
+        for(int sy=y*h/oh;sy<(y+1)*h/oh;sy++)for(int sx=x*w/ow;sx<(x+1)*w/ow;sx++)
+            colors[canvas[top+sy][left+sx]]++;
+        for(unsigned c=1;c<16;c++)if(colors[c] && (!color || colors[c]>colors[color]))color=c;
+        int dx=x+ox,dy=y+oy;
+        unsigned index=(dx/8*2+dy/8)*32+(dy&7)*4+(dx&7)/2;
+        shadow_head[index]|=(uint8_t)(color<<((dx&1)?0:4));
+    }
+    shadow_head_source=d;
+}
 int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
 {
     for(unsigned i=0;i<2048;i++)if(tiles[i]==3)tiles[i]=0;
@@ -134,7 +193,11 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
     }
     if(player) {
         memset(tiles+0x680,3,32);
-        upload(tri_rd32(d+76),0x7D4*32,128);
+        if(tri_shadow_selected) {
+            shadow_head_art(d);
+            if(shadow_head_source==d)memcpy(g_machine.vdp.vram+0x7D4*32,shadow_head,128);
+            else upload(tri_rd32(d+76),0x7D4*32,128);
+        } else upload(tri_rd32(d+76),0x7D4*32,128);
         upload(tri_rd32(d+80),0x7D8*32,160);
         upload(tri_rd32(d+80)+160,0x7DE*32,32);
         memset(tiles+0x7D4,3,4);

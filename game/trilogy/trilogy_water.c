@@ -60,6 +60,25 @@ static int s2_water(void)
     return inf && tri_rd8(inf + S2I_WATER_PAL);
 }
 
+/* The S1/S2 converter distributes elemental shields into original plain-
+ * shield boxes. Underwater that distribution must use a water-safe shield.
+ * Apply to existing converted packs too, before their sprites are published. */
+void tri_water_monitor_frame(void)
+{
+    uint32_t e=tri_dir();
+    if(!e || !r8(RAM_Water_flag))return;
+    int game=tri_rd8(e+TD_GAME);
+    if(game!=TRI_GAME_S1 && game!=TRI_GAME_S2)return;
+    for(unsigned i=2;i<110;i++) {
+        uint32_t o=RAM_Player_1+i*OBJ_SIZE;
+        unsigned subtype=r8(o+OBJ_subtype),routine=r8(o+OBJ_routine);
+        if(r32(o)!=S3K_Obj_Monitor || routine>2 || (subtype!=5 && subtype!=6) ||
+            r16(o+OBJ_y_pos)<=r16(RAM_Water_level))continue;
+        w8(o+OBJ_subtype,7);
+        if(routine==2)w8(o+OBJ_anim,7);
+    }
+}
+
 static uint8_t water_pal_id(void)
 {
     return s2_water() ? tri_rd8(s1info() + S2I_WATER_PAL) : tri_rd8(s1info() + S1I_WATER_PAL);

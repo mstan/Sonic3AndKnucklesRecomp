@@ -117,6 +117,17 @@ static int semantic_animation(int a)
 static void animate(uint32_t p,uint32_t d)
 {
     int native=r8(p+OBJ_anim),ani=semantic_animation(native);
+    /* S3K's ending hold has no S1 animation counterpart. Its former numeric
+     * translation played the donor's bubble script and then walking frames.
+     * Use the complete standing frame during native S3K result holds; imported
+     * acts instead release the characters into their normal runoff. */
+    if(native==0x13) {
+        uint32_t base=tri_rd32(d+20);
+        uint32_t stand=base+(int16_t)tri_rd16(base+5*2);
+        w8(p+OBJ_frame,tri_rd8(stand+1));
+        w8(p+OBJ_render,(r8(p+OBJ_render)&0xFC)|(r8(p+OBJ_status)&1));
+        old_native=native;return;
+    }
     if(native!=old_native) {
         old_native=native;source_anim=ani;cursor=0;timer=0;
         w8(p+0x21,(uint8_t)native);
