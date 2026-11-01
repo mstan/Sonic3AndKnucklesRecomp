@@ -415,7 +415,8 @@ void cd_time_icon(uint32_t o)
         o_asset(o, SCDA_TIMEPOST);
         SET8(o, OBJ_render, 0);                               /* (on the screen) */
         SET16(o, OBJ_priority, 0);
-        SET16(o, OBJ_x_pos, 68 + 128);
+        /* Leave room for S3K's wider life/name strip, including SHADOW. */
+        SET16(o, OBJ_x_pos, 96 + 128);
         SET16(o, OBJ_y_pos, 210 + 128);
     }
     SET8(o, OBJ_frame, s_dir < 0 ? 0x12 : 0x13);
