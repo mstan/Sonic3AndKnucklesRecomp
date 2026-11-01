@@ -9,9 +9,9 @@ Count only a reproduced fix with relevant built-runtime acceptance as fixed. The
 ```mermaid
 xychart-beta
     title "Player reports awaiting disposition"
-    x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up"]
+    x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up", "Save/audio/CD HUD"]
     y-axis "Reports remaining" 0 --> 44
-    line [22, 15, 13, 12, 34]
+    line [22, 15, 13, 12, 34, 30]
 ```
 
 | Checkpoint | Total reports | Fixed | Deferred this pass | Remaining |
@@ -22,6 +22,7 @@ xychart-beta
 | LZ2 water-art fix qualified | 22 | 8 | 2 | 12 |
 | Owner follow-up: ten new reports, three reopened, one explicitly deferred | 32 | 5 | 3 | 24 |
 | Further owner follow-up: twelve reports, binding reset and low-priority sprite deferral | 44 | 5 | 5 | 34 |
+| Sample rate, imported CLEAR and two CD HUD fixes qualified | 44 | 9 | 5 | 30 |
 
 | Work group | Total | Fixed | Deferred | Remaining |
 | --- | ---: | ---: | ---: | ---: |
@@ -29,7 +30,7 @@ xychart-beta
 | Next Sonic 3 & Knuckles / imported campaigns | 8 | 1 | 1 | 6 |
 | Sonic 3 Alone additions | 2 | 0 | 0 | 2 |
 | Sonic 2, later | 4 | 0 | 0 | 4 |
-| Sonic 3 family follow-up reports | 22 | 0 | 3 | 19 |
+| Sonic 3 family follow-up reports | 22 | 4 | 3 | 15 |
 
 ## Sonic 3 family — next
 
@@ -55,7 +56,7 @@ Continue with the reproducible water/presentation defects; retain individual dis
 | ID | Report | State | Acceptance / evidence needed |
 | --- | --- | --- | --- |
 | S3A-01 | Some AIZ level objects are missing | Open | Compare two reported sites against the original layouts: the ledge with shoes/ring monitors (possible platform) and the cave ledge under spikes near the balloon (possible spring). The latter was reported in both Sonic 3 Alone and S3&K. The reporter may remember AIR differences; verify actual placements/spawning before adding objects. |
-| S3A-02 | Characters and level objects constantly shift/jitter slightly | Open | Also reported in S3&K after AIZ bombing, possibly with heat deformation. Correlate world/camera/sprite positions across consecutive native and wide frames; preserve intended background deformation while removing actor jitter. |
+| S3A-02 | Characters and level objects constantly shift/jitter slightly | Partial - S3&K heat case qualified; standalone runtime pending | `ffb8607` separates the object camera from plane deformation. A stationary AIZ2 camera/player produces a one-pixel actor shift in the baseline, none in the candidate/native reference, while heat scrolling remains active. Shared renderer tests pass in both compile modes; standalone built-runtime qualification remains. |
 
 ## Sonic 2 — later burndown
 
@@ -78,11 +79,11 @@ Reopened release claims remain in their original rows above. These twenty-two re
 | S3-18 | Controller A, mapped to the Genesis A button, plays a switch sound instead of jumping | Closed this pass - intended Shadow control / binding reset | Owner reset bindings and no longer reproduced the sound. Source reserves logical A for Shadow's ground boost; fewer than five rings produces sound $5B, while B/C jump. No speculative control remapping or fix claimed. Reopen a genuine binding failure with logs. |
 | S3-19 | The OW in SHADOW on the HUD looks wrong | Open | Reproduce from the owner screenshot; verify the complete donor-derived name and its tile boundaries. |
 | S3-20 | The X between the HUD head and life count is corrupted | Open | Verify the multiplication glyph and count alongside the updated head/name, including a life-count change. |
-| S3-21 | Launcher sample-rate selection does not persist | Open | Change/apply the selection, exit/reopen and verify both persisted settings and the selected/actual audio rate. |
+| S3-21 | Launcher sample-rate selection does not persist | Fixed / qualified - not released yet | Engine `9d2c0af` loads/saves the requested rate, seeds the launcher from it and passes it to the device. Settings round trips and Mods preservation pass; the production dummy device actually opens at 32000, 32040, 44100 and 48000 Hz. Internal emulation/mix rate stays 223721 Hz. |
 | S3-22 | Animated save-select stage previews are corrupt, especially Sonic 3 levels | Open | Compare every supported preview source against its intended scene. Owner image shows a partial/broken Angel Island preview. Verify native and widescreen preview updates. |
 | S3-23 | Slot-machine bonus-stage margins are corrupt | Open | Enter the real slot-machine bonus and verify clean side content or a faithful composition at each supported aspect, including fades. |
 | S3-24 | Slot-machine graphics themselves are corrupt | Open | Verify the machine, reels, player and palette against the original stage while idle and spinning. |
-| S3-25 | Slot-machine bonus soft-locks the player | Open - priority | Reproduce from a normal entrance, then exercise the real spin/reward and exit path without forcing completion flags. Reported in the attached Discord image. |
+| S3-25 | Slot-machine bonus soft-locks the player | Reproduced held-player state - priority investigation | A real native AIZ1 starpost entrance reaches zone $1500; control stays $81 at the machine after a further 1800-frame wait in native 4:3 too. Determine the reel/reward controller's expected completion and validate release/exit. Wide teleport setups that leave gameplay are invalid prerequisites, not evidence of the reported soft-lock. |
 | S3-26 | Slot-machine life-count text looks red instead of grey | Open - compare original first | Determine whether the tint matches vanilla, as the reporter suspects; fix only a demonstrated mismatch. |
 | S3-27 | AIZ1 intro has black graphic lines at the left edge in widescreen | Open | Capture the full intro and compare native composition; clean the extended edge through the affected seconds and transition. |
 | S3-28 | Gumball bonus has corrupt graphics at the extreme left/right edges | Open | Exercise the real bonus entrance, play and fade at native and wide aspects. |
@@ -90,12 +91,12 @@ Reopened release claims remain in their original rows above. These twenty-two re
 | S3-30 | AIZ2 Flying Battery chase replaces the view with repeated trees | Open | Capture the chase before, during and after the ship passes; preserve the scripted plane composition and visible actors throughout. Reporter says the view recovers when the ship disappears. |
 | S3-31 | Life display changes from about 99 to a misplaced 0 and 1, then stays wrong | Open | Compare actual RAM life count with displayed digits before/during/after the AIZ2 chase; distinguish a count over 99 from damaged glyphs or a counter reset. Preserve native progress. |
 | S3-32 | Trees disappear/glitch when Eggman flies behind them in AIZ2 | Open | Exercise the real boss scene; verify foreground occlusion and tree tiles as Eggman crosses them. |
-| S3-33 | Imported cleared S3&K save becomes Zone 1: Palmtree Panic and enters PPZ1 Present after a freeze | Open - priority | Use a valid cleared native SRAM fixture; preserve its cleared status, zone selection and progress with campaigns disabled/enabled. Never reset owner saves to hide the defect. |
+| S3-33 | Imported cleared S3&K save becomes Zone 1: Palmtree Panic and enters PPZ1 Present after a freeze | Fixed / qualified - not released yet | `1f0ec84` preserves the native CLEAR card instead of auto-starting an unplayed addon. Baseline reproduces Zone 1/PPZ1. Candidate retains CLEAR, all emeralds and 99 lives with CD on/off; actual Up/Start chooses a replay stage and enters it. Like the cartridge, untouched CLEAR waits for a zone choice. All 16 campaign-mask projection/capture tests retain native progress without certifying unplayed addons. |
 | S3-34 | Knuckles pops into existence at the widescreen edge during AIZ-to-HCZ cutscene | Open | Capture the actual cutscene and extend actor visibility smoothly before entering the native viewport. |
 | S3-35 | HCZ1 initial bar-grab section briefly glitches edge graphics | Open | Exercise appearance/disappearance of that section's graphics at wide aspects; compare native behavior. |
 | S3-36 | Sonic/Tails use ordinary running/rolling sprites on Palmtree Panic's 3D ramp | Deferred by owner - low priority | Later research suitable existing online perspective sprites and provenance. No asset search, import or implementation this pass; report is retained for a future asset task. |
-| S3-37 | Palmtree Panic life-count text is orange | Open - compare palette | Compare the imported CD palette and native HUD color; correct a demonstrated palette conflict without changing stage colors. |
-| S3-38 | CD time-period label is too far from the life/name HUD | Open | Keep the period label adjacent to the life HUD across native/adaptive widths, including Past/Present/Future changes. |
+| S3-37 | Palmtree Panic life-count text is orange | Fixed / qualified - not released yet | `efdff8c` remaps only the two life-digit tiles from S3K C/F indices to PPZ's D/E greys after native HUD uploads. All ten PPZ base variants have neutral D/E entries; native/wide captures show grey updated counts. Scenery palettes and resource packs are untouched. The change is deliberately scoped to PPZ; other CD rounds have different palette assignments. |
+| S3-38 | CD time-period label is too far from the life/name HUD | Fixed / qualified - not released yet | The pending Past/Future badge now shares the life HUD's left anchor and leaves room for the wider S3K/Shadow name strip. Real source-placed past-post activation produces the badge; native and 32:9 captures show it beside the life display without overlap. No new art. |
 
 S3-01 retains these separate reproduction checks under one original menu-presentation report:
 
@@ -151,3 +152,7 @@ Conveyor reproduction evidence: `C:/temp/Codex/sonic-feedback-release-20261101/s
 LZ2 water-art qualification: `server-lz-slide-baseline-stable`, `server-lz-slide-candidate-stable` and `server-lz-slide-candidate-native` under the task evidence root. The candidate executable identifies game `ea2e527fdce129f8cecacedf538834907c560fe7` and engine `bc6a3209ba8fc6a29de8cc8c85371d3e3a4ef60a`. Published v0.6.3 archives remain frozen; this fix belongs to the next update.
 
 Anthology reference already available locally: `F:/Projects/segagenesisrecomp/_reference-sonic-anthology-cd` at `8f5726a754e819cdff6f6a03690737239889c6fa`; its README identifies Sonic Anthology and the owner-media workflow in AnthologyBuilder. Refresh/freeze the current fork before feature integration. This source review does not start the gated movement/asset work.
+
+Follow-up qualification (private task evidence root): `sample-rate-ctest.log` (six focused tests), `server-save-hud-qualification-final` (old/new cleared-save and badge captures; four actual audio rates), `save-hud-followup` (explicit replay selection with CD on/off; native/wide updated life digits and badge spacing) and `camera-settled/analysis.json` (24 successive AIZ2 frames per baseline/candidate/native run). Candidate game `efdff8c`, engine `9d2c0af`, executable SHA256 `5fa7cebdd5c8f555093b52dbe02f569aed2aea0a6a1283a3dbee2a466c098469`. Camera/player RAM stay fixed at (8032,672)/(8192,768); the baseline blue-sprite bounds shift one pixel, candidate bounds match native after subtracting the 238-pixel viewport offset. Animation poses are compared separately. A prerequisite camera settling period is excluded from this measurement.
+
+The first cleared-save candidate probe pressed Start on untouched CLEAR and reached its frame limit while remaining in Data Select. That is native menu behavior, not a passing level-entry test; the follow-up uses actual Up/Start and validates entry. Likewise, queued RAM/VRAM/screenshot requests are serviced after the input-script tick, so an immediately following count write can appear one snapshot ahead of its displayed digits. The digit captures establish grey rendering after updates, not life-award/death mechanics.
