@@ -120,6 +120,11 @@ HOOKS = [
     ("WATER_PAL",       "LoadWaterPalette",      r"^tst\.b \(Water_flag\)\.w", 'at', 0, 'sk'),
     ("DYN_WATER",       "DynamicWaterHeight",    r"^moveq #0,d0", 'at', 0, 'sk'),
     ("WATER_LEVEL",     "Handle_Onscreen_Water_Height", r"^move\.w d0,\(Water_level\)\.w", 'at', 0, 'sk'),
+    # S1 swaps all 64 colours, including a waterline below scanline 200.
+    ("S1_WATER_COUNT3", "HInt3",                 r"^subi\.b #200,d0", 'at', 0, 'sk'),
+    ("S1_WATER_COUNT4", "HInt4",                 r"^subi\.b #200,d0", 'at', 0, 'sk'),
+    ("S1_WATER_COUNT5", "HInt5",                 r"^subi\.b #200,d0", 'at', 0, 'sk'),
+    ("S1_WATER_COUNT6", "HInt_6",                r"^subi\.b #200,d0", 'at', 0, 'sk'),
     ("OBJ_INDEX",       "loc_1B6CA",             r"^move\.l d0,\(Object_index_addr\)\.w", 'at', 0, 'sk'),
     ("OBJ_LAYOUT",      "loc_1B6E8",             r"^movea\.l \(a0,d0\.w\),a0", 'after', 0, 'sk'),
     ("RING_LAYOUT",     "loc_EB52",              r"^movea\.l \(a1,d0\.w\),a1", 'after', 0, 'sk'),
