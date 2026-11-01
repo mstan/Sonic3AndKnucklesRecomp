@@ -656,6 +656,9 @@ kind = "game_hook"
 addr = 0x06185C # trilogy SS_GO (SSEntryFlash_GoSS)
 kind = "game_hook"
 [[widescreen_site]]
+addr = 0x02CFC0 # trilogy S1_STARPOST_INIT (loc_2CFC0)
+kind = "game_hook"
+[[widescreen_site]]
 addr = 0x02D0CA # trilogy STARPOST_STARS (sub_2D028)
 kind = "game_hook"
 [[widescreen_site]]

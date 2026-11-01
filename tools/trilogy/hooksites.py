@@ -111,6 +111,8 @@ HOOKS = [
     ("OSC_DO",          "OscillateNumDo",        r"^lea \(Osc_Data2\)\.l,a2", 'after', 0, 'sk'),
     # giant ring: enter the special stage only after the act-clear tally
     ("SS_GO",           "SSEntryFlash_GoSS",     r"^moveq #signextendB\(sfx_EnterSS\),d0", 'at', 0, 'sk'),
+    # S1's authored lamp foot ends four pixels above the native starpost's.
+    ("S1_STARPOST_INIT", "loc_2CFC0",            r"^addq\.b #2,routine\(a0\)", 'at', 0, 'sk'),
     # starpost: S1/S2 had no star-circle bonus stages
     ("STARPOST_STARS",  "sub_2D028",             r"^blo\.s loc_2D0D0", 'at', 0, 'sk'),
     # water (S1 Labyrinth / SBZ3): set-up, dynamic height, oscillating surface
