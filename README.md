@@ -27,8 +27,8 @@ These controls are on the development branch and will appear in a future release
 In **Mods**, enable **High refresh rate**, then choose **Presentation rate**:
 120, 144 or Display. Display follows the monitor's refresh rate. Gameplay and
 music keep their normal speed. Menus, finite special-stage views and some
-scripted scenes repeat complete frames. Blue Spheres keeps its native view;
-full widescreen projection remains deferred.
+scripted scenes repeat complete frames. The corrected Blue Spheres widescreen projection has passed its bounded checks
+and owner visual review; it is being integrated for the next release.
 
 Enable **Unfiltered audio** for the clearer sound without the hardware low-pass
 filter. The normal filtered sound remains the default. Both controls are also

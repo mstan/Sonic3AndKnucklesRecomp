@@ -1,7 +1,6 @@
 # Player-feedback burndown — 2026-11-01
 
-Current result: all 58 reports have dispositions, with 36 qualified fixes and
-22 non-fix dispositions: 21 deferrals and the resolved Shadow A-button/binding report. [Sonic 3 family v0.6.4](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.4)
+Current report result: 37 qualified fixes (36 already released, plus the owner-accepted Blue Spheres correction), 20 deferred reports and one resolved Shadow A-button/binding report. Blue Spheres was reopened after the earlier deferral; the existing corrected upstream projection has now passed bounded runtime and owner visual checks. Default-path integration and the next release gates are still pending. [Sonic 3 family v0.6.4](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.4)
 is published at `19115a6d16444504a496abd9053f3b6ba2b42d3c`, engine
 `8424dbb7d6d25615e9597c3d8bb938d96c350c27`, with three Windows ZIPs, three
 Linux AppImages and verified uploaded checksums.
@@ -18,9 +17,9 @@ Count only a reproduced fix with relevant built-runtime acceptance as fixed. The
 ```mermaid
 xychart-beta
     title "Player reports awaiting disposition"
-    x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up", "Save/audio/CD HUD", "Heat camera", "Slot fixes", "Replay follow-up", "CD/music/LZ decisions", "Bonus/Competition", "Previews/CD/Shadow", "Menus/stage fixes/repro decisions", "Water/input/assets", "AIZ/SYZ/repro decisions", "Owner projection deferral", "Knuckles qualified"]
+    x-axis ["Reported scope", "v0.6.3 published", "Bounded repro pass", "LZ2 water art", "Owner follow-up", "Save/audio/CD HUD", "Heat camera", "Slot fixes", "Replay follow-up", "CD/music/LZ decisions", "Bonus/Competition", "Previews/CD/Shadow", "Menus/stage fixes/repro decisions", "Water/input/assets", "AIZ/SYZ/repro decisions", "Owner projection deferral", "Knuckles qualified", "Corrected Blue Spheres accepted"]
     y-axis "Reports remaining" 0 --> 58
-    line [22, 15, 13, 12, 34, 30, 29, 27, 42, 37, 35, 28, 16, 10, 2, 1, 0]
+    line [22, 15, 13, 12, 34, 30, 29, 27, 42, 37, 35, 28, 16, 10, 2, 1, 0, 0]
 ```
 
 | Checkpoint | Total reports | Fixed | Non-fix dispositions | Remaining |
@@ -43,11 +42,12 @@ xychart-beta
 | AIZ2 ship/occlusion and SYZ colors qualified; five bounded visual deferrals | 58 | 35 | 21 | 2 |
 | Owner defers full Blue Spheres projection to a separate renderer task | 58 | 35 | 22 | 1 |
 | Knuckles preview qualified against native artwork and displayed scenery | 58 | 36 | 22 | 0 |
+| Blue Spheres reopened, corrected path qualified and accepted by owner | 58 | 37 | 21 | 0 |
 
 | Work group | Total | Fixed | Non-fix dispositions | Remaining |
 | --- | ---: | ---: | ---: | ---: |
 | Original Sonic 3 family reports | 8 | 7 | 1 | 0 |
-| Next Sonic 3 & Knuckles / imported campaigns | 8 | 3 | 5 | 0 |
+| Next Sonic 3 & Knuckles / imported campaigns | 8 | 4 | 4 | 0 |
 | Sonic 3 Alone additions | 2 | 1 | 1 | 0 |
 | Sonic 2, later | 4 | 2 | 2 | 0 |
 | Sonic 3 family follow-up reports | 36 | 23 | 13 | 0 |
@@ -66,7 +66,7 @@ Continue with the reproducible water/presentation defects; retain individual dis
 | S3-11 | LZ underwater objects shift slightly | Deferred this pass - not reproduced in bounded setup | Natural-start LZ2, alive Sonic, fixed nominal camera and 32 observations across a full ripple cycle: hardware scroll varies -202..-198; both old/new wide actor bounds match native plus exactly (200,0), including normal pose changes. No extra sprite shift was reproduced. S1-only setup does not qualify the exact owner all-mod replay. Dead/resurrection fixtures are excluded. No new fix claimed. |
 | S3-12 | LZ water push uses HCZ bar-grab behavior | Deferred by owner - suitable frames unavailable | Confirmed imported current selects the HCZ grip animation. Original S1 Float2 is a five-pose free tumble; inspected S3K alternatives do not supply a validated equivalent across characters. Owner explicitly permits asset-focused deferral when suitable existing frames cannot match. No speculative pose replacement or physics change. |
 | S3-13 | LZ2 starting water slide has a gap at the slope-to-vertical join | Fixed / qualified - released in v0.6.4 | Static waterfall slopes lost their placement flip bits. `ea2e527` preserves them; same-host before/after 32:9 captures and a native-width capture show a continuous join. Stage/player placement is a visual-setup bypass. |
-| S3-14 | Blue Spheres has no widescreen | Deferred by owner - separate renderer task | The tested ellipsoid/table extensions misalign floor checkerboard and sphere positions; none is accepted. Owner explicitly deferred full gameplay projection while delivering the other fixes. Native globe margins remain; the separately qualified wide entry fade is included. A later renderer must add correct side content without changing central gameplay or physics. |
+| S3-14 | Blue Spheres has no widescreen | Fix qualified / owner accepted - awaiting default integration and release | Earlier deferral superseded. The historical executable predates alignment fixes already in the newer Anthology/previous module. Native checker pixel differences alone did not prove incorrect geometry. The restored corrected path passes 1,478 same-binary canonical logs, 14 RAM/VRAM checkpoints, actual movement/turn/jump/natural failure, 3,958 exact opaque sphere pixels, maximum foot error 0.421px and 18 checker quadrant checks. Owner explicitly said "ok blue spheres is good". Preserve that visual approval; do not relaunch it for another routine owner check. Evidence: `blue-spheres-owner-qa/qualification/acceptance.json` and `owner-approval.json`. No new assets or guest-physics changes. |
 | S3-15 | Shadow uses Sonic sprites in Blue Spheres | Deferred by owner - suitable frames unavailable | Appropriate Shadow special-stage turning/running/jump/result frames have not been established from the owned donor. Owner explicitly permits deferral for an asset-focused follow-up when existing frames cannot match; no generated replacement art. |
 | S3-16 | Competition menu background wraps; submenus darken and lose widescreen | Fixed / qualified - released in v0.6.4 | Actual vanilla/all-six-mod routes at 32:9 keep main, player and level menus full width, with stretched scenery and native-size UI, without repeated/wrapped tiles. Frozen original 4:3 reference confirms submenu shadow/highlight darkening is authored behavior; the candidate applies that same brightness consistently across the width. |
 | S3-05 | GHZ1 signpost sometimes spins forever as Sonic & Tails | Deferred this pass — not reproduced | Prior eight approach variants passed. Closed for this pass per owner instruction; no fix or forced timeout patch. Reopen with future logs if it recurs. |
@@ -206,6 +206,8 @@ A fresh default-on report with infinite lives/time, shield transformation and ch
 - F-12: Qualified opt-in Tails giant-ring follow (`469d202`). In a genuine GHZ1 approach with no actor/result RAM writes, nearby native Tails moves to the entered ring and only adopts the native entry pose at actual overlap. All 22 leader/camera/ring/mode samples match Off; tally, Blue Spheres and actual GHZ2 return preserve progression and restore both characters/control. Off and absent-companion cases pass. Imported-stage quickstate/rewind refusal is preserved, with four actual rejected save requests and no files. Evidence: `feature-tails-ring-candidate-on/acceptance.json`; frozen executable SHA256 `3813f4b2dcd7ed706a86848638ab7727b70e56dcf8d95252cd2c2291c8047e72`.
 
 All preceding feature results remain **unreleased** on `codex/sonic-features-after-v064`, with the qualified engine pinned at `bbe5fa94`. The bug-fix/default-diagnostics releases at the top remain the published artifacts. No feature release, full Linux title/package matrix, or drop-dash/peel-out implementation is claimed by these checks. Retained task evidence and qualified binaries live under `C:/temp/Codex/sonic-feedback-release-20261101`; Linux helper artifacts live at the G: path above. Preserve them for the next package cut; remove remaining disposable build/profile scratch after that release gate.
+
+Latest remote audit after the owner challenged the deferral: Anthology checkout was `8f5726a`, fetched remote `a35f127`; corrected alignment code was already available. Sonic 3 remote main is now `47bb597` (v0.6.5), engine remote master `fe9168f`. The feature branch started from v0.6.4 and must integrate the newer preserved engine/API/per-mode policies before release. This is a required baseline gate, not a claim that main already restores the Blue Spheres projection. The private QA window is `C:/temp/Codex/sonic-feedback-release-20261101/blue-spheres-owner-qa/Validation.ps1`, adapted from the existing X5 selector, with isolated profiles and locally saved case-specific notes. Owner visual acceptance is complete. ISO and BIN/CUE remain release requirements; ZIP support is retained; no 7z/RAR expansion is requested.
 
 Conveyor reproduction evidence: `C:/temp/Codex/sonic-feedback-release-20261101/server-lz-baseline`, `server-lz-wide-baseline` and `server-lz-prefix-baseline`. Direct/approach probes use stage/player positioning as a prerequisite bypass; they establish spawning, not an end-to-end LZ2 completion. This limitation is retained in the deferral.
 
