@@ -1483,4 +1483,12 @@ static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int 
     (void)v;
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
-const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline, NULL, menu_raster_enabled, scanline_lazy };
+const GameVideo sonic3_video = {
+    .configure = configure,
+    .enabled = enabled,
+    .width = width,
+    .scanline = scanline,
+    .overlay_scanline = overlay_scanline,
+    .raster_enabled = menu_raster_enabled,
+    .scanline_presented = scanline_lazy
+};
