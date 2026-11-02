@@ -1,12 +1,15 @@
 # Player-feedback burndown — 2026-11-01
 
 Current report result: 37 qualified fixes, all released in the Sonic 3 family v0.7.0 (including the 36 fixes carried forward from v0.6.4), 20 deferred reports and one resolved Shadow A-button/binding report. The corrected Blue Spheres projection is integrated by default with widescreen and explicitly accepted by the owner. The original 58 reports all have dispositions. [Sonic 3 family v0.7.0](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.7.0)
-is published at `19115a6d16444504a496abd9053f3b6ba2b42d3c`, engine
-`8424dbb7d6d25615e9597c3d8bb938d96c350c27`, with three Windows ZIPs, three
+is published at `c57efa267083d811f4dfee5569d247979ded7b58`, engine
+`0d27d77d3c4d72c58f0a6fd3278216e3b3edb4e2`, with three Windows ZIPs, three
 Linux AppImages and verified uploaded checksums.
+[Sonic 1 v0.8.0](https://github.com/mstan/SonicTheHedgehogRecomp/releases/tag/v0.8.0)
+is published at `c78ea38c61261a26c7b38a0f2bd6dcd98fb12784` with its verified
+Windows ZIP/checksum and the same engine.
 [Sonic 2 v0.9.4](https://github.com/mstan/SonicTheHedgehog2Recomp/releases/tag/v0.9.4)
 is published at `8c121ca3b4b91855ef3cc5353affc257155ccbef` with its verified
-Windows ZIP/checksum. Deferrals are not fixes. Requested enhancements are being qualified separately below; the movement/asset stretch work stays stopped for an owner check-in.
+Windows ZIP/checksum. Deferrals are not fixes. Requested enhancements are released as described below; the movement/asset stretch work stays stopped for an owner check-in.
 
 Release first: [Sonic family v0.6.3](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.3) is published at game `5303dfe1a51f9afaa7191a4b4073b04c53c02f60`, engine `6d14f65868c2c355c8249c87638b68ca9ed2a57f`. Seven original reports initially passed validation; the owner subsequently reopened three, and closed the unreproduced signpost report for this pass. Source, package and replay evidence is retained at `C:/temp/Codex/sonic-feedback-release-20261101`; the original investigation is described in [PLAYER_REPORTS_20261101.md](PLAYER_REPORTS_20261101.md).
 
