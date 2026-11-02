@@ -7,6 +7,7 @@
  * instead of S3K's seamless act-2 transition.
  */
 #include "trilogy_obj.h"
+#include "sonic3_gameplay.h"
 #include "trilogy_assets_s2.h"
 #include "scd.h"
 #include <stdio.h>
@@ -407,6 +408,10 @@ int tri_flow_hook(uint32_t pc)
     }
     case TH_STARPOST_STARS:         /* blo.s: S1 has giant rings; S2's stars come at 50 rings */
         if (tri_dir()) {
+            /* Optional S3-style bonus entry retains the native 20-ring CMP.
+             * Do not route it through Sonic 2's special-stage selection. */
+            if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 &&
+                s3_gameplay.checkpoint_bonus) return 0;
             extern int tri_ss_stars_wanted(void);
             if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S2 && tri_ss_stars_wanted()) g_cpu.SR &= ~1u;
             else g_cpu.SR |= 1u;
@@ -437,6 +442,8 @@ int tri_flow_hook(uint32_t pc)
         return 0;
     case TH_STARS_TOUCH:            /* the star circle: Sonic 2's special stage, not a bonus stage */
         if (tri_dir()) {
+            if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 &&
+                s3_gameplay.checkpoint_bonus) return 0;
             extern int tri_ss_stars_touch(void);
             return tri_ss_stars_touch();
         }
