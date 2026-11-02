@@ -12,11 +12,12 @@ void s3_gameplay_load(const char *settings_path,const char *mode);
 int s3_gameplay_save(void);
 int s3_gameplay_netplay_allowed(void);
 void s3_gameplay_apply(uint8_t ram[65536]);
-/* Audited native Sonic branch: zero leaves every native instruction intact.
- * A nonzero target is a tail jump into the original eligibility/transform
- * routine; the caller must exclude alternate character implementations. */
+/* Audited native Sonic elemental BEQ sites. When true, set only CCR.Z before
+ * executing the original branch, eventually reaching native CheckTransform.
+ * Return0 from the instruction hook in both cases: no routine/stack is replaced.
+ * The caller must exclude alternate character implementations. */
 int s3_gameplay_owns(uint32_t pc);
-uint32_t s3_gameplay_transform_target(uint32_t pc,const uint8_t ram[65536],
-                                     uint32_t actor,int native_sonic);
+int s3_gameplay_skip_shield(uint32_t pc,const uint8_t ram[65536],
+                            uint32_t actor,int native_sonic);
 const struct RecompLauncherCModProvider *s3_gameplay_mods(
     const struct RecompLauncherCModProvider *base);

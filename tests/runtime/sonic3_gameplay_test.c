@@ -128,53 +128,57 @@ static void test_shield_transform(void)
     const char *modes[]={"sonic3","sonic3k","sandk"};
     for(unsigned m=0;m<3;++m) {
         s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
-        unsigned pc=m?0x1192C:0x12946,target=m?0x119D2:0x129EC;
+        unsigned pc=m?0x1193C:0x12956;
+        const unsigned sites[]={pc,m?0x11980u:0x1299Au,m?0x119A8u:0x129C2u};
         unsigned demo=m?0xFFD0:0xFFF0,competition=m?0xFFE8:0xFFD8;
         CHECK(s3_gameplay_owns(pc)&&!s3_gameplay_owns(pc+2));
         memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xB02A]=2;
         ram[0xB02B]=0x11;ram[0xF602]=1;ram[0xF603]=0x20;
         ram[0xFE1E]=1;ram[0xFE21]=50;if(m)ram[0xFFB0]=7;else ram[0xFFB1]=7;
         memcpy(before,ram,sizeof ram);
-        CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));
+        for(unsigned k=0;k<3;++k)CHECK(!s3_gameplay_skip_shield(sites[k],ram,0xFFFFB000u,1));
         s3_gameplay.shield_transform=1;
         for(unsigned shield=0x10;shield<=0x40;shield<<=1)for(unsigned jump=0x10;jump<=0x40;jump<<=1) {
             ram[0xB02B]=(uint8_t)(1|shield);ram[0xF603]=(uint8_t)jump;
             memcpy(before,ram,sizeof ram);
-            CHECK(s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1)==target);
+            for(unsigned k=0;k<3;++k) {
+                CHECK(s3_gameplay_owns(sites[k]));
+                CHECK(s3_gameplay_skip_shield(sites[k],ram,0xFFFFB000u,1)==1);
+            }
             CHECK(!memcmp(before,ram,sizeof ram));
-            CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,0)); /* Shadow/Mighty. */
-            CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB04Au,1));
-            CHECK(!s3_gameplay_transform_target(pc+2,ram,0xFFFFB000u,1));
+            CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,0)); /* Shadow/Mighty. */
+            CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB04Au,1));
+            CHECK(!s3_gameplay_skip_shield(pc+2,ram,0xFFFFB000u,1));
         }
         /* Every unavailable case leaves the native shield action intact. */
         const unsigned blocked[]={0xB02F,0xFE19,0xFE08,demo,demo+1,competition,competition+1};
         for(unsigned i=0;i<sizeof blocked/sizeof blocked[0];++i) {
             unsigned p=blocked[i];uint8_t old=ram[p];ram[p]=1;
-            CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));ram[p]=old;
+            CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));ram[p]=old;
         }
         const unsigned required[]={0xF602,0xF603,0xFE1E,0xB02A};
         for(unsigned i=0;i<sizeof required/sizeof required[0];++i) {
             unsigned p=required[i];uint8_t old=ram[p];ram[p]=0;
-            CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));ram[p]=old;
+            CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));ram[p]=old;
         }
-        ram[0xFE21]=49;CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));ram[0xFE21]=50;
-        ram[0xB02B]=0x43;CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));
-        ram[0xB02B]=1;CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));
-        ram[0xB02B]=0;CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));CHECK(!ram[0xB02B]);
+        ram[0xFE21]=49;CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));ram[0xFE21]=50;
+        ram[0xB02B]=0x43;CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));
+        ram[0xB02B]=1;CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));
+        ram[0xB02B]=0;CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));CHECK(!ram[0xB02B]);
         ram[0xB02B]=0x41;
         const uint8_t menus[]={0,4,8,0x28,0x34,0x8C};
-        for(unsigned i=0;i<sizeof menus;++i){ram[0xF600]=menus[i];CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));}
+        for(unsigned i=0;i<sizeof menus;++i){ram[0xF600]=menus[i];CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));}
         ram[0xF600]=12;ram[0xFFB0]=0;ram[0xFFB1]=6;
-        CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));
+        CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));
         if(m) {
             ram[0xFFB0]=7;ram[0xFFBA]=1;
-            CHECK(!s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1));
-            ram[0xFFB1]=7;CHECK(s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1)==target);
+            CHECK(!s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1));
+            ram[0xFFB1]=7;CHECK(s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1)==1);
         } else {
             ram[0xFFB1]=7;ram[0xFFBA]=1;
-            CHECK(s3_gameplay_transform_target(pc,ram,0xFFFFB000u,1)==target);
+            CHECK(s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1)==1);
         }
-        CHECK(!s3_gameplay_transform_target(pc,NULL,0xFFFFB000u,1));
+        CHECK(!s3_gameplay_skip_shield(pc,NULL,0xFFFFB000u,1));
     }
 }
 int main(void)
