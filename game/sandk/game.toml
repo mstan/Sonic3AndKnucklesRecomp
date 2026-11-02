@@ -494,3 +494,9 @@ addr = 0x47A96 # Extras collide with sub_47A96
 kind = "game_hook"
 
 # END knuckles-army hooks
+
+# Opt-in native Sonic shielded transformation; sonic3k.lst Sonic_FireShield.
+# Original opcode0828 0001 002B; disabled path preserves the native BTST.
+[[widescreen_site]]
+addr = 0x1192C
+kind = "game_hook"
