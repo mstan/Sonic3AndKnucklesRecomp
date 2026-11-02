@@ -59,6 +59,7 @@ TRI_ZONE = {'GHZ': 0x20, 'LZ': 0x21, 'MZ': 0x22, 'SLZ': 0x23, 'SYZ': 0x24, 'SBZ'
 
 # S3K VRAM tiles that common objects own; level art must stay below.
 S3K_LEVEL_TILE_LIMIT = 0x45C
+S1_FLAG_PLANE_EXTPAL = 1       # stage_pack.h: optional S1 SYZ source-line-0 mask
 
 
 def be16(b, a): return (b[a] << 8) | b[a + 1]
@@ -516,10 +517,15 @@ class Sonic1:
         # ---- per-act level art: only what this act can show
         need = self.objects.act_assets(z, act)
         tables = {0: L0_MAP, 1: L1_PERM, 2: list(range(16)), 3: list(range(16))}
+        if name == 'SYZ':
+            tables[0] = list(range(16))  # original Sonic palette via existing extended line 1
         pinned = S1_ANIMATED.get(name, [])
         pk = Packer(self._vram, tables, S3K_LEVEL_TILE_LIMIT, pinned)
+        plane_source_tiles = set()
         for t0, n, line in self.objects.level_asset_groups(need):
             pk.place_group(t0, n, line)
+            if line == 0:
+                plane_source_tiles.update(range(t0, t0 + n))
         blocks = bytearray(self._blocks)
         used_blocks = set()
         for ch in chunks:
@@ -548,6 +554,8 @@ class Sonic1:
                 w = be16(blocks, o)
                 if b in used_blocks:
                     pk.place_single(w & 0x7FF, (w >> 13) & 3)
+                    if not (w & 0x6000):
+                        plane_source_tiles.add(w & 0x7FF)
         for b in range(len(blocks) // 8):
             for k in range(4):
                 o = b * 8 + k * 2
@@ -556,6 +564,14 @@ class Sonic1:
                 w = (w & 0xF800) | nt
                 blocks[o] = w >> 8
                 blocks[o + 1] = w & 0xFF
+        plane_mask = bytearray(256) if name == 'SYZ' else b''
+        if plane_mask:
+            # Include source-line-0 block pieces and the level-art object
+            # groups packed above. Both use these same original colours.
+            for t in plane_source_tiles:
+                nt = pk.slot[(t, 0)]
+                assert 0 < nt < S3K_LEVEL_TILE_LIMIT
+                plane_mask[nt >> 3] |= 1 << (nt & 7)
         # animated ranges keep their slots; their pixels take the colour remap
         # of the palette line the zone's blocks draw them with
         lines = self.anim_lines(name)
@@ -591,7 +607,7 @@ class Sonic1:
         if name == 'LZ':
             wy = (0xB8, 0x328, 0x900, 0x228)[act]
             wpal = self.water_palette(0x27A0 if act == 3 else 0x2460, bank)
-        s1info_a = bank.add(bytes(raw) + rom[lt:lt + 4] + struct.pack('>BBH', wpal, 0, wy) + lz3_swap)
+        s1info_a = bank.add(bytes(raw) + rom[lt:lt + 4] + struct.pack('>BBH', wpal, 0, wy) + lz3_swap + plane_mask)
         ob, rb = self.objects.convert_objects(z, act)
         assets_a = self.objects.build_assets(bank, name, free, need, pk.slot, act)
         objs_a = bank.add(ob, dedupe=False)
@@ -604,6 +620,7 @@ class Sonic1:
         # S1 song id (s1_music.py); SBZ act 3 internal = Final Zone
         d[e + 0x24] = 0x8D if (name == 'SBZ' and act == 2) else S1_ZONE_SONG[name]
         d[e + 0x25] = 1           # game: S1
+        d[e + 0x26] = S1_FLAG_PLANE_EXTPAL if plane_mask else 0
         struct.pack_into('>III', d, e + 0x28, ang_a, hgt_a, hgtr_a)
         struct.pack_into('>I', d, e + 0x3C, s1info_a)
         struct.pack_into('>II', d, e + 0x34, objptrs_a, assets_a)

@@ -136,6 +136,21 @@ int s3_pack_validate(const char *path, int content, char *error, unsigned capaci
                 if(p<0x402040 || p-0x400000>=(uint32_t)size-12) goto done;
             }
         }
+    /* Validate every flagged directory slot, including otherwise unused acts;
+     * no bogus optional pointer may escape validation through enrollment. */
+    for(unsigned i=0;i<128;i++) {
+        const uint8_t *e=data+0x40+i*0x40;
+        if(!(e[0x26] & S3_PACK_S1_PLANE_EXTPAL))continue;
+        uint32_t info=be32(e+0x3C),payload=(uint32_t)size-12;
+        if(i/4!=4 || i%4>=3 || e[0x25]!=1 ||
+           !range(info,S3_PACK_S1_PLANE_MASK+S3_PACK_S1_PLANE_MASK_BYTES,payload))goto done;
+        const uint8_t *mask=data+info-0x400000u+S3_PACK_S1_PLANE_MASK;
+        /* Tile zero and common/player/character pattern banks must never
+         * inherit a scenery marker, even in an untrusted pack. */
+        if(mask[0]&1u)goto done;
+        for(unsigned t=S3_PACK_LEVEL_TILE_LIMIT;t<2048;t++)
+            if((mask[t>>3]>>(t&7))&1u)goto done;
+    }
     if(megamix) {
         uint32_t p=be32(data+0x24)-0x400000u;
         uint32_t payload=(uint32_t)size-12;

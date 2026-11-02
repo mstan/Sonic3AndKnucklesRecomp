@@ -1,6 +1,12 @@
 #pragma once
 #include <stddef.h>
 #include <stdint.h>
+/* Optional S1 SYZ lossless source-line-0 patterns. Old flag-zero banks keep
+ * their original layout and lossy remap. Bitmap bits are LSB-first by tile. */
+#define S3_PACK_S1_PLANE_EXTPAL 1u
+#define S3_PACK_S1_PLANE_MASK 0x210u
+#define S3_PACK_S1_PLANE_MASK_BYTES 256u
+#define S3_PACK_LEVEL_TILE_LIMIT 0x45Cu
 struct RecompLauncherCModProvider;
 extern int s3_stage_pack_enabled;
 extern int s3_stage_pack_megamix, s3_stage_pack_mighty;

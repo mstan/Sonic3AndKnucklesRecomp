@@ -11,6 +11,7 @@
  */
 #include "trilogy_obj.h"
 #include "trilogy_hooks.h"
+#include "stage_pack.h"
 #include "video/genesis_vdp.h"
 #include <string.h>
 
@@ -20,6 +21,7 @@
 static uint8_t s_tiles[2048];               /* VRAM tile -> extended line (0 / 1) */
 static uint16_t s_cur[2][16], s_tgt[2][16]; /* [0] above water, [1] below */
 static int s_have;                          /* this act has an extended line */
+static uint8_t s_plane_tiles[S3_PACK_S1_PLANE_MASK_BYTES];
 
 void tri_ext_tiles(uint32_t tile, uint32_t n, int on)
 {
@@ -29,13 +31,17 @@ void tri_ext_tiles(uint32_t tile, uint32_t n, int on)
 
 /* A level (re)starting (tri_obj_level_entry): the last load's flags would
  * otherwise colour the title card's tiles until this act's art is uploaded */
-void tri_ext_clear_tiles(void) { memset(s_tiles, 0, sizeof s_tiles); }
+void tri_ext_clear_tiles(void)
+{
+    memset(s_tiles, 0, sizeof s_tiles);
+    memset(s_plane_tiles, 0, sizeof s_plane_tiles);
+}
 
 /* Level load: no tiles flagged yet; colours at their targets (a fade-in
  * fills them black first, exactly as it does CRAM). */
 void tri_ext_level(void)
 {
-    memset(s_tiles, 0, sizeof s_tiles);
+    tri_ext_clear_tiles();
     s_have = 0;
     uint32_t t = tri_rd32(TRI_BANK_BASE + TB_BLOBS);
     uint32_t b = t ? tri_rd32(t + TRI_BLOB_EXTPAL * 4u) : 0;
@@ -54,6 +60,15 @@ void tri_ext_level(void)
         s_have |= c != 0;
     }
     memcpy(s_cur, s_tgt, sizeof s_cur);
+    uint32_t dir = tri_dir();
+    if (tri_zone() == TRI_S1_SYZ && tri_rd8(dir + TD_GAME) == TRI_GAME_S1 &&
+        (tri_rd8(dir + TD_FLAGS) & S3_PACK_S1_PLANE_EXTPAL)) {
+        /* The loader validates the complete flagged $310-byte info block.
+         * Cache only its bitmap, never read past old flag-zero S1 info. */
+        uint32_t mask = tri_rd32(dir + TD_EXTRA) + S3_PACK_S1_PLANE_MASK;
+        for (unsigned k = 0; k < sizeof s_plane_tiles; k++)
+            s_plane_tiles[k] = tri_rd8(mask + k);
+    }
 }
 
 /* ---- S3K's fade steps, on the extended line ----------------------------- */
@@ -143,6 +158,8 @@ void tri_ext_frame(void)
     if(actors) {
         memcpy(top, s_cur[0], sizeof s_cur[0]);
         memcpy(bot, s_cur[1], sizeof s_cur[1]);
+        for (unsigned t = 1; t < S3_PACK_LEVEL_TILE_LIMIT; t++)
+            if ((s_plane_tiles[t >> 3] >> (t & 7)) & 1) s_tiles[t] = 1;
     }
     int mighty=tri_mighty_presentation_frame(s_tiles,top+32,bot+32);
     extern int tri_signpost_frame(uint16_t *,uint16_t *);
