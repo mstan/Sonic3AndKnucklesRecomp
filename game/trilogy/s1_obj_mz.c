@@ -629,8 +629,23 @@ static void button(uint32_t o)
 #define PB_LAVA   0x32
 #define PB_ORIGX  0x34
 #define PB_ORIGY  0x36
+#define PB_SOUND  0x38
 #define PB_STATE  0x3A
 #define PB_LAVABLOCK 0x16A          /* first MZ lava block */
+
+static void pushb_sound(uint32_t o)
+{
+    /* S1 ignores repeated sfx_Push until its 7+2+6+16 tick sequence clears
+     * f_push_playing. S3K's equivalent $69 has no such driver flag. Keep the
+     * gate in saved object RAM, shared by the live push blocks. */
+    for (uint32_t slot = 0; slot < 110; slot++) {
+        uint32_t p = RAM_Object_RAM + slot * OBJ_SIZE;
+        if (r32(p + OBJ_code) == NATIVE_S1_BASE + 0x33 * 4u && OB8(p, PB_SOUND))
+            return;
+    }
+    SET8(o, PB_SOUND, 31);
+    o_sfx(0x69);
+}
 
 static void pushb_land(uint32_t o, int16_t d1, uint16_t blk)
 {
@@ -665,11 +680,15 @@ static void pushb_solid(uint32_t o, int d1, int d2, int d3, int d4)
         }
         return;
     }
+    uint16_t player_x = OB16(RAM_Player_1, OBJ_x_pos);
     o_solid(o, d1, d2, d3, d4);
     if (!(g_o_d6 & (1u << 16)) || OB8(o, PB_LAVA))  /* P1 side contact */
         return;
     uint32_t p = RAM_Player_1;
     if (OB8(p, OBJ_status) & 2) return;        /* in the air */
+    /* S1's tst.w d0 rejects side contact without horizontal penetration.
+     * SolidObjectFull also visits P2, so retain P1's correction explicitly. */
+    if (OB16(p, OBJ_x_pos) == player_x) return;
     int right = (int16_t)OB16(p, OBJ_x_pos) < (int16_t)OB16(o, OBJ_x_pos);
     int d0, vel;
     if (right) {
@@ -686,7 +705,7 @@ static void pushb_solid(uint32_t o, int d1, int d2, int d3, int d4)
     SET16(p, OBJ_x_pos, OB16(p, OBJ_x_pos) + d0);
     SET16(p, OBJ_ground_vel, vel);
     SET16(p, OBJ_x_vel, 0);
-    o_sfx(0x69);                               /* sfx_Push */
+    pushb_sound(o);
     if (OB8(o, OBJ_subtype) & 0x80) return;
     int16_t f = o_floor_dist(o);
     if (f > 4) {
@@ -734,6 +753,7 @@ static void pushb_offscreen(uint32_t o)        /* loc_BFE6 */
 
 static void push_block(uint32_t o)
 {
+    if (OB8(o, PB_SOUND)) SET8(o, PB_SOUND, OB8(o, PB_SOUND) - 1);
     switch (OB8(o, OBJ_routine)) {
     case 0: {
         static const uint8_t var[2][2] = { { 0x10, 0 }, { 0x40, 1 } };

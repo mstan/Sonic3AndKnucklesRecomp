@@ -19,7 +19,7 @@ For the separate owned-disc conversion and its 70 act/time variants, see
 
 ## Build your stage bank
 
-### Direct import in development builds (unreleased)
+### Direct import in v0.7.0 and later
 
 In **Mods**, open the campaign's **Files** and select your supported Sonic 1
 or Sonic 2 ROM, or a ZIP containing it. The complete package includes an

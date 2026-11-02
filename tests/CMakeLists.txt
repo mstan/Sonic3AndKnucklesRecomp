@@ -62,6 +62,22 @@ add_executable(trilogy_water_palette_test runtime/trilogy_water_palette_test.c)
 target_include_directories(trilogy_water_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME trilogy_water_palette COMMAND trilogy_water_palette_test)
+add_executable(trilogy_mz_push_test runtime/trilogy_mz_push_test.c)
+target_include_directories(trilogy_mz_push_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+# The fixture includes the real object module; unrelated object handlers are
+# deliberately discarded rather than replaced with permissive test stubs.
+if(MSVC)
+    target_compile_options(trilogy_mz_push_test PRIVATE /Gy)
+    target_link_options(trilogy_mz_push_test PRIVATE /OPT:REF)
+elseif(APPLE)
+    target_compile_options(trilogy_mz_push_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(trilogy_mz_push_test PRIVATE -Wl,-dead_strip)
+else()
+    target_compile_options(trilogy_mz_push_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(trilogy_mz_push_test PRIVATE -Wl,--gc-sections)
+endif()
+add_test(NAME trilogy_mz_push COMMAND trilogy_mz_push_test)
 add_executable(trilogy_syz_palette_test runtime/trilogy_syz_palette_test.c)
 target_include_directories(trilogy_syz_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")

@@ -171,6 +171,25 @@ extra = [
 ]
 
 # Opt-in host renderer. Stock skdisasm 1e1b5af S3 cartridge verified byte-perfect.
+# The life formatter accepts two digits; larger stocks append a ROM glyph.
+[[widescreen_site]]
+addr = 0xEE72 # HUD_Lives: after loading Life_count into D1
+kind = "game_hook"
+
+# Platform families use CMP.W $42(A0),D0 after the same native coarse
+# camera subtraction. Match their early activation and lifetime to the view.
+[[widescreen_site]]
+addr = 0x23E1E # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x2452A # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x24646 # Native platform variable-range cull
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x19CF2 # Reset placement lifetime
 kind = "game_hook"

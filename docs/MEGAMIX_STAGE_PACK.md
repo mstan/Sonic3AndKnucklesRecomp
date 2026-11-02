@@ -13,7 +13,7 @@ checkboxes. Enable either character without adding stages, or stages without
 adding either character. Sonic 1 and Sonic 2 remain independent too.
 
 All three Megamix entries require your own **Sonic Megamix v3 ROM**.
-**Development builds (unreleased)** accept its raw BIN/MD/GEN file or ROM ZIP
+**v0.7.0 and later** accept its raw BIN/MD/GEN file or ROM ZIP
 under **Files** and automatically prepare the campaign and character resources.
 The packaged offline helper requires no Python/Pillow installation and no
 Sonic 1 or Sonic 2 cartridge. It retains the verified raw Megamix ROM in the

@@ -15,7 +15,7 @@ the shared disc importer does not turn it into an original-program CD session.
 
 ## Convert your owned disc
 
-The supported game is **Sonic CD (US)**. Development builds (unreleased) accept
+The supported game is **Sonic CD (US)**. v0.7.0 and later accept
 these inputs directly under the mod's **Files**:
 
 | Input | Imported content and audio |
@@ -44,7 +44,7 @@ release.
 No disc, BIOS, ROM, converted pack or save is distributed. This S3K campaign
 does not require a BIOS.
 
-**Development packages (unreleased)** bundle the offline converter and its
+**v0.7.0 and later packages** bundle the offline converter and its
 Python/Pillow runtime; players do not install either dependency. **Published
 v0.6.4** requires Python 3.11 or later and Pillow (`python -m pip install Pillow`).
 Then:

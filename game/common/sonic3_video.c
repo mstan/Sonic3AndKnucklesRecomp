@@ -29,7 +29,10 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_TITLE_PLANE_SIZE=0x11,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
-       S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374 };
+       S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374,
+       S3_MOVING_PLATFORM_CULL=0x23E1E, S3_FLOATING_PLATFORM_CULL=0x2452A,
+       S3_SWING_PLATFORM_CULL=0x24646,
+       S3_HUD_LIFE_VALUE=0xEE72, S3_LIFE_DIGITS=0xF1D2 };
 #else
 enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
@@ -40,7 +43,10 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_TITLE_PLANE_SIZE=1,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
-       S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C };
+       S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C,
+       S3_MOVING_PLATFORM_CULL=0x24F28, S3_FLOATING_PLATFORM_CULL=0x25634,
+       S3_SWING_PLATFORM_CULL=0x25750,
+       S3_HUD_LIFE_VALUE=0xE12A, S3_LIFE_DIGITS=0xE48A };
 #endif
 
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -770,8 +776,15 @@ static void publish_sprites(void)
     memcpy(dst->sat,s_build.sat,640);
     memcpy(dst->sprites,s_build.sprites,s_build.count*sizeof(SceneSprite));
 }
+#include "sonic3_lives.inc"
+
 int s3_video_hook(uint32_t pc)
 {
+    if(pc==S3_HUD_LIFE_VALUE) {
+        /* Change only the formatter argument, never the earned counter. */
+        if(g_cpu.D[1]>=100)g_cpu.D[1]/=10;
+        return 0;
+    }
     if(s_interpolation_enabled && !enabled()) {
         if(pc==S3_CAPTURE) {
             s_capture_frame=&s_ix_build;s_capture_readonly=1;capture_objects();
@@ -799,7 +812,21 @@ int s3_video_hook(uint32_t pc)
         if(gameplay()) {
             int x=(uint16_t)((uint16_t)g_cpu.D[0]+ram16(0xF7DA));
             int lo,hi;activation_bounds(ram16(0xEE78),s_requested_width,&lo,&hi);
-            g_cpu.D[0]=(g_cpu.D[0]&0xFFFF0000u)|((x<lo || x>=hi)?641u:320u);
+            /* These platform families compare against their saved range,
+             * rather than the usual immediate $280. Without the matching
+             * hook, early wide activation deletes them while the host loader
+             * still considers their placement loaded. Keep their authored
+             * range/physics intact and only translate this cull comparison. */
+            unsigned limit=640;
+            if(pc==S3_MOVING_PLATFORM_CULL || pc==S3_FLOATING_PLATFORM_CULL ||
+               pc==S3_SWING_PLATFORM_CULL) {
+                limit=ram16(g_cpu.A[0]+0x42);
+                /* Long sweeps bias their saved anchor by $100 and extend
+                 * the original range by the same amount. */
+                if(limit>640)hi+=(int)limit-640;
+            }
+            g_cpu.D[0]=(g_cpu.D[0]&0xFFFF0000u)|
+                ((x<lo || x>=hi)?limit+1u:limit/2u);
         }
         return 0;
     }
@@ -987,11 +1014,12 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
     if(!line){++s_frames;s_native_x=origin;}
 }
 
-static void render_scanline(const GVDP *v, int line, const uint32_t *native, int nw,
+static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
                             GameVideoNativeRow native_row, void *native_ctx,
-                            const GVDPRasterRow *raster)
+                            const GVDPRasterRow *raster,int *hud_origin)
 {
+    *hud_origin=(width-nw)/2;
     /* Publish one immutable art/scroll snapshot per frame. Palettes and the
      * scripted foreground VSRAM switch remain live across native HBlank. */
     unsigned live_fg_scroll=presentation_fg_scroll(line,v->vsram[0]);
@@ -1180,8 +1208,13 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
          * offsets belong to the planes, never to the object camera or the
          * bounded viewport. Keep sampling the deformed planes below while
          * projecting actors against the same camera used by Render_Sprites. */
-        s_camera=level?presentation_camera(0,s_frame_fg_x):camera;
-        s_camera_y=level?presentation_camera(1,s_frame_fg_y):camera_y;if(!s_interpolating)++s_frames;
+        /* GHZ/SYZ deform only B. Their next camera copy can already be in
+         * RAM while the previous scroll/SAT is still installed. Project
+         * those actors against the installed A camera, just like terrain,
+         * rather than adding a one-pixel correction ahead of its upload. */
+        int installed_camera=level && (s_frame_zone==0x20 || s_frame_zone==0x24);
+        s_camera=level?presentation_camera(0,installed_camera?camera:s_frame_fg_x):camera;
+        s_camera_y=level?presentation_camera(1,installed_camera?camera_y:s_frame_fg_y):camera_y;if(!s_interpolating)++s_frames;
         s_left=level?view_left(s_camera,width):camera-(width-nw)/2;
         if(level && s_display && s_display->preview_knux) {
             /* This AIZ2 waiting phase adds only 0/1px heat offsets to A.
@@ -1293,12 +1326,18 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
      * is the close, collidable boss arena entered by the later events. */
     if(bg_world && s_frame_zone==22 && !s_frame_act && !s_frame_bg_event)
         bg_width=512;
+    int aiz_intro_canvas=bg_world && !s_frame_zone && !s_frame_act && !s_frame_bg_event;
     int background_x=-bg_origin-hs_b;
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
     GenesisTileRow fg={0},bg={0};
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
+        /* IntroDeform clamps each band's streaming origin at zero. Left
+         * extensions still wrap the first installed 512px canvas while the
+         * virtual HScroll crosses zero; later positive coast cells are a
+         * continuous world, not that repeat period. */
+        int source_bx=aiz_intro_canvas && reference_bx<0?(reference_bx&511):background_x;
         /* Title/menu backgrounds only initialize the visible 40 tile
          * columns; repeat that composition, not the stale 512px name table. */
         if(!level && !special && !file_select){
@@ -1318,8 +1357,8 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
             gtile_row_begin(&fg,v->vram,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         }
         if(!bg.remaining) {
-            uint16_t attr=bg_world?world_attr(s_background_frame,background_x,by,1):plane_attr(v,base_b,bx,by);
-            gtile_row_begin(&bg,v->vram,attr,bg_world?background_x:bx,by);
+            uint16_t attr=bg_world?world_attr(s_background_frame,source_bx,by,1):plane_attr(v,base_b,bx,by);
+            gtile_row_begin(&bg,v->vram,attr,bg_world?source_bx:bx,by);
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
@@ -1368,8 +1407,8 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
             }
             if(s_frame_bg_event==0) {
                 art=by>=0x380?&s_aiz_intro:&s_aiz_main;
-                b=world_attr_blocks(s_background_frame,art->blocks,background_x,by,1);
-                bp=pattern_pixel(&art->video,b,background_x,by);
+                b=world_attr_blocks(s_background_frame,art->blocks,source_bx,by,1);
+                bp=pattern_pixel(&art->video,b,source_bx,by);
                 bpalette=by>=0x380?intro_palette:forest_palette;
             }
         }
@@ -1474,6 +1513,7 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         if(s_frame_level && s_display->preview_knux)
             s3_knux_preview_scanline(g_rom,line,out,width,origin,
                 s_knux_plane_camera_x,s_knux_plane_camera_y);
+        *hud_origin=0;
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
@@ -1487,6 +1527,15 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         int first=origin<0?-origin:0,last=origin+nw>width?width-origin:nw;
         if(last>first)memcpy(out+origin+first,native+first,(size_t)(last-first)*sizeof(uint32_t));
     }
+}
+
+static void render_scanline(const GVDP *v,int line,const uint32_t *native,int nw,
+                            uint32_t *out,int width,GameVideoNativeRow native_row,
+                            void *native_ctx,const GVDPRasterRow *raster)
+{
+    int origin;
+    render_scanline_base(v,line,native,nw,out,width,native_row,native_ctx,raster,&origin);
+    life_ones_scanline(v,s_interpolating?s_world_frame:g_ram,line,out,width,origin);
 }
 
 static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)
@@ -1571,7 +1620,7 @@ static S3VideoFrameOverlay s_frame_overlay;
 void s3_video_set_frame_overlay(S3VideoFrameOverlay draw) { s_frame_overlay = draw; }
 static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int width)
 {
-    (void)v;
+    if(!enabled())life_ones_scanline(v,g_ram,line,out,width,(width-320)/2);
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
 
@@ -1726,6 +1775,15 @@ static void interpolation_capture(const GVDP *v,int line,const uint32_t *image,
             c->bg_band[0]=(int16_t)ram16(0xA802);c->bg_band[1]=(int16_t)ram16(0xA806);
             c->width=width;
             if(c->level && !c->zone && !c->act)load_aiz_art();
+        }
+        /* Canonical GHZ/SYZ actors follow installed, undeformed A scroll.
+         * Keep that same camera basis in the owned fractional snapshots;
+         * the RAM copy may already be preparing the next native frame. */
+        RenderContext *c=&f->context;
+        if(c->level && (c->zone==0x20 || c->zone==0x24)) {
+            unsigned base=(c->video.reg[13]&63u)<<10;
+            c->fg_x=unwrap(-(int16_t)vram16(&c->video,base),c->fg_x);
+            c->fg_y=unwrap(c->video.vsram[0],c->fg_y);
         }
         if(scene)f->scene=*scene;else memset(&f->scene,0,sizeof f->scene);
         /* Finite/native projections, scene replacement and host-only crowd

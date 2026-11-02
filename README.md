@@ -14,7 +14,7 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The v0.7.0 release
+the separate versions need their corresponding ROMs. The v0.7.1 release
 provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
@@ -162,7 +162,7 @@ import to finish before pressing PLAY. **No Sega CD BIOS is needed for this
 mod.** It uses Sonic 3 & Knuckles' characters and abilities. For the original
 Sonic CD experience, see [SonicCDRecomp](https://github.com/mstan/SonicCDRecomp).
 
-**Development builds — unreleased:** under a mod's **Files**, select your
+**v0.7.0 and later:** under a mod's **Files**, select your
 Sonic 1, Sonic 2 or Megamix ROM, or a ZIP containing that ROM. The bundled
 offline importer verifies it, prepares a private cached campaign and fills in
 the resources automatically. Each campaign needs only its own cartridge and
