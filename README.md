@@ -52,6 +52,9 @@ local play in Sonic 3, Sonic & Knuckles and the combined game:
 - **Sonic 1 checkpoint bonus stages**, in the combined game, adds entry stars
   above activated imported Sonic 1 checkpoints when you have at least 20 rings.
   Jump into the stars to visit a native bonus stage and return to the checkpoint.
+- **Tails giant-ring follow**, in imported Sonic 1 acts, lets a nearby companion
+  run and jump after you into the end-of-act ring. He enters when he reaches it;
+  distant or missing companions keep normal behavior.
 
 ## Every zone, across the campaigns
 
