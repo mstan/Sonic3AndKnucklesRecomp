@@ -15,14 +15,14 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
 the separate versions need their corresponding ROMs. The v0.7.0 release
-candidate provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
 
 ## New options in v0.7.0
 
-These controls are included in the release candidate.
+These controls are included in v0.7.0.
 
 In **Mods**, enable **High refresh rate**, then choose **Presentation rate**:
 120, 144 or Display. Display follows the monitor's refresh rate. Gameplay and
