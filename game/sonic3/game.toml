@@ -407,8 +407,14 @@ kind = "game_hook"
 addr = 0x5A6A8 # CMP.W #$280,D0 after native coarse-camera subtraction
 kind = "game_hook"
 
-# Opt-in native Sonic shielded transformation; s3.lst Sonic_FireShield.
-# Original opcode0828 0001 002B; disabled path preserves the native BTST.
+# Opt-in Sonic shielded transformation; original elemental BEQ instructions.
+# Only CCR.Z is overridden; generated and interpreted paths execute native code.
 [[widescreen_site]]
-addr = 0x12946
+addr = 0x12956 # BEQ Sonic_LightningShield (673C)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1299A # BEQ Sonic_BubbleShield (6720)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x129C2 # BEQ Sonic_CheckTransform (6728)
 kind = "game_hook"

@@ -56,9 +56,10 @@ int s3_gameplay_netplay_allowed(void)
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
 int s3_gameplay_owns(uint32_t pc)
-{return pc==(standalone_s3?0x12946u:0x1192Cu);}
-uint32_t s3_gameplay_transform_target(uint32_t pc,const uint8_t ram[65536],
-                                     uint32_t actor,int native_sonic)
+{return standalone_s3?(pc==0x12956u || pc==0x1299Au || pc==0x129C2u):
+                     (pc==0x1193Cu || pc==0x11980u || pc==0x119A8u);}
+int s3_gameplay_skip_shield(uint32_t pc,const uint8_t ram[65536],
+                            uint32_t actor,int native_sonic)
 {
     if(!s3_gameplay.shield_transform || !native_sonic || !s3_gameplay_owns(pc) ||
        !ram || (actor&0xFFFFFFu)!=0xFFB000u || ram[0xF600]!=12)return 0;
@@ -77,7 +78,7 @@ uint32_t s3_gameplay_transform_target(uint32_t pc,const uint8_t ram[65536],
     if(standalone_s3) {
         if(word(ram,0xFFB0)<7)return 0;
     } else if(ram[0xFFB1]<7 && (ram[0xFFB0]<7 || ram[0xFFBA]))return 0;
-    return standalone_s3?0x129ECu:0x119D2u;
+    return 1;
 }
 void s3_gameplay_apply(uint8_t ram[65536])
 {
