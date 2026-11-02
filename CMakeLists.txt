@@ -226,7 +226,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         ${GENERATED_SOURCES}
         "${GAME}/${PREFIX}_spec.c"
     )
-    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c")
+    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
+        "${S3_GAME_COMMON}/sonic3_gameplay.c")
     # Game-owned mods that run S&K code: the combined cart and S&K alone.
     if(NOT PREFIX STREQUAL "sonic3")
         list(APPEND SHARED_SRC

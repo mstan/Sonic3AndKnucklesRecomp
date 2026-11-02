@@ -16,6 +16,7 @@
 #include "genesis_runtime.h"
 #include "sonic_extras.h"
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
+#include "sonic3_gameplay.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -229,7 +230,12 @@ static const GameDebugCommand s3_commands[] = {
     { "object_table", s3_cmd_object_table },
 };
 
+static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); }
 const GameSpec g_game_spec = {
+    .load_settings          = gameplay_settings,
+    .mods                   = s3_gameplay_mods,
+    .netplay_allowed        = s3_gameplay_netplay_allowed,
     .video                  = &sonic3_video,
     .instruction_hook       = s3_video_hook,
     .main_cpu_divisor       = s3_video_main_cpu_divisor,
@@ -255,7 +261,7 @@ const GameSpec g_game_spec = {
     .call_periodic          = NULL,
 
     .on_post_reset          = NULL,
-    .on_frame_pre           = NULL,
+    .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 

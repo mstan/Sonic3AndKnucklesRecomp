@@ -15,6 +15,7 @@
 #include "sonic3_video.h"
 #include "sonic3_knuckles_army.h"
 #include "sonic3_mods.h"
+#include "sonic3_gameplay.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
 #include "trilogy.h"
@@ -56,10 +57,10 @@ static int s3k_instruction(uint32_t pc)
 extern void tri_obj_vblank(void);
 static void s3k_call_entry_point(void) { trilogy_init(); s3_army_init(); recomp_call_addr(0x000206u); }
 static void s3k_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); if (tri_bank_loaded()) tri_obj_vblank(); }
-static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); s3_stage_pack_load(path); }
+static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); s3_gameplay_load(path,"sonic3k"); s3_stage_pack_load(path); }
 static const struct RecompLauncherCModProvider *s3k_mods(const struct RecompLauncherCModProvider *base)
-{ return s3_stage_pack_mods(s3_mods(base)); }
-static int s3k_netplay_allowed(void) { return !s3_stage_pack_enabled && s3_mods_netplay_allowed(); }
+{ return s3_stage_pack_mods(s3_gameplay_mods(s3_mods(base))); }
+static int s3k_netplay_allowed(void) { return !s3_stage_pack_enabled && s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void s3k_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* ---- 68K work-RAM accessors ---- */
@@ -226,6 +227,7 @@ static const GameDebugCommand s3k_commands[] = {
     { "knuckles_army", s3_army_command },
 };
 
+static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
     .state_size             = s3_state_size,
@@ -274,7 +276,7 @@ const GameSpec g_game_spec = {
     .call_periodic          = NULL,
 
     .on_post_reset          = NULL,
-    .on_frame_pre           = NULL,
+    .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 

@@ -101,6 +101,10 @@ add_executable(sonic3_mods_test runtime/sonic3_mods_test.c "${S3_GAME_COMMON}/so
 target_include_directories(sonic3_mods_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
 target_compile_definitions(sonic3_mods_test PRIVATE RECOMP_LAUNCHER=1)
 add_test(NAME sonic3_mods COMMAND sonic3_mods_test)
+add_executable(sonic3_gameplay_test runtime/sonic3_gameplay_test.c "${S3_GAME_COMMON}/sonic3_gameplay.c")
+target_include_directories(sonic3_gameplay_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
+target_compile_definitions(sonic3_gameplay_test PRIVATE RECOMP_LAUNCHER=1)
+add_test(NAME sonic3_gameplay COMMAND sonic3_gameplay_test)
 
 # The renderer test #includes game/common/sonic3_video.c directly and supplies
 # its own guest-memory/TCP stubs; it compiles once per cartridge address profile.
