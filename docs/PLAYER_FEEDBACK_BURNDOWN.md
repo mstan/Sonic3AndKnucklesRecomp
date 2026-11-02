@@ -1,4 +1,4 @@
-# Player-feedback burndown â€” 2026-11-01
+# Player-feedback burndown — 2026-11-01
 
 Current result: all 58 reports have dispositions, with 36 qualified fixes and
 22 owner-directed or bounded deferrals. [Sonic 3 family v0.6.4](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.6.4)
@@ -53,7 +53,7 @@ xychart-beta
 | Sonic 2, later | 4 | 2 | 2 | 0 |
 | Sonic 3 family follow-up reports | 36 | 23 | 13 | 0 |
 
-## Sonic 3 family â€” next
+## Sonic 3 family — next
 
 Continue with the reproducible water/presentation defects; retain individual dispositions. Use native inputs and cheats/teleports only for prerequisites, without setting the result under test. Preserve native saves and use muted isolated profiles.
 
@@ -62,7 +62,7 @@ Continue with the reproducible water/presentation defects; retain individual dis
 | S3-01 | Title and save-select widescreen presentation remains wrong | Fixed / qualified - released in v0.6.4 | `bf90e61` stretches original scenery while retaining native-size actors/UI and the outgoing world through actual fades. All nine cases below pass built-runtime checks, including all-six-mod title/demo routes, standalone Sonic 3's different plane layout, actual boss/capsule/Knuckles/HCZ transition and real giant-ring entry. No new art or frame-timer workaround. |
 | S3-03 | Background scrolling still glitches at level entry and at the left edge in general | Fixed / qualified - released in v0.6.4 | `cb48a55` makes imported Sonic 1 parallax follow the bounded expanded view, rather than the original narrower camera moving inside it. Actual GHZ and lower LZ2 approach/return captures keep parallax steady at the left boundary; all eleven normal-width reference images per stage are byte-identical. Position/protection is a presentation prerequisite bypass, not full route completion. |
 | S3-08 | Shadow HUD head still differs from Megamix | Fixed / qualified - released in v0.6.4 | The already required verified Megamix ROM supplies its authored 16x16 life icon, replacing the shrunken standing-pose reconstruction. Actual native/32:9 captures exactly match all 128 donor icon bytes and preserve neighboring live digits. No new artwork or pack reimport; earlier 1-UP award qualification remains separate from this visual update. |
-| S3-09 | LZ conveyor platforms do not spawn; LZ2 cannot be completed | Deferred this pass â€” not reproduced, including supplied saves | Actual supplied slot 2 (Sonic) and slot 7 (Shadow & Tails) load LZ1 through the menu and reach LZ2 through the genuine sign/tally. Each spawns all 16 platforms (eight per group), all moving over 60 ticks, with live players. Earlier native/32:9 probes also pass. Travel/obstacles were bypassed with positioning/protection; a complete normal LZ2 ride/exit is not qualified. Original replay still diverges at 305 under reconstructed resources/settings. No conveyor fix claimed. |
+| S3-09 | LZ conveyor platforms do not spawn; LZ2 cannot be completed | Deferred this pass — not reproduced, including supplied saves | Actual supplied slot 2 (Sonic) and slot 7 (Shadow & Tails) load LZ1 through the menu and reach LZ2 through the genuine sign/tally. Each spawns all 16 platforms (eight per group), all moving over 60 ticks, with live players. Earlier native/32:9 probes also pass. Travel/obstacles were bypassed with positioning/protection; a complete normal LZ2 ride/exit is not qualified. Original replay still diverges at 305 under reconstructed resources/settings. No conveyor fix claimed. |
 | S3-10 | LZ water briefly flickers orange | Fixed / qualified - released in v0.6.4 | `b24b19a` preserves the full imported S1 LZ palette transfer when the waterline is below line 200, without moving the split. Actual native/32:9 descent captures at lines 215/221 remove all measured above-water-only brown/orange pixels below the split; camera, water height and normal/target/water palette RAM remain identical. Four-handler scope tests pass, and a native AIZ control image stays identical. |
 | S3-11 | LZ underwater objects shift slightly | Deferred this pass - not reproduced in bounded setup | Natural-start LZ2, alive Sonic, fixed nominal camera and 32 observations across a full ripple cycle: hardware scroll varies -202..-198; both old/new wide actor bounds match native plus exactly (200,0), including normal pose changes. No extra sprite shift was reproduced. S1-only setup does not qualify the exact owner all-mod replay. Dead/resurrection fixtures are excluded. No new fix claimed. |
 | S3-12 | LZ water push uses HCZ bar-grab behavior | Deferred by owner - suitable frames unavailable | Confirmed imported current selects the HCZ grip animation. Original S1 Float2 is a five-pose free tumble; inspected S3K alternatives do not supply a validated equivalent across characters. Owner explicitly permits asset-focused deferral when suitable existing frames cannot match. No speculative pose replacement or physics change. |
@@ -70,16 +70,16 @@ Continue with the reproducible water/presentation defects; retain individual dis
 | S3-14 | Blue Spheres has no widescreen | Deferred by owner - separate renderer task | The tested ellipsoid/table extensions misalign floor checkerboard and sphere positions; none is accepted. Owner explicitly deferred full gameplay projection while delivering the other fixes. Native globe margins remain; the separately qualified wide entry fade is included. A later renderer must add correct side content without changing central gameplay or physics. |
 | S3-15 | Shadow uses Sonic sprites in Blue Spheres | Deferred by owner - suitable frames unavailable | Appropriate Shadow special-stage turning/running/jump/result frames have not been established from the owned donor. Owner explicitly permits deferral for an asset-focused follow-up when existing frames cannot match; no generated replacement art. |
 | S3-16 | Competition menu background wraps; submenus darken and lose widescreen | Fixed / qualified - released in v0.6.4 | Actual vanilla/all-six-mod routes at 32:9 keep main, player and level menus full width, with stretched scenery and native-size UI, without repeated/wrapped tiles. Frozen original 4:3 reference confirms submenu shadow/highlight darkening is authored behavior; the candidate applies that same brightness consistently across the width. |
-| S3-05 | GHZ1 signpost sometimes spins forever as Sonic & Tails | Deferred this pass â€” not reproduced | Prior eight approach variants passed. Closed for this pass per owner instruction; no fix or forced timeout patch. Reopen with future logs if it recurs. |
+| S3-05 | GHZ1 signpost sometimes spins forever as Sonic & Tails | Deferred this pass — not reproduced | Prior eight approach variants passed. Closed for this pass per owner instruction; no fix or forced timeout patch. Reopen with future logs if it recurs. |
 
-## Sonic 3 Alone â€” same burndown
+## Sonic 3 Alone — same burndown
 
 | ID | Report | State | Acceptance / evidence needed |
 | --- | --- | --- | --- |
 | S3A-01 | Some AIZ level objects are missing | Deferred this pass - runtime reproduction unverified | Both original layouts place the floating platform at (1870,032A), below the reported shoes/ring ledge during its cycle. Neither has a spring at the identified cave vine/spike ledge. Three bounded native-menu setups did not establish ordinary object activation, so source presence is not a runtime spawn pass. No speculative objects added; revisit with qualified route/logs. |
 | S3A-02 | Characters and level objects constantly shift/jitter slightly | Fixed / qualified - released in v0.6.4 | `ffb8607` separates the object camera from plane deformation. Combined and standalone AIZ2 runs reproduce a one-pixel horizontal actor shift in their baselines, none in their candidates/native references, while heat scrolling remains active. Shared renderer tests pass in both compile modes. Normal pose/vertical movement is compared against the native reference, not misclassified as jitter. |
 
-## Sonic 2 â€” later burndown
+## Sonic 2 — later burndown
 
 The four reports are disposed and the qualified fixes are released. A
 [native Sonic 2 handoff list](https://github.com/mstan/SonicTheHedgehog2Recomp/blob/master/docs/PLAYER_FEEDBACK_HANDOFF_20261101.md)
@@ -170,7 +170,7 @@ Sonic 1 v0.7.4 passed 78 tests and native/wide production replay checks; Sonic 2
 
 Central Beads is unavailable: the existing client reports database `beads` missing on port 3307. Do not replace the database or interrupt its unrelated service. Backfill the owning game issues, hierarchy and dispositions when the central tracker returns. This file is the durable interim record.
 
-## Features â€” only after the gameplay burndowns
+## Features — only after the gameplay burndowns
 
 These are requested enhancements, not completed bug fixes and not part of the report count. Finish or explicitly dispose the gameplay reports before starting them. Default-on diagnostics releases above are delivered.
 
@@ -194,7 +194,7 @@ These are requested enhancements, not completed bug fixes and not part of the re
 The following are development results, not claims about the published v0.6.4 artifacts. Engine feature head `471d51f` and game hook head `76ba79c` built all three native titles; 116 of 117 Windows tests passed in the combined run. The remaining generated-profile ordering check passed after the authored shield hooks were moved before the generated Megamix block (`a101541`); addresses and generated header were unchanged. The immutable combined test executable is SHA256 `445bdf8c7f5a9e3eaf921ff0c5fb76b5161b1ea4b983d1e1afa66f8cea361296`.
 
 - F-01: S3K presentation is qualified at native/Fit 120/144 FPS and actual D3D11 Display 165 Hz. All 1,472 guest executions, six RAM/PNG samples and supported full-state files match Off controls; fractional images differ within guest ticks. Canonical audio also matches. Menus, finite native special/bonus projections, Knuckles preview and unsupported crowd/CD scenes repeat complete frames. Existing all-mod quickstate refusal is preserved. Launcher persistence and the corrected CLI/presented-PNG path pass. Sonic 1 implementation and runtime-overlay navigation remain separate work; native Sonic 2 is pending handoff.
-- F-02/F-03: Default-off options and three-cartridge guards pass. Real terminal-timer expiry occurs with infinite time off and is prevented with it on. A genuine last-life pit death reaches native Game Over when off; enabled, it retries the original act alive with three lives. Act-transition qualification is in progress. Evidence: `feature-gameplay-first` and `feature-gameplay-followup`.
+- F-02/F-03: Default-off options and three-cartridge guards pass. Real terminal-timer expiry occurs with infinite time off and is prevented with it on. A genuine last-life pit death reaches native Game Over when off; enabled, it retries the original act alive with three lives. Both options also preserve a genuine imported GHZ1 sign/tally to GHZ2 transition, including the native life award (3 to 4), exactly matching Off. Evidence: `feature-gameplay-first`, `feature-gameplay-followup` and `feature-lives-time-transition`.
 - F-04: Default filtered PCM is byte-identical to published v0.6.4 over 2,000 executions and 7,464,000 stereo samples. Unfiltered output measurably changes the high frequencies while preserving RAM, image, clocks and sample count; both recordings replay all executions. The 144 FPS normal-audio arm has the identical canonical PCM. Evidence: `feature-audio-first` and `feature-audio-fps144`.
 - F-05: Source, native C/UI build and transaction tests pass; actual bundled-helper media/adoption qualification is still in progress. No standalone Python installation is intended for release users.
 - F-06/F-07: Actual native level-select and debug placement controls pass in all three cartridges, with normal visible stages and genuine input; S&K uses A+Start through the fade. Imported stages are excluded from native debug. Evidence: `feature-native-access-first` and `feature-native-access-grounded`.
