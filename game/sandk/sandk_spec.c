@@ -21,6 +21,7 @@
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
 #include "sonic3_knuckles_army.h"
 #include "sonic3_mods.h"
+#include "sonic3_gameplay.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
 
@@ -48,7 +49,10 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static void sandk_call_entry_point(void) { s3_army_init(); recomp_call_addr(0x000206u); }
 static void sandk_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
-static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); }
+static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); s3_gameplay_load(path,"sandk"); }
+static const struct RecompLauncherCModProvider *sandk_mods(const struct RecompLauncherCModProvider *base)
+{ return s3_gameplay_mods(s3_mods(base)); }
+static int sandk_netplay_allowed(void) { return s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* Mode-aware save-state resume (sonic3k.lst, org 0):
@@ -230,6 +234,7 @@ static const GameDebugCommand sandk_commands[] = {
     { "knuckles_army", s3_army_command },
 };
 
+static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
     .state_size             = s3_state_size,
@@ -242,8 +247,8 @@ const GameSpec g_game_spec = {
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras. */
     .logical_players        = 4,
     .load_settings          = sandk_load_settings,
-    .mods                   = s3_mods,
-    .netplay_allowed        = s3_mods_netplay_allowed,
+    .mods                   = sandk_mods,
+    .netplay_allowed        = sandk_netplay_allowed,
     .display_name           = "Sonic & Knuckles",
     .short_name             = "SonicK",
     .boxart                 = "boxart-sonick.tga",
@@ -269,7 +274,7 @@ const GameSpec g_game_spec = {
     .call_periodic          = NULL,
 
     .on_post_reset          = NULL,
-    .on_frame_pre           = NULL,
+    .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 
