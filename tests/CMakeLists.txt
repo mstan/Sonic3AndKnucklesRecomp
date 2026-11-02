@@ -114,6 +114,9 @@ function(s3_video_test name)
     target_include_directories(${name}_test PRIVATE
         "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
     target_compile_definitions(${name}_test PRIVATE ${ARGN})
+    if(UNIX)
+        target_link_libraries(${name}_test PRIVATE m)
+    endif()
     add_test(NAME ${name} COMMAND ${name}_test)
 endfunction()
 

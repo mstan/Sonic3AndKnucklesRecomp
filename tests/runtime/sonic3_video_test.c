@@ -666,6 +666,122 @@ static void test_interpolation_owned_and_readonly(void)
     interpolation_configure(0);free(before);free(after);
 }
 
+static void test_blue_spheres(void)
+{
+    GVDP v={0};M68KState cpu_before=g_cpu;
+    /* Blue Spheres' forward and inverse projections agree on the same
+     * surface, including expanded margins. Behind-horizon points are not
+     * mistaken for the near intersection. */
+    for(int stretch=1;stretch<=6;++stretch)for(int z=0;z<5;++z)for(int x=-3;x<=3;++x) {
+        double px,py,d;
+        CHECK(ss_project(x,z,stretch,&px,&py,&d));
+        SSPoint p=ss_intersect(px,py,stretch);
+        CHECK(fabs(p.x-x)<.0001 && fabs(p.z-z)<.0001 && fabs(p.depth-d)<.0001);
+    }
+    CHECK(!ss_intersect(0,0,1).depth);
+    CHECK(ss_intersect(-790,200,5).depth>0);
+    double px,py,depth;
+    CHECK(ss_project(0,0,1,&px,&py,&depth));
+    CHECK(fabs(px)<.001 && fabs(py-(112+ss_focal*ss_ground_lift/ss_distance))<.001);
+    CHECK(ss_project(2,1,1,&px,&py,&depth));
+    CHECK(fabs(px-155)<3);
+    CHECK(!ss_project(100,0,1,&px,&py,&depth));
+    /* Full native board, more than 80 host spheres, and no guest writes.
+     * Test without copyrighted assets using synthetic mappings/art. */
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(SS_EXTRA+16,0x1000);word(g_ram,SS_EXTRA+20,0x4002);
+    for(unsigned i=0;i<16;++i)word(g_rom,0x1000+i*2,32);
+    word(g_rom,0x1020,1);g_rom[0x1022]=240;g_rom[0x1023]=15;
+    word(g_rom,0x1024,0);word(g_rom,0x1026,65520);
+    memset(v.vram+64,0x11,512);memset(g_ram+0xF100,2,1024);
+    g_ram[0xF600]=0x34;ss_capture();
+    static uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+    ss_begin(&v,1603);CHECK(ss_ready && ss_count>80 && ss_margin_count>80);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    CHECK(ss_texture[2][0][32*64+32]==33);
+    write16(0xE422,512);ss_begin(&v,1603);CHECK(ss_x==0); /* no mixed publication */
+    ss_capture();ss_begin(&v,1603);CHECK(ss_x==2);
+    ss_begin(&v,398);CHECK(ss_ready && ss_width==398);
+    ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
+    /* A sprite's visible base stays on its actual board intersection while
+     * moving, turning and resizing. This would fail with the old separate
+     * sphere-camera lift even though the ground's inverse test passed. */
+    uint32_t checker[1600],checker_colors[64]={0};
+    checker_colors[56]=0xFF00FFFF;checker_colors[60]=0xFFFF00FF;
+    for(unsigned turn=0;turn<8;++turn)for(unsigned motion=0;motion<3;++motion)
+    for(int canvas=320;canvas<=1600;canvas+=320) {
+        double angle=turn*6.2831853071795864769/8;
+        int ix=(int)round(-2*sin(angle)),iy=(int)round(-2*cos(angle));
+        memset(g_ram+0xF100,0,1024);
+        g_ram[0xF100+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
+        word(g_ram,0xE422,motion*32);word(g_ram,0xE424,motion*16);g_ram[0xE426]=(uint8_t)(turn*32);
+        ss_capture();ss_begin(&v,canvas);CHECK(ss_ready && ss_count>=1);
+        double dx=ix-ss_x,dy=iy-ss_y;
+        CHECK(ss_project(dx*ss_cos-dy*ss_sin,-dx*ss_sin-dy*ss_cos,ss_stretch,&px,&py,&depth));
+        /* Very wide views can see the periodic board again. Select this
+         * cell's nearest projected copy, not an arbitrary depth-sort slot. */
+        const SSSphere *sphere=NULL;double nearest=1e30;
+        for(unsigned n=0;n<ss_count;++n) {
+            double distance=fabs(ss_spheres[n].x+ss_spheres[n].w*.5-(px+(canvas-1)*.5));
+            if(distance<nearest){nearest=distance;sphere=&ss_spheres[n];}
+        }
+        CHECK(sphere!=NULL);
+        CHECK(ss_texture_floor[2][sphere->lod]==48);
+        CHECK(fabs(sphere->x+sphere->w*.5-(px+(canvas-1)*.5))<=.501);
+        CHECK(fabs(sphere->y+48*sphere->h/64.0-py)<=.501);
+        /* Render the four quadrants around this object's board position.
+         * Opposite quadrants must match and adjacent ones must differ. This
+         * checks the actual checkerboard phase, not just projection algebra. */
+        unsigned count=ss_count;ss_count=0;
+        for(int qy=0;qy<2;++qy)for(int qx=0;qx<2;++qx) {
+            double wx=ix+(qx?.1:-.1)-ss_x,wy=iy+(qy?.1:-.1)-ss_y;
+            CHECK(ss_project(wx*ss_cos-wy*ss_sin,-wx*ss_sin-wy*ss_cos,ss_stretch,&px,&py,&depth));
+            int col=(int)floor(px+(canvas-1)*.5+.5),row=(int)floor(py+.5);
+            CHECK(col>=0 && col<canvas && row>=32 && row<224);
+            ss_scanline(&v,row,checker,canvas,checker_colors,checker_colors,0);
+            unsigned parity=(ix-(qx==0)+iy-(qy==0))&1;
+            CHECK(checker[col]==checker_colors[parity?60:56]);
+        }
+        ss_count=count;
+    }
+    CHECK(!memcmp(&cpu_before,&g_cpu,sizeof g_cpu));
+    /* Widescreen uses the corrected projection by default. Native Off and
+     * a 320-pixel canvas retain the exact completed native composition. */
+    CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=0x34;v.reg[1]=64;v.reg[12]=8;
+    v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.cram[56]=14;v.cram[60]=0xE0;s3_video_vblank();
+    uint32_t native[320],out[796];
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
+    native_row_calls=0;
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,NULL);
+    scanline_lazy(&v,180,320,out,796,test_native_row,native,NULL);
+    CHECK(ss_ready && native_row_calls==0);
+    CHECK(out[0]==0xFFFF0000 || out[0]==0xFF00FF00);
+    /* The native exit keeps the last board until SHI display retirement. */
+    g_ram[0xF600]=0x0C;ss_capture();
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,NULL);
+    CHECK(s_frame_special && ss_latched && ss_ready);
+    CHECK(configure("off") && !enabled());native_row_calls=0;
+    scanline_lazy(&v,180,320,out,796,test_native_row,native,NULL);
+    CHECK(native_row_calls==1 && out[0]==0xFF000000 && out[238]==native[0]);
+    CHECK(configure("fit") && width(320,224,320,224)==320);
+    native_row_calls=0;scanline_lazy(&v,0,320,out,320,test_native_row,native,NULL);
+    CHECK(native_row_calls==1 && !memcmp(out,native,sizeof native) && !ss_ready);
+    /* Retained native actors honor the existing private atlas and palette
+     * contract in the projected stage, independently of the sphere artwork. */
+    memset(v.vram+0xF800,0,8);word(v.vram,0xF800,128+80);
+    word(v.vram,0xF804,0x4001);word(v.vram,0xF806,128+100);v.vram[0xF802]=128;
+    memset(test_atlas,0,sizeof test_atlas);memset(test_atlas+32,0x11,32);
+    memset(v.vram+32,0x22,32);test_atlas_enabled=test_private_planes=1;
+    uint32_t colors[64]={0};colors[33]=0xFFFF0000;colors[34]=0xFF0000FF;
+    memset(out,0,sizeof out);ss_native_sprites(&v,80,out,796,colors,colors,1);
+    CHECK(!out[337] && !out[346]);
+    for(unsigned x=338;x<346;++x)CHECK(out[x]==0xFF00FF00);
+    test_atlas_enabled=test_private_planes=0;
+    interpolation_reset();CHECK(!ss_latched && !ss_ready);
+}
+
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -990,10 +1106,10 @@ int main(int argc,char **argv)
             ((x>=234 && x<238)||(x>=558 && x<562))?0xFFFF0000:0xFF000000;
         CHECK(out[x]==expected);
     }
-    /* The native special-stage row is the visual oracle. Preserve every
-     * pixel, including sphere placement, operator sprites and HUD, across
-     * all rows and canvas sizes. Both interfaces must produce the same row;
-     * the lazy interface fetches the native composition exactly once. */
+    /* Missing projection metadata falls back to the complete native row at
+     * every canvas size. Both interfaces preserve sprites/operators/HUD; the
+     * lazy interface fetches the native composition exactly once. Valid wide
+     * data and native-sized output are exercised by test_blue_spheres. */
     static const int ss_canvases[]={320,398,523,796,1603};
     uint32_t ss_native[320],ss_output[1605],ss_eager[1603];
     static uint8_t before[65536];
@@ -1033,6 +1149,7 @@ int main(int argc,char **argv)
     test_knux_preview_installed_scroll();
 #endif
     test_interpolation_owned_and_readonly();
+    test_blue_spheres();
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
 }

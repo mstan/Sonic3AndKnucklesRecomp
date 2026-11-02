@@ -45,6 +45,7 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
 
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
 static int s_mode;
+static void ss_capture(void);
 static S3VideoObjectZoom s_object_zoom;
 void s3_video_set_object_zoom(S3VideoObjectZoom fn) { s_object_zoom = fn; }
 static double s_ratio = 16.0 / 9.0;
@@ -461,6 +462,7 @@ static int s_capture_readonly;
 static void interpolation_native_publish(void);
 void s3_video_vblank(void)
 {
+    if(s_mode!=VIDEO_OFF)ss_capture();
     if(s_interpolation_enabled && !enabled() && g_ram[0xF62A])s_ix_upload_serial=s_ix_serial;
     unsigned tick=ram16(0xFE04),zone=ram16(0xFE10);
     /* The following V-int uploads this completed tile queue. Main-thread
@@ -804,6 +806,8 @@ int s3_video_hook(uint32_t pc)
 }
 
 
+#include "sonic3_blue_spheres.inc"
+
 static uint8_t *s_priority;
 static int s_priority_capacity;
 static S3VideoActorOverlay s_actor_overlay;
@@ -1019,6 +1023,9 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
          * likewise retains that projection until the video mode ends. */
         s_frame_special=(v->reg[12]&8) && (v->reg[1]&64) &&
             ((g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48 || s_frame_special);
+        if(s_frame_special && s_mode!=VIDEO_OFF && width>320)ss_begin(&s_video_frame,width);
+        else ss_ready=0;
+        if(!s_frame_special)ss_latched=0;
         int ready=level_ready();
         /* The title entry clears Current_zone before fading the old level.
          * Keep its published world/camera as well as its composition until
@@ -1129,12 +1136,14 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
     int hs_b=(int16_t)vram16(v,hsbase+(unsigned)hi*4+2);
     presentation_scroll(line,&hs_a,&hs_b);
     if(s_frame_special) {
-        /* The prerecorded globe and native sphere-distance frames are one
-         * authored projection. A fitted host globe changes their placement
-         * relative to the board during movement and turns. Keep the complete
-         * native composition at its original aspect, including its sprites,
-         * shadow/highlight operators, HUD and exit fade. Main levels retain
-         * their independent expanded world renderer. */
+        if(s_mode!=VIDEO_OFF && width>320 && ss_ready) {
+            ss_scanline(v,line,out,width,palette,shadow,hs_b);
+            if(!line){++s_frames;s_native_x=(width-nw)/2;}
+            return;
+        }
+        /* Native-sized canvases and unavailable projection data retain the
+         * complete native composition, including sprites, shadow/highlight,
+         * HUD and exit fade. */
         if(!native)native=native_row(native_ctx);
         int origin=(width-nw)/2;
         for(int x=0;x<width;++x)out[x]=0xFF000000u;
@@ -1514,7 +1523,8 @@ void s3_video_command(int id, const char *json)
         pattern_pixel(&s_aiz_main.video,0x582C,0x1300,0x390),
         s_bg_bad_x,s_bg_bad_y,s_bg_bad_a,s_bg_bad_expected,s_frame_bg_event,
         s_tick_samples,s_tick_updates,s_tick_lag,s_tick_multi,s_publication_lag,
-        s_frame_special,0u,0u);
+        s_frame_special,s_mode!=VIDEO_OFF && s_requested_width>320 && ss_ready?ss_count:0u,
+        s_mode!=VIDEO_OFF && s_requested_width>320 && ss_ready?ss_margin_count:0u);
     cmd_send_response(reply);
 }
 static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
@@ -1589,6 +1599,7 @@ static InterpSnapshot *ix_current(void) { return &s_ix[s_ix_front]; }
 static InterpSnapshot *ix_previous(void) { return &s_ix[s_ix_front^1u]; }
 static void interpolation_reset(void)
 {
+    ss_ready=ss_latched=0;
     for(unsigned n=0;n<2;++n){s_ix[n].valid=0;s_ix[n].lines=0;}
     for(unsigned n=0;n<3;++n)s_ix_history[n].serial=0;
     s_ix_build.serial=s_ix_serial=s_ix_upload_serial=0;
