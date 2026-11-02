@@ -1,16 +1,29 @@
 # Sonic 3 family custom video experiment
 
-## Current special-stage behavior (2026-10-27)
+## Current special-stage behavior (2026-11-01)
 
-Blue Spheres uses the original native rendering at its original aspect,
-centered within the selected canvas. Main levels keep expanded widescreen.
-The earlier host globe projection described in the historical sections below
-was visually inaccurate during play and has been removed (`beads-tdq.3.26`).
-The native board, sphere distance frames, sprites, shadow/highlight operators,
-HUD, movement and exit fade now remain one original composition. There are
-no projected margin spheres or guest changes. Tests compare every native
-pixel through both renderer interfaces and multiple canvas sizes; runtime
-checks compare against independently entered native special stages.
+Blue Spheres uses the corrected host projection when Widescreen is enabled
+and the canvas is wider than 320 pixels. Widescreen Off and native-sized
+canvases keep the original native composition. The renderer reads the native
+32x32 board and original distance-frame artwork; movement, collisions,
+collection, layouts and guest memory remain native.
+
+The floor and sphere feet share one camera model. Sphere artwork anchors at
+its opaque foot, and checkerboard boundaries meet the integer board grid.
+Characters, messages, shadows and the edge-anchored counters retain native
+artwork. The projection survives mode-changing exit fades until the installed
+special-stage video retires.
+
+The owner approved the corrected view on 2026-11-01. The matched current-build
+comparison preserved all 1,478 full-RAM frame logs and 14 RAM/VRAM checkpoints
+through movement, turns, a jump and natural failure. Six actual spheres matched
+3,958 opaque artwork pixels; their foot placement error was at most 0.421 pixels,
+and 18 visible checkerboard samples matched. This is representative runtime
+coverage, not every layout, character or imported campaign.
+
+The historical ultrawide binary predates the 2026-09-28 grid/foot fixes and is
+not evidence against the corrected renderer. Native checkerboard pixel changes
+under a different projection are not, by themselves, incorrect gameplay.
 
 The combined **Sonic 3 & Knuckles** target was implemented first. Standalone
 Sonic 3 and Sonic & Knuckles share the renderer, with a separately verified
@@ -114,9 +127,10 @@ python tests/runtime/run_sonic3_custom_video.py `
 ```
 
 `tests/runtime/run_sonic3_blue_spheres.py` takes a user-owned save plus a
-pre-change executable. Isolated runs verify byte-exact native RAM/VRAM
+compatible reference executable. Isolated runs verify byte-exact native RAM/VRAM
 through moving, turning, collection, jumping and the red-sphere exit, with
-byte-exact output when disabled. Fixed 16:9/21:9/32:9 and 2676:374 exercise
+byte-exact output when disabled or native-sized and active content in the wide
+margins. Geometry and opaque-foot checks remain in the renderer unit tests. Fixed 16:9/21:9/32:9 and 2676:374 exercise
 the same projection; the original save is hashed before/after. Unit tests
 cover projection/intersection agreement, native camera reference points,
 sprite counts beyond 80, host-only state and both cartridge address profiles.
