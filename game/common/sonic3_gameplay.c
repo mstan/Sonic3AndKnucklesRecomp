@@ -56,13 +56,44 @@ int s3_gameplay_netplay_allowed(void)
     !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
-int s3_gameplay_owns(uint32_t pc)
+static int shield_site(uint32_t pc)
 {return standalone_s3?(pc==0x12956u || pc==0x1299Au || pc==0x129C2u):
                      (pc==0x1193Cu || pc==0x11980u || pc==0x119A8u);}
+static int timer_site(uint32_t pc)
+{return standalone_s3?(pc==0xEAF2u || pc==0xEB14u || pc==0xEB26u):
+                     (pc==0xDD76u || pc==0xDD98u || pc==0xDDAAu);}
+int s3_gameplay_owns(uint32_t pc)
+{return shield_site(pc) || timer_site(pc);}
+static int timed_story(const uint8_t ram[65536])
+{
+    if(!ram || ram[0xF600]!=12 || (ram[0xFE10]>=0x13 && ram[0xFE10]<=0x15))return 0;
+    unsigned demo=standalone_s3?0xFFF0:0xFFD0,competition=standalone_s3?0xFFD8:0xFFE8;
+    return !word(ram,demo) && !word(ram,competition);
+}
+void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],
+                           uint32_t *d1,uint16_t *sr)
+{
+    if(!timer_site(pc) || !timed_story(ram) || !d1 || !sr)return;
+    unsigned minute=ram[0xFE23];
+    if(pc==(standalone_s3?0xEAF2u:0xDD76u)) {
+        /* Original BEQ after the exact 9:59:59 comparison. Let the native
+         * counter roll normally. Re-enabling the limit after ten minutes
+         * takes the original Time Over path on its next active update. */
+        if(s3_gameplay.infinite_time)*sr&=(uint16_t)~4u;
+        else if(minute>=10)*sr|=4u;
+    } else if(pc==(standalone_s3?0xEB14u:0xDD98u)) {
+        /* Original BLO before clamping the minute back to nine. */
+        if(s3_gameplay.infinite_time && minute<=99)*sr|=1u;
+    } else if(minute>=10 && minute<=99) {
+        /* The renderer adds the original tens glyph in the spare column.
+         * Preserve the earned time; pass only its ones digit to native art. */
+        *d1=(*d1&~255u)|((*d1&255u)%10u);
+    }
+}
 int s3_gameplay_skip_shield(uint32_t pc,const uint8_t ram[65536],
                             uint32_t actor,int native_sonic)
 {
-    if(!s3_gameplay.shield_transform || !native_sonic || !s3_gameplay_owns(pc) ||
+    if(!s3_gameplay.shield_transform || !native_sonic || !shield_site(pc) ||
        !ram || (actor&0xFFFFFFu)!=0xFFB000u || ram[0xF600]!=12)return 0;
     unsigned demo=standalone_s3?0xFFF0:0xFFD0,competition=standalone_s3?0xFFD8:0xFFE8;
     /* The native site follows the fresh-airborne-jump/double-jump/Super
@@ -102,10 +133,11 @@ void s3_gameplay_apply(uint8_t ram[65536])
     if(s3_gameplay.infinite_lives && ram[0xFE12]<3) {
         ram[0xFE12]=3;ram[0xFE1C]=1;
     }
-    /* UpdateHUD compares 00:09:3B:3B BEFORE incrementing Timer_frame.
-     * Hold only that terminal subsecond: displayed time reaches 9:59 and
-     * stays there, while all unrelated frame/air/invincibility timers run. */
-    if(s3_gameplay.infinite_time && !ram[0xFE22] && ram[0xFE23]==9 &&
+    /* Keep the native minute/second clock, extending its limit to 99:59.
+     * Only the terminal subsecond is held; all unrelated timers still run.
+     * Results use the true minutes, so the original 9:59 jackpot lasts only
+     * its genuine second; ten minutes and later use the normal late bonus. */
+    if(s3_gameplay.infinite_time && !ram[0xFE22] && ram[0xFE23]==99 &&
        ram[0xFE24]==59 && ram[0xFE25]==59)ram[0xFE25]=58;
 }
 #if RECOMP_LAUNCHER
@@ -116,7 +148,7 @@ static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","
 static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Sonic 1 checkpoint bonus stages","Tails giant-ring follow"};
 static const char *descriptions[]={
     "Keep at least three lives, including after death and retry. Local play only.",
-    "Disable the stage time limit. The clock runs normally to 9:59, then stays there. Local play only.",
+    "Disable the stage time limit. The clock counts to 99:59, then stays there. The 100,000-point time bonus applies only at 9:59. Local play only.",
     "Unlock Sound Test on the title menu. Press Up to select it, then Start; use the native stage list. Local play only.",
     "Enable native debug in original stages. B enters/exits placement, A cycles objects, C places one. Imported rounds are excluded. Local play only.",
     "Native Sonic: hold Up and press jump again in the air to transform with an elemental shield. Requires native emeralds and 50 rings. Without Up, shield actions stay normal. Shadow/Mighty keep their own controls. Local play only.",

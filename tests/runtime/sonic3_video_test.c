@@ -4,6 +4,7 @@ uint8_t g_ram[65536],g_rom[0x400000];
 uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
 static int test_private_planes;
+static int test_time_private_palette;
 int gvdp_ext_line(unsigned tile) { return test_private_planes && tile>=1 && tile<=2?(int)tile:0; }
 static uint8_t test_atlas[128];
 static int test_atlas_enabled;
@@ -12,8 +13,13 @@ const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
     return *bytes?test_atlas:NULL;
 }
 int gvdp_sprite_pattern_line(unsigned flags,unsigned tile) { (void)flags;return gvdp_ext_line(tile); }
-int gvdp_sprite_palette_line(unsigned flags,unsigned tile,unsigned source) { (void)source;return gvdp_sprite_pattern_line(flags,tile); }
+int gvdp_sprite_palette_line(unsigned flags,unsigned tile,unsigned source) {
+    if(test_time_private_palette && source==1 && (tile==0x6F2 || tile==0x6F3))return 2;
+    return gvdp_sprite_pattern_line(flags,tile);
+}
 uint16_t gvdp_ext_color(int row,int line,int nib) {
+    if(test_time_private_palette && line==2 && (nib==1 || nib==15))
+        return (uint16_t)(row<32?(nib==1?0xE:0xE00):(nib==1?0xE0:0xEEE));
     return test_private_planes && nib==1?(uint16_t)(line==1?(row>=80?0xE0:0xE):line==2?0xE00:0):0;
 }
 M68KState g_cpu;
@@ -736,6 +742,127 @@ static void test_life_interpolation(void)
     }
     CHECK(g_ram[0xFE12]==255);interpolation_configure(0);
 }
+static void time_test_font(void)
+{
+    for(unsigned d=0;d<10;d++)for(unsigned y=0;y<16;y++)for(unsigned x=0;x<8;x+=2) {
+        unsigned a=(x+y+d)%4,b=(x+1+y+d)%4;
+        a=a==1?1:a==2?15:0;b=b==1?1:b==2?15:0;
+        g_rom[S3_TIME_DIGITS+d*64+y*4+x/2]=(uint8_t)(a*16+b);
+    }
+}
+static void time_test_sat(GVDP *v,unsigned minute,int slide)
+{
+    memset(v,0,sizeof *v);v->reg[1]=64;v->reg[5]=0x7C;v->reg[12]=1;
+    word(v->vram,0xF800,24+128);v->vram[0xF802]=13;
+    word(v->vram,0xF804,0xA6F2);word(v->vram,0xF806,56+slide+128);
+    memcpy(v->vram+0x6F2*32,g_rom+S3_TIME_DIGITS+(minute%10)*64,64);
+    v->cram[17]=0xEEE;v->cram[31]=0x222;
+}
+static void test_time_minute_tens(void)
+{
+    GVDP v;uint32_t out[800];uint8_t before[65536];
+    memset(g_ram,0,sizeof g_ram);time_test_font();
+    g_ram[0xF600]=12;g_ram[0xFE10]=1;
+    for(unsigned minute=0;minute<=100;minute++)for(int slide=-60;slide<=8;slide+=68)
+        for(int origin=0;origin<=238;origin+=238) {
+            time_test_sat(&v,minute,slide);g_ram[0xFE23]=(uint8_t)minute;
+            GVDP unchanged=v;memcpy(before,g_ram,sizeof before);
+            for(unsigned y=0;y<16;y++) {
+                for(unsigned x=0;x<800;x++)out[x]=0x12345678;
+                time_tens_scanline(&v,g_ram,24+(int)y,out+1,796,origin);
+                CHECK(out[0]==0x12345678 && out[797]==0x12345678);
+                for(int x=0;x<796;x++) {
+                    unsigned expected=0x12345678;int gx=x-origin-48-slide;
+                    if(minute>=10 && minute<=99 && gx>=0 && gx<8) {
+                        unsigned b=g_rom[S3_TIME_DIGITS+(minute/10)*64+y*4+(unsigned)gx/2];
+                        unsigned n=(b>>((gx&1)?0:4))&15;
+                        if(n)expected=genesis_dac_cram_to_argb(v.cram[16+n],GENESIS_DAC_NORMAL);
+                    }
+                    CHECK(out[x+1]==expected);
+                }
+            }
+            CHECK(!memcmp(&v,&unchanged,sizeof v) && !memcmp(g_ram,before,sizeof before));
+        }
+    /* Ordinary gameplay and the installed HUD/glyph are separate guards. */
+    for(unsigned gate=0;gate<11;gate++) {
+        memset(g_ram,0,sizeof g_ram);g_ram[0xF600]=12;g_ram[0xFE10]=1;g_ram[0xFE23]=12;
+        time_test_sat(&v,12,0);
+        if(gate==0)g_ram[0xF600]=4;
+        if(gate>=1 && gate<=3)g_ram[0xFE10]=(uint8_t)(0x12+gate);
+        if(gate==4)word(g_ram,0xFE08,1);
+        if(gate==5)word(g_ram,S3_COMPETITION,1);
+        if(gate==6)v.reg[1]=0;
+        if(gate==7)word(v.vram,0xF804,0);
+        if(gate==8)v.vram[0x6F2*32]^=1;
+        if(gate==9)v.vram[0x6F3*32+31]^=1;
+        memset(out,0,sizeof out);
+        time_tens_scanline(&v,g_ram,28,out,320,0);
+        if(gate<10)for(unsigned x=0;x<320;x++)CHECK(!out[x]);
+        else CHECK(out[49] || out[50] || out[51]);
+    }
+    /* RAM advances before queued native glyph DMA: retain the validated
+     * old complete minute, and never guess beyond that one native step. */
+    const unsigned previous_minutes[]={9,10,19,98};
+    for(unsigned q=0;q<sizeof previous_minutes/sizeof *previous_minutes;q++)
+        for(unsigned uploaded=0;uploaded<2;uploaded++) {
+            unsigned previous=previous_minutes[q],minute=previous+1,displayed=uploaded?minute:previous;
+            time_test_sat(&v,displayed,0);g_ram[0xFE23]=(uint8_t)minute;
+            for(unsigned y=0;y<16;y++) {
+                memset(out,0,sizeof out);time_tens_scanline(&v,g_ram,24+(int)y,out,320,0);
+                for(unsigned x=0;x<8;x++) {
+                    unsigned n=0;
+                    if(displayed>=10) {
+                        unsigned b=g_rom[S3_TIME_DIGITS+(displayed/10)*64+y*4+x/2];
+                        n=(b>>((x&1)?0:4))&15;
+                    }
+                    CHECK(out[48+x]==(n?genesis_dac_cram_to_argb(v.cram[16+n],GENESIS_DAC_NORMAL):0));
+                }
+            }
+        }
+    g_ram[0xFE23]=12;
+    CHECK(configure("off"));
+    /* Both halves retain the native row's fade and optional CD palette. */
+    for(unsigned private_line=0;private_line<2;private_line++)for(unsigned y=0;y<16;y++) {
+        test_time_private_palette=(int)private_line;time_test_sat(&v,12,0);
+        for(unsigned fade=0;fade<8;fade++) {
+            v.cram[17]=v.cram[31]=(uint16_t)(fade*0x222);
+            memset(out,0,sizeof out);overlay_scanline(&v,24+(int)y,out,320);
+            for(unsigned x=0;x<8;x++) {
+                unsigned b=g_rom[S3_TIME_DIGITS+64+y*4+x/2],n=(b>>((x&1)?0:4))&15;
+                unsigned color=private_line?gvdp_ext_color(24+(int)y,2,(int)n):fade*0x222;
+                CHECK(out[48+x]==(n?genesis_dac_cram_to_argb((uint16_t)color,GENESIS_DAC_NORMAL):0));
+            }
+        }
+    }
+    test_time_private_palette=0;CHECK(configure("off"));
+}
+static void test_time_interpolation(void)
+{
+    GVDP v;static uint32_t row[320],image[320*224];
+    memset(g_ram,0,sizeof g_ram);time_test_font();time_test_sat(&v,12,0);
+    CHECK(configure("off"));s_world_cell=NULL;s_world_publish=NULL;s_actor_overlay=NULL;s_frame_overlay=NULL;
+    g_ram[0xF600]=12;g_ram[0xFE10]=1;g_ram[0xFE23]=12;g_ram[0xF711]=1;
+    write32(0xB000,0x123456);word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    memset(s_ix_history,0,sizeof s_ix_history);s_ix_upload_serial=0;
+    test_time_private_palette=1;interpolation_configure(1);
+    for(unsigned tick=1;tick<=2;tick++) {
+        SceneFrame *f=&s_ix_history[1];memset(f,0,sizeof *f);f->serial=tick;f->scene=1;
+        memcpy(f->sat,v.vram+0xF800,640);word(g_ram,0xFE04,tick);
+        for(int y=0;y<224;y++) {
+            memset(row,0,sizeof row); /* prove redraw rather than image reuse */
+            interpolation_capture(&v,y,row,320,320,NULL);
+        }
+    }
+    CHECK(ix_current()->valid && ix_previous()->valid && !s_ix_overlay_seen);
+    test_time_private_palette=0;g_ram[0xFE23]=99;memset(v.vram,0,sizeof v.vram);
+    CHECK(interpolate(.5,image,320,224));
+    for(unsigned y=0;y<16;y++)for(unsigned x=0;x<8;x++) {
+        unsigned b=g_rom[S3_TIME_DIGITS+64+y*4+x/2],n=(b>>((x&1)?0:4))&15;
+        unsigned color=y<8?(n==1?0xE:0xE00):(n==1?0xE0:0xEEE);
+        CHECK(image[(24+y)*320+48+x]==(n?genesis_dac_cram_to_argb((uint16_t)color,GENESIS_DAC_NORMAL):0xFF000000));
+    }
+    CHECK(g_ram[0xFE23]==99);interpolation_configure(0);
+}
 #ifndef SONIC3_STANDALONE
 static void test_knux_preview_publication(void)
 {
@@ -1418,6 +1545,7 @@ int main(int argc,char **argv)
     test_interpolation_owned_and_readonly();
     test_s1_interpolation_installed_camera();
     test_three_digit_lives();test_life_interpolation();
+    test_time_minute_tens();test_time_interpolation();
     test_blue_spheres();
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
