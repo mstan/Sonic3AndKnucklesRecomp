@@ -373,6 +373,13 @@ add_recomp_mode(Sonic3KRecomp sonic3k sonic3k sonic3k.bin 4386 4387)
 # sonic3k.lst at offset 0). See game/sandk/game.toml.
 add_recomp_mode(SonicAndKnucklesRecomp sandk sandk sandk.bin 4388 4389)
 
+# Matched MSVC runtime qualification retains ordinary compilation for these
+# siblings; the S3K target keeps the shared IPO/PGO training workflow.
+if(MSVC)
+    set_property(TARGET Sonic3Recomp SonicAndKnucklesRecomp
+        PROPERTY GENESIS_NATIVE_IPO_DISABLED ON)
+endif()
+
 # Record the exact source and submodule inputs for release payload validation.
 find_package(Git REQUIRED)
 foreach(_repo SOURCE ENGINE UI DISASM)
