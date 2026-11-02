@@ -14,7 +14,7 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The v0.7.1 release
+the separate versions need their corresponding ROMs. The v0.7.2 release
 provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
@@ -39,7 +39,7 @@ local play in Sonic 3, Sonic & Knuckles and the combined game:
 
 - **Infinite lives** keeps at least three lives through death and retry, and
   preserves higher counts and life awards.
-- **Infinite time** lets the clock run to 9:59 and stay there.
+- **Infinite time** lets the clock run to 99:59 and stay there. The original 100,000-point bonus applies only during the actual 9:59 second; finishing at 10:00 or later gives the normal 100-point time bonus.
 - **Easier level select** unlocks Sound Test on the title menu: select it with
   Up, then Start. In Sonic & Knuckles, hold the game's A button and press
   Start, keeping A held through the fade.

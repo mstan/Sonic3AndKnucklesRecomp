@@ -116,6 +116,19 @@ extra = [
 
 # Opt-in host renderer hooks. Verified using stock skdisasm 1e1b5af;
 # its assembled S&K half matches the combined ROM byte-for-byte.
+# Infinite time extends the original clock to 99:59 without replacing results.
+[[widescreen_site]]
+addr = 0xDD76 # Native time-limit BEQ
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xDD98 # Native minute-clamp BLO
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xDDAA # Native minute digit BSR
+kind = "game_hook"
+
 # The life formatter accepts two digits; larger stocks append a ROM glyph.
 [[widescreen_site]]
 addr = 0xE12A # HUD_Lives: after loading Life_count into D1

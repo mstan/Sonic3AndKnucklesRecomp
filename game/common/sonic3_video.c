@@ -32,7 +32,7 @@ enum { S3_COMPETITION=0xFFD8, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374,
        S3_MOVING_PLATFORM_CULL=0x23E1E, S3_FLOATING_PLATFORM_CULL=0x2452A,
        S3_SWING_PLATFORM_CULL=0x24646,
-       S3_HUD_LIFE_VALUE=0xEE72, S3_LIFE_DIGITS=0xF1D2 };
+       S3_HUD_LIFE_VALUE=0xEE72, S3_LIFE_DIGITS=0xF1D2, S3_TIME_DIGITS=0xEED2 };
 #else
 enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
@@ -46,7 +46,7 @@ enum { S3_COMPETITION=0xFFE8, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C,
        S3_MOVING_PLATFORM_CULL=0x24F28, S3_FLOATING_PLATFORM_CULL=0x25634,
        S3_SWING_PLATFORM_CULL=0x25750,
-       S3_HUD_LIFE_VALUE=0xE12A, S3_LIFE_DIGITS=0xE48A };
+       S3_HUD_LIFE_VALUE=0xE12A, S3_LIFE_DIGITS=0xE48A, S3_TIME_DIGITS=0xE18A };
 #endif
 
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -1535,7 +1535,9 @@ static void render_scanline(const GVDP *v,int line,const uint32_t *native,int nw
 {
     int origin;
     render_scanline_base(v,line,native,nw,out,width,native_row,native_ctx,raster,&origin);
-    life_ones_scanline(v,s_interpolating?s_world_frame:g_ram,line,out,width,origin);
+    const uint8_t *ram=s_interpolating?s_world_frame:g_ram;
+    life_ones_scanline(v,ram,line,out,width,origin);
+    time_tens_scanline(v,ram,line,out,width,origin);
 }
 
 static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)
@@ -1620,7 +1622,10 @@ static S3VideoFrameOverlay s_frame_overlay;
 void s3_video_set_frame_overlay(S3VideoFrameOverlay draw) { s_frame_overlay = draw; }
 static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int width)
 {
-    if(!enabled())life_ones_scanline(v,g_ram,line,out,width,(width-320)/2);
+    if(!enabled()) {
+        life_ones_scanline(v,g_ram,line,out,width,(width-320)/2);
+        time_tens_scanline(v,g_ram,line,out,width,(width-320)/2);
+    }
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
 

@@ -277,3 +277,8 @@ The S3-family pass closes at 54 reports: 40 released fixes, 12 authorized deferr
 
 
 Completion cleanup removed1,116,444,281 logical bytes of Windows build scratch,114,362,894 bytes of exact-ZIP staging duplicates and2,328,102,890 Linux scratch/duplicate-package bytes. Release archives, frozen executables/ELFs, debug maps/configs, native-save fixtures, runtime captures, replay/import proof, source worktrees and shared dependencies remain retained for reproduction. Exact cleanup paths and retained-data details are in `windows-v071-build-cleanup.json`, `windows-v071-stage-cleanup.json` and `linux-v071-cleanup.json` under the task root. No new cleanup needs remain.
+
+
+## F-03 infinite-time follow-up: v0.7.2
+
+Owner requested a clock past9:59 and removal of the permanently available100,000-point bonus, with suppression as fallback if extension is unsuitable. Implemented native timer/formatter hooks to retain true elapsed minutes through99:59 and display the extra original digit in the existing HUD gap. At9:59 the original100,000 bonus remains;10:00 and later use the unmodified late-finish100-point bonus. The clock holds at99:59 without Time Over; disabling the option after ten minutes takes the original Time Over path. No guest-state additions or new assets. Default-off behavior is preserved. Focused gameplay and both renderer profiles pass; built-runtime rollover, act-clear scoring and packaged qualification are pending. Central Beads was retried and still reports its database missing; this is the interim owning feature record. No reported-issue counts change.

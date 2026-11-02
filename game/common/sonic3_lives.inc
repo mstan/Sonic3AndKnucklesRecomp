@@ -60,3 +60,52 @@ static void life_ones_scanline(const GVDP *v,const uint8_t *ram,int line,
         }
     }
 }
+
+/* TIME has one unused eight-pixel column before its native minute glyph.
+ * Extend minutes with the existing 8x16 font without stealing VRAM tiles. */
+static void time_tens_scanline(const GVDP *v,const uint8_t *ram,int line,
+                               uint32_t *out,int width,int origin)
+{
+    unsigned minute=ram[0xFE23],mode=ram[0xF600]&127,zone=ram[0xFE10];
+    if(minute<10 || minute>99 || (mode!=8 && mode!=12) ||
+       (zone>=0x13 && zone<=0x15) || ram[0xFE08] || ram[0xFE09] ||
+       ram[S3_COMPETITION] || ram[(S3_COMPETITION+1)&65535u] || !(v->reg[1]&64))return;
+    int mx=0,my=0,found=0;
+    unsigned palette=0,flags=0,sat=(v->reg[5]&127u)<<9,slot=0;
+    for(unsigned visited=0;visited<80;++visited) {
+        unsigned p=(sat+slot*8)&65535u,attr=vram16(v,p+4);
+        unsigned size=v->vram[(p+2)&65535u],w=((size>>2)&3)+1,h=(size&3)+1,base=attr&2047u;
+        if((attr&0xF800u)==0xA000u && !(size&0xC0u) && h==2 &&
+           base<=0x6F2u && base+w*h>0x6F3u) {
+            unsigned column=(0x6F2u-base)/2;
+            if(base+column*2==0x6F2u) {
+                mx=(vram16(v,p+6)&511)-128+(int)column*8;
+                my=(vram16(v,p)&511)-128;palette=(attr>>9)&48u;flags=size;found=1;break;
+            }
+        }
+        unsigned next=v->vram[(p+3)&65535u]&127u;
+        if(!next || next>=80)break;
+        slot=next;
+    }
+    if(!found || line<my || line>=my+16)return;
+    if(memcmp(v->vram+0x6F2*32,g_rom+S3_TIME_DIGITS+(minute%10)*64,64)) {
+        /* RAM can advance one minute before its queued upload. Keep that
+         * exact installed minute coherent, including 19->20's old tens. */
+        if(minute<=10 || memcmp(v->vram+0x6F2*32,
+                g_rom+S3_TIME_DIGITS+((minute-1)%10)*64,64))return;
+        --minute;
+    }
+    unsigned row=(unsigned)(line-my);
+    const uint8_t *p=g_rom+S3_TIME_DIGITS+(minute/10)*64+row*4;
+    int ext=presentation_sprite_line(flags,0x6F2u+row/8,palette>>4);
+    for(int x=0;x<8;++x) {
+        unsigned nib=(p[x/2]>>((x&1)?0:4))&15u;
+        int dx=origin+mx-8+x;
+        if(nib && dx>=0 && dx<width) {
+            unsigned index=palette+nib;
+            unsigned color=ext?presentation_ext_color(line,ext,nib):
+                presentation_cram(line,index,v->cram[index]);
+            out[dx]=genesis_dac_cram_to_argb((uint16_t)color,GENESIS_DAC_NORMAL);
+        }
+    }
+}

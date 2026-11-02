@@ -14,11 +14,78 @@
 #define REMOVE_DIR(p) rmdir(p)
 #endif
 #define CHECK(c) do{if(!(c)){fprintf(stderr,"line %d: %s\n",__LINE__,#c);exit(1);}}while(0)
-static void native_timer(uint8_t *ram)
+/* Original timer arithmetic/branches; hook decisions are tested independently
+ * below as well. Built-runtime checks additionally execute the real ROM. */
+static void native_timer_profile(uint8_t *ram,int standalone)
 {
-    if(ram[0xFE23]==9 && ram[0xFE24]==59 && ram[0xFE25]==59)
-        ram[0xFE1A]=1;
-    else ++ram[0xFE25];
+    uint32_t d1=0;uint16_t sr=ram[0xFE23]==9 && ram[0xFE24]==59 && ram[0xFE25]==59?4:0;
+    s3_gameplay_timer_hook(standalone?0xEAF2:0xDD76,ram,&d1,&sr);
+    if(sr&4){ram[0xFE1A]=1;return;}
+    if(++ram[0xFE25]<60)return;
+    ram[0xFE25]=0;
+    if(++ram[0xFE24]<60)return;
+    ram[0xFE24]=0;
+    ++ram[0xFE23];sr=ram[0xFE23]<9?1:0;
+    s3_gameplay_timer_hook(standalone?0xEB14:0xDD98,ram,&d1,&sr);
+    if(!(sr&1))ram[0xFE23]=9;
+}
+static void native_timer(uint8_t *ram){native_timer_profile(ram,0);}
+static void test_extended_timer(void)
+{
+    static uint8_t ram[65536],before[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;++m) {
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        unsigned over=m?0xDD76:0xEAF2,clamp=m?0xDD98:0xEB14,digit=m?0xDDAA:0xEB26;
+        unsigned demo=m?0xFFD0:0xFFF0,competition=m?0xFFE8:0xFFD8;
+        CHECK(s3_gameplay_owns(over)&&s3_gameplay_owns(clamp)&&s3_gameplay_owns(digit));
+        memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE23]=9;ram[0xFE24]=59;ram[0xFE25]=59;
+        native_timer_profile(ram,!m);CHECK(ram[0xFE1A]==1); /* unchanged native expiry */
+        ram[0xFE1A]=0;s3_gameplay.infinite_time=1;
+        native_timer_profile(ram,!m);
+        CHECK(!ram[0xFE1A]&&ram[0xFE23]==10&&!ram[0xFE24]&&!ram[0xFE25]);
+        for(unsigned t=0;t<120;++t){s3_gameplay_apply(ram);native_timer_profile(ram,!m);}
+        CHECK(ram[0xFE23]==10&&ram[0xFE24]==2&&!ram[0xFE25]&&!ram[0xFE1A]);
+        ram[0xFE23]=99;ram[0xFE24]=59;ram[0xFE25]=59;
+        for(unsigned t=0;t<300;++t){s3_gameplay_apply(ram);native_timer_profile(ram,!m);}
+        CHECK(ram[0xFE23]==99&&ram[0xFE24]==59&&ram[0xFE25]==59&&!ram[0xFE1A]);
+        s3_gameplay.infinite_time=0;native_timer_profile(ram,!m);CHECK(ram[0xFE1A]==1);
+        for(unsigned on=0;on<2;++on)for(unsigned minute=0;minute<100;++minute) {
+            s3_gameplay.infinite_time=on;ram[0xFE23]=(uint8_t)minute;
+            uint32_t d1=0xABCD1200u|minute;uint16_t sr=0xA71F;
+            memcpy(before,ram,sizeof ram);s3_gameplay_timer_hook(digit,ram,&d1,&sr);
+            CHECK(d1==(0xABCD1200u|(minute<10?minute:minute%10))&&sr==0xA71F);
+            CHECK(!memcmp(before,ram,sizeof ram));
+            d1=0x12345678u;sr=0xA71F;s3_gameplay_timer_hook(over,ram,&d1,&sr);
+            CHECK(sr==(on?0xA71B:0xA71F)&&d1==0x12345678u);
+            sr=0xA71A;s3_gameplay_timer_hook(over,ram,&d1,&sr);
+            CHECK(sr==((!on&&minute>=10)?0xA71E:0xA71A));
+            sr=0xA71A;s3_gameplay_timer_hook(clamp,ram,&d1,&sr);
+            CHECK(sr==(on?0xA71B:0xA71A)&&d1==0x12345678u);
+        }
+        s3_gameplay.infinite_time=1;ram[0xFE23]=10;
+        const unsigned blocked[]={demo,demo+1,competition,competition+1};
+        for(unsigned i=0;i<4;++i) {
+            ram[blocked[i]]=1;uint32_t d1=10;uint16_t sr=0xA71F;
+            for(unsigned j=0;j<3;++j)s3_gameplay_timer_hook((unsigned[]){over,clamp,digit}[j],ram,&d1,&sr);
+            CHECK(d1==10&&sr==0xA71F);ram[blocked[i]]=0;
+        }
+        const unsigned excluded[]={0,4,8,0x34,0x8C};
+        for(unsigned i=0;i<sizeof excluded/sizeof excluded[0];++i) {
+            ram[0xF600]=(uint8_t)excluded[i];uint32_t d1=10;uint16_t sr=4;
+            s3_gameplay_timer_hook(over,ram,&d1,&sr);CHECK(d1==10&&sr==4);
+        }
+        ram[0xF600]=12;
+        for(unsigned z=0x13;z<=0x15;++z) {
+            ram[0xFE10]=(uint8_t)z;uint32_t d1=10;uint16_t sr=4;
+            s3_gameplay_timer_hook(over,ram,&d1,&sr);CHECK(d1==10&&sr==4);
+        }
+        ram[0xFE10]=0;uint32_t d1=10;uint16_t sr=4;
+        s3_gameplay_timer_hook(over+2,ram,&d1,&sr);CHECK(d1==10&&sr==4);
+        s3_gameplay_timer_hook(over,NULL,&d1,&sr);CHECK(d1==10&&sr==4);
+        s3_gameplay_timer_hook(over,ram,NULL,&sr);CHECK(sr==4);
+        s3_gameplay_timer_hook(over,ram,&d1,NULL);CHECK(d1==10);
+    }
 }
 static void test_native_access(void)
 {
@@ -56,7 +123,7 @@ static void test_native_access(void)
         }
         memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=0x20;
         ram[0xFE12]=1;ram[0xFE23]=9;ram[0xFE24]=59;ram[0xFE25]=59;
-        s3_gameplay_apply(ram);CHECK(ram[0xFE12]==3 && ram[0xFE25]==58);
+        s3_gameplay_apply(ram);CHECK(ram[0xFE12]==3 && ram[0xFE25]==59);
         const unsigned guards[]={demo,demo+1,competition,competition+1};
         for(unsigned i=0;i<4;++i)for(unsigned title=0;title<2;++title) {
             memset(ram,0,sizeof ram);ram[0xF600]=title?4:12;ram[guards[i]]=1;
@@ -197,6 +264,7 @@ static void test_shield_transform(void)
             CHECK(s3_gameplay_skip_shield(pc,ram,0xFFFFB000u,1)==1);
         }
         CHECK(!s3_gameplay_skip_shield(pc,NULL,0xFFFFB000u,1));
+        CHECK(!s3_gameplay_skip_shield(m?0xDD76:0xEAF2,ram,0xFFFFB000u,1));
     }
 }
 int main(void)
@@ -223,8 +291,9 @@ int main(void)
     s3_gameplay_load("settings.ini","test-gameplay");
     CHECK(s3_gameplay.infinite_lives && s3_gameplay.infinite_time &&
           s3_gameplay.easy_level_select && s3_gameplay.debug_mode && s3_gameplay.shield_transform);
+    ram[0xFE23]=99;
     for(int frame=0;frame<300;++frame){s3_gameplay_apply(ram);native_timer(ram);CHECK(!ram[0xFE1A]);}
-    CHECK(ram[0xFE23]==9 && ram[0xFE24]==59 && ram[0xFE25]==59);
+    CHECK(ram[0xFE23]==99 && ram[0xFE24]==59 && ram[0xFE25]==59);
     CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","infinite-time",0));
     native_timer(ram);CHECK(ram[0xFE1A]==1);
     s3_gameplay.infinite_time=1;s3_gameplay.easy_level_select=0;
@@ -237,7 +306,7 @@ int main(void)
     CHECK(p->commit(p->ctx,NULL));s3_gameplay_load("settings.ini","test-gameplay");
     CHECK(!s3_gameplay.infinite_lives && !s3_gameplay.infinite_time);
     remove("test-gameplay-gameplay.ini");
-    test_native_access();test_provider_composition();test_checkpoint_option();test_shield_transform();
+    test_native_access();test_provider_composition();test_checkpoint_option();test_shield_transform();test_extended_timer();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }
