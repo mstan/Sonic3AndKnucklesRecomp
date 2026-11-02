@@ -251,16 +251,17 @@ static int media_import(unsigned kind,const char *disc,const char *rom,const cha
     CloseHandle(process.hThread);CloseHandle(process.hProcess);
 #endif
     if(code){snprintf(error,capacity,"%s See %s",*detail?detail:"Owned-media import failed.",log_path);return 0;}
-    FILE *result=fopen(receipt,"rb");if(!result)goto io_error;int format=0;
+    FILE *result=fopen(receipt,"rb");if(!result)goto io_error;int format=0,audio_absent=0;
     while(fgets(line,sizeof line,result)) {
         line[strcspn(line,"\r\n")]=0;
         if(!strcmp(line,"format=1"))format=1;
+        else if(kind==4&&!strcmp(line,"audio=absent"))audio_absent=1;
         else if(!strncmp(line,"content=",8)&&strlen(line+8)<1024)strcpy(content,line+8);
         else if(kind==4&&!strncmp(line,"music=",6)&&strlen(line+6)<1024)strcpy(music,line+6);
         else if(kind==3&&!strncmp(line,"rom=",4)&&strlen(line+4)<1024)strcpy(music,line+4);
     }
     fclose(result);remove(receipt);
-    if(format&&*content&&((kind==1||kind==2)||*music))return 1;
+    if(format&&*content&&((kind==1||kind==2)||*music||(kind==4&&audio_absent)))return 1;
     snprintf(error,capacity,"Importer returned an incomplete installation; previous selection retained.");return 0;
 path_error:snprintf(error,capacity,"Import path is too long or invalid.");return 0;
 io_error:snprintf(error,capacity,"Unable to read or write the private import directory.");return 0;

@@ -13,5 +13,9 @@ subprocess.Popen([sys.executable, "-c", "import time; time.sleep(8)"],
 if args.disc == "failure.cue":
     print("S3K_CD_ERROR:fixture failure", flush=True)
     sys.exit(7)
-Path(args.receipt).write_text("format=1\ncontent=fixture-content.pak\nmusic=fixture-music.pak\n")
+if args.disc in ('data-only.iso', 'incomplete.iso'):
+    Path(args.receipt).write_text('format=1\ncontent=fixture-content.pak\nmusic=\n' +
+                                 ('audio=absent\n' if args.disc == 'data-only.iso' else ''))
+else:
+    Path(args.receipt).write_text("format=1\ncontent=fixture-content.pak\nmusic=fixture-music.pak\n")
 print("S3K_CD_PROGRESS:1.0:fixture complete", end="", flush=True)
