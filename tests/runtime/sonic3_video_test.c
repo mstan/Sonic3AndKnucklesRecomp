@@ -599,6 +599,61 @@ static void test_knux_preview_installed_scroll(void)
     CHECK(configure("off"));
 }
 #endif
+
+static void test_interpolation_owned_and_readonly(void)
+{
+    GVDP v;
+    CHECK(configure("off"));interpolation_configure(0);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    s_world_cell=NULL;s_world_publish=NULL;s_actor_overlay=NULL;
+    g_ram[0xF600]=12;g_ram[0xFE10]=1;g_ram[0xF711]=1;
+    write32(0xB000,0x123456);word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;
+    v.cram[1]=14;
+    S3StateIO measure={0};measure.ok=1;s3_video_state(&measure);
+    uint8_t *before=(uint8_t*)malloc(measure.pos),*after=(uint8_t*)malloc(measure.pos);
+    CHECK(before && after);
+    S3StateIO io={before,measure.pos,0,0,1};s3_video_state(&io);CHECK(io.ok);
+    uint8_t ram_before[65536];memcpy(ram_before,g_ram,sizeof ram_before);
+    M68KState cpu_before=g_cpu;
+    interpolation_configure(1);CHECK(!enabled() && s3_video_main_cpu_divisor()==1);
+    CHECK(width(1920,1080,320,224)==0);
+    s3_video_hook(S3_CAPTURE);s3_video_hook(S3_PUBLISH);
+    io=(S3StateIO){after,measure.pos,0,0,1};s3_video_state(&io);
+    CHECK(io.ok && !memcmp(before,after,measure.pos));
+    CHECK(!memcmp(g_ram,ram_before,sizeof ram_before) && !memcmp(&g_cpu,&cpu_before,sizeof g_cpu));
+
+    /* Two real completed captures own private patterns and per-line colors.
+     * Moving one object must move every mapping piece by the same fraction. */
+    test_atlas_enabled=test_private_planes=1;memset(test_atlas,0,sizeof test_atlas);
+    memset(test_atlas+32,0x11,32);
+    memset(s_ix_history,0,sizeof s_ix_history);s_ix_upload_serial=0;
+    static uint32_t row[320],half[320*224];
+    for(unsigned tick=1;tick<=2;++tick) {
+        SceneFrame *f=&s_ix_history[1];memset(f,0,sizeof *f);
+        f->serial=tick;f->scene=1;f->count=1;
+        f->sprites[0]=(SceneSprite){(int)(100+(tick-1)*8),10,1,0x80,0,256,1};
+        f->code[1]=0x123456;f->ox[1]=(int16_t)(100+(tick-1)*8);f->oy[1]=10;
+        word(g_ram,0xFE04,tick);
+        for(unsigned x=0;x<320;++x)row[x]=0xFF123400u+tick;
+        for(int y=0;y<224;++y)interpolation_capture(&v,y,row,320,320,NULL);
+    }
+    CHECK(ix_current()->valid && ix_previous()->valid);
+    memset(test_atlas,0x22,sizeof test_atlas);test_atlas_enabled=test_private_planes=0;
+    io=(S3StateIO){before,measure.pos,0,0,1};s3_video_state(&io);
+    memcpy(ram_before,g_ram,sizeof ram_before);cpu_before=g_cpu;
+    CHECK(interpolate(0,half,320,224) && half[0]==0xFF123401);
+    CHECK(interpolate(1,half,320,224) && half[0]==0xFF123402);
+    CHECK(interpolate(.5,half,320,224));
+    CHECK(interpolation_lerp(32760,-32760,48)==-32768);
+    for(int x=100;x<116;++x)CHECK(half[10*320+x]==(x>=104 && x<112?0xFFFF0000u:0xFF000000u));
+    io=(S3StateIO){after,measure.pos,0,0,1};s3_video_state(&io);
+    CHECK(io.ok && !memcmp(before,after,measure.pos));
+    CHECK(!memcmp(g_ram,ram_before,sizeof ram_before) && !memcmp(&g_cpu,&cpu_before,sizeof g_cpu));
+    interpolation_reset();CHECK(!interpolate(.5,half,320,224));
+    interpolation_configure(0);free(before);free(after);
+}
+
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -965,6 +1020,7 @@ int main(int argc,char **argv)
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
 #endif
-    puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
+    test_interpolation_owned_and_readonly();
+    puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
 }
