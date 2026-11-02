@@ -647,6 +647,18 @@ static void test_interpolation_owned_and_readonly(void)
     CHECK(interpolate(.5,half,320,224));
     CHECK(interpolation_lerp(32760,-32760,48)==-32768);
     for(int x=100;x<116;++x)CHECK(half[10*320+x]==(x>=104 && x<112?0xFFFF0000u:0xFF000000u));
+    /* Normal foreground Y uses the owned fractional VSRAM too, independently
+     * of AIZ's special ship band. Distinct rows expose a stepping plane. */
+    InterpSnapshot *latest=ix_current(),*prior=ix_previous();
+    latest->scene.count=prior->scene.count=0;
+    latest->context.fg_y=latest->context.video.vsram[0]=8;prior->context.fg_y=0;
+    for(int y=0;y<224;++y) {
+        latest->fg_scroll[y]=8;prior->fg_scroll[y]=0;
+        for(int n=1;n<=8;++n)latest->cram[y][n]=(uint16_t)((n&7)*2);
+    }
+    for(unsigned y=0;y<8;++y)memset(latest->context.video.vram+y*4,(int)((y+1)*17),4);
+    CHECK(interpolate(.5,half,320,224));
+    CHECK(half[0]==genesis_dac_cram_to_argb(latest->cram[0][5],GENESIS_DAC_NORMAL));
     io=(S3StateIO){after,measure.pos,0,0,1};s3_video_state(&io);
     CHECK(io.ok && !memcmp(before,after,measure.pos));
     CHECK(!memcmp(g_ram,ram_before,sizeof ram_before) && !memcmp(&g_cpu,&cpu_before,sizeof g_cpu));

@@ -1158,7 +1158,7 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         ((s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7]);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
-    unsigned fg_scroll=aiz_ship?live_fg_scroll:v->vsram[0];
+    unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
     int ship_band=aiz_ship && !((fg_scroll^(unsigned)ship_y)&1023u);
     int camera=level?unwrap(-hs_a,ship_band?ship_x:s_frame_fg_x):ram16(0xEE78);
     int camera_y=unwrap((int)fg_scroll,ship_band?ship_y:s_frame_fg_y);
