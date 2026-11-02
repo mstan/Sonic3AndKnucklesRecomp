@@ -26,6 +26,9 @@ static void test_native_access(void)
     const char *modes[]={"sonic3","sonic3k","sandk"};
     for(unsigned m=0;m<3;++m) {
         s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        const RecompLauncherCModProvider *provider=s3_gameplay_mods(NULL);
+        RecompLauncherCModFeature feature;CHECK(provider->feature_get(provider->ctx,2,&feature));
+        CHECK(strstr(feature.description,m==2?"Hold A and press Start":"Press Up")!=NULL);
         s3_gameplay=(S3GameplayConfig){0,0,1,1,0};
         unsigned select=m?0xFFE0:0xFFD0,debug=m?0xFFDA:0xFFFA;
         unsigned demo=m?0xFFD0:0xFFF0,competition=m?0xFFE8:0xFFD8;

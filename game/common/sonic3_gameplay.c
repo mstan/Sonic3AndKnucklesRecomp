@@ -6,11 +6,12 @@
 #endif
 S3GameplayConfig s3_gameplay;
 static char path[1024],error[256];
-static int standalone_s3,combined_mode;
+static int standalone_s3,standalone_sk,combined_mode;
 void s3_gameplay_load(const char *settings_path,const char *mode)
 {
     memset(&s3_gameplay,0,sizeof s3_gameplay);
     error[0]=0;standalone_s3=mode&&!strcmp(mode,"sonic3");
+    standalone_sk=mode&&!strcmp(mode,"sandk");
     combined_mode=mode&&!strcmp(mode,"sonic3k");
     snprintf(path,sizeof path,"%s",settings_path?settings_path:"settings.ini");
     char *a=strrchr(path,'/'),*b=strrchr(path,'\\');
@@ -120,6 +121,8 @@ static int get_feature(void *c,int i,RecompLauncherCModFeature *o)
     COPY(o->id,ids[i]);COPY(o->package_id,package);COPY(o->package_name,"Gameplay options");
     COPY(o->package_version,"0.1.0");COPY(o->name,names[i]);COPY(o->group,"Gameplay");
     COPY(o->description,descriptions[i]);COPY(o->status,*value(i)?"Enabled — local play":"Disabled");
+    if(i==2 && standalone_sk)
+        COPY(o->description,"Hold A and press Start on the title screen to open native level select. Keep A held through the fade. Local play only.");
     o->enabled=*value(i);return 1;
 }
 static int enable(void *c,const char *p,const char *f,int on)
