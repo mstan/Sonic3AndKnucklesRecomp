@@ -77,11 +77,14 @@ int main(int argc,char **argv)
         }
         CHECK(p->feature_enable(NULL,ids[i],"campaign",0));
     }
-    if(argc==4 && (!strcmp(argv[1],"--import") || !strcmp(argv[1],"--reject-import"))) {
+    if((argc==4 || argc==5) && (!strcmp(argv[1],"--import") || !strcmp(argv[1],"--import-data-only") || !strcmp(argv[1],"--reject-import"))) {
         char error[256],content[1024],music[1024];RecompLauncherCModResource resource;
+        int data_only=!strcmp(argv[1],"--import-data-only");
         CHECK(p->feature_resource_count(NULL,ids[3],"campaign")==3);
         CHECK(p->feature_resource_get(NULL,ids[3],"campaign",0,&resource));
         CHECK(!strcmp(resource.id,"cd-disc") && resource.import_on_select);
+        CHECK(strstr(resource.file_patterns,"*.iso") && strstr(resource.file_patterns,"*.zip"));
+        if(argc==5)CHECK(p->feature_resource_set_path(NULL,ids[3],"campaign","cd-music",argv[4]));
         CHECK(p->feature_enable(NULL,ids[3],"campaign",1));
         int imported=p->feature_resource_import(NULL,ids[3],"campaign","cd-disc",argv[2],argv[3],
                                                 import_progress,NULL,error,sizeof error);
@@ -95,7 +98,10 @@ int main(int argc,char **argv)
         CHECK(s3_stage_pack_cd && !s3_stage_pack_mighty && !s3_pack_shadow_requested);
         CHECK(p->feature_resource_get(NULL,ids[3],"campaign",1,&resource) && resource.verified);
         snprintf(content,sizeof content,"%s",resource.path);
-        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",2,&resource) && resource.verified);
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",2,&resource));
+        CHECK(resource.verified==(!data_only || argc==5));
+        if(data_only && argc==5)CHECK(!strcmp(resource.path,argv[4]));
+        if(data_only && argc==4)CHECK(!*resource.path && strstr(resource.status,"No CDDA"));
         snprintf(music,sizeof music,"%s",resource.path);
         CHECK(!p->feature_resource_import(NULL,ids[3],"campaign","cd-disc","missing-disc.cue",argv[3],
                                          import_progress,NULL,error,sizeof error));
@@ -104,6 +110,7 @@ int main(int argc,char **argv)
         CHECK(s3_stage_pack_cd && !strcmp(content,s3_pack_paths[3]) && !strcmp(music,s3_cd_audio_path));
         CHECK(p->feature_resource_get(NULL,ids[3],"campaign",0,&resource));
         CHECK(resource.verified && !strcmp(resource.path,argv[2]));
+        if(data_only)CHECK(strstr(resource.status,argc==5?"retained":"no CDDA"));
         printf("Imported content: %s\nImported music: %s\n",content,music);
     }
     /* A same-size impostor must fail too, without requiring any donor data. */
