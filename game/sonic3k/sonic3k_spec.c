@@ -48,6 +48,11 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static int s3k_instruction(uint32_t pc)
 {
+    if(s3_gameplay_owns(pc)) {
+        uint32_t target=s3_gameplay_transform_target(pc,g_ram,g_cpu.A[0],!tri_character_active());
+        if(target){recomp_tail_call(target);return 1;}
+        return 0; /* This private site must not reach the renderer default. */
+    }
     if (trilogy_instruction(pc)) return 1;
     /* New hook sites must never reach the renderer's object-range default,
      * even with the pack disabled. Shared army sites retain their old chain. */

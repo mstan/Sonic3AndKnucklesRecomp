@@ -406,3 +406,9 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x5A6A8 # CMP.W #$280,D0 after native coarse-camera subtraction
 kind = "game_hook"
+
+# Opt-in native Sonic shielded transformation; s3.lst Sonic_FireShield.
+# Original opcode0828 0001 002B; disabled path preserves the native BTST.
+[[widescreen_site]]
+addr = 0x12946
+kind = "game_hook"

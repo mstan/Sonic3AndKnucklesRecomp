@@ -231,13 +231,22 @@ static const GameDebugCommand s3_commands[] = {
 };
 
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static int gameplay_instruction(uint32_t pc)
+{
+    if(s3_gameplay_owns(pc)) {
+        uint32_t target=s3_gameplay_transform_target(pc,g_ram,g_cpu.A[0],1);
+        if(target){recomp_tail_call(target);return 1;}
+        return 0;
+    }
+    return s3_video_hook(pc);
+}
 static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); }
 const GameSpec g_game_spec = {
     .load_settings          = gameplay_settings,
     .mods                   = s3_gameplay_mods,
     .netplay_allowed        = s3_gameplay_netplay_allowed,
     .video                  = &sonic3_video,
-    .instruction_hook       = s3_video_hook,
+    .instruction_hook       = gameplay_instruction,
     .main_cpu_divisor       = s3_video_main_cpu_divisor,
     .display_name           = "Sonic 3",
     .short_name             = "Sonic3",

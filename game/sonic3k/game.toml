@@ -974,3 +974,9 @@ kind = "game_hook"
 addr = 0x00C402 # Megamix Write_SaveGame+1E
 kind = "game_hook"
 # END megamix geometry hooks
+
+# Opt-in native Sonic shielded transformation; sonic3k.lst Sonic_FireShield.
+# Original opcode0828 0001 002B; disabled path preserves the native BTST.
+[[widescreen_site]]
+addr = 0x1192C
+kind = "game_hook"

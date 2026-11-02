@@ -235,6 +235,15 @@ static const GameDebugCommand sandk_commands[] = {
 };
 
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static int gameplay_instruction(uint32_t pc)
+{
+    if(s3_gameplay_owns(pc)) {
+        uint32_t target=s3_gameplay_transform_target(pc,g_ram,g_cpu.A[0],1);
+        if(target){recomp_tail_call(target);return 1;}
+        return 0;
+    }
+    return s3_sk_instruction_hook(pc);
+}
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
     .state_size             = s3_state_size,
@@ -242,7 +251,7 @@ const GameSpec g_game_spec = {
     .state_load             = s3_state_load,
     .state_at_boundary      = s3_state_at_boundary,
     .video                  = &sonic3_video,
-    .instruction_hook       = s3_sk_instruction_hook,
+    .instruction_hook       = gameplay_instruction,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras. */
     .logical_players        = 4,
