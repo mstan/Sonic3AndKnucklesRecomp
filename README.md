@@ -214,6 +214,9 @@ Want to build or contribute? See the [build guide](docs/BUILDING.md) and
 
 ## Credits and license
 
+[TheGabeMaster29](https://github.com/TheGabeMaster29) contributed extensive QA testing,
+detailed bug reports, and regression feedback.
+
 Sonic and the original games belong to SEGA. Campaign and character additions
 build on [Sonic Anthology](https://github.com/sonsegajp/SonicAnthology) by
 sonsegajp (formerly SonicTrilogy), whose Sonic 1, Sonic 2 and Sonic CD work is
