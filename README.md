@@ -14,21 +14,21 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The latest release,
-v0.6.4, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+the separate versions need their corresponding ROMs. The v0.7.0 release
+candidate provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
 
-## Upcoming options (unreleased)
+## New options in v0.7.0
 
-These controls are on the development branch and will appear in a future release.
+These controls are included in the release candidate.
 
 In **Mods**, enable **High refresh rate**, then choose **Presentation rate**:
 120, 144 or Display. Display follows the monitor's refresh rate. Gameplay and
 music keep their normal speed. Menus, finite special-stage views and some
-scripted scenes repeat complete frames. The corrected Blue Spheres widescreen projection has passed its bounded checks
-and owner visual review; it is being integrated for the next release.
+scripted scenes repeat complete frames. Blue Spheres uses the corrected widescreen projection by default when
+widescreen is enabled.
 
 Enable **Unfiltered audio** for the clearer sound without the hardware low-pass
 filter. The normal filtered sound remains the default. Both controls are also
@@ -168,11 +168,14 @@ offline importer verifies it, prepares a private cached campaign and fills in
 the resources automatically. Each campaign needs only its own cartridge and
 your selected S3K ROM. A Megamix import also prepares Mighty and Shadow;
 their checkboxes stay independent. Wait for completion, then select **PLAY**.
-No Python or Pillow installation is needed with the complete development
-package. Failed imports retain your previous resources and native progress.
+No Python or Pillow installation is needed with the complete package. Failed imports retain your previous resources and native progress.
 
-The bundled importer also handles Sonic CD **CUE/BIN** and verified **.sgcd**
-images. Bare ISO files and compressed disc archives are not supported.
+The bundled importer also handles Sonic CD **CUE/BIN**, **ISO**, raw data
+**BIN/IMG** and verified **.sgcd** images, directly or inside a **ZIP**.
+Keep the CUE and its referenced tracks together to retain CD audio. Data-only
+ISO/BIN images provide stages, embedded Past music and voices; Present/Future
+CD audio requires the audio tracks. The importer reports missing CD audio and
+retains previously verified music when available.
 
 **Published v0.6.4:** cartridge stage packs still need to be prepared before use.
 Follow the
