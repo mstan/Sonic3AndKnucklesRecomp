@@ -1791,4 +1791,16 @@ static int interpolate(double phase,uint32_t *image,int stride,int height)
     return 1;
 }
 
-const GameVideo sonic3_video = { configure, enabled, width, scanline, overlay_scanline, NULL, menu_raster_enabled, scanline_lazy, interpolation_configure, interpolation_capture, interpolate, interpolation_reset };
+const GameVideo sonic3_video = {
+    .configure = configure,
+    .enabled = enabled,
+    .width = width,
+    .scanline = scanline,
+    .overlay_scanline = overlay_scanline,
+    .raster_enabled = menu_raster_enabled,
+    .scanline_presented = scanline_lazy,
+    .presentation_configure = interpolation_configure,
+    .presentation_capture = interpolation_capture,
+    .interpolate = interpolate,
+    .presentation_reset = interpolation_reset
+};
