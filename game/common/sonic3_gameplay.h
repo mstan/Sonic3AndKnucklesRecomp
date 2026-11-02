@@ -1,7 +1,11 @@
 #pragma once
 #include <stdint.h>
 struct RecompLauncherCModProvider;
-typedef struct { int infinite_lives,infinite_time; } S3GameplayConfig;
+typedef struct {
+    int infinite_lives,infinite_time;
+    int easy_level_select,debug_mode;
+    int checkpoint_bonus;
+} S3GameplayConfig;
 extern S3GameplayConfig s3_gameplay;
 void s3_gameplay_load(const char *settings_path,const char *mode);
 int s3_gameplay_save(void);
