@@ -29,7 +29,7 @@ static void test_native_access(void)
         const RecompLauncherCModProvider *provider=s3_gameplay_mods(NULL);
         RecompLauncherCModFeature feature;CHECK(provider->feature_get(provider->ctx,2,&feature));
         CHECK(strstr(feature.description,m==2?"Hold A and press Start":"Press Up")!=NULL);
-        s3_gameplay=(S3GameplayConfig){0,0,1,1,0,0};
+        s3_gameplay=(S3GameplayConfig){0,0,1,1,0,0,0};
         unsigned select=m?0xFFE0:0xFFD0,debug=m?0xFFDA:0xFFFA;
         unsigned demo=m?0xFFD0:0xFFF0,competition=m?0xFFE8:0xFFD8;
         memset(ram,0,sizeof ram);ram[0xF600]=4;ram[0xFE12]=1;
@@ -45,7 +45,18 @@ static void test_native_access(void)
             CHECK(!ram[debug] && !ram[0xFE08] && ram[0xF600]==12);
         }
         /* Each byte of both native words must exclude demo/Competition. */
-        s3_gameplay=(S3GameplayConfig){1,1,1,1,0,0};
+        s3_gameplay=(S3GameplayConfig){1,1,1,1,0,0,0};
+        /* Slots, Gumball and Pachinko use Level mode too. Never alter their
+         * lives/timer/debug state, while imported campaign rounds still work. */
+        for(unsigned z=0x13;z<=0x15;++z) {
+            memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=(uint8_t)z;
+            ram[0xFE12]=1;ram[0xFE23]=9;ram[0xFE24]=59;ram[0xFE25]=59;
+            memcpy(before,ram,sizeof ram);s3_gameplay_apply(ram);
+            CHECK(!memcmp(before,ram,sizeof ram));
+        }
+        memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=0x20;
+        ram[0xFE12]=1;ram[0xFE23]=9;ram[0xFE24]=59;ram[0xFE25]=59;
+        s3_gameplay_apply(ram);CHECK(ram[0xFE12]==3 && ram[0xFE25]==58);
         const unsigned guards[]={demo,demo+1,competition,competition+1};
         for(unsigned i=0;i<4;++i)for(unsigned title=0;title<2;++title) {
             memset(ram,0,sizeof ram);ram[0xF600]=title?4:12;ram[guards[i]]=1;
@@ -106,18 +117,25 @@ static void test_checkpoint_option(void)
         char path[128];snprintf(path,sizeof path,"%s/%s-gameplay.ini",dir,modes[i]);
         s3_gameplay_load("test-gameplay-modes/settings.ini",modes[i]);
         const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
-        CHECK(p->feature_count(p->ctx)==(i==2?6:5));
-        CHECK(!s3_gameplay.checkpoint_bonus && s3_gameplay_netplay_allowed());
+        CHECK(p->feature_count(p->ctx)==(i==2?7:5));
+        CHECK(!s3_gameplay.checkpoint_bonus && !s3_gameplay.tails_ring_follow && s3_gameplay_netplay_allowed());
         if(i==2) {
             CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
             CHECK(s3_gameplay.checkpoint_bonus && !s3_gameplay_netplay_allowed());
+            CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",0));
+            CHECK(s3_gameplay_netplay_allowed());
+            CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","tails-ring-follow",1));
+            CHECK(s3_gameplay.tails_ring_follow && !s3_gameplay_netplay_allowed());
+            CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
             CHECK(p->commit(p->ctx,NULL));
         } else {
             CHECK(!p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
-            FILE *f=fopen(path,"wb");CHECK(f);fputs("checkpoint_bonus=1\n",f);CHECK(!fclose(f));
+            CHECK(!p->feature_enable(p->ctx,"sonic3.gameplay","tails-ring-follow",1));
+            FILE *f=fopen(path,"wb");CHECK(f);fputs("checkpoint_bonus=1\ntails_ring_follow=1\n",f);CHECK(!fclose(f));
         }
         s3_gameplay_load("test-gameplay-modes/settings.ini",modes[i]);
         CHECK(s3_gameplay.checkpoint_bonus==(i==2));
+        CHECK(s3_gameplay.tails_ring_follow==(i==2));
         CHECK(remove(path)==0);
     }
     CHECK(REMOVE_DIR(dir)==0);

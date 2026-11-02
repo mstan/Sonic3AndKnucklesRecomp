@@ -6,6 +6,7 @@ typedef struct {
     int easy_level_select,debug_mode;
     int checkpoint_bonus;
     int shield_transform;
+    int tails_ring_follow;
 } S3GameplayConfig;
 extern S3GameplayConfig s3_gameplay;
 void s3_gameplay_load(const char *settings_path,const char *mode);
