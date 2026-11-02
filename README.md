@@ -15,9 +15,9 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
 the separate versions need their corresponding ROMs. The latest release,
-v0.6.0, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+v0.6.4, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
-**The extra campaigns, Mighty and Shadow shown below are included in v0.6.0**
+**The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
 
 ## Every zone, across the campaigns
@@ -109,12 +109,12 @@ checkbox, and all are **experimental** and off by default.
 
 | Mod | What you need |
 | --- | --- |
-| Sonic 1 stages | Your own supported Sonic 1 ROM and a prepared stage pack |
-| Sonic 2 stages | Your own supported Sonic 2 ROM and a prepared stage pack |
+| Sonic 1 stages | Your own supported Sonic 1 ROM |
+| Sonic 2 stages | Your own supported Sonic 2 ROM |
 | Sonic CD stages | Your own supported Sonic CD (US) disc image |
-| Sonic Megamix stages | Your own Sonic Megamix v3 ROM and a prepared content pack |
-| Mighty | The same Megamix ROM and content pack |
-| Shadow | The same Megamix ROM and content pack |
+| Sonic Megamix stages | Your own Sonic Megamix v3 ROM |
+| Mighty | The same Megamix ROM |
+| Shadow | The same Megamix ROM |
 
 Enable whichever campaigns you want. They play in this order:
 **Sonic 1 → Sonic 2 → Sonic CD → Sonic 3 & Knuckles → Megamix**.
@@ -126,11 +126,24 @@ import to finish before pressing PLAY. **No Sega CD BIOS is needed for this
 mod.** It uses Sonic 3 & Knuckles' characters and abilities. For the original
 Sonic CD experience, see [SonicCDRecomp](https://github.com/mstan/SonicCDRecomp).
 
-Stage packs must be prepared from your own game files before use. Follow the
+**Development builds — unreleased:** under a mod's **Files**, select your
+Sonic 1, Sonic 2 or Megamix ROM, or a ZIP containing that ROM. The bundled
+offline importer verifies it, prepares a private cached campaign and fills in
+the resources automatically. Each campaign needs only its own cartridge and
+your selected S3K ROM. A Megamix import also prepares Mighty and Shadow;
+their checkboxes stay independent. Wait for completion, then select **PLAY**.
+No Python or Pillow installation is needed with the complete development
+package. Failed imports retain your previous resources and native progress.
+
+The bundled importer also handles Sonic CD **CUE/BIN** and verified **.sgcd**
+images. Bare ISO files and compressed disc archives are not supported.
+
+**Published v0.6.4:** cartridge stage packs still need to be prepared before use.
+Follow the
 [Sonic 1/2 setup guide](docs/STAGE_PACKS.md#build-your-stage-bank),
 [Megamix setup guide](docs/MEGAMIX_STAGE_PACK.md#enable-and-convert), or
 [Sonic CD setup guide](docs/SONIC_CD.md#convert-your-owned-disc).
-The CD import currently also needs Python and Pillow, as explained in its guide.
+Its CD import also needs Python and Pillow, as explained in its guide.
 
 ## Make it your own
 

@@ -29,6 +29,8 @@ cmake -S "$REPO" -B "$BUILD" -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release \
     -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF
 cmake --build "$BUILD" -j"$JOBS"
 [ "$PACKAGE" = 1 ] || exit 0
+python3 "$REPO/tools/make_campaign_builder.py" --out "$BUILD" \
+    --work "$BUILD/campaign-builder" --engine-root "$REPO/segagenesisrecomp"
 mkdir -p "$OUT" "$BUILD/appimage-tools"
 OUT=$(realpath "$OUT")
 WORK=$(mktemp -d)

@@ -15,6 +15,13 @@ $out = Join-Path $root 'release-stage'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $modes = Get-Content -LiteralPath "$PSScriptRoot/release/modes.json" -Raw | ConvertFrom-Json
+$builderEngine = if ($EngineRoot) { $EngineRoot } else { Join-Path $root 'segagenesisrecomp' }
+$ErrorActionPreference = 'Continue'
+& $Python "$PSScriptRoot/make_campaign_builder.py" --out $build `
+  --work (Join-Path (Split-Path -Parent $build) 'campaign-builder') --engine-root $builderEngine
+$builderExit=$LASTEXITCODE
+$ErrorActionPreference='Stop'
+if ($builderExit) { throw 'Bundled owner-media converter build failed' }
 foreach ($mode in @('sonic3','sonic3k','sandk')) {
   $target = $modes.$mode.target
   $name = "$target-windows-x64-v$Version"

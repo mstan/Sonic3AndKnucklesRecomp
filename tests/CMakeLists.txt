@@ -94,6 +94,7 @@ target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/tri
     "${CMAKE_SOURCE_DIR}/recomp-ui/src" "${RUNNER_ROOT}" "${RUNNER_ROOT}/external/superzazu")
 target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1
     S3_CD_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py"
+    S3_ROM_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_campaign.py"
     S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
 add_test(NAME stage_pack COMMAND stage_pack_test)
 
@@ -155,6 +156,8 @@ if(Python3_Interpreter_FOUND)
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_disc_test.py")
     add_test(NAME scd_import_transaction COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_test.py")
+    add_test(NAME campaign_import_transaction COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/campaign_import_test.py")
     # The Python media reader supports the same explicit engine override as
     # the C/C++ build. Isolated worktrees need not initialize a second engine.
     set_property(TEST scd_resource scd_disc scd_import_transaction APPEND
