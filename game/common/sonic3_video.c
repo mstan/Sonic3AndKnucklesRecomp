@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "sonic3_knuckles_preview.inc"
 
 /* The standalone S3 cartridge has the same object/layout formats, with a
  * different engine address map. S&K and the combined cartridge share code. */
@@ -49,6 +50,7 @@ void s3_video_set_object_zoom(S3VideoObjectZoom fn) { s_object_zoom = fn; }
 static double s_ratio = 16.0 / 9.0;
 static int s_width, s_left, s_camera, s_stage_width, s_native_x, s_requested_width = 320;
 static int s_camera_y;
+static int s_knux_plane_camera_x,s_knux_plane_camera_y;
 static unsigned s_frames, s_fallbacks, s_terrain_checks, s_terrain_errors;
 static unsigned s_bg_checks, s_bg_errors, s_bg_unstreamed;
 static unsigned s_scene_misses, s_scene_holds;
@@ -394,6 +396,7 @@ typedef struct {
     int scene; /* 1 level, 2 special, 3 native bonus, 0 menu */
     int title; /* provenance survives Game_mode's outgoing fade transition */
     int camera_x, camera_y; /* coordinates used when capturing world sprites */
+    int preview_knux; /* waiting pose belongs to this completed display list */
 } SceneFrame;
 static SceneFrame s_build, s_history[3], s_display_frame;
 static const SceneFrame *s_display;
@@ -605,9 +608,22 @@ static unsigned rings_end(void)
 }
 static void capture_objects(void)
 {
+    int prior_preview=s_build.preview_knux;
     s_build.count=0;s_visible_count=0;++s_scene_tick;
     s_build.scene=bonus_stage()?3:level_ready()?1:0;
     s_build.title=!s_build.scene && (g_ram[0xF600]&127)==4;
+    s_build.preview_knux=s_build.scene==1 && s3_knux_preview_needed(g_ram);
+#ifndef SONIC3_STANDALONE
+    /* Allocation can target an earlier slot than the controller. Keep the
+     * waiting pose for that one queued-display handover until the real actor
+     * below has actually reached Draw_Sprite. The tag is saved with the scene. */
+    if(prior_preview && s_build.scene==1 && g_ram[0xF600]==12 &&
+       ram16(0xFE10)==1 && g_ram[0xB038]!=2)
+        for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
+            if(scene_read32(0xFF0000u+o)==0x69588)s_build.preview_knux=1;
+#else
+    (void)prior_preview;
+#endif
     /* These stages stream machine/reel art independently of world layouts.
      * Publish only their native SAT identity so entry/exit fades retain the
      * correct composition; never add ordinary stage rings or mappings. */
@@ -654,6 +670,7 @@ static void capture_objects(void)
                 anchor=s_hud_object && s_hud_object(o)?1:2;
             }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
+            if(map==0x364016)s_build.preview_knux=0;
             unsigned zoom=(flags&4) && s_object_zoom?s_object_zoom(o):0;
             /* The title plane is queued even beyond the hardware viewport.
              * Retain its signed position instead of the wrapped/cut SAT. */
@@ -684,6 +701,7 @@ static void publish_sprites(void)
     SceneFrame *dst=&s_history[s_serial%3];
     dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
+    dst->preview_knux=s_build.preview_knux;
     memcpy(dst->sat,s_build.sat,640);
     memcpy(dst->sprites,s_build.sprites,s_build.count*sizeof(SceneSprite));
 }
@@ -754,6 +772,7 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.title=s_display->title;
         s_display_frame.serial=s_display->serial;
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
+        s_display_frame.preview_knux=s_display->preview_knux;
         memcpy(s_display_frame.sat,s_display->sat,sizeof s_display_frame.sat);
         memcpy(s_display_frame.sprites,s_display->sprites,s_display->count*sizeof(SceneSprite));
         s_display=&s_display_frame;
@@ -1079,6 +1098,19 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         s_camera=level?s_frame_fg_x:camera;
         s_camera_y=level?s_frame_fg_y:camera_y;++s_frames;
         s_left=level?view_left(s_camera,width):camera-(width-nw)/2;
+        if(level && s_display && s_display->preview_knux) {
+            /* This AIZ2 waiting phase adds only 0/1px heat offsets to A.
+             * Recover its installed base once, so the rigid pose follows
+             * the displayed ledge without inheriting the per-row wave. */
+            int base=hs_a;
+            for(int y=0;y<224;++y) {
+                int row=hmode==0?0:hmode==2?y&~7:y;
+                int scroll=(int16_t)vram16(v,hsbase+(unsigned)row*4);
+                if(scroll<base)base=scroll;
+            }
+            s_knux_plane_camera_x=unwrap(-base,s_frame_fg_x);
+            s_knux_plane_camera_y=camera_y;
+        }
     }
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
@@ -1350,6 +1382,13 @@ static void render_scanline(const GVDP *v, int line, const uint32_t *native, int
         if((g_ram[0xF600]&127)==4 && s_actor_overlay)
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
     } else if(s_display) {
+        /* This static waiting pose belongs to the ledge already installed in
+         * the foreground. The live object camera can advance while that
+         * scroll snapshot is retained; sampling it would slide the preview
+         * ahead of the ledge during the approach. */
+        if(s_frame_level && s_display->preview_knux)
+            s3_knux_preview_scanline(g_rom,line,out,width,origin,
+                s_knux_plane_camera_x,s_knux_plane_camera_y);
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(s_actor_overlay)s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
     } else {

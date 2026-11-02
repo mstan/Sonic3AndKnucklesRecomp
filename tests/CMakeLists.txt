@@ -58,6 +58,21 @@ add_executable(trilogy_cd_presentation_test runtime/trilogy_cd_presentation_test
 target_include_directories(trilogy_cd_presentation_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME trilogy_cd_presentation COMMAND trilogy_cd_presentation_test)
+add_executable(trilogy_water_palette_test runtime/trilogy_water_palette_test.c)
+target_include_directories(trilogy_water_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+add_test(NAME trilogy_water_palette COMMAND trilogy_water_palette_test)
+add_executable(trilogy_syz_palette_test runtime/trilogy_syz_palette_test.c)
+target_include_directories(trilogy_syz_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+add_test(NAME trilogy_syz_palette COMMAND trilogy_syz_palette_test)
+add_executable(sonic3_knuckles_preview_test runtime/sonic3_knuckles_preview_test.c)
+target_include_directories(sonic3_knuckles_preview_test PRIVATE "${RUNNER_ROOT}")
+add_test(NAME sonic3_knuckles_preview COMMAND sonic3_knuckles_preview_test)
+add_executable(sonic3_standalone_knuckles_preview_test runtime/sonic3_knuckles_preview_test.c)
+target_include_directories(sonic3_standalone_knuckles_preview_test PRIVATE "${RUNNER_ROOT}")
+target_compile_definitions(sonic3_standalone_knuckles_preview_test PRIVATE SONIC3_STANDALONE=1)
+add_test(NAME sonic3_standalone_knuckles_preview COMMAND sonic3_standalone_knuckles_preview_test)
 add_executable(megamix_sat_test runtime/megamix_sat_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/trilogy_megamix_sprites.c")
 target_include_directories(megamix_sat_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"

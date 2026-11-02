@@ -543,6 +543,62 @@ static void test_hud_mapping(void)
     s3_video_set_hud_mapping(NULL);capture_objects();
     CHECK(s_build.count==1 && !s_build.sprites[0].size && s_build.sprites[0].attr==0x86CB);
 }
+#ifndef SONIC3_STANDALONE
+static void test_knux_preview_publication(void)
+{
+    memset(g_ram,0,sizeof g_ram);memset(&s_build,0,sizeof s_build);
+    CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,1);write32(0xB000,0x1234);
+    word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x4A38);word(g_ram,0xEE84,0x15A);word(g_ram,0xEEAA,0x7FF);
+    write32(0xB206,0x69526);
+    capture_objects();CHECK(s_build.preview_knux);publish_sprites();
+    CHECK(s_history[s_serial%3].preview_knux);
+    /* The earlier allocated slot has not reached its initializer/Draw_Sprite. */
+    write32(0xB206,0x69588);write32(0xB128,0x61D4C);
+    capture_objects();CHECK(s_build.preview_knux);publish_sprites();
+    CHECK(s_history[s_serial%3].preview_knux);
+    /* The real pose is now queued in this same completed display list. */
+    write32(0xB128,0x61F98);write32(0xB134,0x364016);
+    g_ram[0xB12C]=5;g_ram[0xB12E]=24;g_ram[0xB12F]=28;g_ram[0xB14A]=22;
+    word(g_ram,0xB132,0xA4DA);word(g_ram,0xB138,0x4B8E);word(g_ram,0xB13C,0x17D);
+    word(g_rom,0x364016+44,0x80);word(g_rom,0x364096,1);
+    word(g_rom,0x364098,0xF800);word(g_rom,0x36409A,0);word(g_rom,0x36409C,0);
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB128);
+    capture_objects();CHECK(!s_build.preview_knux && s_build.count==1);publish_sprites();
+    CHECK(!s_history[s_serial%3].preview_knux);
+    word(g_ram,0xAC00,0);capture_objects();CHECK(!s_build.preview_knux);
+    word(g_ram,0xFE10,0);capture_objects();CHECK(!s_build.preview_knux);
+    CHECK(configure("off"));
+}
+static void test_knux_preview_installed_scroll(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];
+    CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x1234);g_ram[0xF600]=12;word(g_ram,0xFE10,1);
+    word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x4A00);word(g_ram,0xEE84,0x160);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=14;
+    for(int line=0;line<224;++line)
+        word(v.vram,0xF000+(unsigned)line*4,(unsigned)(-0x49F8+(line%3==0)));
+    v.vsram[0]=0x160;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.preview_knux=1;
+    publish_sprites();
+    /* A synthetic opaque anchor isolates camera selection from art decoding. */
+    memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
+    s3_knux_preview_cache.rom=g_rom;s3_knux_preview_cache.ready=1;
+    s3_knux_preview_cache.pixels[32*64+32]=1;
+    s3_knux_preview_cache.colors[1]=0xFFFF0000;
+    scanline(&v,0,native,320,out,796);
+    scanline(&v,0x17D-0x160,native,320,out,796);
+    CHECK(out[238 + 0x4B8E - 0x49F8]==0xFFFF0000);
+    CHECK(out[238 + 0x4B8E - 0x4A00]==0xFF000000);
+    memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
+    CHECK(configure("off"));
+}
+#endif
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -905,6 +961,10 @@ int main(int argc,char **argv)
     test_private_plane_colors();
     test_hud_object_anchor();
     test_native_bonus();
+#ifndef SONIC3_STANDALONE
+    test_knux_preview_publication();
+    test_knux_preview_installed_scroll();
+#endif
     puts("Sonic 3 video terrain, activation, publication, file select and Blue Spheres PASS");
     return 0;
 }
