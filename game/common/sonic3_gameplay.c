@@ -27,6 +27,7 @@ void s3_gameplay_load(const char *settings_path,const char *mode)
         if(!strcmp(line,"debug_mode=1"))s3_gameplay.debug_mode=1;
         if(combined_mode&&!strcmp(line,"checkpoint_bonus=1"))s3_gameplay.checkpoint_bonus=1;
         if(!strcmp(line,"shield_transform=1"))s3_gameplay.shield_transform=1;
+        if(combined_mode&&!strcmp(line,"tails_ring_follow=1"))s3_gameplay.tails_ring_follow=1;
     }
     fclose(f);
 }
@@ -35,9 +36,9 @@ int s3_gameplay_save(void)
     error[0]=0;
     char temp[1040];snprintf(temp,sizeof temp,"%s.tmp",path);
     FILE *f=fopen(temp,"wb");if(!f)goto failed;
-    fprintf(f,"infinite_lives=%d\ninfinite_time=%d\neasy_level_select=%d\ndebug_mode=%d\ncheckpoint_bonus=%d\nshield_transform=%d\n",
+    fprintf(f,"infinite_lives=%d\ninfinite_time=%d\neasy_level_select=%d\ndebug_mode=%d\ncheckpoint_bonus=%d\nshield_transform=%d\ntails_ring_follow=%d\n",
         s3_gameplay.infinite_lives,s3_gameplay.infinite_time,
-        s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform);
+        s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform,s3_gameplay.tails_ring_follow);
     int ok=!ferror(f);if(fclose(f))ok=0;
     if(!ok)goto failed;
 #ifdef _WIN32
@@ -52,7 +53,7 @@ failed:
 int s3_gameplay_netplay_allowed(void)
 { return !s3_gameplay.infinite_lives && !s3_gameplay.infinite_time &&
     !s3_gameplay.easy_level_select && !s3_gameplay.debug_mode &&
-    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform; }
+    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
 int s3_gameplay_owns(uint32_t pc)
@@ -93,7 +94,7 @@ void s3_gameplay_apply(uint8_t ram[65536])
     /* All three cartridges share these variables. Exclude attract demos,
      * menus, bonus stages and Competition. The normal game owns death/retry,
      * score awards, timer progression, checkpoints and act transitions. */
-    if(ram[0xF600]!=12)return;
+    if(ram[0xF600]!=12 || (ram[0xFE10]>=0x13 && ram[0xFE10]<=0x15))return;
     /* Native B/A/C placement controls, never placement/result flags. Imported
      * rounds have different object tables; do not expose native debug there. */
     if(s3_gameplay.debug_mode)
@@ -111,16 +112,17 @@ void s3_gameplay_apply(uint8_t ram[65536])
 #include "recomp_launcher.h"
 static const RecompLauncherCModProvider *base;
 static const char package[]="sonic3.gameplay";
-static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","s1-checkpoint-bonus"};
-static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Sonic 1 checkpoint bonus stages"};
+static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","s1-checkpoint-bonus","tails-ring-follow"};
+static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Sonic 1 checkpoint bonus stages","Tails giant-ring follow"};
 static const char *descriptions[]={
     "Keep at least three lives, including after death and retry. Local play only.",
     "Disable the stage time limit. The clock runs normally to 9:59, then stays there. Local play only.",
     "Unlock Sound Test on the title menu. Press Up to select it, then Start; use the native stage list. Local play only.",
     "Enable native debug in original stages. B enters/exits placement, A cycles objects, C places one. Imported rounds are excluded. Local play only.",
     "Native Sonic: hold Up and press jump again in the air to transform with an elemental shield. Requires native emeralds and 50 rings. Without Up, shield actions stay normal. Shadow/Mighty keep their own controls. Local play only.",
-    "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only."};
-static int own_features(void){return combined_mode?6:5;}
+    "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
+    "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only."};
+static int own_features(void){return combined_mode?7:5;}
 #define COPY(d,s) snprintf(d,sizeof(d),"%s",s)
 static int own(const char *p){return p&&!strcmp(p,package);}
 static int index_of(const char *f){for(int i=0;i<own_features();++i)if(f&&!strcmp(f,ids[i]))return i;return -1;}
@@ -130,7 +132,8 @@ static int *value(int i){switch(i) {
     case 2:return &s3_gameplay.easy_level_select;
     case 3:return &s3_gameplay.debug_mode;
     case 4:return &s3_gameplay.shield_transform;
-    default:return &s3_gameplay.checkpoint_bonus;
+    case 5:return &s3_gameplay.checkpoint_bonus;
+    default:return &s3_gameplay.tails_ring_follow;
 }}
 static int packages(void *c){(void)c;return 1+(base&&base->package_count?base->package_count(base->ctx):0);}
 static int get_package(void *c,int i,RecompLauncherCModPackage *o)
