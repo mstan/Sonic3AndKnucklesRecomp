@@ -1,4 +1,4 @@
-Sonic 3 & Knuckles Recomp v0.6.5
+Sonic 3 & Knuckles Recomp v0.7.0
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
