@@ -113,6 +113,37 @@ class DiscTests(unittest.TestCase):
                 pass
         self.assertFalse(list(self.root.glob('.media-*')))
 
+    def test_zip_rejects_case_aliases_encryption_and_external_cue_references(self):
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('Disc.iso', b'one');z.writestr('disc.ISO', b'two')
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        sentinel = self.root / 'owner.bin';sentinel.write_bytes(b'owner data')
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('disc.cue', 'FILE "../owner.bin" BINARY\nTRACK 01 MODE1/2352\nINDEX 01 00:00:00\n')
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        self.assertEqual(sentinel.read_bytes(), b'owner data')
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('disc.iso', b''.join(self.sectors))
+        encoded = bytearray(archive.read_bytes());central = encoded.index(b'PK\1\2')
+        struct.pack_into('<H', encoded, 6, 1);struct.pack_into('<H', encoded, central + 8, 1)
+        archive.write_bytes(encoded)
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        self.assertFalse(list(self.root.glob('.media-*')))
+
+    def test_zip_preserves_verified_sgcd_reader(self):
+        from disc_image import convert
+        cue = self.image(raw(self.sectors));sgcd = self.root / 'disc.sgcd'
+        convert(cue, sgcd)
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.write(sgcd, 'nested/disc.sgcd')
+        with open_disc(archive, self.root) as disc:
+            self.assertEqual(disc.read('PROBE.TXT'), b'proof')
+
     def image(self, data=None, cue=None):
         (self.root / 'disc.bin').write_bytes(raw(self.sectors) if data is None else data)
         path = self.root / 'disc.cue'

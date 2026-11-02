@@ -15,11 +15,32 @@ the shared disc importer does not turn it into an original-program CD session.
 
 ## Convert your owned disc
 
-The supported input is **Sonic CD (US)** with one data track and 34 audio
-tracks. Use its CUE/BIN files or the same verified `.sgcd` image accepted by
-SonicCDRecomp. Extract archives first and keep CUE/BIN relative names together.
-Bare ISO files and compressed disc archives are not supported. A data-only
-ISO does not supply the 34 audio tracks required by the complete import.
+The supported game is **Sonic CD (US)**. Development builds (unreleased) accept
+these inputs directly under the mod's **Files**:
+
+| Input | Imported content and audio |
+| --- | --- |
+| CUE with BINARY tracks | MODE1/2352 BIN or MODE1/2048 ISO data, plus all 34 original raw CDDA audio tracks |
+| Verified `.sgcd` | The complete data and audio layout |
+| `.iso`, `.bin`, `.img` | MODE1/2048 user sectors or MODE1/2352 raw sectors; a matching adjacent CUE is used automatically when present |
+| CD `.zip` | A CUE with its referenced tracks, a verified SGCD, or one ISO/raw data image; unpacked automatically in private bounded staging |
+
+An ISO/data image without a CUE supplies all stages, embedded **Past PCM music
+and voices**, but no CDDA track layout. Existing verified imported CD music is
+retained. If none is installed, the launcher reports that **Present/Future
+CDDA music is unavailable**. Import a complete CUE/SGCD/CD ZIP later to add it;
+stage progress is retained. Audio is never replaced with invented silent tracks.
+Unreferenced audio files are not assigned guessed track numbers. CUE audio must
+be original raw BINARY CDDA; WAV/MP3/FLAC and RAR/7z are not enrolled formats.
+
+ZIPs must contain one disc. Unsafe paths, links, encrypted entries, ambiguous
+images and oversized archives fail without changing the installed resources.
+Limits are 1 GiB compressed, 1.5 GiB expanded and 512 members; multipart/ZIP64
+directory containers are rejected. Originals are never extracted over or edited.
+
+Published **v0.6.4** accepts CUE/BIN and verified SGCD only, and requires
+extracting disc archives first. Keep CUE/BIN relative names together for that
+release.
 No disc, BIOS, ROM, converted pack or save is distributed. This S3K campaign
 does not require a BIOS.
 
@@ -36,7 +57,9 @@ Then:
 5. Select PLAY to save your choices and launch.
 
 The importer runs in the background. A failed import keeps the previous stage
-and music selections. Imported resources stay private in `sonic-cd-imports`
+and music selections. A successful data-only import retains verified existing
+music, or keeps an explicitly empty music selection across restarts. Imported
+resources stay private in `sonic-cd-imports`
 beside your campaign settings. Clearing the disc selection does not delete
 those resources or any progress. Development packages use `S3KCampaignBuilder`
 beside the game. Source builds and v0.6.4 use the installed Python launcher
@@ -56,7 +79,7 @@ place of the Windows helper. From a source checkout it is a normal CMake target.
 For that command-line route, select the two files in the returned directory
 under **Campaign content pack** and **CD music** in Mods. Existing separately
 converted resources still work; `build_sonic_cd_pack.py --cue` remains supported
-and also accepts `--disc` for either input format.
+and also accepts `--disc` for the supported image/ZIP inputs in development builds.
 
 The content pack contains all 70 stage/time variants, UFO/warp
 data, Past PCM music and voices. The separate music pack supplies CD-DA tracks;
