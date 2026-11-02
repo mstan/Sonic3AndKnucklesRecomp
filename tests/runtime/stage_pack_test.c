@@ -44,6 +44,15 @@ int main(int argc,char **argv)
     CHECK(p->package_count(NULL)==6 && p->feature_count(NULL)==6);
     CHECK(!s3_stage_pack_enabled && !s3_stage_pack_sram());
     CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
+    for(int i=0;i<2;++i) {
+        RecompLauncherCModResource r;
+        CHECK(p->feature_resource_count(NULL,ids[i],"campaign")==2);
+        CHECK(p->feature_resource_get(NULL,ids[i],"campaign",0,&r));
+        CHECK(!strcmp(r.id,"source-rom") && r.import_on_select && !r.required);
+        CHECK(!p->feature_resource_set_path(NULL,ids[i],"campaign","source-rom","missing-rom.zip"));
+        replay_playing=1;CHECK(p->feature_resource_set_path(NULL,ids[i],"campaign","source-rom","missing-rom.zip"));replay_playing=0;
+        CHECK(p->feature_resource_get(NULL,ids[i],"campaign",1,&r) && !strcmp(r.id,"stage-bank"));
+    }
     replay_playing=1;
     CHECK(p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
     CHECK(!s3_stage_pack_cd && !s3_stage_pack_enabled);
@@ -63,7 +72,7 @@ int main(int argc,char **argv)
             RecompLauncherCModResource r;
             CHECK(p->feature_resource_count(NULL,ids[i],"campaign")==2);
             CHECK(p->feature_resource_get(NULL,ids[i],"campaign",0,&r));
-            CHECK(r.required && !r.verified && !strcmp(r.id,"megamix-rom"));
+            CHECK(r.required && !r.verified && r.import_on_select && !strcmp(r.id,"megamix-rom"));
             CHECK(!p->feature_resource_set_path(NULL,ids[i],"campaign",r.id,"missing.bin"));
         }
         CHECK(p->feature_enable(NULL,ids[i],"campaign",0));

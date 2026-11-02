@@ -2,6 +2,7 @@
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +12,23 @@ from trilogy.scd_resource import CONTENT_NAMES, write_pack
 
 
 class ImportTests(unittest.TestCase):
+    def test_content_converters_do_not_spawn_a_python_interpreter(self):
+        from build_sonic_cd_pack import build_content_parts
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            calls = []
+            def convert(argv):
+                calls.append(argv)
+                Path(argv[argv.index('--out') + 1]).write_bytes(b'converted')
+            modules = {name: SimpleNamespace(main=convert) for name in ('scd_level', 'scd_special')}
+            with patch.dict(sys.modules, modules), patch('subprocess.run', side_effect=AssertionError('interpreter spawn')):
+                build_content_parts(root / 'disc', root, root / 's3k.bin')
+            self.assertEqual(len(calls), 2)
+            self.assertIn('--s3k', calls[0])
+            self.assertNotIn('--s3k', calls[1])
+            self.assertEqual((root / 'levels.bin').read_bytes(), b'converted')
+            self.assertEqual((root / 'scenes.bin').read_bytes(), b'converted')
+
     def test_audio_failure_retains_previous_install_and_cleans_staging(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -1,0 +1,3 @@
+# Build-host dependencies only; the shipped helper includes its runtime.
+PyInstaller==6.16.0
+Pillow==12.1.1

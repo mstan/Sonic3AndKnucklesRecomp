@@ -4,6 +4,9 @@ Unchanged payloads are located by complete byte identity against the owner's
 retail S1 input. Changed payloads are selected by verified v3 PLC entries or
 object initialization instructions, rather than retail absolute offsets.
 """
+import hashlib
+import json
+from pathlib import Path
 import struct
 from s1_objects import (S1Objects,ASSETS,ASSET_EXTRA_ART,ZONE_NEED,BOSS_NEED,
                         load_symbols,obj_assets,anim_blob,be16,RING_POS,
@@ -25,8 +28,22 @@ ZONE_NAMES=('GHZ','LZ','MZ','SLZ','SYZ','SBZ')
 # Megamix monitor item IDs are converted separately from the retail S1 set.
 # Exact contents are bound by the v3 monitor's item-dispatch table.
 
-def relocated_symbols(donor,retail):
+def bound_metadata(donor):
+    metadata=json.loads((Path(__file__).parent/'data/v3_bindings.json').read_text())
+    if metadata['format']!=1 or hashlib.sha256(donor.data).hexdigest()!=metadata['rom_sha256']:
+        raise ValueError('Megamix v3 does not match the verified single-cartridge bindings')
+    return metadata
+
+def relocated_symbols(donor,retail=None):
     original=load_symbols(True);result=dict(original);labels={}
+    if retail is None:
+        # Addresses only: all art/maps/animations are still read from the
+        # selected, exact v3 cartridge. No retail ROM or asset template ships.
+        bindings=bound_metadata(donor)['symbols']
+        if any(k not in original or not 0<=v<len(donor.data) for k,v in bindings.items()):
+            raise ValueError('Invalid Megamix object binding metadata')
+        result.update(bindings)
+        return result
     for _,_,nem,_,_,maps,anim,_ in ASSETS:
         for kind,name in (('nem',nem),('maps',maps),('ani',anim)):
             if name:labels[name.removesuffix('*2')]=kind

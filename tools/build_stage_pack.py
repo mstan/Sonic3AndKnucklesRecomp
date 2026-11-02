@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the optional complete Sonic 1 & 2 campaign from owner-supplied ROMs.
+"""Build Sonic 1, Sonic 2, or both campaigns from owner-supplied ROMs.
 
 No ROM data is distributed. Output is private, derived data; do not commit it.
 """
@@ -28,27 +28,36 @@ def verify(path, game):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     for game in ROMS:
-        parser.add_argument('--'+game, required=True, type=Path)
+        parser.add_argument('--'+game, required=game=='s3k', type=Path)
     parser.add_argument('--out', required=True, type=Path)
     args = parser.parse_args(argv)
     try:
-        for game in ROMS:
-            verify(getattr(args, game), game)
+        if not args.s1 and not args.s2:
+            raise ValueError('Select a Sonic 1 or Sonic 2 source ROM')
+        inputs={game:getattr(args,game) for game in ROMS if getattr(args,game)}
+        for game,path in inputs.items():
+            verify(path, game)
         output = args.out.resolve()
-        if output in {getattr(args, game).resolve() for game in ROMS}:
+        if output in {path.resolve() for path in inputs.values()}:
             raise ValueError('Output must be a different file from every source ROM')
         output.parent.mkdir(parents=True, exist_ok=True)
         # Staging is private and on the same filesystem for an atomic replace.
         with tempfile.TemporaryDirectory(prefix='stage-pack-', dir=output.parent) as tmp:
             bank = Path(tmp)/'bank.bin'
-            subprocess.run([sys.executable, str(ROOT/'tools/trilogy/build_bank.py'),
-                '--s1', str(args.s1.resolve()), '--s2', str(args.s2.resolve()),
-                '--s3k', str(args.s3k.resolve()), '--zones', ZONES,
-                '--out', str(bank)], check=True)
+            zones=ZONES.split(',')
+            selected=(zones[:6] if args.s1 else [])+(zones[6:] if args.s2 else [])
+            sys.path.insert(0,str(ROOT/'tools/trilogy'))
+            import build_bank
+            command=['--s3k',str(args.s3k.resolve()),'--zones',','.join(selected),'--out',str(bank)]
+            for game in ('s1','s2'):
+                if getattr(args,game):command+=['--'+game,str(getattr(args,game).resolve())]
+            # In-process conversion also works in the shipped frozen helper;
+            # sys.executable there is the helper, not a Python interpreter.
+            build_bank.main(command)
             data = bank.read_bytes()
             bank.write_bytes(data+struct.pack('>4sII', b'SPK1', len(data), zlib.crc32(data)))
             os.replace(bank, output)
-        print(f'Sonic 1 & 2 Stage Pack: {output} ({output.stat().st_size} bytes)')
+        print(f'Campaign Stage Pack: {output} ({output.stat().st_size} bytes)')
         return 0
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         print(error, file=sys.stderr)

@@ -18,10 +18,15 @@ the shared disc importer does not turn it into an original-program CD session.
 The supported input is **Sonic CD (US)** with one data track and 34 audio
 tracks. Use its CUE/BIN files or the same verified `.sgcd` image accepted by
 SonicCDRecomp. Extract archives first and keep CUE/BIN relative names together.
+Bare ISO files and compressed disc archives are not supported. A data-only
+ISO does not supply the 34 audio tracks required by the complete import.
 No disc, BIOS, ROM, converted pack or save is distributed. This S3K campaign
 does not require a BIOS.
 
-Install Python 3.11 or later and Pillow (`python -m pip install Pillow`). Then:
+**Development packages (unreleased)** bundle the offline converter and its
+Python/Pillow runtime; players do not install either dependency. **Published
+v0.6.4** requires Python 3.11 or later and Pillow (`python -m pip install Pillow`).
+Then:
 
 1. Select your supported S3K cartridge in the launcher.
 2. Enable **Sonic CD stages (Experimental)** in Mods.
@@ -33,7 +38,8 @@ Install Python 3.11 or later and Pillow (`python -m pip install Pillow`). Then:
 The importer runs in the background. A failed import keeps the previous stage
 and music selections. Imported resources stay private in `sonic-cd-imports`
 beside your campaign settings. Clearing the disc selection does not delete
-those resources or any progress. Windows uses the installed Python launcher
+those resources or any progress. Development packages use `S3KCampaignBuilder`
+beside the game. Source builds and v0.6.4 use the installed Python launcher
 (`py -3`), or Python on PATH; `SONIC3K_PYTHON` can name a specific executable.
 
 For command-line conversion, one invocation prepares both resources:
