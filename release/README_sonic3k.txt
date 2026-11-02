@@ -1,4 +1,4 @@
-Sonic 3 & Knuckles Recomp v0.6.3
+Sonic 3 & Knuckles Recomp v0.6.4
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -40,11 +40,14 @@ Sonic CD stages, Megamix stages, Mighty and Shadow. All default off.
 Campaign order: Sonic 1, Sonic 2, Sonic CD, Sonic 3 & Knuckles, Megamix.
 Mighty, Shadow and Megamix stages require your matching Megamix v3 ROM;
 the three controls share the same ROM and converted-content paths.
-Sonic CD requires your supported US disc image, converted with the included
-tools. CD-DA music is a separate optional resource. See docs/SONIC_CD.md.
+Select your supported US Sonic CD disc image directly in Mods; the importer
+prepares its content and optional CD-DA music. See docs/SONIC_CD.md.
 The CD campaign has 70 act/time variants and its own Time Stone progress.
 See docs/STAGE_PACKS.md, MEGAMIX_STAGE_PACK.md and SHADOW_CHARACTER.md for
 other conversions and character controls. No ROM, BIOS or bank is included.
+Rebuild/reimport existing Sonic 1 packs with this release's tools to apply the
+Marble Zone window and Spring Yard scenery color fixes. Native saves remain
+compatible; keep the .srm.campaign companion with the save.
 Campaign additions adapt Sonic Anthology by sonsegajp
 (https://github.com/sonsegajp/SonicAnthology) and Sonic Megamix by Team Megamix.
 

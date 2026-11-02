@@ -1,4 +1,4 @@
-Sonic 3 Recomp v0.6.3
+Sonic 3 Recomp v0.6.4
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.

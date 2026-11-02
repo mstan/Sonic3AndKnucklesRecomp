@@ -19,6 +19,11 @@ For the separate owned-disc conversion and its 70 act/time variants, see
 
 ## Build your stage bank
 
+When upgrading to v0.6.4, rebuild Sonic 1 packs with the new tools for the
+Marble Zone window and Spring Yard scenery color corrections. Existing packs
+still load, but retain their old converted colors. Rebuilding does not change
+native SRAM or the campaign-progress companion.
+
 No cartridge data or converted bank is distributed. With Python 3.10 or newer
 and Pillow installed (`python -m pip install Pillow`),
 run the following from the source checkout, supplying your own ROM paths:

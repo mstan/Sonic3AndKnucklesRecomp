@@ -73,8 +73,12 @@ def main():
             command += [str(args.rom.resolve()), "--no-launcher"]
             # Benchmarks intentionally disable SRAM writes. Input routes need
             # normal autosave so the next process can verify an existing file.
+            # This default-on capture is also replayed from the package. Use
+            # normal pacing so the bounded disk writer is not stress-tested
+            # by an unrelated accelerated presentation check.
+            pace = "60" if name == "native-title" else "1000"
             command += (["--benchmark", "3600"] if script is None else
-                        ["--max-frames", "12000", "--target-fps", "1000"])
+                        ["--max-frames", "12000", "--target-fps", pace])
         if wide:
             command += ["--widescreen", "32:9"]
         if script is not None:
