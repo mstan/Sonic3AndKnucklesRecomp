@@ -116,6 +116,25 @@ extra = [
 
 # Opt-in host renderer hooks. Verified using stock skdisasm 1e1b5af;
 # its assembled S&K half matches the combined ROM byte-for-byte.
+# The life formatter accepts two digits; larger stocks append a ROM glyph.
+[[widescreen_site]]
+addr = 0xE12A # HUD_Lives: after loading Life_count into D1
+kind = "game_hook"
+
+# Platform families use CMP.W $42(A0),D0 after the same native coarse
+# camera subtraction. Match their early activation and lifetime to the view.
+[[widescreen_site]]
+addr = 0x24F28 # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x25634 # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x25750 # Native platform variable-range cull
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x1B690 # Reset native object placement lifetime
 kind = "game_hook"
