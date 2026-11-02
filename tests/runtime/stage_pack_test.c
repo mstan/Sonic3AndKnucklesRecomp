@@ -43,6 +43,13 @@ int main(int argc,char **argv)
     const RecompLauncherCModProvider *p=s3_stage_pack_mods(NULL);
     CHECK(p->package_count(NULL)==6 && p->feature_count(NULL)==6);
     CHECK(!s3_stage_pack_enabled && !s3_stage_pack_sram());
+    {
+        RecompLauncherCModResource cleared;
+        CHECK(p->feature_resource_set_path(NULL,ids[3],"campaign","cd-music",""));
+        CHECK(p->commit(NULL,NULL));s3_stage_pack_load("settings.ini");
+        CHECK(p->feature_resource_get(NULL,ids[3],"campaign",2,&cleared));
+        CHECK(!*cleared.path && !cleared.verified);
+    }
     CHECK(!p->feature_resource_set_path(NULL,ids[3],"campaign","cd-disc","missing-disc.cue"));
     for(int i=0;i<2;++i) {
         RecompLauncherCModResource r;

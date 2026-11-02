@@ -58,7 +58,7 @@ void s3_stage_pack_load(const char *settings)
     char *a=strrchr(s_settings,'/'),*b=strrchr(s_settings,'\\');
     char *name=a&&(!b||a>b)?a+1:b?b+1:s_settings;
     snprintf(name,sizeof s_settings-(size_t)(name-s_settings),"sonic3k-stage-pack.ini");
-    FILE *f=fopen(s_settings,"rb");int v2=0,v3=0,legacy=0,mm=0;
+    FILE *f=fopen(s_settings,"rb");int v2=0,v3=0,legacy=0,mm=0,audio_path_set=0;
     char line[1200];
     while(f && fgets(line,sizeof line,f)) {
         line[strcspn(line,"\r\n")]=0;
@@ -67,7 +67,7 @@ void s3_stage_pack_load(const char *settings)
         if(!strncmp(line,"mighty=",7))s3_pack_mighty_requested=atoi(line+7)!=0;
         if(!strncmp(line,"shadow=",7))s3_pack_shadow_requested=atoi(line+7)!=0;
         if(!strncmp(line,"megamix_rom=",12))read_path(s3_megamix_rom_path,line+12);
-        if(!strncmp(line,"sonic_cd_audio=",15))read_path(s3_cd_audio_path,line+15);
+        if(!strncmp(line,"sonic_cd_audio=",15)){read_path(s3_cd_audio_path,line+15);audio_path_set=1;}
         if(!strncmp(line,"sonic_cd_disc=",14))read_path(s_cd_disc_path,line+14);
         if(!strcmp(line,"sonic_cd_data_only=1"))s_cd_data_only=1;
         if(!strncmp(line,"sonic_cd_ufo_practice=",22)) {
@@ -111,8 +111,8 @@ void s3_stage_pack_load(const char *settings)
             memcpy(s3_megamix_rom_path,s_settings,prefix);strcpy(s3_megamix_rom_path+prefix,relative);
         }
     }
-    if(!s3_cd_audio_path[0])snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"mods/sonic-cd-audio.pak");
-    if(s3_cd_audio_path[0]!='/' && s3_cd_audio_path[0]!='\\' && s3_cd_audio_path[1]!=':') {
+    if(!s3_cd_audio_path[0]&&!audio_path_set)snprintf(s3_cd_audio_path,sizeof s3_cd_audio_path,"mods/sonic-cd-audio.pak");
+    if(s3_cd_audio_path[0] && s3_cd_audio_path[0]!='/' && s3_cd_audio_path[0]!='\\' && s3_cd_audio_path[1]!=':') {
         char relative[1024];snprintf(relative,sizeof relative,"%s",s3_cd_audio_path);
         size_t prefix=(size_t)(name-s_settings);
         if(prefix+strlen(relative)<1024){memcpy(s3_cd_audio_path,s_settings,prefix);strcpy(s3_cd_audio_path+prefix,relative);}
