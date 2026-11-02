@@ -20,6 +20,39 @@ v0.6.4, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
 
+## Upcoming options (unreleased)
+
+These controls are on the development branch and will appear in a future release.
+
+In **Mods**, enable **High refresh rate**, then choose **Presentation rate**:
+120, 144 or Display. Display follows the monitor's refresh rate. Gameplay and
+music keep their normal speed. Menus, finite special-stage views and some
+scripted scenes repeat complete frames. Blue Spheres keeps its native view;
+full widescreen projection remains deferred.
+
+Enable **Unfiltered audio** for the clearer sound without the hardware low-pass
+filter. The normal filtered sound remains the default. Both controls are also
+available in the in-game options.
+
+**Gameplay options** in Mods are optional and off by default. They apply to
+local play in Sonic 3, Sonic & Knuckles and the combined game:
+
+- **Infinite lives** keeps at least three lives through death and retry, and
+  preserves higher counts and life awards.
+- **Infinite time** lets the clock run to 9:59 and stay there.
+- **Easier level select** unlocks Sound Test on the title menu: select it with
+  Up, then Start. In Sonic & Knuckles, hold the game's A button and press
+  Start, keeping A held through the fade.
+- **Debug mode** enables native placement controls in original stages: B
+  enters/exits placement, A cycles objects and C places one.
+- **Shielded transformation** lets native Sonic hold Up and press jump again
+  in the air to become Super or Hyper with an elemental shield. The original
+  emerald and 50-ring requirements apply. Ordinary shield actions remain
+  available without Up; Mighty and Shadow keep their own controls.
+- **Sonic 1 checkpoint bonus stages**, in the combined game, adds entry stars
+  above activated imported Sonic 1 checkpoints when you have at least 20 rings.
+  Jump into the stars to visit a native bonus stage and return to the checkpoint.
+
 ## Every zone, across the campaigns
 
 ![Gameplay across Sonic 1, Sonic 2, Sonic CD, Sonic 3, Sonic and Knuckles, and Megamix, with different playable characters](docs/images/zones/showcase.png)
