@@ -1,5 +1,5 @@
 /*
- * sonic3k_spec.c — GameSpec for Sonic 3 & Knuckles (S&K locked-on combined ROM, 1994).
+ * sonic3k_spec.c â€” GameSpec for Sonic 3 & Knuckles (S&K locked-on combined ROM, 1994).
  *
  * ROM layout:  S&K occupies $000000-$1FFFFF; Sonic 3 mapped at $200000-$3FFFFF.
  * VBlank/HBlank: vectors point to RAM trampolines installed at boot ($000304).
@@ -31,7 +31,7 @@
 #include <stdlib.h>
 
 #if OWN_BACKEND
-#include "backend_decls.h"   /* own decls — native builds have no clownmdemu paths */
+#include "backend_decls.h"   /* own decls â€” native builds have no clownmdemu paths */
 #else
 #include "clownmdemu.h"
 #endif
@@ -49,6 +49,7 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 static int s3k_instruction(uint32_t pc)
 {
     if(s3_gameplay_owns(pc)) {
+        s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],!tri_character_active()))g_cpu.SR|=4u;
         return 0; /* This private site must not reach the renderer default. */
@@ -241,6 +242,7 @@ const GameSpec g_game_spec = {
     .state_at_boundary      = s3_state_at_boundary,
     .save_resume_pc         = s3_state_resume_pc,
     .video                  = &sonic3_video,
+    .video_default          = "fit",
     .instruction_hook       = s3k_instruction,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras; seat 2
@@ -276,7 +278,7 @@ const GameSpec g_game_spec = {
     .call_entry_point       = s3k_call_entry_point,
     .call_vblank            = s3k_call_vblank,
     .call_hblank            = s3k_call_hblank,
-    .resume_main_loop_pc    = 0x0004B6u,   /* GameLoop (S&K master, World ROM) — save-state fiber restart */
+    .resume_main_loop_pc    = 0x0004B6u,   /* GameLoop (S&K master, World ROM) â€” save-state fiber restart */
     .dispatch_main_loop_pc  = 0x0004B6u,   /* GameLoop (actual World ROM addr) */
     .call_periodic          = NULL,
 

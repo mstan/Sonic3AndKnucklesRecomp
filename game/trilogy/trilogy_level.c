@@ -241,6 +241,10 @@ int tri_level_hook(uint32_t pc)
         return 0;
     }
     case TH_LVL_ARTLOAD:            /* title card done: zone object art */
+        if(!tri_megamix_sprite_patterns()) {
+            fprintf(stderr,"[megamix] invalid incoming sprite patterns\n");
+            exit(EXIT_FAILURE);
+        }
         if (tri_dir())
             tri_obj_upload_art();
         return 0;

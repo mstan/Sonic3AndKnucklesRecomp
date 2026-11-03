@@ -16,7 +16,7 @@ enum { LEVEL_LOOP = 0x650C, LEVEL_WAIT_RETURN = 0x6520, PAUSE_WAIT_RETURN = 0x14
 
 static void state(S3StateIO *io)
 {
-    unsigned version = 1;
+    unsigned version = 2;
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
 #ifndef SONIC3_STANDALONE
@@ -62,5 +62,6 @@ int s3_state_load(const void *data, size_t size, int apply)
     S3StateIO io = { (uint8_t *)data, size, 0, 1, 1 }; state(&io);
     if (!io.ok || io.pos != size) return 0;
     if (apply) { io.pos = 0; io.mode = 2; state(&io); }
-    return io.ok;
+    if (apply && io.ok && io.pos == size) s3_video_state_loaded();
+    return io.ok && io.pos == size;
 }

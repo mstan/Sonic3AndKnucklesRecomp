@@ -87,6 +87,45 @@ static void test_extended_timer(void)
         s3_gameplay_timer_hook(over,ram,&d1,NULL);CHECK(d1==10);
     }
 }
+static unsigned fifo_source(const uint8_t *ram,unsigned slot)
+{
+    unsigned p=0xF680+slot*6;
+    return (unsigned)ram[p]<<24|(unsigned)ram[p+1]<<16|(unsigned)ram[p+2]<<8|ram[p+3];
+}
+static void test_native_nemesis_fifo(void)
+{
+    static uint8_t ram[65536],before[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;m++) {
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        unsigned pc=m?0x1880:0x1B0A;CHECK(s3_gameplay_owns(pc));
+        memset(ram,0xA5,sizeof ram);
+        for(unsigned i=0;i<16;i++) {
+            unsigned p=0xF680+i*6,source=0x100000+i*0x100,dest=0x4000+i*0x20;
+            ram[p]=source>>24;ram[p+1]=source>>16;ram[p+2]=source>>8;ram[p+3]=source;
+            ram[p+4]=dest>>8;ram[p+5]=dest;
+        }
+        for(unsigned n=0;n<16;n++) {
+            CHECK(fifo_source(ram,0)==0x100000+n*0x100);
+            /* Execute the original22 MOVE.L shifts, including its partial
+             * final entry. The hook must finish the authored90-byte pop. */
+            for(unsigned i=0;i<88;i++)ram[0xF680+i]=ram[0xF686+i];
+            memcpy(before,ram,sizeof before);uint16_t sr=0xA71B;
+            s3_gameplay_nemesis_pop(pc,ram,&sr);CHECK(!fifo_source(ram,15));CHECK(sr==0xA714);
+            CHECK(!memcmp(ram,before,0xF6D8));
+            CHECK(!memcmp(ram+0xF6DE,before+0xF6DE,sizeof ram-0xF6DE));
+            CHECK(ram[0xF6D8]==before[0xF6DE] && ram[0xF6D9]==before[0xF6DF]);
+            CHECK(!fifo_source(ram,15));
+            for(unsigned slot=0;slot<15-n;slot++)
+                CHECK(fifo_source(ram,slot)==0x100000+(n+1+slot)*0x100);
+        }
+        CHECK(!fifo_source(ram,0)); /* no repeatedly decompressed16th source */
+        memcpy(before,ram,sizeof before);uint16_t sr=0xFFFF;
+        s3_gameplay_nemesis_pop(pc+2,ram,&sr);CHECK(sr==0xFFFF && !memcmp(before,ram,sizeof ram));
+        s3_gameplay_nemesis_pop(pc,NULL,&sr);CHECK(sr==0xFFFF);
+        s3_gameplay_nemesis_pop(pc,ram,NULL);CHECK(!memcmp(before,ram,sizeof ram));
+    }
+}
 static void test_native_access(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -306,7 +345,7 @@ int main(void)
     CHECK(p->commit(p->ctx,NULL));s3_gameplay_load("settings.ini","test-gameplay");
     CHECK(!s3_gameplay.infinite_lives && !s3_gameplay.infinite_time);
     remove("test-gameplay-gameplay.ini");
-    test_native_access();test_provider_composition();test_checkpoint_option();test_shield_transform();test_extended_timer();
+    test_native_nemesis_fifo();test_native_access();test_provider_composition();test_checkpoint_option();test_shield_transform();test_extended_timer();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

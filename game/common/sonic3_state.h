@@ -8,5 +8,7 @@ int s3_state_at_boundary(void);
 uint32_t s3_state_resume_pc(uint8_t mode);
 struct S3StateIO;
 void s3_video_state(struct S3StateIO *io);
+/* Notify presentation only after the full native-state reader succeeds. */
+void s3_video_state_loaded(void);
 void s3_army_state(struct S3StateIO *io);
 int s3_army_state_ready(void);

@@ -15,6 +15,8 @@ int s3_gameplay_netplay_allowed(void);
 void s3_gameplay_apply(uint8_t ram[65536]);
 /* All private gameplay hook sites; the renderer must not consume them. */
 int s3_gameplay_owns(uint32_t pc);
+/* Unconditional native Nemesis FIFO correctness repair at its audited RTS. */
+void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t ram[65536],uint16_t *sr);
 /* Audited timer branch/formatter sites; only their consumed CCR bits or
  * display argument change. Native timer/result/death routines still execute. */
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],

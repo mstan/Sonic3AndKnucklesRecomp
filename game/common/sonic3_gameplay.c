@@ -62,8 +62,22 @@ static int shield_site(uint32_t pc)
 static int timer_site(uint32_t pc)
 {return standalone_s3?(pc==0xEAF2u || pc==0xEB14u || pc==0xEB26u):
                      (pc==0xDD76u || pc==0xDD98u || pc==0xDDAAu);}
+static int nemesis_pop_site(uint32_t pc)
+{return pc==(standalone_s3?0x1B0Au:0x1880u);}
 int s3_gameplay_owns(uint32_t pc)
-{return shield_site(pc) || timer_site(pc);}
+{return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc);}
+/* Original skdisasm FixBugs repair for Process_Nem_Queue_ShiftUp. Retail
+ * shifts only88 of90 bytes and never retires its16th source. Once occupied,
+ * that source repeats forever and later append requests overwrite variables
+ * beyond the queue, including Tails' AI routine. Complete the FIFO pop at
+ * its original RTS; no native registers or decompressor state are replaced. */
+void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t ram[65536],uint16_t *sr)
+{
+    if(!nemesis_pop_site(pc) || !ram || !sr)return;
+    ram[0xF6D8]=ram[0xF6DE];ram[0xF6D9]=ram[0xF6DF];
+    memset(ram+0xF6DA,0,4);
+    *sr=(uint16_t)((*sr&~15u)|4u); /* native CLR.L: preserve X and upperSR */
+}
 static int timed_story(const uint8_t ram[65536])
 {
     if(!ram || ram[0xF600]!=12 || (ram[0xFE10]>=0x13 && ram[0xFE10]<=0x15))return 0;
@@ -186,7 +200,7 @@ static int get_feature(void *c,int i,RecompLauncherCModFeature *o)
     memset(o,0,sizeof *o);
     COPY(o->id,ids[i]);COPY(o->package_id,package);COPY(o->package_name,"Gameplay options");
     COPY(o->package_version,"0.1.0");COPY(o->name,names[i]);COPY(o->group,"Gameplay");
-    COPY(o->description,descriptions[i]);COPY(o->status,*value(i)?"Enabled — local play":"Disabled");
+    COPY(o->description,descriptions[i]);COPY(o->status,*value(i)?"Enabled â€” local play":"Disabled");
     if(i==2 && standalone_sk)
         COPY(o->description,"Hold A and press Start on the title screen to open native level select. Keep A held through the fade. Local play only.");
     o->enabled=*value(i);return 1;

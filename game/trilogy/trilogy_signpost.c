@@ -8,10 +8,14 @@
 static uint32_t descriptor(void)
 {
     uint32_t e=tri_dir();
-    if(!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX)return 0;
+    if(!e)return 0;
+    unsigned game=tri_rd8(e+TD_GAME);
+    int character_sign=game==TRI_GAME_S1 && (tri_shadow_active() || tri_mighty_active());
+    if(game!=TRI_GAME_MEGAMIX && !character_sign)return 0;
     uint32_t d=tri_rd32(TRI_BANK_BASE+0x24);
     if(!d || tri_rd16(d+10)<4)return 0;
     uint32_t p=tri_rd32(d+36);
+    if(character_sign && tri_shadow_active() && (!p || tri_rd32(p)!=0x4D475332u))return 0;
     return p && (tri_rd32(p)==0x4D475331u || tri_rd32(p)==0x4D475332u)?p:0;
 }
 uint32_t tri_signpost_mapping(void) { uint32_t p=descriptor();return p?tri_rd32(p+4):0; }
@@ -31,7 +35,8 @@ int tri_signpost_frame(uint16_t *top,uint16_t *bottom)
     unsigned hi[3]={0},lo[3]={14,14,14};
     for(unsigned i=0;i<64;i++)for(unsigned c=0;c<3;c++) {
         unsigned v=(r16(RAM_Normal_palette+i*2)>>(c*4))&14;
-        if(v>hi[c])hi[c]=v;if(v<lo[c])lo[c]=v;
+        if(v>hi[c])hi[c]=v;
+        if(v<lo[c])lo[c]=v;
     }
     for(unsigned w=0;w<2;w++)for(unsigned i=0;i<16;i++) {
         unsigned value=tri_rd16((w?wet:normal)+i*2),color=0;

@@ -32,6 +32,26 @@ static int current(void)
 {
     return s_geometry.layout && (s_stage==r16(RAM_Current_zone_and_act) || r16(RAM_Restart_level_flag));
 }
+int tri_megamix_sprite_patterns(void)
+{
+    /* The outgoing Data Select fade temporarily owns bank0 after Level has
+     * initialized the incoming geometry. Rebind at the existing post-fade
+     * art-load seam, without reinitializing layout/collision or guest RAM. */
+    const uint8_t *pixels=NULL,*lines=NULL;
+    unsigned bytes=0;
+    if(current()) {
+        uint32_t e=tri_dir(),info=e?tri_rd32(e+TD_EXTRA):0;
+        if(e && tri_rd8(e+TD_GAME)==TRI_GAME_MEGAMIX && bank_range(info,52)) {
+            bytes=tri_rd32(info+44);
+            if(bytes) {
+                pixels=bank_range(tri_rd32(info+40),bytes);
+                lines=bank_range(tri_rd32(info+48),bytes/32);
+                if(!pixels || !lines)return 0;
+            }
+        }
+    }
+    return gvdp_set_sprite_patterns(pixels,bytes,lines);
+}
 static int video_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     if(tri_scd_video_cell(ram,x,y,background,cell))return 1;
@@ -46,7 +66,8 @@ void tri_megamix_geometry_begin(void)
 {
     memset(&s_geometry,0,sizeof s_geometry);
     s_chunks_address=0;
-    gvdp_set_sprite_patterns(NULL,0,NULL);
+    /* Level enters before Pal_FadeToBlack, potentially mid-scanline. Keep
+     * the outgoing sprite bank intact until the post-fade art-load seam. */
     s3_video_set_world_cell(video_cell);
     s3_video_set_world_publish(tri_cd_zone(tri_zone())?tri_scd_publish:NULL);
     uint32_t e=tri_dir();
@@ -64,8 +85,7 @@ void tri_megamix_geometry_begin(void)
     s_stage=r16(RAM_Current_zone_and_act);s_chunks_address=chunks;
     if(bank_range(info,52)) {
         uint32_t pixels=tri_rd32(info+40),bytes=tri_rd32(info+44),lines=tri_rd32(info+48);
-        if(bytes && (!bank_range(pixels,bytes) || !bank_range(lines,bytes/32) ||
-           !gvdp_set_sprite_patterns(bank_range(pixels,bytes),bytes,bank_range(lines,bytes/32))))goto invalid;
+        if(bytes && (bytes>65536 || bytes%32 || !bank_range(pixels,bytes) || !bank_range(lines,bytes/32)))goto invalid;
     }
     return;
 invalid:

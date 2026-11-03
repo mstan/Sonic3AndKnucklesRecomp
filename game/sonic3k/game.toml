@@ -1,14 +1,14 @@
-# game.toml — Sonic the Hedgehog 3 & Knuckles (locked-on, 1994)
+# game.toml â€” Sonic the Hedgehog 3 & Knuckles (locked-on, 1994)
 # 68000, 4MB combined ROM (S&K 2MB + S3 ~1.5MB), SRAM-backed save data,
 # Sega Lock-On cartridge memory mapper.
 # Product serial: GM MK-1563 -00  (S&K's header $0180)
 # Internal checksum: $DFB3        (header $018E)
 # Region: JUE
 # Entry PC: $000206 (vector $000004)
-# VBlank vector: $FFFFFFF0 — RAM-installed handler
-# HBlank vector: $FFFFFFF6 — RAM-installed handler
+# VBlank vector: $FFFFFFF0 â€” RAM-installed handler
+# HBlank vector: $FFFFFFF6 â€” RAM-installed handler
 #
-# STATUS: skeleton — *significant* unknowns vs S1/S2. Read first.
+# STATUS: skeleton â€” *significant* unknowns vs S1/S2. Read first.
 #
 # Why S3K is hard:
 #   1. The IRQ vectors point into 68K RAM ($FF0000-$FFFFFF), not ROM.
@@ -20,13 +20,13 @@
 #      `glue_call_ram_vector(0xFFFFF0)` at the dispatch site.
 #   2. Sega Lock-On cartridge memory map: S&K ROM occupies $000000-
 #      $1FFFFF, S3 ROM mapped to $200000-$3FFFFF via the cart MMU.
-#      Some routines in S&K reach into S3's address space — those will
+#      Some routines in S&K reach into S3's address space â€” those will
 #      need ROM mapping support in the runtime.
 #   3. SRAM at $200001-$203FFF (odd bytes only, S&K cart). No mapping
 #      support in the current runtime.
 #   4. ROM is 4MB but the validator currently rejects targets >= 0x400000
 #      in tests/tools/gen_disasm_seeds.py. That heuristic was for 4MB
-#      cart limit — should still pass since 0x400000 is exclusive.
+#      cart limit â€” should still pass since 0x400000 is exclusive.
 #
 # Recommend doing Sonic 2 end-to-end first; treat S3K as a stretch goal.
 
@@ -35,7 +35,7 @@ output_prefix = "sonic3k"
 
 # Annotation CSV: 4094 (addr,name) pairs from the BYTE-PERFECT skdisasm
 # build (S&K half + S3 half @ +0x200000). Surfaces real labels in
-# generated C (EntryPoint, GameLoop, VInt, Wait_VSync, …) instead of
+# generated C (EntryPoint, GameLoop, VInt, Wait_VSync, â€¦) instead of
 # func_XXXXXX. Regenerate via:
 #   python <engine>/tests/tools/gen_annotations_csv.py --lst ../skdisasm/sonic3k.lst \
 #       --max-addr 0x200000 --offset 0          -o ann_sk.csv
@@ -53,7 +53,7 @@ annotations = "annotations_from_disasm.csv"
 #   python <engine>/tests/tools/gen_code_addrs.py ../skdisasm/s3.lst      --max-addr 0x200000 --offset 0x200000 >> sonic3k.code_addrs.txt
 code_addrs_file = "sonic3k.code_addrs.txt"
 
-# Discovery files — the disasm's own ground truth (every assembler-resolved
+# Discovery files â€” the disasm's own ground truth (every assembler-resolved
 # code label; data labels filtered). RESOLVED: the earlier "addresses land
 # mid-instruction" problem was a BUILD-MODE error, not a wrong ROM. The old
 # .lst came from buildS3Complete (Sonic3_Complete=1, a no-filler reconstruction
@@ -87,11 +87,11 @@ discovery_files = [
 ]
 
 # ---------------------------------------------------------------------------
-# Per-game RAM layout — verified against skdisasm sonic3k.constants.asm
+# Per-game RAM layout â€” verified against skdisasm sonic3k.constants.asm
 # (phase $FFFF0000 block).
 # ---------------------------------------------------------------------------
 [ram_layout]
-game_mode      = 0xFFF600   # Game_mode (skdisasm: FFFFF600 → 24-bit $FFF600)
+game_mode      = 0xFFF600   # Game_mode (skdisasm: FFFFF600 â†’ 24-bit $FFF600)
 vint_runcount  = 0xFFFE0C   # V_int_run_count (CrossResetRAM block)
 vint_routine   = 0xFFF62A   # V_int_routine
 plc_pending    = 0x000000
@@ -105,7 +105,7 @@ level_modes    = [0x08, 0x0C]
 # Function discovery now comes entirely from the byte-perfect discovery_files
 # above (EntryPoint $206, GameLoop $4B6, VInt $584, HInt $D10, Wait_VSync $1D18
 # and $201FA2 are all present as labels). Per the project philosophy (cf. Sonic
-# 1/2 game.toml), [functions].extra carries only IRREDUCIBLE residual — entries
+# 1/2 game.toml), [functions].extra carries only IRREDUCIBLE residual â€” entries
 # the disasm label set + heuristic finder can't supply. It is currently empty;
 # any dispatch_misses.toml entry after a run is a coverage gap to root-cause in
 # the gen_disasm pipeline, NOT to hand-add here (Principle 16).
@@ -117,6 +117,12 @@ extra = [
 # Opt-in host renderer hooks. Verified using stock skdisasm 1e1b5af;
 # its assembled S&K half matches the combined ROM byte-for-byte.
 # Infinite time extends the original clock to 99:59 without replacing results.
+# Native Nemesis FIFO pop: complete last destination and retire16th source.
+# Exact original-source FixBugs repair; always active, independent of mods.
+[[widescreen_site]]
+addr = 0x1880
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0xDD76 # Native time-limit BEQ
 kind = "game_hook"

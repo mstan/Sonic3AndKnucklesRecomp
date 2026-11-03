@@ -149,6 +149,12 @@ static void ss_begin(const GVDP *v,int width)
     for(int iy=cy-ry;iy<=cy+ry;++iy)for(int ix=cx-rx;ix<=cx+rx;++ix) {
         unsigned kind=ss_board[((unsigned)iy&31)*32+((unsigned)ix&31)];
         if(!kind || kind>=SS_KINDS)continue;
+        /* Native collision marks a collected blue sphere as $A while its
+         * short contact grace period finishes, then changes it to red. Its
+         * old blue mapping lies inside the native near-plane rejection.
+         * The expanded projection must not resurrect it over the runner
+         * when the player turns before that grace period retires. */
+        if(kind==10)continue;
         double dx=ix-ss_x,dy=iy-ss_y;
         double x=dx*ss_cos-dy*ss_sin,z=-dx*ss_sin-dy*ss_cos;
         if(z< -2 || z>10 || fabs(x)>extent)continue;
@@ -193,6 +199,36 @@ static void ss_draw_spheres(int line,uint32_t *out,int width,const uint32_t *pal
         }
     }
 }
+/* Native split banners stop 192px from their 160px anchor, outside 4:3.
+ * Move each half's anchor across the wider canvas, keeping its glyphs at
+ * native size. Recover SAT's wrapped coordinate before scaling the anchor. */
+static int ss_banner_x(unsigned attr,int sx,int sy,int width,int perfect,int *out)
+{
+    if(sy!=96)return 0;
+    int offset,side;unsigned tile=attr&2047u;
+    switch(tile) {
+    case 0x55F:offset=-64;side=-1;break;
+    case 0x565:offset=-32;side=-1;break;
+    case 0x56D:offset=8;side=1;break;
+    case 0x575:offset=40;side=1;break;
+    case 0x57B:offset=-28;side=-1;break;
+    case 0x583:offset=4;side=1;break;
+    case 0x6F8:
+        side=(attr&0x800)?1:-1;
+        offset=side*(perfect?28:64);if(side<0 && !perfect)offset=-80;
+        if(side<0 && perfect)offset=-44;
+        break;
+    default:return 0;
+    }
+    int anchor=sx-offset;
+    if(side<0 && anchor>160)anchor-=512;
+    if(side>0 && anchor<160)anchor+=512;
+    if((side<0 && (anchor< -32 || anchor>160)) ||
+       (side>0 && (anchor<160 || anchor>352)))return 0;
+    int distance=anchor-160;
+    *out=(width-320)/2+160+(distance*width+(distance<0?-160:160))/320+offset;
+    return 1;
+}
 static void ss_native_sprites(const GVDP *v,int line,uint32_t *out,int width,
                               const uint32_t *palette,const uint32_t *shadow,int text)
 {
@@ -201,6 +237,11 @@ static void ss_native_sprites(const GVDP *v,int line,uint32_t *out,int width,
         unsigned a=(base+index*8)&65535u;
         entries[count++]=a;index=v->vram[(a+3)&65535]&127;
     } while(index && count<80);
+    int perfect=0;
+    for(unsigned n=0;n<count;++n) {
+        unsigned a=entries[n],tile=vram16(v,a+4)&2047u;
+        if((tile==0x57B || tile==0x583) && ((vram16(v,a)&511)-128)==96)perfect=1;
+    }
     /* Characters, arrows and messages retain their original mapping and
      * pixel scale. Spheres/rings are replaced, never drawn twice. */
     /* SAT's first sprite wins: paint back-to-front, especially operators
@@ -210,7 +251,8 @@ static void ss_native_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int is_text=tile<0x5A7 || (tile>=0x6F8 && tile<0x6FC);
         if((is_text || tile>=0x77B) && is_text==text) {
             int sy=(vram16(v,a)&511)-128,sx=(vram16(v,a+6)&511)-128;
-            if(tile>=0x589 && tile<0x59B && sy<32)
+            if(ss_banner_x(attr,sx,sy,width,perfect,&sx)) { /* native-sized split text */ }
+            else if(tile>=0x589 && tile<0x59B && sy<32)
                 sx+=sx<160?0:width-320;
             else sx+=(width-320)/2;
             unsigned flags=v->vram[(a+2)&65535];
@@ -266,7 +308,6 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
     ss_draw_spheres(line,out,width,palette,0);
     ss_native_sprites(v,line,out,width,palette,shadow,0);
     ss_draw_spheres(line,out,width,palette,1);
-    ss_native_sprites(v,line,out,width,palette,shadow,1);
     /* Counters are plane-A tiles, not SAT sprites. Move their two complete
      * 64x24 panels to the actual left/right edges; no centered HUD ghost. */
     if(line>=8 && line<32)for(int side=0;side<2;++side)for(int dx=0;dx<64;++dx) {
@@ -275,4 +316,7 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
         unsigned pixel=pattern_pixel(v,(uint16_t)attr,source,line);
         if(pixel && x>=0 && x<width)out[x]=palette[pixel];
     }
+    /* The native high-priority counter icons cover the plane's border and
+     * digits. Drawing plane A last cuts into both icon frames. */
+    ss_native_sprites(v,line,out,width,palette,shadow,1);
 }

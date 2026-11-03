@@ -15,7 +15,7 @@ int tri_megamix_sprite_hook(uint32_t pc)
 {
     if(pc!=MG_PC_SK_SPRITE_RAW && pc!=MG_PC_SK_SPRITE_CLIP)return 0;
     uint32_t e=tri_dir(),map=A(1)&0xFFFFFFu;
-    int menu=(r8(RAM_Game_mode)&127)==0x4C;
+    int menu=tri_data_select_visible();
     if(((!e || tri_rd8(e+TD_GAME)!=TRI_GAME_MEGAMIX) && !menu) || map<TRI_BANK_BASE ||
        map-TRI_BANK_BASE>=g_rom_ext_size)return 0;
     uint32_t p=A(1),out=A(6);

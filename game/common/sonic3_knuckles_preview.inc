@@ -30,11 +30,13 @@ static int s3_knux_preview_needed(const uint8_t *ram)
 #else
     if(!ram || ram[0xF600]!=0x0C || s3_knux_preview_word(ram,0xFE10)!=1 ||
        ram[0xB038]==2)return 0;
-    /* loc_69526 drives the approach. Its successor allocates the real actor;
-     * retaining this tag with the captured scene makes that handover atomic. */
+    /* A far-right capsule clear already exposes the ledge during loc_694D4.
+     * loc_69526 then drives the approach; its successor allocates the real
+     * actor. Keep the tag with that scene so the handover stays atomic. */
     for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
         if(s3_knux_preview_word(ram,o)==6 &&
-           s3_knux_preview_word(ram,o+2)==0x9526)return 1;
+           (s3_knux_preview_word(ram,o+2)==0x94D4 ||
+            s3_knux_preview_word(ram,o+2)==0x9526))return 1;
     return 0;
 #endif
 }
