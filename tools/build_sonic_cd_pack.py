@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import zlib
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools' / 'trilogy'))
@@ -29,6 +30,20 @@ def source_identity(disc):
     return digest.hexdigest()
 
 
+def build_content_parts(extracted, output, s3k):
+    # sys.executable is the packaged helper in a frozen build, not a Python
+    # interpreter. Both converters expose the same argv entry point in-process.
+    from scd_level import main as build_levels
+    from scd_special import main as build_scenes
+    common = ['--disc', str(extracted)]
+    for convert, target in ((build_levels, 'levels.bin'), (build_scenes, 'scenes.bin')):
+        argv = common + ['--out', str(output / target)]
+        if target == 'levels.bin':
+            argv += ['--s3k', str(s3k.resolve()), '--window', hex(WINDOW)]
+        if convert(argv):
+            raise ValueError(f'Sonic CD {target} conversion failed')
+
+
 def main(argv=None, *, source=None):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--disc', '--cue', dest='cue', type=Path, required=True,
@@ -39,10 +54,15 @@ def main(argv=None, *, source=None):
     ap.add_argument('--validator', type=Path, help='scd_pack_validate executable (required for content)')
     args = ap.parse_args(argv)
     try:
+        if source is None:
+            from scd_media import open_disc
+            args.out.resolve().parent.mkdir(parents=True, exist_ok=True)
+            with open_disc(args.cue, args.out.resolve().parent) as opened:
+                return main(argv, source=opened)
         # A combined import shares one verified media/ISO instance across the
         # content and music passes, avoiding repeated full SGCD verification.
         disc = source if source is not None else Disc(args.cue)
-        if disc.media.path != args.cue.resolve():
+        if getattr(disc, 'source_path', disc.media.path) != args.cue.resolve():
             raise ValueError('shared disc does not match the requested input')
         output = args.out.resolve()
         inputs = disc.input_paths.copy()
@@ -94,12 +114,7 @@ def main(argv=None, *, source=None):
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(disc.read(name))
                 (extracted / '_SYSTEM.BIN').write_bytes(disc.system_area())
-                for tool, target in (('scd_level.py', 'levels.bin'), ('scd_special.py', 'scenes.bin')):
-                    cmd = [sys.executable, str(ROOT / 'tools' / 'trilogy' / tool),
-                           '--disc', str(extracted), '--out', str(tmp / target)]
-                    if tool == 'scd_level.py':
-                        cmd += ['--s3k', str(args.s3k.resolve()), '--window', hex(WINDOW)]
-                    subprocess.run(cmd, check=True)
+                build_content_parts(extracted, tmp, args.s3k)
                 entries = [(CONTENT_NAMES[0], (tmp / 'levels.bin').read_bytes()),
                            (CONTENT_NAMES[1], (tmp / 'scenes.bin').read_bytes())]
                 entries += [(name, disc.read(name)) for name in CONTENT_NAMES[2:]]
@@ -112,7 +127,7 @@ def main(argv=None, *, source=None):
             digest = hashlib.file_digest(f, 'sha256').hexdigest()
         print(f'Sonic CD {args.kind}: {output} ({output.stat().st_size} bytes), SHA256 {digest}')
         return 0
-    except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile, subprocess.CalledProcessError) as error:
         print(str(error), file=sys.stderr)
         return 1
 

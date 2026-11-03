@@ -629,7 +629,7 @@ class Sonic1:
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--s1', required=True)
+    ap.add_argument('--s1')
     ap.add_argument('--s2')
     ap.add_argument('--out', required=True)
     ap.add_argument('--zones', default='GHZ')
@@ -642,10 +642,12 @@ def main(argv=None):
     S3K_WATER_LINE0 = _s3k[be32(_s3k, _pp):be32(_s3k, _pp) + 0x20]
     global S3K_DIAG_SPRING                                     # ArtNem_DiagonalSpring (S3K PLC art)
     S3K_DIAG_SPRING = (0x190B4C, len(nemesis_decode(_s3k, 0x190B4C)[0]) // 32)
-    s1 = Sonic1(Path(args.s1).read_bytes())
+    s1 = Sonic1(Path(args.s1).read_bytes()) if args.s1 else None
     s2 = None
     for name in args.zones.split(','):
         if name in S1_ZONES:
+            if s1 is None:
+                raise SystemExit(f"{name}: needs --s1 <Sonic 1 REV01 ROM>")
             s1.convert_zone(bank, S1_ZONES.index(name))
         elif name in s2_level.S2_ZONES:
             if not args.s2:
@@ -654,7 +656,10 @@ def main(argv=None):
                 s2 = s2_level.Sonic2(Path(args.s2).read_bytes(), sys.modules[__name__])
             s2.convert_zone(bank, name)
     # blobs referenced by native objects (TRI_BLOB_* in trilogy.h)
-    s1rom = Path(args.s1).read_bytes()
+    # S1-only blobs are not read for S2 stages (including oscillator hooks).
+    # Retain their stable table slots with empty data when S1 is not supplied;
+    # never obtain an unrelated campaign's assets from a bundled ROM/template.
+    s1rom = Path(args.s1).read_bytes() if args.s1 else bytes(0x80000)
     slope = s1rom[S1_BLOBS['Ledge_SlopeData']:S1_BLOBS['Ledge_SlopeData'] + 0x30]
     blobs = [bank.add(bytes(b for v in slope for b in (v, v)))]
     # animals: S1 Anml_VarIndex pairs (type numbering matches S3K Obj_Animal)
@@ -676,7 +681,7 @@ def main(argv=None):
     blobs.append(bank.add(s1rom[0x006448:0x006448 + 0x100]))   # Lz_Scroll_Data
     # animated art, recoloured for the palette line its blocks use
     tabs = {0: L0_MAP, 1: L1_PERM, 2: list(range(16)), 3: list(range(16))}
-    ghz_lines = s1.anim_line_map.get('GHZ', {})
+    ghz_lines = s1.anim_line_map.get('GHZ', {}) if s1 else {}
 
     def anim_art(a, n, start):
         return remap_tile(s1rom[a:a + n * 32], tabs[ghz_lines.get(start, 2)])
@@ -688,7 +693,7 @@ def main(argv=None):
     blobs.append(bank.add(kosm_encode(numeral_3(_kosm_decode(s3krom, S3K_SYMS['ArtKosM_TitleCardNum2'])))))  # act 3
     blobs.append(bank.add(s1rom[0x00412E:0x00412E + 0x42]))   # S1 oscillator baselines
     blobs.append(bank.add(s1rom[0x0041C8:0x0041C8 + 0x40]))   # S1 oscillator settings
-    mz_lines = s1.anim_line_map.get('MZ', {})
+    mz_lines = s1.anim_line_map.get('MZ', {}) if s1 else {}
 
     def mz_art(a, n, start):
         return remap_tile(s1rom[a:a + n * 32], tabs[mz_lines.get(start, 2)])
@@ -698,7 +703,7 @@ def main(argv=None):
     blobs.append(bank.add(s1rom[0x00B7A2:0x00B7A2 + 0x4C]))  # LGrass_Data1 (mz_pfm1)
     blobs.append(bank.add(s1rom[0x00B7EE:0x00B7EE + 0x2C]))  # LGrass_Data2 (mz_pfm2)
     blobs.append(bank.add(s1rom[0x00B81A:0x00B81A + 0x4C]))  # LGrass_Data3 (mz_pfm3)
-    music_tab, sizes = build_music(s1rom, bank)
+    music_tab,sizes=build_music(s1rom,bank) if s1 else (bytes(2),[])
     blobs.append(bank.add(music_tab))                       # S1 songs (s1_music.py)
     blobs.append(bank.add(bytes([0x20, 0x21])))             # music slots $20/$21
     blobs.append(bank.add(s1rom[0x001C6E:0x001C6E + 0x30]))  # Pal_SYZCyc1 (4 x 4) + Pal_SYZCyc2 (4 x 2)
@@ -721,7 +726,7 @@ def main(argv=None):
     blobs.append(bank.add(hdr + body))
     blobs.append(bank.add(s1rom[0x001B9E:0x001C02]))   # Pal_LZCyc1 (4x8), LZCyc2 (3x6), LZCyc3 (3x6), SBZ3Cyc (4x8)
     blobs.append(bank.add(s1rom[0x001C4A:0x001C4A + 36]))   # Pal_SLZCyc (6 x 3 colours)
-    sbz_lines = s1.anim_line_map.get('SBZ', {})
+    sbz_lines = s1.anim_line_map.get('SBZ', {}) if s1 else {}
     for start in (0x448, 0x454):                            # Art_SbzSmoke, per puff's palette line
         blobs.append(bank.add(remap_tile(s1rom[0x068116:0x068116 + 84 * 32], tabs[sbz_lines.get(start, 2)])))
     blobs.append(bank.add(s1rom[0x001C9E:0x001DB0]))        # Pal_SBZCycList1/2 + Pal_SBZCyc1-10

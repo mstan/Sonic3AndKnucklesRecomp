@@ -13,6 +13,7 @@ from pathlib import Path
 import shutil
 import sys
 import tempfile
+import zipfile
 
 from build_sonic_cd_pack import main as build_pack
 from trilogy.scd_resource import validate_pack
@@ -30,7 +31,12 @@ def file_hash(path):
 
 
 def verify_bundle(directory, manifest):
+    if (manifest.get('format') != 1 or NAMES[0] not in manifest.get('sha256', {})
+            or not set(manifest['sha256']).issubset(NAMES)):
+        raise ValueError('incomplete or invalid Sonic CD installation manifest')
     for index, name in enumerate(NAMES):
+        if name not in manifest['sha256']:
+            continue
         path = directory / name
         validate_pack(path, audio=index == 1)
         if file_hash(path) != manifest['sha256'][name]:
@@ -50,7 +56,8 @@ def import_disc(disc, s3k, output, validator, *, source=None):
     try:
         progress(0.05, 'Checking disc and converting all stage/time variants...')
         common = ['--disc', str(disc), '--s3k', str(s3k)]
-        for index, kind in enumerate(('content', 'audio')):
+        has_audio = source is None or any(t.kind == 'AUDIO' for t in source.track_info)
+        for index, kind in enumerate(('content', 'audio') if has_audio else ('content',)):
             if index:
                 progress(0.65, 'Verifying and importing all 34 CD music tracks...')
             args = common + ['--kind', kind, '--out', str(staging / NAMES[index])]
@@ -59,7 +66,8 @@ def import_disc(disc, s3k, output, validator, *, source=None):
             if build_pack(args, source=source):
                 raise ValueError(f'Sonic CD {kind} conversion failed; see the import log for details')
         progress(0.95, 'Checking the complete stage and music installation...')
-        manifest = {'format': 1, 'sha256': {name: file_hash(staging / name) for name in NAMES}}
+        installed = NAMES if has_audio else NAMES[:1]
+        manifest = {'format': 1, 'sha256': {name: file_hash(staging / name) for name in installed}}
         encoded = (json.dumps(manifest, sort_keys=True, indent=2) + '\n').encode()
         (staging / 'manifest.json').write_bytes(encoded)
         verify_bundle(staging, manifest)
@@ -81,10 +89,11 @@ def import_disc(disc, s3k, output, validator, *, source=None):
 
 def write_receipt(path, bundle):
     paths = [(bundle / name).resolve() for name in NAMES]
+    audio = NAMES[1] in json.loads((bundle / 'manifest.json').read_text())['sha256']
     if any('\n' in str(p) or '\r' in str(p) for p in paths):
         raise ValueError('newline in imported resource path')
     path = Path(path).resolve()
-    if path.suffix.lower() in ('.pak', '.bin', '.srm', '.sgcd', '.cue'):
+    if path.suffix.lower() in ('.pak', '.bin', '.srm', '.sgcd', '.cue', '.iso', '.img', '.zip'):
         raise ValueError('receipt must be a separate metadata file, not game data')
     if path in paths or path == bundle / 'manifest.json':
         raise ValueError('receipt must not overwrite an imported resource')
@@ -92,7 +101,9 @@ def write_receipt(path, bundle):
     fd, temporary = tempfile.mkstemp(prefix='.receipt-', dir=path.parent)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8', newline='\n') as stream:
-            stream.write(f'format=1\ncontent={paths[0]}\nmusic={paths[1]}\n')
+            stream.write(f'format=1\ncontent={paths[0]}\nmusic={paths[1] if audio else ""}\n')
+            if not audio:
+                stream.write('audio=absent\n')
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
@@ -111,17 +122,19 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         # Do not permit the final receipt to clobber any original input.
-        from trilogy.scd_iso import Disc
-        source = Disc(args.disc)
-        if args.receipt and args.receipt.resolve() in source.input_paths | {args.s3k.resolve()}:
-            raise ValueError('receipt must differ from every owned input')
-        bundle = import_disc(args.disc, args.s3k, args.out, args.validator, source=source)
-        if args.receipt:
-            write_receipt(args.receipt, bundle)
-        progress(1.0, 'Sonic CD stages and music are ready.')
+        from trilogy.scd_media import open_disc
+        args.out.resolve().mkdir(parents=True, exist_ok=True)
+        with open_disc(args.disc, args.out.resolve()) as source:
+            if args.receipt and args.receipt.resolve() in source.input_paths | {args.s3k.resolve()}:
+                raise ValueError('receipt must differ from every owned input')
+            bundle = import_disc(args.disc, args.s3k, args.out, args.validator, source=source)
+            if args.receipt:
+                write_receipt(args.receipt, bundle)
+        progress(1.0, 'Sonic CD stages and music are ready.' if (bundle / NAMES[1]).is_file() else
+                 'Stages, Past PCM music and voices are ready. This data-only image has no CDDA tracks.')
         print(bundle, flush=True)
         return 0
-    except (OSError, ValueError, KeyError, ImportError) as error:
+    except (OSError, ValueError, KeyError, ImportError, RuntimeError, zipfile.BadZipFile) as error:
         print(f'S3K_CD_ERROR:{error}', file=sys.stderr, flush=True)
         return 1
 

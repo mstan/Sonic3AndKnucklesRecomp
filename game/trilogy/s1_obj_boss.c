@@ -327,6 +327,7 @@ static void boss_ball(uint32_t o)
         else if (OB8(parent_of(o), R2) == 6) SET8(o, OBJ_routine, 4);
         if (OB16(o, GB_DROP) != 0x20) SET16(o, GB_DROP, OB16(o, GB_DROP) + 1);
         gball_follow(o);
+        gball_place(o,o);                       /* Swing_Move2 includes the base */
         o_draw(o);
         return;
     case 4: { /* GBall_Base2: Obj48_Move */
@@ -341,6 +342,7 @@ static void boss_ball(uint32_t o)
         }
         SET16(o, GB_SPEED, v);
         SET16(o, OBJ_angle, OB16(o, OBJ_angle) + v);
+        gball_place(o,o);
         o_draw(o);
         return;
     }
@@ -349,16 +351,22 @@ static void boss_ball(uint32_t o)
         uint32_t base = 0xFF0000u | OB16(o, GB_BASE);
         uint32_t boss = parent_of(o);
         uint8_t target = gball_pos[OB8(o, GB_INDEX)];
-        if (OB8(o, GB_RADIUS) != target) SET8(o, GB_RADIUS, OB8(o, GB_RADIUS) + 1);
-        if (!r32(base)) { o_delete(o); return; }
-        gball_place(o, base);
+        int ball=OB8(o,OBJ_routine)==8;
+        int defeated=(OB8(boss,OBJ_status)&0x80)!=0;
+        /* Native Swing_Move2 stops when its base becomes an explosion. The
+         * ball then keeps its last position and repurposes radius as delay. */
+        if (!ball || !defeated || OB8(o,OBJ_coll_flags)) {
+            if (OB8(o, GB_RADIUS) != target) SET8(o, GB_RADIUS, OB8(o, GB_RADIUS) + 1);
+            if (!r32(base)) { o_delete(o); return; }
+            gball_place(o, base);
+        }
         if (OB8(o, OBJ_routine) == 8) {
             SET8(o, OBJ_frame, OB8(o, OBJ_frame) ? 0 : 1);
             if (OB8(boss, OBJ_status) & 0x80) {
                 SET8(o, OBJ_coll_flags, 0);
                 s1_boss_defeated(o);
-                SET8(o, GB_TICKS, OB8(o, GB_TICKS) - 1);
-                if ((int8_t)OB8(o, GB_TICKS) < 0) {
+                SET8(o, GB_RADIUS, OB8(o, GB_RADIUS) - 1);
+                if ((int8_t)OB8(o, GB_RADIUS) < 0) {
                     SET32(o, OBJ_code, S3K_Obj_Explosion);
                     SET8(o, OBJ_routine, 6);                  /* no animal, no break sound */
                     o_sfx(0xB4);                               /* sfx_Bomb (S3K: boss explosion) */

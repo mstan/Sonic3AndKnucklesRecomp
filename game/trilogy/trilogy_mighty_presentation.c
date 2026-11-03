@@ -17,6 +17,16 @@ static uint8_t menu_mighty[9];
 static uint8_t menu_palette_lines[64],menu_art[2048];
 static uint8_t shadow_head[128];
 static uint32_t shadow_head_source;
+int tri_data_select_visible(void)
+{
+    const GVDP *v=&g_machine.vdp;
+    /* Start selects the level before the outgoing menu has faded. Keep the
+     * original portrait atlas while its full-screen Window/128-column B
+     * layout remains installed, matching the family video compositor. */
+    return (r8(RAM_Game_mode)&127)==0x4C ||
+        ((v->reg[12]&1) && (v->reg[2]&56)==0x38 && (v->reg[3]&62)==0x38 &&
+         (v->reg[4]&7)==6 && v->reg[18]==0x80 && (v->reg[16]&3)==3);
+}
 static uint32_t data_for(unsigned character)
 {
     uint32_t p=character==2?tri_shadow_descriptor():tri_mighty_descriptor();
@@ -96,7 +106,7 @@ int tri_mighty_presentation_hook(uint32_t pc)
         if(g_split_sp_popped>0){g_rte_pending=g_split_sp_popped;g_split_sp_popped=0;}
         return 1;
     }
-    if(pc==MG_PC_DS_DRAW && (r8(RAM_Game_mode)&127)==0x4C) {
+    if(pc==MG_PC_DS_DRAW && tri_data_select_visible()) {
         unsigned code=r32(p)&0xFFFFFFu;
         if(code!=0xD30C && code!=0xD39E && code!=0xD42C)return 0;
         uint32_t map=r32(p+OBJ_mappings)&0xFFFFFFu;
@@ -154,7 +164,9 @@ static void shadow_head_art(uint32_t d)
     int top=64,left=64,right=-1,bottom=-1;
     for(int y=0;y<64;y++)for(int x=0;x<64;x++)if(canvas[y][x] && y<top)top=y;
     for(int y=top;y<top+24 && y<64;y++)for(int x=0;x<64;x++)if(canvas[y][x]) {
-        if(x<left)left=x;if(x>right)right=x;bottom=y;
+        if(x<left)left=x;
+        if(x>right)right=x;
+        bottom=y;
     }
     if(right<left)return;
     int w=right-left+1,h=bottom-top+1,span=w>h?w:h;
@@ -173,12 +185,22 @@ static void shadow_head_art(uint32_t d)
     }
     shadow_head_source=d;
 }
+static void shadow_hud_multiply(uint8_t *dst,const uint8_t *native)
+{
+    /* The donor's 48x16 strip is column-major. Its complete multiplication
+     * sign occupies x22..27 on the bottom row, spanning tiles5 and7. Pack
+     * the original x22..29 window into our existing single 8x8 HUD tile. */
+    for(unsigned row=0;row<8;row++) {
+        dst[row*4]=native[5*32+row*4+3];
+        memcpy(dst+row*4+1,native+7*32+row*4,3);
+    }
+}
 int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
 {
     for(unsigned i=0;i<2048;i++)if(tiles[i]==3 || tiles[i]==(GVDP_EXT_SPRITE_FORCE|3))tiles[i]=0;
     uint32_t d=data();
-    int menu=(r8(RAM_Game_mode)&127)==0x4C;
-    int player=(r8(RAM_Game_mode)&127)==0x0C && tri_character_active();
+    int menu=tri_data_select_visible();
+    int player=!menu && (r8(RAM_Game_mode)&127)==0x0C && tri_character_active();
     if(menu)d=data_for(1);
     if(!d || !(s3_stage_pack_mighty || s3_stage_pack_shadow) || (!menu && !player))return 0;
     if(menu) {
@@ -201,7 +223,7 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
             for(unsigned col=0;col<4;col++)
                 memcpy(g_machine.vdp.vram+(0x7D8+col)*32,native+(4+col*2)*32,32);
             memset(g_machine.vdp.vram+0x7DC*32,0,32);
-            memcpy(g_machine.vdp.vram+0x7DE*32,native+7*32,32);
+            shadow_hud_multiply(g_machine.vdp.vram+0x7DE*32,native);
             memset(tiles+0x7D8,GVDP_EXT_SPRITE_FORCE|3,5);
             tiles[0x7DE]=GVDP_EXT_SPRITE_FORCE|3;
         } else if(tri_shadow_selected) {
@@ -236,11 +258,12 @@ int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom)
 void tri_shadow_menu_colors(uint16_t *top,uint16_t *bottom)
 {
     uint32_t d=data_for(2);
-    if(!d || !s3_stage_pack_shadow || (r8(RAM_Game_mode)&127)!=0x4C)return;
+    if(!d || !s3_stage_pack_shadow || !tri_data_select_visible())return;
     unsigned hi[3]={0},lo[3]={14,14,14};
     for(unsigned i=0;i<64;i++)for(unsigned c=0;c<3;c++) {
         unsigned v=(r16(RAM_Normal_palette+i*2)>>(c*4))&14;
-        if(v>hi[c])hi[c]=v;if(v<lo[c])lo[c]=v;
+        if(v>hi[c])hi[c]=v;
+        if(v<lo[c])lo[c]=v;
     }
     for(unsigned i=0;i<16;i++) {
         unsigned source=tri_rd16(tri_rd32(d+16)+i*2),color=0;

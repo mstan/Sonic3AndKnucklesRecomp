@@ -49,9 +49,10 @@ class Disc:
             raise ValueError('expected one MODE1/2352 data track followed by AUDIO tracks')
         self.iso = ISO9660(self.media)
         self.input_paths = self.media.input_paths
-        self.track_info = [Track(t['number'], 'MODE1/2352' if t['data'] else 'AUDIO',
-                                 self.media.path, t['start'] * RAW, t['end'] * RAW,
-                                 (t['start'] - t['index00']) * RAW) for t in rows]
+        self.track_info = [Track(t['number'], f'MODE1/{t.get("sector_size", RAW)}' if t['data'] else 'AUDIO',
+                                 self.media.path, t['start'] * t.get('sector_size', RAW),
+                                 t['end'] * t.get('sector_size', RAW),
+                                 (t['start'] - t['index00']) * t.get('sector_size', RAW)) for t in rows]
         self.tracks = [(t.number, t.kind, t.path, t.start) for t in self.track_info]
         self._sectors = self.iso.volume_sectors
         self.volume_id = self.iso.volume_id

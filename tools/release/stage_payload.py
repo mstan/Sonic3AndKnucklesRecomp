@@ -12,10 +12,16 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def stage_campaign_tools(dest, build, system, engine):
     """Copy the complete public converter, including shared upstream media IO."""
+    builder=build/('S3KCampaignBuilder.exe' if system=='Windows' else 'S3KCampaignBuilder')
+    assert builder.is_file(), 'Build the bundled S3KCampaignBuilder before packaging'
+    shutil.copy2(builder,dest/builder.name)
+    builder_licenses=build/'campaign-builder-licenses'
+    assert (builder_licenses/'Python.txt').is_file() and (builder_licenses/'versions.json').is_file(), 'Missing converter runtime licenses'
+    shutil.copytree(builder_licenses,dest/'licenses/campaign-builder',dirs_exist_ok=True)
     tools = dest / "tools"
     tools.mkdir(exist_ok=True)
     for name in ("build_stage_pack.py", "build_megamix_pack.py",
-                 "split_campaign_packs.py", "build_sonic_cd_pack.py", "import_sonic_cd.py"):
+                 "split_campaign_packs.py", "build_sonic_cd_pack.py", "import_sonic_cd.py", "import_campaign.py"):
         shutil.copy2(ROOT / "tools" / name, tools / name)
     for directory in ("trilogy", "megamix"):
         tracked = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--",

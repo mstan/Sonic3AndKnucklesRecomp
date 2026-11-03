@@ -10,6 +10,10 @@ static uint8_t bank[1024];
 uint8_t *g_rom_ext=bank;uint32_t g_rom_ext_size=sizeof bank;
 M68KState g_cpu;int g_split_sp_popped;
 static int pending,enabled=1;int *g_rte_pending_ptr=&pending;
+static int retained_menu;
+/* The installed-layout predicate itself is exercised with real VDP registers
+ * by megamix_presentation_test; isolate this SAT consumer's two phases. */
+int tri_data_select_visible(void){return (r8(RAM_Game_mode)&127)==0x4C || retained_menu;}
 uint32_t tri_dir(void){return enabled?0x400040:0;}
 uint8_t tri_rd8(uint32_t a){CHECK(a>=0x400000 && a<0x400400);return bank[a-0x400000];}
 uint16_t tri_rd16(uint32_t a){return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1));}
@@ -49,5 +53,15 @@ int main(void)
     CHECK(tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
     CHECK(r16(0xFFD804)==0x0010); /* source priority 8000 + base priority 8000 wraps */
     CHECK(r8(0xFFD802)==0x86);
+    g_ram[RAM_Game_mode&65535]=0x8C;retained_menu=1;
+    g_cpu.A[1]=0x400100;g_cpu.A[6]=0xFFFFD800;g_cpu.D[4]=0;g_cpu.D[7]=7;
+    CHECK(tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
+    CHECK(r16(0xFFD804)==0x0010 && r8(0xFFD802)==0x86);
+    bank[0x101]=6; /* the native Tails piece still uses native art and its base */
+    g_cpu.A[1]=0x400100;g_cpu.A[6]=0xFFFFD800;g_cpu.D[4]=0;g_cpu.D[7]=7;
+    CHECK(tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
+    CHECK(r16(0xFFD804)==0x02AF && r8(0xFFD802)==6);
+    retained_menu=0;g_cpu.A[1]=0x400100;
+    CHECK(!tri_megamix_sprite_hook(MG_PC_SK_SPRITE_RAW));
     puts("Megamix SAT marker, all flips, clipping, budget, links and native opt-out passed");return 0;
 }

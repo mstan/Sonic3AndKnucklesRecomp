@@ -14,11 +14,47 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The latest release,
-v0.6.0, has Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+the separate versions need their corresponding ROMs. The v0.7.3 release
+provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
-**The extra campaigns, Mighty and Shadow shown below are included in v0.6.0**
+**The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
+
+## New options in v0.7.0
+
+These controls are included in v0.7.0.
+
+In **Mods**, enable **High refresh rate**, then choose **Presentation rate**:
+120, 144 or Display. Display follows the monitor's refresh rate. Gameplay and
+music keep their normal speed. Menus, finite special-stage views and some
+scripted scenes repeat complete frames. Blue Spheres uses the corrected widescreen projection by default when
+widescreen is enabled.
+
+Enable **Unfiltered audio** for the clearer sound without the hardware low-pass
+filter. The normal filtered sound remains the default. Both controls are also
+available in the in-game options.
+
+**Gameplay options** in Mods are optional and off by default. They apply to
+local play in Sonic 3, Sonic & Knuckles and the combined game:
+
+- **Infinite lives** keeps at least three lives through death and retry, and
+  preserves higher counts and life awards.
+- **Infinite time** lets the clock run to 99:59 and stay there. The original 100,000-point bonus applies only during the actual 9:59 second; finishing at 10:00 or later gives the normal 100-point time bonus.
+- **Easier level select** unlocks Sound Test on the title menu: select it with
+  Up, then Start. In Sonic & Knuckles, hold the game's A button and press
+  Start, keeping A held through the fade.
+- **Debug mode** enables native placement controls in original stages: B
+  enters/exits placement, A cycles objects and C places one.
+- **Shielded transformation** lets native Sonic hold Up and press jump again
+  in the air to become Super or Hyper with an elemental shield. The original
+  emerald and 50-ring requirements apply. Ordinary shield actions remain
+  available without Up; Mighty and Shadow keep their own controls.
+- **Sonic 1 checkpoint bonus stages**, in the combined game, adds entry stars
+  above activated imported Sonic 1 checkpoints when you have at least 20 rings.
+  Jump into the stars to visit a native bonus stage and return to the checkpoint.
+- **Tails giant-ring follow**, in imported Sonic 1 acts, lets a nearby companion
+  run and jump after you into the end-of-act ring. He enters when he reaches it;
+  distant or missing companions keep normal behavior.
 
 ## Every zone, across the campaigns
 
@@ -109,12 +145,12 @@ checkbox, and all are **experimental** and off by default.
 
 | Mod | What you need |
 | --- | --- |
-| Sonic 1 stages | Your own supported Sonic 1 ROM and a prepared stage pack |
-| Sonic 2 stages | Your own supported Sonic 2 ROM and a prepared stage pack |
+| Sonic 1 stages | Your own supported Sonic 1 ROM |
+| Sonic 2 stages | Your own supported Sonic 2 ROM |
 | Sonic CD stages | Your own supported Sonic CD (US) disc image |
-| Sonic Megamix stages | Your own Sonic Megamix v3 ROM and a prepared content pack |
-| Mighty | The same Megamix ROM and content pack |
-| Shadow | The same Megamix ROM and content pack |
+| Sonic Megamix stages | Your own Sonic Megamix v3 ROM |
+| Mighty | The same Megamix ROM |
+| Shadow | The same Megamix ROM |
 
 Enable whichever campaigns you want. They play in this order:
 **Sonic 1 → Sonic 2 → Sonic CD → Sonic 3 & Knuckles → Megamix**.
@@ -126,16 +162,32 @@ import to finish before pressing PLAY. **No Sega CD BIOS is needed for this
 mod.** It uses Sonic 3 & Knuckles' characters and abilities. For the original
 Sonic CD experience, see [SonicCDRecomp](https://github.com/mstan/SonicCDRecomp).
 
-Stage packs must be prepared from your own game files before use. Follow the
+**v0.7.0 and later:** under a mod's **Files**, select your
+Sonic 1, Sonic 2 or Megamix ROM, or a ZIP containing that ROM. The bundled
+offline importer verifies it, prepares a private cached campaign and fills in
+the resources automatically. Each campaign needs only its own cartridge and
+your selected S3K ROM. A Megamix import also prepares Mighty and Shadow;
+their checkboxes stay independent. Wait for completion, then select **PLAY**.
+No Python or Pillow installation is needed with the complete package. Failed imports retain your previous resources and native progress.
+
+The bundled importer also handles Sonic CD **CUE/BIN**, **ISO**, raw data
+**BIN/IMG** and verified **.sgcd** images, directly or inside a **ZIP**.
+Keep the CUE and its referenced tracks together to retain CD audio. Data-only
+ISO/BIN images provide stages, embedded Past music and voices; Present/Future
+CD audio requires the audio tracks. The importer reports missing CD audio and
+retains previously verified music when available.
+
+**Published v0.6.4:** cartridge stage packs still need to be prepared before use.
+Follow the
 [Sonic 1/2 setup guide](docs/STAGE_PACKS.md#build-your-stage-bank),
 [Megamix setup guide](docs/MEGAMIX_STAGE_PACK.md#enable-and-convert), or
 [Sonic CD setup guide](docs/SONIC_CD.md#convert-your-owned-disc).
-The CD import currently also needs Python and Pillow, as explained in its guide.
+Its CD import also needs Python and Pillow, as explained in its guide.
 
 ## Make it your own
 
 - **Controls:** set up your keyboard or controller in the launcher.
-- **Widescreen:** enable **Mods → Widescreen** and choose **Adaptive** to fit
+- **Widescreen:** fresh profiles default to **Mods → Widescreen → Adaptive** to fit
   the game to your window, or select a fixed screen shape.
 - **Knuckles & Knuckles:** enable the mod and play as Knuckles with a crowd
   following you. Choose 1–74 extras; additional local controllers can join in.

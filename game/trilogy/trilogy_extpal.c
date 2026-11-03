@@ -29,11 +29,13 @@ void tri_ext_tiles(uint32_t tile, uint32_t n, int on)
         s_tiles[(tile + k) & 0x7FF] = on ? 1 : 0;
 }
 
-/* A level (re)starting (tri_obj_level_entry): the last load's flags would
- * otherwise colour the title card's tiles until this act's art is uploaded */
+/* A level (re)starting releases scenery/UI tags before new art is uploaded.
+ * Character line3 has a separate owner: bonus selection can precede the
+ * outgoing fade, so retain it until that owner republishes or retires it. */
 void tri_ext_clear_tiles(void)
 {
-    memset(s_tiles, 0, sizeof s_tiles);
+    for(unsigned k=0;k<sizeof s_tiles;k++)
+        if(s_tiles[k]!=3 && s_tiles[k]!=(GVDP_EXT_SPRITE_FORCE|3))s_tiles[k]=0;
     memset(s_plane_tiles, 0, sizeof s_plane_tiles);
 }
 

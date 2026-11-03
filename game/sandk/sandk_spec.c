@@ -1,5 +1,5 @@
 /*
- * sandk_spec.c — GameSpec for Sonic & Knuckles (USA/World, 1994), STANDALONE.
+ * sandk_spec.c â€” GameSpec for Sonic & Knuckles (USA/World, 1994), STANDALONE.
  *
  * ROM layout:  flat 2 MB at $000000-$1FFFFF, identity-mapped (no lock-on,
  *              no bank-switching). File offset == runtime address. When nothing
@@ -21,6 +21,7 @@
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
 #include "sonic3_knuckles_army.h"
 #include "sonic3_mods.h"
+#include "sonic3_gameplay.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
 
@@ -31,7 +32,7 @@
 #include <stdlib.h>
 
 #if OWN_BACKEND
-#include "backend_decls.h"   /* own decls — native builds have no clownmdemu paths */
+#include "backend_decls.h"   /* own decls â€” native builds have no clownmdemu paths */
 #else
 #include "clownmdemu.h"
 #endif
@@ -48,14 +49,17 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static void sandk_call_entry_point(void) { s3_army_init(); recomp_call_addr(0x000206u); }
 static void sandk_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
-static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); }
+static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); s3_gameplay_load(path,"sandk"); }
+static const struct RecompLauncherCModProvider *sandk_mods(const struct RecompLauncherCModProvider *base)
+{ return s3_gameplay_mods(s3_mods(base)); }
+static int sandk_netplay_allowed(void) { return s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* Mode-aware save-state resume (sonic3k.lst, org 0):
  *   GM $0C Level / $08 Demo -> LevelLoop ($00650C): the per-frame loop top.
  *     Re-entering here continues the level moment-in-time from restored RAM.
  *   Anything else (Sega/title/menus, bonus-stage init) -> 0: fall back to
- *   GameLoop dispatch, which re-runs the mode handler — those states WANT
+ *   GameLoop dispatch, which re-runs the mode handler â€” those states WANT
  *   their init. */
 static uint32_t sandk_save_resume_pc(uint8_t game_mode)
 {
@@ -230,6 +234,17 @@ static const GameDebugCommand sandk_commands[] = {
     { "knuckles_army", s3_army_command },
 };
 
+static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static int gameplay_instruction(uint32_t pc)
+{
+    if(s3_gameplay_owns(pc)) {
+        s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
+        s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
+        if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],1))g_cpu.SR|=4u;
+        return 0;
+    }
+    return s3_sk_instruction_hook(pc);
+}
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
     .state_size             = s3_state_size,
@@ -237,18 +252,19 @@ const GameSpec g_game_spec = {
     .state_load             = s3_state_load,
     .state_at_boundary      = s3_state_at_boundary,
     .video                  = &sonic3_video,
-    .instruction_hook       = s3_sk_instruction_hook,
+    .video_default          = "fit",
+    .instruction_hook       = gameplay_instruction,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras. */
     .logical_players        = 4,
     .load_settings          = sandk_load_settings,
-    .mods                   = s3_mods,
-    .netplay_allowed        = s3_mods_netplay_allowed,
+    .mods                   = sandk_mods,
+    .netplay_allowed        = sandk_netplay_allowed,
     .display_name           = "Sonic & Knuckles",
     .short_name             = "SonicK",
     .boxart                 = "boxart-sonick.tga",
 
-    /* S&K standalone — CRC check skipped (runner CRC calc vs file byteswap
+    /* S&K standalone â€” CRC check skipped (runner CRC calc vs file byteswap
      * unverified); ROM identity is gated by size + external hash check.
      * Expected MD5 of the file is 4ea493ea4e9f6c9ebfccbdb15110367e. */
     .expected_rom_crc32     = 0u,
@@ -257,19 +273,19 @@ const GameSpec g_game_spec = {
     /* No battery SRAM: standalone S&K has no data-select / save game (Start at
      * the title goes straight to Mushroom Hill). The S&K master ROM *contains*
      * the save code, but it runs only when Sonic 3 is locked on (the combined
-     * sonic3k mode) — so sram_start stays 0 and the runtime maps no SRAM here.
+     * sonic3k mode) â€” so sram_start stays 0 and the runtime maps no SRAM here.
      * Confirmed: standalone boot never writes the $200001-$203FFF window. */
 
     .call_entry_point       = sandk_call_entry_point,
     .call_vblank            = sandk_call_vblank,
     .call_hblank            = sandk_call_hblank,
-    .resume_main_loop_pc    = 0x0004B6u,   /* GameLoop — fallback for modes without a loop map */
+    .resume_main_loop_pc    = 0x0004B6u,   /* GameLoop â€” fallback for modes without a loop map */
     .save_resume_pc         = sandk_save_resume_pc,   /* mode -> per-frame loop top */
     .dispatch_main_loop_pc  = 0x0004B6u,   /* GameLoop */
     .call_periodic          = NULL,
 
     .on_post_reset          = NULL,
-    .on_frame_pre           = NULL,
+    .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 

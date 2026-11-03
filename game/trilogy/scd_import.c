@@ -22,6 +22,9 @@
 #ifndef S3_CD_IMPORT_VALIDATOR
 #define S3_CD_IMPORT_VALIDATOR "scd_pack_validate"
 #endif
+#ifndef S3_ROM_IMPORT_SOURCE
+#define S3_ROM_IMPORT_SOURCE "tools/import_campaign.py"
+#endif
 
 static int exists(const char *path) { FILE *f=fopen(path,"rb");if(!f)return 0;fclose(f);return 1; }
 static int join(char *out,size_t n,const char *root,const char *name)
@@ -78,15 +81,15 @@ static void output_chunk(FILE *log,const char *bytes,size_t count,
     }
 }
 
-int s3_cd_import(const char *disc,const char *rom,const char *settings,
+static int media_import(unsigned kind,const char *disc,const char *rom,const char *settings,
                  char content[1024],char music[1024],char *error,size_t capacity,
                  void (*progress)(void *,float,const char *),void *user)
 {
-    char root[1024],cache[1200],receipt[1280],log_path[1280],script[1200],helper[1200];
+    char root[1024],cache[1200],receipt[1280],log_path[1280],script[1200],helper[1200],builder[1200];
     char exe_dir[1024]={0},line[4096],detail[256]={0};int code=1;
     content[0]=music[0]=0;parent(root,sizeof root,settings);
-    if(!rom||!*rom||!disc||!*disc){snprintf(error,capacity,"Select your S3K ROM and owned Sonic CD disc first.");return 0;}
-    if(!join(cache,sizeof cache,root,"sonic-cd-imports"))goto path_error;
+    if(kind<1 || kind>4 || !rom||!*rom||!disc||!*disc){snprintf(error,capacity,"Select your S3K ROM and owned media first.");return 0;}
+    if(!join(cache,sizeof cache,root,kind==4?"sonic-cd-imports":"sonic-rom-imports"))goto path_error;
 #ifdef _WIN32
     unsigned long pid=GetCurrentProcessId();
     if(_mkdir(cache)&&errno!=EEXIST)goto io_error;
@@ -107,12 +110,26 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
 #endif
     if(snprintf(receipt,sizeof receipt,"%s/result-%lu.ini",cache,pid)>=(int)sizeof receipt ||
        snprintf(log_path,sizeof log_path,"%s/import-%lu.log",cache,pid)>=(int)sizeof log_path)goto path_error;
-    if(!join(script,sizeof script,exe_dir,"tools/import_sonic_cd.py"))goto path_error;
+    const char *override=getenv("SONIC3K_IMPORT_HELPER");
+    if(override&&*override) {
+        if(strlen(override)>=sizeof builder)goto path_error;
+        strcpy(builder,override);
+        if(!exists(builder)){snprintf(error,capacity,"The selected import helper is unavailable.");return 0;}
+    } else if(!join(builder,sizeof builder,exe_dir,
+#ifdef _WIN32
+                    "S3KCampaignBuilder.exe"
+#else
+                    "S3KCampaignBuilder"
+#endif
+    ))goto path_error;
+    int bundled=exists(builder);
+    const char *script_name=kind==4?"tools/import_sonic_cd.py":"tools/import_campaign.py";
+    if(!join(script,sizeof script,exe_dir,script_name))goto path_error;
     if(!exists(script)) {
-        if(!join(script,sizeof script,root,"tools/import_sonic_cd.py"))goto path_error;
-        if(!exists(script))snprintf(script,sizeof script,"%s",S3_CD_IMPORT_SOURCE);
+        if(!join(script,sizeof script,root,script_name))goto path_error;
+        if(!exists(script))snprintf(script,sizeof script,"%s",kind==4?S3_CD_IMPORT_SOURCE:S3_ROM_IMPORT_SOURCE);
     }
-    if(!exists(script)){snprintf(error,capacity,"Sonic CD import tools are missing. Extract the complete game package.");return 0;}
+    if(!bundled&&!exists(script)){snprintf(error,capacity,"Import tools are missing. Extract the complete game package.");return 0;}
     if(!join(helper,sizeof helper,exe_dir,
 #ifdef _WIN32
              "scd_pack_validate.exe"
@@ -121,21 +138,29 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
 #endif
     ))goto path_error;
     if(!exists(helper))snprintf(helper,sizeof helper,"%s",S3_CD_IMPORT_VALIDATOR);
-    if(!exists(helper)){snprintf(error,capacity,"Sonic CD import validator is missing beside the game executable.");return 0;}
+    if(kind==4&&!exists(helper)){snprintf(error,capacity,"Sonic CD import validator is missing beside the game executable.");return 0;}
     if(remove(receipt)&&errno!=ENOENT)goto io_error;
     FILE *log=fopen(log_path,"wb");if(!log)goto io_error;
-    if(progress)progress(user,-1,"Checking your owned disc and preparing stages and music...");
+    if(progress)progress(user,-1,kind==4?"Checking your owned disc and preparing stages and music...":"Checking your owned cartridge and preparing its campaign...");
     const char *python=getenv("SONIC3K_PYTHON");
-    const char *args[16]={python&&*python?python:
+    const char *campaigns[]={"","sonic1","sonic2","megamix","sonic_cd"};
+    const char *args[20];unsigned argc=0;
+    args[argc++]=bundled?builder:python&&*python?python:
 #ifdef _WIN32
-        "py.exe",
+        "py.exe";
 #else
-        "python3",
+        "python3";
 #endif
-        script,"--disc",disc,"--s3k",rom,"--out",cache,"--receipt",receipt,"--validator",helper,NULL};
+    if(!bundled)args[argc++]=script;
+    if(bundled || kind!=4){args[argc++]="--campaign";args[argc++]=campaigns[kind];}
+    args[argc++]=!bundled&&kind==4?"--disc":"--source";args[argc++]=disc;
+    args[argc++]="--s3k";args[argc++]=rom;args[argc++]="--out";args[argc++]=cache;
+    args[argc++]="--receipt";args[argc++]=receipt;
+    if(kind==4){args[argc++]="--validator";args[argc++]=helper;}
+    args[argc]=NULL;
 #ifdef _WIN32
     wchar_t executable[32768],command[32768]={0},part[4096];size_t used=0;
-    int python_launcher=!(python&&*python);
+    int python_launcher=!bundled&&!(python&&*python);
     HANDLE rd=NULL,wr=NULL;SECURITY_ATTRIBUTES sa={sizeof sa,NULL,TRUE};
     PROCESS_INFORMATION process={0};STARTUPINFOW start={sizeof start};
     int found=wide(args[0],part,4096)&&SearchPathW(NULL,part,NULL,32768,executable,NULL);
@@ -146,7 +171,7 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
     /* WindowsApps' python.exe can open the Store. Prefer the installed Python
      * launcher and never activate that alias from a background import. */
     if(!found||wcsstr(executable,L"\\Microsoft\\WindowsApps\\python.exe")) {
-        fclose(log);snprintf(error,capacity,"Install Python 3.11+ and Pillow, or set SONIC3K_PYTHON to your Python executable.");return 0;
+        fclose(log);snprintf(error,capacity,"Import helper unavailable. Extract the complete game package.");return 0;
     }
     for(unsigned i=0;args[i];i++) {
         if(!wide(args[i],part,4096)||!argument(command,32768,&used,part)) {
@@ -166,7 +191,7 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
     start.hStdInput=CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&sa,OPEN_EXISTING,0,NULL);
     int launched=CreateProcessW(executable,command,NULL,NULL,TRUE,CREATE_NO_WINDOW,NULL,NULL,&start,&process)!=0;
     CloseHandle(wr);if(start.hStdInput!=INVALID_HANDLE_VALUE)CloseHandle(start.hStdInput);
-    if(!launched){CloseHandle(rd);fclose(log);snprintf(error,capacity,"Unable to start the Sonic CD importer. Check your Python installation.");return 0;}
+    if(!launched){CloseHandle(rd);fclose(log);snprintf(error,capacity,"Unable to start the owned-media importer.");return 0;}
     /* A console host or descendant can retain stdout after Python exits.
      * Completion belongs to this child, not to every inherited pipe handle.
      * Read only available bytes, then drain the final snapshot on child exit. */
@@ -225,17 +250,32 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
     GetExitCodeProcess(process.hProcess,&exit_code);code=(int)exit_code;
     CloseHandle(process.hThread);CloseHandle(process.hProcess);
 #endif
-    if(code){snprintf(error,capacity,"%s See %s",*detail?detail:"Sonic CD import failed (Python 3.11+ and Pillow required).",log_path);return 0;}
-    FILE *result=fopen(receipt,"rb");if(!result)goto io_error;int format=0;
+    if(code){snprintf(error,capacity,"%s See %s",*detail?detail:"Owned-media import failed.",log_path);return 0;}
+    FILE *result=fopen(receipt,"rb");if(!result)goto io_error;int format=0,audio_absent=0;
     while(fgets(line,sizeof line,result)) {
         line[strcspn(line,"\r\n")]=0;
         if(!strcmp(line,"format=1"))format=1;
+        else if(kind==4&&!strcmp(line,"audio=absent"))audio_absent=1;
         else if(!strncmp(line,"content=",8)&&strlen(line+8)<1024)strcpy(content,line+8);
-        else if(!strncmp(line,"music=",6)&&strlen(line+6)<1024)strcpy(music,line+6);
+        else if(kind==4&&!strncmp(line,"music=",6)&&strlen(line+6)<1024)strcpy(music,line+6);
+        else if(kind==3&&!strncmp(line,"rom=",4)&&strlen(line+4)<1024)strcpy(music,line+4);
     }
     fclose(result);remove(receipt);
-    if(format&&*content&&*music)return 1;
-    snprintf(error,capacity,"Sonic CD importer returned an incomplete installation; previous selection retained.");return 0;
-path_error:snprintf(error,capacity,"Sonic CD import path is too long or invalid.");return 0;
-io_error:snprintf(error,capacity,"Unable to read or write the private Sonic CD import directory.");return 0;
+    if(format&&*content&&((kind==1||kind==2)||*music||(kind==4&&audio_absent)))return 1;
+    snprintf(error,capacity,"Importer returned an incomplete installation; previous selection retained.");return 0;
+path_error:snprintf(error,capacity,"Import path is too long or invalid.");return 0;
+io_error:snprintf(error,capacity,"Unable to read or write the private import directory.");return 0;
+}
+
+int s3_cd_import(const char *disc,const char *rom,const char *settings,
+                 char content[1024],char music[1024],char *error,size_t capacity,
+                 void (*progress)(void *,float,const char *),void *user)
+{return media_import(4,disc,rom,settings,content,music,error,capacity,progress,user);}
+
+int s3_rom_import(unsigned kind,const char *source,const char *rom,const char *settings,
+                  char content[1024],char donor[1024],char *error,size_t capacity,
+                  void (*progress)(void *,float,const char *),void *user)
+{
+    if(kind<1 || kind>3){snprintf(error,capacity,"Unsupported cartridge campaign.");return 0;}
+    return media_import(kind,source,rom,settings,content,donor,error,capacity,progress,user);
 }

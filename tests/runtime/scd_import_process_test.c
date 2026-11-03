@@ -24,6 +24,16 @@ int main(int argc,char **argv)
         fprintf(stderr,"Success receipt/progress failed: %s\n",ok?"unexpected result":error);return 1;
     }
     if(seconds()-began>=4){fputs("Waited for inherited stdout instead of the importer process.\n",stderr);return 1;}
+    ok=s3_cd_import("data-only.iso","fixture-rom.bin",argv[1],content,music,
+                   error,sizeof error,NULL,NULL);
+    if(!ok||strcmp(content,"fixture-content.pak")||*music) {
+        fprintf(stderr,"Declared data-only receipt failed: %s\n",error);return 1;
+    }
+    ok=s3_cd_import("incomplete.iso","fixture-rom.bin",argv[1],content,music,
+                   error,sizeof error,NULL,NULL);
+    if(ok||!strstr(error,"incomplete")) {
+        fputs("Undeclared missing music was accepted.\n",stderr);return 1;
+    }
     began=seconds();
     ok=s3_cd_import("failure.cue","fixture-rom.bin",argv[1],content,music,
                      error,sizeof error,NULL,NULL);

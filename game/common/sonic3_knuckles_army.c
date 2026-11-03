@@ -773,6 +773,7 @@ void s3_army_vblank(void)
 {
     /* The SAT built with this capture is uploaded by this V-int. */
     shown = published;
+    s3_video_set_actor_interpolation_blocked(shown.count!=0);
     s3_title_vblank(&g_machine.vdp, title_enabled());
     gvdp_set_host_sprites(shown.count || (title_enabled() && s3_title_active()) ? host_sprites : NULL, NULL);
     /* Lag telemetry, sampled at the IRQ like the family renderer's. */
@@ -816,7 +817,7 @@ void s3_army_state(S3StateIO *io)
     S3_STATE(io, shown);
     S3_STATE(io, lag_ticks); S3_STATE(io, vblank_ticks);
     S3_STATE(io, last_tick); S3_STATE(io, was_active);
-    if (io->mode == 2) { inside_actor = -1; inside_solid = 0; }
+    if (io->mode == 2) { inside_actor = -1; inside_solid = 0; s3_video_set_actor_interpolation_blocked(shown.count!=0); }
 }
 /* Each extra is a full native Knuckles tick charged at 68K speed; a crowd
  * would otherwise turn every frame into a lag frame. LevelLoop still waits
