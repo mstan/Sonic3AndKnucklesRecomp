@@ -18,6 +18,9 @@ typedef void (*S3VideoActorOverlay)(const struct GVDP *v, int line, uint32_t *ou
                                     int origin, const uint32_t *palette, uint8_t *priority,
                                     int camera_x, int camera_y);
 void s3_video_set_actor_overlay(S3VideoActorOverlay draw);
+/* Until an extra-actor provider owns fractional poses, keep its completed
+ * picture intact. Presentation only; this flag is not canonical state. */
+void s3_video_set_actor_interpolation_blocked(int blocked);
 
 /* Game-owned expansion-stage ring layouts and Data Select previews. */
 typedef unsigned (*S3VideoRingLayout)(void);

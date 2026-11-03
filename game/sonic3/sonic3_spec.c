@@ -1,5 +1,5 @@
 /*
- * sonic3_spec.c — GameSpec for Sonic the Hedgehog 3 (USA, 1994), STANDALONE.
+ * sonic3_spec.c â€” GameSpec for Sonic the Hedgehog 3 (USA, 1994), STANDALONE.
  *
  * ROM layout:  flat 2 MB at $000000-$1FFFFF, identity-mapped (no lock-on,
  *              no bank-switching). File offset == runtime address.
@@ -9,13 +9,14 @@
  *   VInt  (VBlank ISR) = $000802   (vector $78 -> VInt)
  *   HInt  (HBlank ISR) = $000F9E   (vector $70 -> JmpTo_HInt -> RAM H_int_addr)
  *
- * All addresses verified against skdisasm s3.lst. This is "Sonic 3 mode" —
+ * All addresses verified against skdisasm s3.lst. This is "Sonic 3 mode" â€”
  * the clean single-ROM target; S&K-alone and S3K-locked-on are separate specs.
  */
 #include "game_spec.h"
 #include "genesis_runtime.h"
 #include "sonic_extras.h"
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
+#include "sonic3_gameplay.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -27,7 +28,7 @@
 #include <stdlib.h>
 
 #if OWN_BACKEND
-#include "backend_decls.h"   /* own decls — native builds have no clownmdemu paths */
+#include "backend_decls.h"   /* own decls â€” native builds have no clownmdemu paths */
 #else
 #include "clownmdemu.h"
 #endif
@@ -47,7 +48,7 @@ static void s3_call_vblank(void)      { s3_video_vblank(); recomp_call_addr(0x00
 static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
 
 /* Mode-aware save-state resume (s3.asm, addresses from s3.lst org 0):
- *   GM $0C Level / $08 Demo -> LevelLoop  ($004B0C): the per-frame loop —
+ *   GM $0C Level / $08 Demo -> LevelLoop  ($004B0C): the per-frame loop â€”
  *     "bsr Pause_Game / Wait_VSync / Process_Sprites / ... / cmpi.b #$C,
  *      (Game_mode) / beq LevelLoop". Re-entering here continues the level
  *     moment-in-time from the restored RAM.
@@ -55,7 +56,7 @@ static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
  *     loop ("bsr Pause_Game / ... / cmpi.b #$34,(Game_mode) / beq loc_77D2").
  *   Anything else (Sega/title/menus, SS init modes $2C/$30, or any mode with
  *   the bit-7 reinit flag, e.g. $88) -> 0: fall back to GameLoop dispatch,
- *   which re-runs the mode handler — those states WANT their init. */
+ *   which re-runs the mode handler â€” those states WANT their init. */
 static uint32_t s3_save_resume_pc(uint8_t game_mode)
 {
     switch (game_mode) {
@@ -229,16 +230,32 @@ static const GameDebugCommand s3_commands[] = {
     { "object_table", s3_cmd_object_table },
 };
 
+static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static int gameplay_instruction(uint32_t pc)
+{
+    if(s3_gameplay_owns(pc)) {
+        s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
+        s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
+        if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],1))g_cpu.SR|=4u;
+        return 0;
+    }
+    return s3_video_hook(pc);
+}
+static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); }
 const GameSpec g_game_spec = {
+    .load_settings          = gameplay_settings,
+    .mods                   = s3_gameplay_mods,
+    .netplay_allowed        = s3_gameplay_netplay_allowed,
     .video                  = &sonic3_video,
-    .instruction_hook       = s3_video_hook,
+    .video_default          = "fit",
+    .instruction_hook       = gameplay_instruction,
     .main_cpu_divisor       = s3_video_main_cpu_divisor,
     .display_name           = "Sonic 3",
     .short_name             = "Sonic3",
     .boxart                 = "boxart-sonic3.tga",
 
     /* Sonic 3 USA standalone. The launcher computes CRC32 over the RAW ROM file
-     * (No-Intro CRC = 0x9BC192CE) and shows a MATCH badge — this is independent
+     * (No-Intro CRC = 0x9BC192CE) and shows a MATCH badge â€” this is independent
      * of the runner's internal byteswapped-buffer CRC path. */
     .expected_rom_crc32     = 0x9BC192CEu,
     .expected_rom_size      = 0x200000u,   /* 2 MB standalone cart */
@@ -249,13 +266,13 @@ const GameSpec g_game_spec = {
     .call_entry_point       = s3_call_entry_point,
     .call_vblank            = s3_call_vblank,
     .call_hblank            = s3_call_hblank,
-    .resume_main_loop_pc    = 0x000734u,   /* GameLoop — fallback for modes without a loop map */
+    .resume_main_loop_pc    = 0x000734u,   /* GameLoop â€” fallback for modes without a loop map */
     .save_resume_pc         = s3_save_resume_pc,   /* mode -> per-frame loop top (moment-in-time) */
     .dispatch_main_loop_pc  = 0x000734u,   /* GameLoop */
     .call_periodic          = NULL,
 
     .on_post_reset          = NULL,
-    .on_frame_pre           = NULL,
+    .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 

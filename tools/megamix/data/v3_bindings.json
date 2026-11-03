@@ -1,0 +1,379 @@
+{
+  "blobs": {
+    "0": {
+      "address": 52930,
+      "method": "repeat2",
+      "size": 48
+    },
+    "11": {
+      "address": 24734,
+      "method": "raw",
+      "size": 66
+    },
+    "12": {
+      "address": 24888,
+      "method": "raw",
+      "size": 64
+    },
+    "13": {
+      "address": 889680,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 768
+    },
+    "14": {
+      "address": 890448,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 1536
+    },
+    "15": {
+      "address": 891984,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 768
+    },
+    "16": {
+      "address": 66642,
+      "method": "raw",
+      "size": 76
+    },
+    "17": {
+      "address": 66718,
+      "method": "raw",
+      "size": 44
+    },
+    "18": {
+      "address": 66762,
+      "method": "raw",
+      "size": 76
+    },
+    "21": {
+      "address": 7582,
+      "method": "raw",
+      "size": 48
+    },
+    "24": {
+      "address": 95146,
+      "method": "repeat2",
+      "size": 48
+    },
+    "25": {
+      "address": 95194,
+      "method": "repeat2",
+      "size": 48
+    },
+    "28": {
+      "address": 7546,
+      "method": "raw",
+      "size": 36
+    },
+    "29": {
+      "address": 892752,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 2688
+    },
+    "30": {
+      "address": 892752,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 2688
+    },
+    "5": {
+      "address": 40172,
+      "method": "raw",
+      "size": 256
+    },
+    "6": {
+      "address": 886992,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 512
+    },
+    "7": {
+      "address": 887504,
+      "method": "tiles",
+      "palette_line": 1,
+      "size": 1024
+    },
+    "8": {
+      "address": 888528,
+      "method": "tiles",
+      "palette_line": 2,
+      "size": 1152
+    }
+  },
+  "format": 1,
+  "platforms": [
+    {
+      "address": 943870,
+      "size": 50
+    },
+    {
+      "address": 943920,
+      "size": 50
+    },
+    {
+      "address": 943970,
+      "size": 50
+    },
+    {
+      "address": 944020,
+      "size": 50
+    },
+    {
+      "address": 944070,
+      "size": 74
+    },
+    {
+      "address": 944144,
+      "size": 56
+    },
+    {
+      "address": 943870,
+      "size": 50
+    },
+    {
+      "address": 943920,
+      "size": 50
+    },
+    {
+      "address": 966868,
+      "size": 50
+    },
+    {
+      "address": 966918,
+      "size": 50
+    },
+    {
+      "address": 966968,
+      "size": 50
+    },
+    {
+      "address": 967018,
+      "size": 50
+    },
+    {
+      "address": 967068,
+      "size": 50
+    },
+    {
+      "address": 967118,
+      "size": 50
+    },
+    {
+      "address": 966868,
+      "size": 50
+    },
+    {
+      "address": 966918,
+      "size": 50
+    }
+  ],
+  "proof": "Addresses and lengths only. Unchanged v3-owned payloads and palette transforms match the qualified full-bank converter; blob4 uses the existing native Megamix descriptor override.",
+  "rom_sha256": "85d9e9ba79f0035d5854618666ff198871abe1931558496e6563b1cd90e5cdbe",
+  "symbols": {
+    "Ani_ADoor": 54052,
+    "Ani_Bas": 89174,
+    "Ani_Bomb": 95854,
+    "Ani_Bump": 82948,
+    "Ani_Burro": 65892,
+    "Ani_Buzz": 58384,
+    "Ani_Chop": 65240,
+    "Ani_Crab": 57606,
+    "Ani_Eggman": 129386,
+    "Ani_Elec": 120316,
+    "Ani_FZEgg": 140620,
+    "Ani_Fire": 81380,
+    "Ani_Flame": 81634,
+    "Ani_Flap": 93760,
+    "Ani_GFire": 67090,
+    "Ani_Geyser": 85026,
+    "Ani_Harp": 96744,
+    "Ani_Hog": 55340,
+    "Ani_Jaws": 65416,
+    "Ani_LWall": 85072,
+    "Ani_Missile": 58402,
+    "Ani_Moto": 86416,
+    "Ani_Newt": 79910,
+    "Ani_Orb": 96572,
+    "Ani_PLaunch": 142264,
+    "Ani_Plasma": 142318,
+    "Ani_Pri": 143132,
+    "Ani_Roll": 80540,
+    "Ani_SEgg": 138106,
+    "Ani_Sign": 83622,
+    "Ani_Spin": 117960,
+    "Ani_SpinConvey": 121040,
+    "Ani_Van": 120130,
+    "Ani_WFall": 99806,
+    "Ani_Yad": 86826,
+    "Map_ADoor": 54080,
+    "Map_BBall": 91340,
+    "Map_BSBall": 135752,
+    "Map_Bas": 89194,
+    "Map_Bomb": 95886,
+    "Map_Bonus": 125218,
+    "Map_BossBlock": 137590,
+    "Map_BossItems": 129666,
+    "Map_Bri": 49786,
+    "Map_Brick": 82476,
+    "Map_Bump": 82964,
+    "Map_Burro": 65916,
+    "Map_But": 70160,
+    "Map_Buzz": 58414,
+    "Map_CFlo": 53400,
+    "Map_CStom": 69302,
+    "Map_Cat": 123324,
+    "Map_Chop": 65258,
+    "Map_Circ": 92334,
+    "Map_Crab": 57660,
+    "Map_Disc": 91010,
+    "Map_Edge": 80738,
+    "Map_EggCyl": 141294,
+    "Map_Eggman": 129466,
+    "Map_Elec": 120340,
+    "Map_Elev": 92020,
+    "Map_FBlock": 90412,
+    "Map_FFloor": 138890,
+    "Map_FZDamaged": 140626,
+    "Map_FZLegs": 140692,
+    "Map_Fan": 94318,
+    "Map_Fire": 67252,
+    "Map_Flame": 81690,
+    "Map_Flap": 93776,
+    "Map_GBall": 51956,
+    "Map_Gar": 97668,
+    "Map_Geyser": 85080,
+    "Map_Gird": 121456,
+    "Map_Glass": 67904,
+    "Map_Harp": 96768,
+    "Map_Hel": 51008,
+    "Map_Hog": 55366,
+    "Map_Jaws": 65424,
+    "Map_Jun": 116406,
+    "Map_LBlock": 97320,
+    "Map_LConv": 98552,
+    "Map_LGrass": 67098,
+    "Map_LWall": 85820,
+    "Map_Ledge": 52978,
+    "Map_Light": 82602,
+    "Map_MBlock": 88694,
+    "Map_MBlockLZ": 88780,
+    "Map_Missile": 58648,
+    "Map_Moto": 86446,
+    "Map_Newt": 79950,
+    "Map_Orb": 96586,
+    "Map_PLaunch": 142286,
+    "Map_PRock": 76002,
+    "Map_Plasma": 142366,
+    "Map_Plat_GHZ": 51846,
+    "Map_Plat_SLZ": 51940,
+    "Map_Plat_SYZ": 51922,
+    "Map_Pole": 93568,
+    "Map_Pri": 143140,
+    "Map_Push": 71250,
+    "Map_Pylon": 92866,
+    "Map_Roll": 80564,
+    "Map_SBall": 91010,
+    "Map_SBall2": 91018,
+    "Map_SEgg": 138156,
+    "Map_SSawBall": 95308,
+    "Map_SStom": 69570,
+    "Map_Saw": 118716,
+    "Map_Scen": 53672,
+    "Map_Seesaw": 95242,
+    "Map_Sign": 83650,
+    "Map_Smab": 88064,
+    "Map_Smash": 76556,
+    "Map_Spike": 75708,
+    "Map_Spin": 118110,
+    "Map_Stair": 92776,
+    "Map_Stomp": 119692,
+    "Map_Surf": 93104,
+    "Map_Swing_GHZ": 50576,
+    "Map_Swing_SLZ": 50606,
+    "Map_Trap": 118020,
+    "Map_VanP": 120150,
+    "Map_WFall": 99814,
+    "Map_Yad": 86844,
+    "Nem_Ball": 199488,
+    "Nem_BallHog": 224364,
+    "Nem_Basaran": 235524,
+    "Nem_Bomb": 236872,
+    "Nem_Bonus": 255398,
+    "Nem_Bridge": 199180,
+    "Nem_Bumper": 218208,
+    "Nem_Burrobot": 227990,
+    "Nem_Buzz": 226586,
+    "Nem_Cater": 238006,
+    "Nem_Chopper": 229744,
+    "Nem_Cork": 210258,
+    "Nem_Crabmeat": 225324,
+    "Nem_Cutter": 220294,
+    "Nem_Eggman": 574280,
+    "Nem_Electric": 222606,
+    "Nem_Exhaust": 584680,
+    "Nem_Fan": 216390,
+    "Nem_FlamePipe": 223270,
+    "Nem_FlapDoor": 204544,
+    "Nem_FzBoss": 581376,
+    "Nem_FzEggman": 583272,
+    "Nem_Gargoyle": 208882,
+    "Nem_GhzWall1": 201160,
+    "Nem_GhzWall2": 201318,
+    "Nem_Girder": 224086,
+    "Nem_Harpoon": 206846,
+    "Nem_Jaws": 230354,
+    "Nem_Lava": 212674,
+    "Nem_LzBlock1": 210556,
+    "Nem_LzBlock3": 206502,
+    "Nem_LzDoor1": 206684,
+    "Nem_LzDoor2": 207294,
+    "Nem_LzPlatfm": 209946,
+    "Nem_LzPole": 207194,
+    "Nem_LzSpikeBall": 204160,
+    "Nem_LzSwitch": 218662,
+    "Nem_LzWheel": 207632,
+    "Nem_Motobug": 232328,
+    "Nem_MzBlock": 215000,
+    "Nem_MzFire": 211940,
+    "Nem_MzGlass": 211672,
+    "Nem_MzMetal": 210828,
+    "Nem_MzSwitch": 211482,
+    "Nem_Newtron": 232958,
+    "Nem_Orbinaut": 237530,
+    "Nem_PplRock": 200858,
+    "Nem_Prison": 577104,
+    "Nem_Pylon": 217068,
+    "Nem_Roller": 231004,
+    "Nem_Sbz2Eggman": 579284,
+    "Nem_SbzBlock": 223016,
+    "Nem_SbzDoor1": 223666,
+    "Nem_SbzDoor2": 223834,
+    "Nem_SbzFloor": 222518,
+    "Nem_SbzWheel1": 219542,
+    "Nem_SbzWheel2": 219626,
+    "Nem_Seesaw": 215492,
+    "Nem_SignPost": 250926,
+    "Nem_SlideFloor": 223746,
+    "Nem_SlzBlock": 217776,
+    "Nem_SlzCannon": 218044,
+    "Nem_SlzSpike": 216064,
+    "Nem_SlzSwing": 217294,
+    "Nem_SlzWall": 216970,
+    "Nem_SpikePole": 200558,
+    "Nem_Spikes": 199902,
+    "Nem_SpinPform": 221224,
+    "Nem_Splash": 201706,
+    "Nem_Stomper": 220810,
+    "Nem_Swing": 198898,
+    "Nem_SyzSpike1": 218888,
+    "Nem_SyzSpike2": 218564,
+    "Nem_TrapDoor": 222040,
+    "Nem_Water": 201414,
+    "Nem_Weapons": 576358,
+    "Nem_Yadrin": 234524
+  }
+}

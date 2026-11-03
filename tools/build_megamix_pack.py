@@ -24,7 +24,7 @@ from megamix.geometry import convert_geometry
 from megamix.mighty import convert_mighty,convert_character
 from megamix.presentation import presentation
 from megamix.signpost import signpost
-from megamix.objects import MegamixObjects,ZONE_NAMES
+from megamix.objects import MegamixObjects,ZONE_NAMES,bound_metadata
 from build_stage_pack import verify
 from s1_music import build_music
 from s1_objects import asset_mappings,_piece_ranges,_retile,ASSET_COUNT,ASSET_REC
@@ -319,27 +319,58 @@ def upgrade_presentation(source,donor,s3k):
     data=bytes(bank.data)
     return data+struct.pack('>4sII',b'SPK2',len(data),zlib.crc32(data))
 
-def main():
+def standalone_base(s3k,donor,directory):
+    """Common resources from this owner's S3K/v3 only, with no S1/S2 levels."""
+    metadata=bound_metadata(donor)
+    with tempfile.TemporaryDirectory(prefix='megamix-base-',dir=directory)as temp:
+        target=Path(temp)/'common.bin'
+        bb.main(['--s3k',str(s3k),'--zones','','--out',str(target)])
+        source=target.read_bytes()
+    bank=bb.Bank();bank.data=bytearray(source)
+    ptr=bb.be32(source,0x20)-bb.BANK_BASE
+    blobs=[bb.be32(source,ptr+i*4) for i in range(54)]
+    tables={0:bb.L0_MAP,1:bb.L1_PERM,2:list(range(16)),3:list(range(16))}
+    for key,spec in metadata['blobs'].items():
+        raw=donor.blob(spec['address'],spec['size'])
+        if spec['method']=='repeat2':raw=bytes(b for v in raw for b in (v,v))
+        elif spec['method']=='tiles':raw=bb.remap_tile(raw,tables[spec['palette_line']])
+        elif spec['method']!='raw':raise ValueError('Unsupported common resource binding')
+        blobs[int(key)]=bank.add(raw)
+    header,body=bytearray(),bytearray()
+    for spec in metadata['platforms']:
+        header+=struct.pack('>H',32+len(body));body+=donor.blob(spec['address'],spec['size'])
+    blobs[26]=bank.add(header+body)
+    # LZ wobble is supplied by the existing versioned Megamix descriptor,
+    # not the absent retail S1 table. Other common assets above are proven
+    # byte-identical after their existing palette/height transformations.
+    struct.pack_into('>I',bank.data,0x20,bank.add(b''.join(struct.pack('>I',p)for p in blobs)))
+    data=bank.finish()
+    return data+struct.pack('>4sII',b'SPK1',len(data),zlib.crc32(data))
+
+def main(argv=None):
     ap=argparse.ArgumentParser(description=__doc__)
-    for key in ('base-bank','s3k','megamix','out'):ap.add_argument('--'+key,required=True,type=Path)
+    for key in ('s3k','megamix','out'):ap.add_argument('--'+key,required=True,type=Path)
+    ap.add_argument('--base-bank',type=Path)
     ap.add_argument('--s1',type=Path)
     ap.add_argument('--upgrade-presentation',action='store_true',help='Upgrade existing SPK2 character/background resources without reconverting stages')
-    args=ap.parse_args()
+    args=ap.parse_args(argv)
     inputs=[p for p in (args.base_bank,args.s1,args.s3k,args.megamix) if p]
     if args.out.resolve() in {p.resolve() for p in inputs}:raise ValueError('Output must differ from every input')
     donor=MegamixV3(load_rom(args.megamix));s3k=verify(args.s3k,'s3k')
+    args.out.parent.mkdir(parents=True,exist_ok=True)
     if args.upgrade_presentation:
+        if not args.base_bank:ap.error('--upgrade-presentation needs --base-bank')
         data=upgrade_presentation(args.base_bank.read_bytes(),donor,s3k)
         stages=[];mighty=dict(status='existing verified stages retained; independent character UI and source background resources added')
     else:
-        if not args.s1:ap.error('--s1 is required for a full stage conversion')
-        data,stages,mighty=extend(args.base_bank.read_bytes(),donor,verify(args.s1,'s1'),s3k)
-    args.out.parent.mkdir(parents=True,exist_ok=True)
+        source=args.base_bank.read_bytes() if args.base_bank else standalone_base(args.s3k,donor,args.out.parent)
+        data,stages,mighty=extend(source,donor,verify(args.s1,'s1') if args.s1 else None,s3k)
     with tempfile.NamedTemporaryFile(dir=args.out.parent,delete=False) as f:
         temporary=Path(f.name);f.write(data)
     os.replace(temporary,args.out)
     args.out.with_suffix('.manifest.json').write_text(json.dumps(dict(stages=stages,mighty=mighty,
         status='runtime integration and gameplay acceptance in progress'),indent=2)+'\n',encoding='utf-8')
     print('Megamix bank:',args.out,len(data),'bytes')
+    return 0
 
 if __name__=='__main__':main()

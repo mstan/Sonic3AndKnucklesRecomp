@@ -1,14 +1,9 @@
 # Optional Megamix v3 stages, Mighty and Shadow
 
-`feature/megamix-after-s3k` extends the audited Sonic 1/2 pack with all
-**19 Mega Drive Megamix v3 acts** and selectable **Mighty**. Campaign order:
-**Sonic 1 → Sonic 2 → Sonic 3 & Knuckles → Megamix**. The game keeps its
-existing name; the additions are disabled by default.
-
-This child starts from `c2d9f37eaec2e1befd025d8fcb637b8057e24de9` on
-`feature/imported-stage-packs`. Its engine adds an optional sprite bank at
-`c17a6a48d82466ad1fbb5c2f31223d6b1652cfa3`. The audited parent still pins
-`aeaff277c9838d07ec65512d12ea3adff8c119c9`.
+The optional campaign adds all **19 Mega Drive Megamix v3 acts**, with
+independent **Mighty** and **Shadow** character options. Campaign order is
+**Sonic 1 → Sonic 2 → Sonic CD → Sonic 3 & Knuckles → Megamix** when all
+campaigns are enabled. The additions are disabled by default.
 
 ## Enable and convert
 
@@ -17,8 +12,16 @@ On recomp-ui's Mods page, **Sonic Megamix stages (Experimental)**,
 checkboxes. Enable either character without adding stages, or stages without
 adding either character. Sonic 1 and Sonic 2 remain independent too.
 
-All three Megamix entries require your own **Sonic Megamix v3 ROM**. Choose
-its raw BIN/MD/GEN file; extract ZIP archives first. This path and the locally
+All three Megamix entries require your own **Sonic Megamix v3 ROM**.
+**v0.7.0 and later** accept its raw BIN/MD/GEN file or ROM ZIP
+under **Files** and automatically prepare the campaign and character resources.
+The packaged offline helper requires no Python/Pillow installation and no
+Sonic 1 or Sonic 2 cartridge. It retains the verified raw Megamix ROM in the
+private cache for runtime donor artwork. A failed import retains old resources
+and native progress. Select **PLAY** after completion to save your choices.
+
+In **published v0.6.4**, extract ROM ZIPs first and prepare the content pack
+using the developer commands below. The raw-ROM path and the locally
 converted content-pack path are shared automatically across all three entries.
 The ROM is checked at selection and every boot (1,283,224 bytes, CRC32
 `66ECB4F4`). Missing/invalid ROMs cannot be replaced by a converted pack;
@@ -30,6 +33,16 @@ base bank with `tools/build_stage_pack.py`, then extend it:
 ```text
 python tools/build_megamix_pack.py --base-bank sonic1-2-stages.bin --s1 sonic1.bin --s3k sonic3k.bin --megamix "sonic-1-megamix-v3.0 (1).zip" --out sonic-megamix-stages.bin
 ```
+
+The development converter can also build Megamix alone, without a base bank
+or retail Sonic 1/2 input:
+
+```text
+python tools/build_megamix_pack.py --s3k sonic3k.bin --megamix megamix-v3.bin --out megamix-stages.bin
+```
+
+Its verified v3 address bindings contain metadata only; every donor asset is
+read from the supplied ROM. Existing combined-bank conversion remains supported.
 
 Export `mods/megamix-stages.pak` with
 `python tools/split_campaign_packs.py --bank sonic-megamix-stages.bin --content megamix --out mods`

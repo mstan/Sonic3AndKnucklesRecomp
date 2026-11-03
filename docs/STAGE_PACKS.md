@@ -19,6 +19,26 @@ For the separate owned-disc conversion and its 70 act/time variants, see
 
 ## Build your stage bank
 
+### Direct import in v0.7.0 and later
+
+In **Mods**, open the campaign's **Files** and select your supported Sonic 1
+or Sonic 2 ROM, or a ZIP containing it. The complete package includes an
+offline converter; players do not install Python or Pillow. Wait for the
+verified campaign to appear, enable the desired campaign and select **PLAY**.
+Each import uses only that campaign's cartridge and the selected S3K cartridge.
+No other campaign cartridge or previously prepared bank is required.
+
+Converted files stay in a private `sonic-rom-imports` cache beside settings.
+Cache identities include the source cartridges and converter version, so a
+new converter prepares fresh resources. Failed conversion or verification
+leaves the selected resources, switches, SRAM and campaign journal unchanged.
+ROM ZIP entries are read with size/count limits; archive paths are never
+extracted. Inputs are never modified. Megamix uses the same workflow; see
+[its guide](MEGAMIX_STAGE_PACK.md#enable-and-convert).
+
+The following command-line workflow remains available for developers and
+published v0.6.4. It requires Python and Pillow on the conversion machine.
+
 When upgrading to v0.6.4, rebuild Sonic 1 packs with the new tools for the
 Marble Zone window and Spring Yard scenery color corrections. Existing packs
 still load, but retain their old converted colors. Rebuilding does not change
@@ -32,6 +52,9 @@ run the following from the source checkout, supplying your own ROM paths:
 python tools/build_stage_pack.py --s1 sonic1.bin --s2 sonic2.bin --s3k sonic3k.bin --out sonic1-2-stages.bin
 ```
 
+In development builds, omit `--s2` for a Sonic 1-only bank, or omit `--s1`
+for a Sonic 2-only bank. Both inputs retain the original combined-bank output.
+
 Export independent packs from that converted bank:
 
 ```text
@@ -43,8 +66,10 @@ Sonic 1 and Sonic 2 each have their own **Campaign content pack** resource.
 Megamix stages, Mighty and Shadow share one **Campaign content pack** and one
 required **Sonic Megamix v3 ROM** resource. Selecting either path from any of
 these three entries fills it in all three immediately, including after restart.
-The raw ROM (.bin/.md/.gen) must be 1,283,224 bytes with CRC32 `66ECB4F4`;
-extract ZIP archives first. The picker verifies it and boot verifies it again.
+The raw ROM (.bin/.md/.gen) must be 1,283,224 bytes with CRC32 `66ECB4F4`.
+Published v0.6.4 requires extracting ROM ZIPs first. Development imports accept
+the ZIP directly and retain its verified raw ROM privately for runtime artwork.
+The picker verifies it and boot verifies it again.
 A converted pack alone cannot activate any Megamix addition. If the ROM is
 removed or invalid, all three fall back safely with settings/progress retained.
 Replacing it restores only the independently selected additions.

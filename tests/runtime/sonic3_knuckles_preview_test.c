@@ -14,8 +14,14 @@ static void predicate_test(void)
     lng(ram,0xCF82,0x69526);
 #ifdef SONIC3_STANDALONE
     CHECK(!s3_knux_preview_needed(ram));
+    lng(ram,0xCF82,0x694D4);CHECK(!s3_knux_preview_needed(ram));
 #else
     CHECK(s3_knux_preview_needed(ram));
+    /* Real capsule-wait controller and the native far-right camera cap:
+     * the ledge enters the margin before automatic approach starts. */
+    lng(ram,0xCF82,0x694D4);word(ram,0xEE80,0x4980);
+    uint8_t before[65536];memcpy(before,ram,sizeof before);
+    CHECK(s3_knux_preview_needed(ram));CHECK(!memcmp(before,ram,sizeof before));
     ram[0xB038]=2;CHECK(!s3_knux_preview_needed(ram));ram[0xB038]=0;
     word(ram,0xFE10,0);CHECK(!s3_knux_preview_needed(ram));
     word(ram,0xFE10,0x2001);CHECK(!s3_knux_preview_needed(ram));word(ram,0xFE10,1);

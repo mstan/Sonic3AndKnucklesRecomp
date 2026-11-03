@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.6.5 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.7.3 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -226,7 +226,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         ${GENERATED_SOURCES}
         "${GAME}/${PREFIX}_spec.c"
     )
-    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c")
+    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
+        "${S3_GAME_COMMON}/sonic3_gameplay.c")
     # Game-owned mods that run S&K code: the combined cart and S&K alone.
     if(NOT PREFIX STREQUAL "sonic3")
         list(APPEND SHARED_SRC
@@ -436,7 +437,16 @@ add_executable(scd_pack_validate tools/scd_pack_validate.c
     game/trilogy/scd_resource.c game/trilogy/scd_pack.c)
 target_include_directories(scd_pack_validate PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 set_source_files_properties("${CMAKE_SOURCE_DIR}/game/trilogy/scd_import.c" PROPERTIES
-    COMPILE_DEFINITIONS "S3_CD_IMPORT_SOURCE=\"${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py\";S3_CD_IMPORT_VALIDATOR=\"$<TARGET_FILE:scd_pack_validate>\"")
+    COMPILE_DEFINITIONS "S3_CD_IMPORT_SOURCE=\"${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py\";S3_ROM_IMPORT_SOURCE=\"${CMAKE_SOURCE_DIR}/tools/import_campaign.py\";S3_CD_IMPORT_VALIDATOR=\"$<TARGET_FILE:scd_pack_validate>\"")
+
+# Optional developer target. Release packagers always freeze/stage this helper;
+# ordinary native builds do not require the PyInstaller/Pillow build packages.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_custom_target(s3_campaign_builder
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/make_campaign_builder.py"
+        --out "$<TARGET_FILE_DIR:Sonic3KRecomp>"
+        --work "${CMAKE_BINARY_DIR}/campaign-builder" --engine-root "${RECOMP_ROOT}"
+    VERBATIM)
 
 option(BUILD_TESTING "Build ROM-independent renderer and framework tests" ON)
 if(BUILD_TESTING)

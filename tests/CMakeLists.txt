@@ -62,10 +62,50 @@ add_executable(trilogy_water_palette_test runtime/trilogy_water_palette_test.c)
 target_include_directories(trilogy_water_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME trilogy_water_palette COMMAND trilogy_water_palette_test)
+add_executable(trilogy_mz_push_test runtime/trilogy_mz_push_test.c)
+target_include_directories(trilogy_mz_push_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+# The fixture includes the real object module; unrelated object handlers are
+# deliberately discarded rather than replaced with permissive test stubs.
+if(MSVC)
+    target_compile_options(trilogy_mz_push_test PRIVATE /Gy)
+    target_link_options(trilogy_mz_push_test PRIVATE /OPT:REF)
+elseif(APPLE)
+    target_compile_options(trilogy_mz_push_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(trilogy_mz_push_test PRIVATE -Wl,-dead_strip)
+else()
+    target_compile_options(trilogy_mz_push_test PRIVATE -ffunction-sections -fdata-sections)
+    target_link_options(trilogy_mz_push_test PRIVATE -Wl,--gc-sections)
+endif()
+add_test(NAME trilogy_mz_push COMMAND trilogy_mz_push_test)
 add_executable(trilogy_syz_palette_test runtime/trilogy_syz_palette_test.c)
 target_include_directories(trilogy_syz_palette_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
 add_test(NAME trilogy_syz_palette COMMAND trilogy_syz_palette_test)
+
+add_executable(trilogy_sign_camera_test runtime/trilogy_sign_camera_test.c)
+target_include_directories(trilogy_sign_camera_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+add_test(NAME trilogy_sign_camera COMMAND trilogy_sign_camera_test)
+
+foreach(_case tail_respawn boss_ball sign_finish)
+    add_executable(trilogy_${_case}_test runtime/trilogy_${_case}_test.c)
+    target_include_directories(trilogy_${_case}_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy"
+        "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/superzazu")
+    add_test(NAME trilogy_${_case} COMMAND trilogy_${_case}_test)
+endforeach()
+foreach(_case boss_ball sign_finish)
+    if(MSVC)
+        target_compile_options(trilogy_${_case}_test PRIVATE /Gy)
+        target_link_options(trilogy_${_case}_test PRIVATE /OPT:REF)
+    elseif(APPLE)
+        target_compile_options(trilogy_${_case}_test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(trilogy_${_case}_test PRIVATE -Wl,-dead_strip)
+    else()
+        target_compile_options(trilogy_${_case}_test PRIVATE -ffunction-sections -fdata-sections)
+        target_link_options(trilogy_${_case}_test PRIVATE -Wl,--gc-sections)
+    endif()
+endforeach()
 add_executable(sonic3_knuckles_preview_test runtime/sonic3_knuckles_preview_test.c)
 target_include_directories(sonic3_knuckles_preview_test PRIVATE "${RUNNER_ROOT}")
 add_test(NAME sonic3_knuckles_preview COMMAND sonic3_knuckles_preview_test)
@@ -94,6 +134,7 @@ target_include_directories(stage_pack_test PRIVATE "${CMAKE_SOURCE_DIR}/game/tri
     "${CMAKE_SOURCE_DIR}/recomp-ui/src" "${RUNNER_ROOT}" "${RUNNER_ROOT}/external/superzazu")
 target_compile_definitions(stage_pack_test PRIVATE RECOMP_LAUNCHER=1
     S3_CD_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_sonic_cd.py"
+    S3_ROM_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_campaign.py"
     S3_CD_IMPORT_VALIDATOR="$<TARGET_FILE:scd_pack_validate>")
 add_test(NAME stage_pack COMMAND stage_pack_test)
 
@@ -101,6 +142,10 @@ add_executable(sonic3_mods_test runtime/sonic3_mods_test.c "${S3_GAME_COMMON}/so
 target_include_directories(sonic3_mods_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
 target_compile_definitions(sonic3_mods_test PRIVATE RECOMP_LAUNCHER=1)
 add_test(NAME sonic3_mods COMMAND sonic3_mods_test)
+add_executable(sonic3_gameplay_test runtime/sonic3_gameplay_test.c "${S3_GAME_COMMON}/sonic3_gameplay.c")
+target_include_directories(sonic3_gameplay_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
+target_compile_definitions(sonic3_gameplay_test PRIVATE RECOMP_LAUNCHER=1)
+add_test(NAME sonic3_gameplay COMMAND sonic3_gameplay_test)
 
 # The renderer test #includes game/common/sonic3_video.c directly and supplies
 # its own guest-memory/TCP stubs; it compiles once per cartridge address profile.
@@ -109,6 +154,9 @@ function(s3_video_test name)
     target_include_directories(${name}_test PRIVATE
         "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
     target_compile_definitions(${name}_test PRIVATE ${ARGN})
+    if(UNIX)
+        target_link_libraries(${name}_test PRIVATE m)
+    endif()
     add_test(NAME ${name} COMMAND ${name}_test)
 endfunction()
 
@@ -151,6 +199,8 @@ if(Python3_Interpreter_FOUND)
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_disc_test.py")
     add_test(NAME scd_import_transaction COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/scd_import_test.py")
+    add_test(NAME campaign_import_transaction COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_LIST_DIR}/runtime/campaign_import_test.py")
     # The Python media reader supports the same explicit engine override as
     # the C/C++ build. Isolated worktrees need not initialize a second engine.
     set_property(TEST scd_resource scd_disc scd_import_transaction APPEND

@@ -170,10 +170,16 @@ static int card_rgb(int camx, int camy, int ox, int oy)
 
 static int cam_y(int x)
 {
-    int i = (x - s_xmin) / PATH_STEP;
-    if (i < 0) i = 0;
-    if (i >= (int)(sizeof s_path / sizeof s_path[0])) i = (int)(sizeof s_path / sizeof s_path[0]) - 1;
-    return s_path[i];
+    if(x<s_xmin)x=s_xmin;
+    if(x>s_xmax)x=s_xmax;
+    int offset=x-s_xmin,i=offset/PATH_STEP;
+    int last=(int)(sizeof s_path/sizeof s_path[0])-1;
+    if(i>=last)return s_path[last];
+    /* The ground path is sampled every32 world pixels, but playback moves
+     * three per tick. Interpolate its bounded targets instead of seeking
+     * vertically by an entire path step when the next knot is reached. */
+    int fraction=offset%PATH_STEP;
+    return (s_path[i]*(PATH_STEP-fraction)+s_path[i+1]*fraction)/PATH_STEP;
 }
 
 /* ---- colours: median cut to 15 --------------------------------------------- */

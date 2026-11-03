@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Read-only replay: Blue Spheres preserves the complete native composition.
+"""Read-only replay: Blue Spheres preserves guest state and native-sized output.
 
-Supply a user-owned save and pristine pre-change executable. Every run has
+Supply a user-owned save and compatible reference executable. Every run has
 isolated SRAM. Never overwrite the input save, edit RAM, or pause the CPU.
 """
 import argparse
@@ -57,6 +57,7 @@ def main():
         case = args.out / mode.replace(":", "-")
         replay(args.exe, args.rom, args.save, case, mode)
         checked, counters, angles, modes, widths = 0, set(), set(), set(), set()
+        projected_margin_frames = 0
         for frame in range(100):
             name = f"frame-{frame}"
             ram = (reference / f"{name}.ram.bin").read_bytes()
@@ -75,14 +76,18 @@ def main():
             elif ram[0xF600] in (0x34, 0x48):
                 native = Image.open(reference / f"{name}.png").convert("RGB")
                 image = Image.open(case / f"{name}.png").convert("RGB")
-                left = (image.width - native.width) // 2
-                assert image.crop((left, 0, left + native.width, native.height)).tobytes() == native.tobytes(), (mode, name, "native special-stage pixels changed")
-                assert not any(image.crop((0, 0, left, image.height)).tobytes()), (mode, name, "left aspect margin")
-                assert not any(image.crop((left + native.width, 0, image.width, image.height)).tobytes()), (mode, name, "right aspect margin")
+                if image.width == native.width:
+                    assert image.tobytes() == native.tobytes(), (mode, name, "native-sized output changed")
+                else:
+                    left = (image.width - native.width) // 2
+                    margins = image.crop((0, 0, left, image.height)).tobytes() + image.crop((left + native.width, 0, image.width, image.height)).tobytes()
+                    projected_margin_frames += ram[0xF600] == 0x34 and any(margins)
         assert checked >= 10 and len(angles) > 1 and len(counters) > 1, ("insufficient replay coverage", checked, angles, counters)
         expected = 320 if mode == "off" else max(320, round(224 * float(mode.split(":")[0]) / float(mode.split(":")[1])))
         assert widths == {expected}, (mode, widths, expected)
-        report[mode] = dict(native_exact_checkpoints=checked, blue_counts=sorted(counters), angles=sorted(angles), modes=sorted(modes), width=expected)
+        if expected > 320:
+            assert projected_margin_frames >= 10, (mode, "no active expanded projection", projected_margin_frames)
+        report[mode] = dict(guest_exact_checkpoints=checked, projected_margin_frames=projected_margin_frames, blue_counts=sorted(counters), angles=sorted(angles), modes=sorted(modes), width=expected)
         print(mode, "PASS", report[mode], flush=True)
     assert hashlib.sha256(args.save.read_bytes()).hexdigest() == save_hash
     (args.out / "report.json").write_text(json.dumps(report, indent=2))

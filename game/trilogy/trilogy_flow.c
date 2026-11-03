@@ -7,10 +7,12 @@
  * instead of S3K's seamless act-2 transition.
  */
 #include "trilogy_obj.h"
+#include "sonic3_gameplay.h"
 #include "trilogy_assets_s2.h"
 #include "scd.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "trilogy_sign_camera.inc"
 
 /* (zone<<8|act) sequence of the Sonic 1 campaign.
  * S1 internals: SBZ act 3 is "LZ act 4", Final Zone is "SBZ act 3". */
@@ -53,6 +55,10 @@ static int s_sbz2_ss;             /* SBZ2's giant ring entered: its stage before
 static int s_results_started, s_results_finished;
 static int s_runoff;              /* the tally's run off screen: bit 0 Player 1, bit 1 Player 2;
                                    * bits 2, 3: gone (off screen, held there) */
+static uint32_t s_tail_ring_flash;
+static uint8_t s_tail_ring_lock, s_tail_ring_jump, s_tail_ring_age;
+static int s_tail_ring_entered;
+#include "trilogy_tail_respawn.inc"
 
 static uint32_t find_obj(uint32_t code)
 {
@@ -69,7 +75,10 @@ static void start_act_clear(void)
     if (find_obj(S3K_Obj_LevelResults)) return;      /* tally already running */
     uint32_t sign = find_obj(NATIVE_S1_BASE + 0x0D * 4);
     if (sign && OB8(sign, OBJ_routine) >= 8) return; /* sign spawned it */
-    if (sign) SET8(sign, OBJ_routine, 8);            /* sign: straight to "after" */
+    if (sign) {
+        SET8(sign, OBJ_routine, 8);                 /* sign: straight to "after" */
+        SET8(sign, OBJ_anim, 3);                    /* skipped spin must still settle */
+    }
     w8(RAM_Update_HUD_timer, 0);                     /* GotThroughAct */
     w16(RAM_Camera_min_X_pos, r16(RAM_Camera_max_X_pos));
     w8(RAM__unkFABE, 0xFF);
@@ -138,6 +147,9 @@ void tri_flow_level_entry(void)
     }
     tri_sbz2_open = 0;
     s_runoff = 0;
+    s_tail_ring_flash = 0;
+    s_tail_ring_entered = 0;
+    s_tail_ring_jump = s_tail_ring_age = 0;
     if (za != 0x2501) s_sbz2_ss = 0;
     w8(RAM_Disable_death_plane, 0);
     if (!s_ss_advance) return;
@@ -319,12 +331,98 @@ static int runoff_gone(uint32_t p)                   /* (off the screen: right, 
     return dx >= 320 + (extra > 0 ? extra : 0) + 24 || dy >= 224 + 48;
 }
 
+/* Native SSEntryFlash retains the real ring position through its animation
+ * and Obj_Wait callback. Routine 0 has not copied that position yet. */
+static int tail_ring_flash(uint32_t o)
+{
+    return (r32(o) == 0x0617BEu && OB8(o, OBJ_routine) >= 2) ||
+           (r32(o) == S3K_Obj_Wait && r32(o + 0x34) == TH_SS_GO);
+}
+
+static void tail_ring_release(void)
+{
+    /* A sign/tally may have acquired the same native lock in the meantime. */
+    if (s_tail_ring_flash && r8(RAM_Ctrl_2_locked) == 0xFF &&
+        !s_results_started && !s_ss_pending && !(s_runoff & 2) &&
+        !find_obj(S3K_Obj_LevelResults)) {
+        w8(RAM_Ctrl_2_locked, s_tail_ring_lock);
+        w16(0xFFF66Au, 0);
+    }
+    s_tail_ring_flash = 0;
+}
+
+static void tail_ring_tick(void)
+{
+    uint32_t e = tri_dir(), p = RAM_Player_2;
+    if (s_tail_ring_entered) return;
+    if (!s3_gameplay.tails_ring_follow || !e || tri_rd8(e + TD_GAME) != TRI_GAME_S1 ||
+        r8(RAM_Game_mode) != 0x0C || r16(RAM_Player_mode) != 0 ||
+        !r32(p) || OB8(p, 0x38) != 1 || OB8(p, OBJ_routine) >= 6 ||
+        (OB8(p, OBJ_status) & 0x80) || runoff_gone(p)) {
+        tail_ring_release();
+        return;
+    }
+    if (!s_tail_ring_flash) {
+        /* Observe actual P1 entry, never mere proximity to an unentered ring. */
+        if (OB8(RAM_Player_1, 0x2E) != 0x53 || OB8(RAM_Player_1, OBJ_anim) != 0x1C)
+            return;
+        uint32_t flash = 0;
+        for (uint32_t n = 2; n < 110; ++n) {
+            uint32_t o = RAM_Player_1 + n * OBJ_SIZE;
+            if (tail_ring_flash(o)) { flash = o; break; }
+        }
+        if (!flash) return;
+        int dx = (int16_t)(OB16(flash, OBJ_x_pos) - OB16(p, OBJ_x_pos));
+        int dy = (int16_t)(OB16(flash, OBJ_y_pos) - OB16(p, OBJ_y_pos));
+        if (dx < -192 || dx > 192 || dy < -128 || dy > 128) return;
+        /* Native carried-Tails entry already performed the same choreography. */
+        if (OB8(p, 0x2E) == 0x53 && OB8(p, OBJ_anim) == 0x1C) {
+            s_tail_ring_entered = 1;
+            return;
+        }
+        if (OB8(p, 0x2E)) return;     /* do not steal flying/scripted companions */
+        s_tail_ring_flash = flash;
+        s_tail_ring_lock = r8(RAM_Ctrl_2_locked);
+        s_tail_ring_jump = s_tail_ring_age = 0;
+        fprintf(stderr, "[trilogy] Tails following entered S1 ring at %u,%u\n",
+            OB16(flash, OBJ_x_pos), OB16(flash, OBJ_y_pos));
+    }
+    if (!tail_ring_flash(s_tail_ring_flash) || ++s_tail_ring_age > 90 || OB8(p, 0x2E)) {
+        fprintf(stderr, "[trilogy] Tails ring follow ended without entry\n");
+        tail_ring_release();
+        return;
+    }
+    int dx = (int16_t)(OB16(s_tail_ring_flash, OBJ_x_pos) - OB16(p, OBJ_x_pos));
+    int dy = (int16_t)(OB16(s_tail_ring_flash, OBJ_y_pos) - OB16(p, OBJ_y_pos));
+    /* Exact SSEntry_Range, followed by the native carried-Tails entry pose.
+     * Never move the actor, spawn one, or write ring/tally/progression flags. */
+    if (dx > -24 && dx <= 24 && dy > -40 && dy <= 40) {
+        SET8(p, OBJ_frame, 0);
+        SET8(p, OBJ_anim, 0x1C);
+        SET8(p, 0x2E, 0x53);
+        s_tail_ring_entered = 1;
+        s_runoff &= ~10;
+        fprintf(stderr, "[trilogy] Tails reached S1 ring at %u,%u\n",
+            OB16(p, OBJ_x_pos), OB16(p, OBJ_y_pos));
+        return;
+    }
+    uint8_t held = dx > 3 ? 8 : dx < -3 ? 4 : 0, pressed = 0;
+    if (!(OB8(p, OBJ_status) & 2) && dx > -80 && dx < 80 && dy < -24 && !s_tail_ring_jump) {
+        s_tail_ring_jump = 12;
+        pressed = 0x20;
+    }
+    if (s_tail_ring_jump) { held |= 0x20; --s_tail_ring_jump; }
+    w8(RAM_Ctrl_2_locked, 0xFF);       /* native input, no CPU steering */
+    w16(0xFFF66Au, (uint16_t)(held << 8 | pressed));
+}
+
 static void runoff_tick(void)
 {
     if (!s_runoff) return;
     w8(RAM_Disable_death_plane, 1);
     for (int n = 0; n < 2; n++) {
         uint32_t p = n ? RAM_Player_2 : RAM_Player_1;
+        if (n && (s_tail_ring_flash || s_tail_ring_entered)) continue;
         if (!(s_runoff & (1 << n))) continue;
         if (!(s_runoff & (4 << n)) && runoff_gone(p)) s_runoff |= 4 << n;
         if (s_runoff & (4 << n)) {                   /* gone: still, out of play */
@@ -353,6 +451,7 @@ int tri_flow_hook(uint32_t pc)
         int bit = a1 == RAM_Player_1 ? 1 : a1 == RAM_Player_2 ? 2 : 0;
         if (!bit || !runoff_wanted()) return 0;
         s_runoff |= bit;
+        if (bit == 2 && (s_tail_ring_flash || s_tail_ring_entered)) return 1;
         /* Imported signs do not run the native end-sign's Tails gate.
          * Include the existing companion, using his ordinary physics/input. */
         if(bit==1 && r16(RAM_Player_mode)==0 && r32(RAM_Player_2) &&
@@ -382,8 +481,11 @@ int tri_flow_hook(uint32_t pc)
         return 0;
     }
     case TH_LVL_PRE_SPRITES:
+        s1_signpost_camera_lock();
         { extern void tri_water_monitor_frame(void);tri_water_monitor_frame(); }
+        tail_ring_tick();
         runoff_tick();
+        tail_ring_respawn_tick();
         return 0;
     case TH_RESULTS_DONE:
         if (!tri_dir()) return 0;
@@ -407,6 +509,10 @@ int tri_flow_hook(uint32_t pc)
     }
     case TH_STARPOST_STARS:         /* blo.s: S1 has giant rings; S2's stars come at 50 rings */
         if (tri_dir()) {
+            /* Optional S3-style bonus entry retains the native 20-ring CMP.
+             * Do not route it through Sonic 2's special-stage selection. */
+            if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 &&
+                s3_gameplay.checkpoint_bonus) return 0;
             extern int tri_ss_stars_wanted(void);
             if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S2 && tri_ss_stars_wanted()) g_cpu.SR &= ~1u;
             else g_cpu.SR |= 1u;
@@ -437,6 +543,8 @@ int tri_flow_hook(uint32_t pc)
         return 0;
     case TH_STARS_TOUCH:            /* the star circle: Sonic 2's special stage, not a bonus stage */
         if (tri_dir()) {
+            if (tri_rd8(tri_dir() + TD_GAME) == TRI_GAME_S1 &&
+                s3_gameplay.checkpoint_bonus) return 0;
             extern int tri_ss_stars_touch(void);
             return tri_ss_stars_touch();
         }

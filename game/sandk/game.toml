@@ -1,11 +1,11 @@
-# game.toml — Sonic & Knuckles (USA/World, 1994), STANDALONE (no lock-on).
+# game.toml â€” Sonic & Knuckles (USA/World, 1994), STANDALONE (no lock-on).
 # 68000, 2 MB ROM, flat at $000000-$1FFFFF. Identity-mapped (no banks).
 #
-# This is "Sonic & Knuckles mode" — the second of three lock-on family modes
+# This is "Sonic & Knuckles mode" â€” the second of three lock-on family modes
 # (Sonic 3 alone, Sonic & Knuckles alone, Sonic 3 & Knuckles locked-on). Like
 # standalone Sonic 3, S&K-alone is a single 2 MB ROM whose code runs at its own
 # org-0 addresses, so file offset == runtime address == disasm address. NO
-# +$200000 offset and no cross-half lock-on calls — when nothing is locked on at
+# +$200000 offset and no cross-half lock-on calls â€” when nothing is locked on at
 # $200000, the upper bank reads back as 0 (unmapped) and S&K's lock-on detector
 # takes the standalone path (Knuckles in S&K + S&K attract/levels).
 #
@@ -22,7 +22,7 @@
 [game]
 output_prefix = "sandk"
 
-# Real labels from the byte-perfect S&K disasm (skdisasm sonic3k.lst — the S&K
+# Real labels from the byte-perfect S&K disasm (skdisasm sonic3k.lst â€” the S&K
 # master half), emitted at OFFSET 0 (standalone S&K runs at $000000). The same
 # .lst the combined sonic3k mode consumes for its $000000-$1FFFFF half, just
 # without the paired S3 +$200000 file. Regenerate via (skdisasm built with
@@ -41,7 +41,7 @@ discovery_files = [
 ]
 
 # ---------------------------------------------------------------------------
-# Per-game RAM layout — S&K uses the shared Sonic 3-family WRAM map (verified
+# Per-game RAM layout â€” S&K uses the shared Sonic 3-family WRAM map (verified
 # against skdisasm sonic3k.constants.asm; identical offsets to the S3K combined
 # and standalone Sonic 3).
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ game_mode      = 0xFFF600   # Game_mode
 vint_runcount  = 0xFFFE0C   # V_int_run_count (longword)
 vint_routine   = 0xFFF62A   # V_int_routine
 plc_pending    = 0x000000
-initial_ssp    = 0xFFFE00   # System_stack — set by `lea (System_stack).w,sp` at EntryPoint
+initial_ssp    = 0xFFFE00   # System_stack â€” set by `lea (System_stack).w,sp` at EntryPoint
 vbla_stack     = 0xFFFE00
 intr_stack     = 0xFFFE00
 player_object  = 0xFFB000   # Player_1 / Object_RAM start
@@ -68,6 +68,44 @@ extra = [
 
 # Opt-in host renderer hooks. Verified using stock skdisasm 1e1b5af;
 # its assembled S&K half matches the combined ROM byte-for-byte.
+# Infinite time extends the original clock to 99:59 without replacing results.
+# Native Nemesis FIFO pop: complete last destination and retire16th source.
+# Exact original-source FixBugs repair; always active, independent of mods.
+[[widescreen_site]]
+addr = 0x1880
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xDD76 # Native time-limit BEQ
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xDD98 # Native minute-clamp BLO
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0xDDAA # Native minute digit BSR
+kind = "game_hook"
+
+# The life formatter accepts two digits; larger stocks append a ROM glyph.
+[[widescreen_site]]
+addr = 0xE12A # HUD_Lives: after loading Life_count into D1
+kind = "game_hook"
+
+# Platform families use CMP.W $42(A0),D0 after the same native coarse
+# camera subtraction. Match their early activation and lifetime to the view.
+[[widescreen_site]]
+addr = 0x24F28 # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x25634 # Native platform variable-range cull
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x25750 # Native platform variable-range cull
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x1B690 # Reset native object placement lifetime
 kind = "game_hook"
@@ -494,3 +532,15 @@ addr = 0x47A96 # Extras collide with sub_47A96
 kind = "game_hook"
 
 # END knuckles-army hooks
+
+# Opt-in Sonic shielded transformation; original elemental BEQ instructions.
+# Only CCR.Z is overridden; generated and interpreted paths execute native code.
+[[widescreen_site]]
+addr = 0x1193C # BEQ Sonic_LightningShield (673C)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x11980 # BEQ Sonic_BubbleShield (6720)
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x119A8 # BEQ Sonic_CheckTransform (6728)
+kind = "game_hook"

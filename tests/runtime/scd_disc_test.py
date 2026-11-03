@@ -5,9 +5,13 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import zipfile
+import stat
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools' / 'trilogy'))
 from scd_iso import Disc, RAW, USER
+from scd_media import open_disc
 
 
 def both(b, offset, value, width=4):
@@ -53,6 +57,92 @@ class DiscTests(unittest.TestCase):
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def test_iso_and_bare_raw_image_match_cue_filesystem(self):
+        iso = self.root / 'data.iso'
+        iso.write_bytes(b''.join(self.sectors))
+        binary = self.root / 'data.bin'
+        binary.write_bytes(raw(self.sectors))
+        for path in (iso, binary):
+            with open_disc(path) as disc:
+                self.assertEqual(disc.read('PROBE.TXT'), b'proof')
+                self.assertFalse(any(t.kind == 'AUDIO' for t in disc.track_info))
+        (self.root / 'audio.bin').write_bytes(b'A' * RAW * 2)
+        (self.root / 'disc.cue').write_text('FILE "data.iso" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n'
+                                           'FILE "audio.bin" BINARY\nTRACK 02 AUDIO\nINDEX 01 00:00:00\n')
+        with open_disc(iso) as disc:
+            self.assertEqual(disc.audio(2), b'A' * RAW * 2)
+
+    def test_zip_cue_tracks_case_and_separators_are_portable_and_private(self):
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('Disc/DISC.CUE', 'FILE "tracks\\DATA.ISO" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\n'
+                       'FILE "tracks\\AUDIO.BIN" BINARY\nTRACK 02 AUDIO\nINDEX 01 00:00:00\n')
+            z.writestr('Disc/tracks/data.iso', b''.join(self.sectors))
+            z.writestr('Disc/tracks/audio.bin', b'A' * RAW * 2)
+        prior = archive.read_bytes()
+        with open_disc(archive, self.root) as disc:
+            self.assertEqual(disc.read('PROBE.TXT'), b'proof')
+            self.assertEqual(disc.audio(2), b'A' * RAW * 2)
+            private = disc.media.path.parent
+        self.assertFalse(private.exists())
+        self.assertEqual(archive.read_bytes(), prior)
+
+    def test_zip_iso_and_hostile_or_ambiguous_members(self):
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('nested/disc.iso', b''.join(self.sectors))
+        with open_disc(archive, self.root) as disc:
+            self.assertEqual(disc.read('PROBE.TXT'), b'proof')
+        for name in ('../escape.iso', '/absolute.iso', 'C:/escape.iso', 'NUL.bin'):
+            with zipfile.ZipFile(archive, 'w') as z:
+                z.writestr(name, b'hostile')
+            with self.assertRaises(ValueError), open_disc(archive, self.root):
+                pass
+        with zipfile.ZipFile(archive, 'w') as z:
+            link = zipfile.ZipInfo('link.iso');link.create_system = 3;link.external_attr = (stat.S_IFLNK | 0o777) << 16
+            z.writestr(link, '../outside')
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('a.iso', b''.join(self.sectors));z.writestr('b.iso', b''.join(self.sectors))
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        with patch('scd_media.MAX_EXPANDED', 1):
+            with self.assertRaises(ValueError), open_disc(archive, self.root):
+                pass
+        self.assertFalse(list(self.root.glob('.media-*')))
+
+    def test_zip_rejects_case_aliases_encryption_and_external_cue_references(self):
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('Disc.iso', b'one');z.writestr('disc.ISO', b'two')
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        sentinel = self.root / 'owner.bin';sentinel.write_bytes(b'owner data')
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('disc.cue', 'FILE "../owner.bin" BINARY\nTRACK 01 MODE1/2352\nINDEX 01 00:00:00\n')
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        self.assertEqual(sentinel.read_bytes(), b'owner data')
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.writestr('disc.iso', b''.join(self.sectors))
+        encoded = bytearray(archive.read_bytes());central = encoded.index(b'PK\1\2')
+        struct.pack_into('<H', encoded, 6, 1);struct.pack_into('<H', encoded, central + 8, 1)
+        archive.write_bytes(encoded)
+        with self.assertRaises(ValueError), open_disc(archive, self.root):
+            pass
+        self.assertFalse(list(self.root.glob('.media-*')))
+
+    def test_zip_preserves_verified_sgcd_reader(self):
+        from disc_image import convert
+        cue = self.image(raw(self.sectors));sgcd = self.root / 'disc.sgcd'
+        convert(cue, sgcd)
+        archive = self.root / 'disc.zip'
+        with zipfile.ZipFile(archive, 'w') as z:
+            z.write(sgcd, 'nested/disc.sgcd')
+        with open_disc(archive, self.root) as disc:
+            self.assertEqual(disc.read('PROBE.TXT'), b'proof')
 
     def image(self, data=None, cue=None):
         (self.root / 'disc.bin').write_bytes(raw(self.sectors) if data is None else data)

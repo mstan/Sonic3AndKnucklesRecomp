@@ -7,8 +7,9 @@ interfaces are allowed; game-specific implementation belongs here. Epic:
 `dcf77ffb3b5f185990a164077eb85668cf3460e2` without changing gameplay.
 
 - `game/common/`: `sonic3_video.{c,h}` (the opt-in family renderer linked by
-  all three modes) and `CUSTOM-VIDEO.md`. Blue Spheres uses the original
-  native composition; the inaccurate host globe projection has been removed.
+  all three modes) and `CUSTOM-VIDEO.md`. Blue Spheres retains its original
+  composition at native width and uses the corrected game-owned projection
+  for wider canvases, including the approved alignment fixes.
 - `game/sonic3/`, `game/sonic3k/`, `game/sandk/`: per-mode `game.toml`,
   discovery inputs (`*.disasm_labels*.toml`, `*.disasm_jumptables*.toml`,
   `*.code_addrs.txt`, `annotations_from_disasm.csv`, S3K's
