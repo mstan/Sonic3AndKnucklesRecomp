@@ -16,10 +16,14 @@ int g_split_sp_popped;static int rte;int *g_rte_pending_ptr=&rte;
 int s3_stage_pack_mighty=1,s3_stage_pack_megamix=1,s3_stage_pack_enabled=1;
 int s3_stage_pack_shadow,tri_shadow_selected;
 static uint8_t donor_hud[384];static int donor_hud_valid;
+static int sign_level=1,sign_uploads,sign_clears;
+static const uint8_t *sign_pixels;
+uint32_t tri_dir(void){return sign_level?0x400020:0;}
 const uint8_t *s3_megamix_shadow_hud(void){return donor_hud_valid?donor_hud:NULL;}
 uint32_t tri_shadow_descriptor(void){return s3_stage_pack_shadow?0x400E00:0;}
 int tri_character_active(void){return tri_mighty_active();}
 int tri_mighty_selected;static int player_active=1,atlas_calls;
+int tri_shadow_active(void){return player_active && tri_shadow_selected;}
 uint8_t tri_rd8(uint32_t a) { CHECK(a>=0x400000 && a<0x401000);return bank[a-0x400000]; }
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1)); }
 uint32_t tri_rd32(uint32_t a) { return ((uint32_t)tri_rd16(a)<<16)|tri_rd16(a+2); }
@@ -37,6 +41,14 @@ int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t 
     ++atlas_calls;return 1;
 }
 #include "../../game/trilogy/trilogy_mighty_presentation.c"
+int gvdp_set_sprite_patterns_bank(unsigned index,const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
+{
+    CHECK(index==1);
+    if(pixels){CHECK(bytes==128 && lines[0]==2 && lines[57]==2);sign_pixels=pixels;sign_uploads++;}
+    else {CHECK(!bytes && !lines);sign_clears++;}
+    return 1;
+}
+#include "../../game/trilogy/trilogy_signpost.c"
 static void word(unsigned p,unsigned v) { bank[p]=(uint8_t)(v>>8);bank[p+1]=(uint8_t)v; }
 static void longword(unsigned p,unsigned v) { word(p,v>>16);word(p+2,v); }
 int main(void)
@@ -129,6 +141,24 @@ int main(void)
     for(unsigned i=0;i<64;i++)w16(RAM_Normal_palette+i*2,i?0xEEE:0);
     CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
     tri_shadow_menu_colors(top,bottom);CHECK(top[2]==0xE22 && bottom[2]==0xE22);
+    /* A real level mode is selected before the Data Select fade ends. Its
+     * installed layout must retain both menu atlas and Shadow colors, and
+     * native portrait drawing must not revert the selected character. */
+    w8(RAM_Game_mode,0x8C);
+    g_machine.vdp.reg[12]=1;g_machine.vdp.reg[2]=0x38;g_machine.vdp.reg[3]=0x38;
+    g_machine.vdp.reg[4]=6;g_machine.vdp.reg[18]=0x80;g_machine.vdp.reg[16]=3;
+    int old_atlas_calls=atlas_calls;
+    memset(top,0,sizeof top);memset(bottom,0,sizeof bottom);
+    CHECK(tri_mighty_presentation_frame(tiles,top,bottom));
+    CHECK(atlas_calls==old_atlas_calls+1);
+    tri_shadow_menu_colors(top,bottom);CHECK(top[2]==0xE22 && bottom[2]==0xE22);
+    w32(A(0)+OBJ_mappings,0xCE0E);w8(A(0)+OBJ_frame,5);
+    CHECK(!tri_mighty_presentation_hook(MG_PC_DS_DRAW));
+    CHECK(r32(A(0)+OBJ_mappings)==0x400E80 && r8(A(0)+OBJ_frame)==9);
+    memset(g_machine.vdp.reg,0,sizeof g_machine.vdp.reg);
+    w32(A(0)+OBJ_mappings,0xCE0E);w8(A(0)+OBJ_frame,5);
+    CHECK(!tri_mighty_presentation_hook(MG_PC_DS_DRAW));
+    CHECK(r32(A(0)+OBJ_mappings)==0xCE0E && r8(A(0)+OBJ_frame)==5);
     w32(SAVE_POINTER,0xFFE6B6);w8(0xFFE6B8,0x70);w16(PLAYER_OPTION,1);
     CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));
     CHECK(tri_shadow_selected && !tri_mighty_selected && r16(RAM_Player_mode)==1);
@@ -173,11 +203,48 @@ int main(void)
     CHECK(!memcmp(g_machine.vdp.vram+0x7D4*32,donor_hud,128));
     for(unsigned i=0;i<4;i++)CHECK(!memcmp(g_machine.vdp.vram+(0x7D8+i)*32,donor_hud+(4+i*2)*32,32));
     for(unsigned i=0;i<32;i++)CHECK(!g_machine.vdp.vram[0x7DC*32+i]);
-    CHECK(!memcmp(g_machine.vdp.vram+0x7DE*32,donor_hud+7*32,32));
+    /* The complete multiplication glyph crosses the strip's tile boundary
+     * at x24. Copying tile7 alone drops its leftmost two columns. Read the
+     * original 48x16 strip pixelwise, independently of the upload packing. */
+    for(unsigned y=0;y<8;y++)for(unsigned x=0;x<8;x++) {
+        unsigned sx=22+x,src=(sx/8*2+1)*32+y*4+(sx&7)/2;
+        unsigned expected=(donor_hud[src]>>((sx&1)?0:4))&15;
+        unsigned actual=(g_machine.vdp.vram[0x7DE*32+y*4+x/2]>>((x&1)?0:4))&15;
+        CHECK(actual==expected);
+    }
     CHECK(tiles[0x7D8]==(GVDP_EXT_SPRITE_FORCE|3) && tiles[0x7DC]==(GVDP_EXT_SPRITE_FORCE|3));
     CHECK(tiles[0x7DE]==(GVDP_EXT_SPRITE_FORCE|3) && !tiles[0x7DD] && !tiles[0x7DF]);
     CHECK(g_machine.vdp.vram[0x7DD*32]==0x5A && g_machine.vdp.vram[0x7DF*32]==0x5A);
     player_active=0;CHECK(!tri_mighty_presentation_frame(tiles,top,bottom));
     CHECK(!tiles[0x7D8] && !tiles[0x7DC] && !tiles[0x7DE]);
+    /* Imported S1 uses the already converted character-specific sign strip.
+     * Retail S1 characters, other campaigns and native S3 retain their own. */
+    word(0x10A,5);longword(0x124,0x400B80);
+    longword(0xB80,0x4D475332);longword(0xB84,0x400700);longword(0xB88,0x400720);
+    for(unsigned c=0;c<3;c++) {
+        unsigned p=0xB8C+c*20;
+        longword(p,0x400740+c*32);longword(p+4,128);
+        longword(p+8,0x400C00);longword(p+12,0x400D00);longword(p+16,0x400D00);
+    }
+    bank[0x20+TD_GAME]=TRI_GAME_S1;player_active=1;tri_shadow_selected=1;
+    CHECK(tri_signpost_mapping()==0x400700 && tri_signpost_animation()==0x400720);
+    memcpy(before,g_ram,sizeof before);
+    CHECK(tri_signpost_frame(top,bottom) && sign_uploads==1 && sign_pixels==bank+0x780);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    longword(0xB80,0x4D475331);CHECK(!tri_signpost_mapping());
+    longword(0xB80,0x4D475332);tri_shadow_selected=0;
+    CHECK(tri_signpost_frame(top,bottom) && sign_pixels==bank+0x760);
+    player_active=0;CHECK(!tri_signpost_mapping());
+    CHECK(!tri_signpost_frame(top,bottom) && sign_clears==1);
+    player_active=1;
+    for(unsigned game=TRI_GAME_S2;game<=TRI_GAME_CD;game++) {
+        bank[0x20+TD_GAME]=(uint8_t)game;
+        if(game==TRI_GAME_MEGAMIX)CHECK(tri_signpost_mapping()==0x400700);
+        else CHECK(!tri_signpost_mapping());
+    }
+    sign_level=0;CHECK(!tri_signpost_mapping());sign_level=1;
+    bank[0x20+TD_GAME]=TRI_GAME_MEGAMIX;player_active=0;
+    CHECK(tri_signpost_mapping()==0x400700); /* ordinary donor sign unchanged */
+    CHECK(tri_signpost_frame(top,bottom) && sign_pixels==bank+0x740);
     puts("Mighty selection, save identity, menu atlas, palette isolation and HUD digits passed");return 0;
 }

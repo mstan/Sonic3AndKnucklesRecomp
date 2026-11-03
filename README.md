@@ -14,7 +14,7 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The v0.7.2 release
+the separate versions need their corresponding ROMs. The v0.7.3 release
 provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
@@ -187,7 +187,7 @@ Its CD import also needs Python and Pillow, as explained in its guide.
 ## Make it your own
 
 - **Controls:** set up your keyboard or controller in the launcher.
-- **Widescreen:** enable **Mods → Widescreen** and choose **Adaptive** to fit
+- **Widescreen:** fresh profiles default to **Mods → Widescreen → Adaptive** to fit
   the game to your window, or select a fixed screen shape.
 - **Knuckles & Knuckles:** enable the mod and play as Knuckles with a crowd
   following you. Choose 1–74 extras; additional local controllers can join in.

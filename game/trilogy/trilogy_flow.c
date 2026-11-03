@@ -12,6 +12,7 @@
 #include "scd.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "trilogy_sign_camera.inc"
 
 /* (zone<<8|act) sequence of the Sonic 1 campaign.
  * S1 internals: SBZ act 3 is "LZ act 4", Final Zone is "SBZ act 3". */
@@ -57,6 +58,7 @@ static int s_runoff;              /* the tally's run off screen: bit 0 Player 1,
 static uint32_t s_tail_ring_flash;
 static uint8_t s_tail_ring_lock, s_tail_ring_jump, s_tail_ring_age;
 static int s_tail_ring_entered;
+#include "trilogy_tail_respawn.inc"
 
 static uint32_t find_obj(uint32_t code)
 {
@@ -73,7 +75,10 @@ static void start_act_clear(void)
     if (find_obj(S3K_Obj_LevelResults)) return;      /* tally already running */
     uint32_t sign = find_obj(NATIVE_S1_BASE + 0x0D * 4);
     if (sign && OB8(sign, OBJ_routine) >= 8) return; /* sign spawned it */
-    if (sign) SET8(sign, OBJ_routine, 8);            /* sign: straight to "after" */
+    if (sign) {
+        SET8(sign, OBJ_routine, 8);                 /* sign: straight to "after" */
+        SET8(sign, OBJ_anim, 3);                    /* skipped spin must still settle */
+    }
     w8(RAM_Update_HUD_timer, 0);                     /* GotThroughAct */
     w16(RAM_Camera_min_X_pos, r16(RAM_Camera_max_X_pos));
     w8(RAM__unkFABE, 0xFF);
@@ -476,9 +481,11 @@ int tri_flow_hook(uint32_t pc)
         return 0;
     }
     case TH_LVL_PRE_SPRITES:
+        s1_signpost_camera_lock();
         { extern void tri_water_monitor_frame(void);tri_water_monitor_frame(); }
         tail_ring_tick();
         runoff_tick();
+        tail_ring_respawn_tick();
         return 0;
     case TH_RESULTS_DONE:
         if (!tri_dir()) return 0;

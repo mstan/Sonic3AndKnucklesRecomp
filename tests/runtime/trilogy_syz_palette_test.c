@@ -68,7 +68,16 @@ static void runtime_test(void)
     for(unsigned n=0;n<21;n++)tri_ext_hook(TH_PAL_FROMBLACK);
     tri_ext_frame();CHECK(!memcmp(top,normal,sizeof normal) && !memcmp(bottom,wet,sizeof wet));
     before[RAM_Palette_fade_info&65535]=0;CHECK(!memcmp(before,g_ram,sizeof before));
-    tri_ext_clear_tiles();tri_ext_frame();CHECK(!published[0x123]);
+    /* A bonus zone is selected before the outgoing character fades. Level
+     * art must release its tags immediately, while the separately owned
+     * character/HUD palette stays installed until its next publication. */
+    s_tiles[0x7D4]=3;s_tiles[0x7DE]=GVDP_EXT_SPRITE_FORCE|3;
+    s_tiles[0x6CA]=GVDP_EXT_SPRITE_FORCE|2;
+    tri_ext_clear_tiles();
+    CHECK(!published[0x123] && !published[0x500] && !published[0x6CA]);
+    CHECK(published[0x680]==3 && published[0x7D4]==3 &&
+        published[0x7DE]==(GVDP_EXT_SPRITE_FORCE|3));
+    tri_ext_frame();CHECK(!published[0x123]);
     bank[0x440+TD_FLAGS]=0;mask_reads=0;tri_ext_level();tri_ext_frame();
     CHECK(!mask_reads && !published[0x123] && published[0x680]==3);
     bank[0x440+TD_FLAGS]=S3_PACK_S1_PLANE_EXTPAL;w16(RAM_Current_zone_and_act,0x2200);

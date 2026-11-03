@@ -103,6 +103,7 @@ static void test_native_bonus(void)
     CHECK(configure("off"));CHECK(configure("32:9"));
     for(unsigned zone=0x13;zone<=last;zone++) {
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        v.reg[1]=64;v.cram[1]=0xE;
         g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)zone;g_ram[0xF711]=1;
         write32(0xB000,0x123456);word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
         CHECK(bonus_stage() && !gameplay() && !level_ready());
@@ -119,13 +120,168 @@ static void test_native_bonus(void)
             for(int x=0;x<796;x++)CHECK(out[x]==(x>=238 && x<558?native[x-238]:0xFF000000u));
         }
         CHECK(!memcmp(before,g_ram,sizeof before));
-        /* The outgoing bonus publication survives a mode/zone change before
-         * the next native SAT upload, including a fully white fade. */
-        g_ram[0xFE10]=0;g_ram[0xF600]=0x8C;
+        /* The installed bonus survives an early mode/zone assignment, then
+         * retires at the completed native fade, including full white. */
+        g_ram[0xFE10]=0;g_ram[0xF600]=0x0C;
+        scanline(&v,0,native,320,out,796);CHECK(s_frame_bonus && !s_frame_level);
+        g_ram[0xF600]=0x8C;
+        scanline(&v,0,native,320,out,796);CHECK(s_frame_bonus && !s_frame_level);
         for(unsigned i=0;i<64;i++)v.cram[i]=0xEEE;
         scanline(&v,0,native,320,out,796);
-        CHECK(s_frame_bonus && out[0]==0xFF000000u && out[238]==native[0]);
+        CHECK(!s_frame_bonus);
+        for(unsigned x=0;x<796;x++)CHECK(out[x]==genesis_dac_cram_to_argb(0xEEE,GENESIS_DAC_NORMAL));
     }
+    CHECK(configure("off"));
+}
+static void test_bonus_margins(void)
+{
+    static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
+    memset(&v,0,sizeof v);v.reg[1]=64;v.reg[4]=7;v.reg[16]=1;v.reg[13]=0x3F;v.reg[11]=3;
+    v.cram[1]=0xE;v.cram[2]=0xE00;
+    for(unsigned n=0;n<64;n++) {
+        palette[n]=genesis_dac_cram_to_argb(v.cram[n],GENESIS_DAC_NORMAL);
+        shadow[n]=genesis_dac_cram_to_argb(v.cram[n],GENESIS_DAC_SHADOW);
+    }
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned n=0;n<64*32;n++)word(v.vram,0xE000+n*2,1);
+    word(v.vram,0xE000+63*2,2);
+    for(unsigned n=0;n<320;n++)native[n]=0xFF123400u+n;
+    bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow);
+    CHECK(out[237]==palette[2] && out[558]==palette[1]);
+    for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+    /* Use the installed per-row scroll, not a stretched finite native image. */
+    word(v.vram,0xFC00+8*4+2,8);
+    bonus_scanline(&v,8,0x14,native,320,out,796,palette,shadow);
+    CHECK(out[237]==palette[1]);
+    test_private_planes=1;
+    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow);
+    CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_NORMAL));
+    v.reg[12]=8;
+    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow);
+    CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_SHADOW));
+    test_private_planes=0;
+    bonus_scanline(&v,0,0x13,native,320,out,796,palette,shadow);
+    CHECK(out[0]==0xFF000000u && out[558]==0xFF000000u); /* Gumball unchanged */
+    for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+}
+static void test_bonus_entry_publication(void)
+{
+    GVDP v={0};v.reg[5]=0x7C;
+    memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=12;g_ram[0xFE10]=1;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
+    s_build.sprites[0].x=10;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);select_scene(&v,0);
+    CHECK(s_display && s_display->sprites[0].x==10);
+    /* The last level SAT can finish DMA after the bonus zone is assigned.
+     * Retain its matching publication, not the earlier displayed pose. */
+    s_build.sprites[0].x=20;g_ram[0xF806]=1;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);g_ram[0xFE10]=0x13;
+    select_scene(&v,1);CHECK(s_display && s_display->scene==1 && s_display->sprites[0].x==20);
+    /* A premature bonus tag with the same installed SAT contains no level
+     * mappings. It must not replace the outgoing level during its fade. */
+    s_build.scene=3;s_build.count=0;publish_sprites();
+    select_scene(&v,1);CHECK(s_display && s_display->scene==1 && s_display->sprites[0].x==20);
+    v.vram[0xF806]^=2;select_scene(&v,1);
+    CHECK(s_display && s_display->scene==1 && s_display->sprites[0].x==20);
+    CHECK(configure("off"));
+}
+static void test_native_demo_publication(void)
+{
+    GVDP v={0};v.reg[5]=0x7C;
+    memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=12;g_ram[0xFE10]=1;
+    write32(0xB000,1);word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    s_loader_active=0;
+    word(g_ram,S3_DEMO,1);
+    g_ram[0xF711]=1;g_ram[0xF600]=8;CHECK(s3_video_main_cpu_divisor()==1);
+    /* Wide drawing must not alter the native demo's loader, ring interval,
+     * cull result or simulated render-visible flag. */
+    g_cpu.D[0]=0x12345678u;g_cpu.A[1]=0x1234;g_cpu.A[2]=0x5678;g_cpu.A[4]=0x9ABC;
+    CHECK(!s3_video_hook(S3_LOAD_UPDATE));CHECK(!s_loader_active);
+    s3_video_hook(S3_RING_RANGE);s3_video_hook(S3_RING_STATUS);s3_video_hook(S3_SWING_PLATFORM_CULL);
+    CHECK(g_cpu.D[0]==0x12345678u && g_cpu.A[1]==0x1234 &&
+          g_cpu.A[2]==0x5678 && g_cpu.A[4]==0x9ABC);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
+    s_visible_count=1;s_visible_objects[0]=0xB000;g_ram[0xB004]=4;
+    s_build.sprites[0].x=10;publish_sprites();CHECK(g_ram[0xB004]==4);
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);select_scene(&v,0);
+    CHECK(s_display && s_display->sprites[0].x==10);
+    /* A real Start changes the mode before the last outgoing level SAT is
+     * queued. Prefer that newly installed pose, then hold it during fade. */
+    s_frame_level=1;s_frame_zone=1;s_frame_act=0;g_ram[0xF600]=4;
+    capture_objects();CHECK(s_build.scene==1 && !s_build.title);
+    s_build.count=1;s_build.sprites[0].x=20;g_ram[0xF806]=1;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);select_scene(&v,1);
+    CHECK(s_display && s_display->scene==1 && s_display->sprites[0].x==20);
+    v.vram[0xF806]^=2;select_scene(&v,1);
+    CHECK(s_display && s_display->sprites[0].x==20);
+    word(g_ram,S3_DEMO,0);g_ram[0xF600]=12;
+    CHECK(s3_video_main_cpu_divisor()==4);
+    s_visible_count=1;s_visible_objects[0]=0xB000;publish_sprites();
+    CHECK(g_ram[0xB004]==132); /* Ordinary gameplay retains wide visibility. */
+    CHECK(configure("off"));
+}
+static void test_title_card_edges(void)
+{
+    GVDP v={0};uint32_t native[320],out[1603];
+    memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=0x88;g_ram[0xFE10]=2;
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=14;
+    memset(v.vram+32,0x11,32);
+    for(unsigned n=0;n<320;++n)native[n]=0xFF123456u;
+    unsigned o=0xB172;write32(o,0x9000);write32(o+0xC,S3_TITLE_CARD_MAP);
+    write16(o+0x10,448);write16(o+0x14,128);
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,(uint16_t)o);
+    unsigned p=S3_TITLE_CARD_MAP+0x40;
+    word(g_rom,p,1);g_rom[p+2]=g_rom[p+3]=0;
+    word(g_rom,p+4,1);word(g_rom,p+6,0);
+    const unsigned frames[]={6,3,2,1},targets[]={0x120,0x17C,0x184,0xC0};
+    for(unsigned n=0;n<4;++n) {
+        word(g_rom,S3_TITLE_CARD_MAP+frames[n]*2,0x40);
+        g_ram[o+0x22]=(uint8_t)frames[n];write16(o+0x46,(uint16_t)targets[n]);
+        capture_objects();CHECK(s_build.count==1 && s_build.sprites[0].hud==6+n);
+    }
+    g_ram[o+0x22]=6;write16(o+0x46,0x120);
+    capture_objects();publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    /* A mapping whose native left reaches320 must reach the requested right
+     * edge. This uses finite8px art, including odd adaptive canvas widths. */
+    const int canvases[]={320,398,796,1603};
+    for(unsigned n=0;n<4;++n) {
+        scanline(&v,0,native,320,out,canvases[n]);CHECK(s_frame_menu==MENU_TITLE_CARD);
+        for(int x=0;x<canvases[n];++x)CHECK(out[x]==0xFF000000u);
+    }
+    /* The next entering pixel is already at the expanded edge, rather than
+     * first appearing at the old320px clip. No native clipped copy remains. */
+    write16(o+0x10,447);capture_objects();publish_sprites();
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=793?0xFFFF0000u:0xFF000000u));
+    write16(o+0x10,0x120);capture_objects();publish_sprites();
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=398 && x<406?0xFFFF0000u:0xFF000000u));
+    /* Native SAT lists the name before the red banner, so its opaque text
+     * stays in front where they overlap. Preserve that first-sprite rule. */
+    s_display_frame.count=2;s_display_frame.sprites[1]=s_display_frame.sprites[0];
+    s_display_frame.sprites[1].hud=9;s_display_frame.sprites[1].slot=7;
+    s_display_frame.sprites[1].attr=2;memset(v.vram+64,0x22,32);v.cram[2]=0xE00;
+    uint32_t colors[64];for(unsigned i=0;i<64;++i)colors[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
+    memset(s_priority,0,796);for(int x=0;x<796;++x)out[x]=0xFF000000u;
+    draw_scene_sprites(&v,0,out,796,238,colors);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=398 && x<406?0xFFFF0000u:0xFF000000u));
+    size_t bytes=presentation_state_save(NULL,0);uint8_t *blob=(uint8_t*)malloc(bytes);CHECK(blob);
+    CHECK(presentation_state_save(blob,bytes)==bytes);
+    s_frame_menu=MENU_NONE;s_display_frame.sprites[0].hud=0;s_display=NULL;
+    CHECK(presentation_state_load(blob,bytes,1));free(blob);
+    CHECK(s_frame_menu==MENU_TITLE_CARD && s_display==&s_display_frame);
+    CHECK(s_display->sprites[0].hud==6 && s_display->sprites[1].hud==9);
+    memset(s_priority,0,796);for(int x=0;x<796;++x)out[x]=0xFF000000u;
+    draw_scene_sprites(&v,0,out,796,238,colors);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=398 && x<406?0xFFFF0000u:0xFF000000u));
+    CHECK(title_card_black(&v));word(v.vram,0xC000,1);CHECK(!title_card_black(&v));
+    word(v.vram,0xC000,0);v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
+    /* A bonus card with a different authored target keeps its native layout. */
+    write16(o+0x46,0xC8);capture_objects();CHECK(s_build.sprites[0].hud==2);
     CHECK(configure("off"));
 }
 static void test_file_select(void)
@@ -193,6 +349,48 @@ static void test_file_select(void)
     }
     CHECK(!memcmp(before,g_ram,sizeof before));
     s_menu_map_ready=0;
+}
+static void test_results_margin_sprites(void)
+{
+    static GVDP v;SceneFrame scene={0};uint32_t out[796],pal[64]={0};
+    const SceneFrame *previous=s_display;
+    unsigned saved_mode=s_world_frame[0xF600];
+    memset(&v,0,sizeof v);memset(v.vram+32,0x11,32);pal[1]=0xFFFF0000;
+    scene.scene=0;scene.count=3;
+    scene.sprites[0]=(SceneSprite){-200,0,0x8001,0,2};
+    scene.sprites[1]=(SceneSprite){520,0,0x8001,0,2};
+    scene.sprites[2]=(SceneSprite){100,0,0x8001,0,2};
+    s_display=&scene;
+    for(unsigned phase=0;phase<3;phase++) {
+        /* A live mode change must not alter a restored/published result.
+         * Both signed off-native anchors retain eight-pixel glyphs. */
+        s_world_frame[0xF600]=(uint8_t)(phase==1?4:0x48);
+        memset(out,0,sizeof out);memset(s_priority,0,sizeof out/sizeof *out);
+        draw_scene_sprites(&v,0,out,796,238,pal);
+        for(int x=0;x<796;x++) {
+            int glyph=(x>=38&&x<46)||(x>=758&&x<766);
+            CHECK(out[x]==(phase!=1&&glyph?pal[1]:0));
+        }
+    }
+    memset(out,0,sizeof out);memset(s_priority,0,320);
+    draw_scene_sprites(&v,0,out,320,0,pal);
+    for(int x=0;x<320;x++)CHECK(!out[x]); /* native composition stays owned */
+    /* Exercise the complete composition caller, not only its sprite helper.
+     * The native row owns the center while queued signed pieces can already
+     * be visible on either side of it. */
+    CHECK(configure("off"));CHECK(configure("fit"));
+    memset(g_ram,0,sizeof g_ram);g_ram[0xF600]=0x48;
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;
+    s_build=scene;s_visible_count=0;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    uint32_t native[320]={0};
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++) {
+        int glyph=(x>=38&&x<46)||(x>=758&&x<766);
+        CHECK(out[x]==(glyph?pal[1]:x>=238&&x<558?0:0xFF000000u));
+    }
+    s_display=previous;s_world_frame[0xF600]=(uint8_t)saved_mode;
 }
 static void test_menu_layers(void)
 {
@@ -427,11 +625,12 @@ static void test_deformation_keeps_actors_still(void)
 static void test_s1_undeformed_installed_camera(void)
 {
     static GVDP v;uint32_t native[320]={0},out[398];
-    const unsigned zones[]={0x20,0x24};
-    for(unsigned z=0;z<sizeof zones/sizeof *zones;++z) {
+    const unsigned cases[][2]={{0x20,0},{0x24,0},{0,4},{0,8}};
+    for(unsigned z=0;z<sizeof cases/sizeof *cases;++z) {
         CHECK(configure("off"));CHECK(configure("fit"));width(398,224,320,224);
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-        write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)zones[z];
+        write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)cases[z][0];
+        word(g_ram,0xEEC2,cases[z][1]);
         word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
         for(unsigned i=0;i<4;i++)word(g_ram,0x9008+i*2,2);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
@@ -462,6 +661,51 @@ static void test_s1_undeformed_installed_camera(void)
         s3_video_set_world_cell(NULL);CHECK(configure("off"));
     }
 }
+static void test_uploaded_scene_camera(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[398];
+    const unsigned zones[]={0,4};
+    for(unsigned z=0;z<sizeof zones/sizeof *zones;++z) {
+        CHECK(configure("off"));CHECK(configure("fit"));width(398,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)zones[z];g_ram[0xF62A]=8;
+        write32(0xB000,0x123456);word(g_ram,0xEEC2,8);
+        word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+        for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,2);
+        word(g_ram,0xEE80,64);word(g_ram,0xEE84,100);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=100;
+        word(v.vram,0xF000,(uint16_t)-64);
+        v.cram[1]=0xEEE;v.cram[2]=14;
+        memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
+        s_build.camera_x=64;s_build.camera_y=100;
+        s_build.sprites[0]=(SceneSprite){40,20,0x8001,0,0};s_visible_count=0;
+        publish_sprites();unsigned uploaded=s_serial;s3_video_vblank();
+        memcpy(v.vram+0xF800,g_ram+0xF800,640);
+        /* Camera-follow leaves the native SAT byte-identical. The next main
+         * loop may already publish a new world pose before its VBlank DMA. */
+        s_build.camera_x=65;s_build.camera_y=99;publish_sprites();
+        word(g_ram,0xEE80,65);word(g_ram,0xEE84,99);
+        s3_video_set_world_cell(deformed_cell);
+        static uint8_t before[65536];memcpy(before,g_ram,sizeof before);GVDP untouched=v;
+        interpolation_configure(1);
+        for(int y=0;y<224;++y) {
+            scanline(&v,y,native,320,out,398);
+            interpolation_capture(&v,y,out,398,320,NULL);
+        }
+        CHECK(s_display && s_display->serial==uploaded);
+        CHECK(s_camera==64 && s_camera_y==100);
+        CHECK(ix_current()->scene.serial==uploaded);
+        CHECK(ix_current()->context.fg_x==64 && ix_current()->context.fg_y==100);
+        scanline(&v,20,native,320,out,398);
+        for(int x=78;x<=87;++x)CHECK((out[x]==0xFFFFFFFFu)==(x>=79 && x<87));
+        CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&untouched,&v,sizeof v));
+        /* The newer pose becomes eligible only with the next native upload. */
+        s3_video_vblank();select_scene(&v,0);CHECK(s_display->serial==s_serial);
+        interpolation_configure(0);s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+}
 static int cd_edge_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     (void)ram;(void)y;
@@ -485,6 +729,8 @@ static void test_aiz_intro_canvas_edge(void)
     v.cram[1]=0xE;v.cram[2]=0xE0;
     memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
     for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    /* FBZ uses the installed B canvas, including its mixed redraw rows. */
+    for(unsigned i=0;i<64*32;i++)word(v.vram,0xE000+i*2,1+((i%64>>1)&1));
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(intro_canvas_cell);
     const int cameras[]={32,176,336};
@@ -493,11 +739,116 @@ static void test_aiz_intro_canvas_edge(void)
         word(v.vram,0xF000,(unsigned)-camera);word(v.vram,0xF002,(unsigned)-(camera/2));
         scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;x++) {
-            int source=x-s_native_x+camera/2;
+            int source=x-238+camera/2;
             CHECK(out[x]==(source<512?0xFFFF0000u:0xFF00FF00u));
         }
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
+static void test_aiz_intro_live_palette(void)
+{
+    GVDP v={0};uint32_t out[64];uint16_t saved[48];
+    memcpy(saved,s_aiz_intro.colors,sizeof saved);
+    s_frame_zone=s_frame_act=s_frame_bg_event=0;s_frame_fg_x=0;
+    /* FadeFromBlack clips each channel; proportional scaling is different. */
+    for(unsigned i=0;i<64;i++)v.cram[i]=(uint16_t)(i&1?0x200:0);
+    v.cram[16]=0;v.cram[17]=0x200;
+    for(unsigned i=0;i<48;i++)s_aiz_intro.colors[i]=0xE88;
+    aiz_palette(&s_aiz_intro,&v,out);
+    for(unsigned i=0;i<64;i++)CHECK(out[i]==genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL));
+    /* Shared player colours are already live even for the other art bank. */
+    aiz_palette(&s_aiz_main,&v,out);
+    for(unsigned i=0;i<16;i++)CHECK(out[i]==genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL));
+    memcpy(s_aiz_intro.colors,saved,sizeof saved);
+}
+static void test_aiz_cached_native_fade(void)
+{
+    GVDP v={0};uint32_t out[64];uint16_t saved[48],expected[48]={0};
+    memcpy(saved,s_aiz_intro.colors,sizeof saved);
+    word(s_world_frame,0xEE50,22);s_frame_bg_event=8;s_frame_fg_x=0x1300;
+    /* Original Pal_AddColor, applied independently to each cached target.
+     * Green $00A0 finishes at tick5, before white starts its green channel. */
+    const uint16_t targets[]={0xA0,4,0xE88,0xC02,0xEEE,0};
+    for(unsigned i=0;i<48;i++)s_aiz_intro.colors[i]=targets[i%6];
+    for(unsigned step=0;step<=21;step++) {
+        unsigned blue=step<7?step:7,green=step<=7?0:step<14?step-7:7,red=step<=14?0:step-14;
+        v.cram[17]=(uint16_t)(blue*0x200+green*0x20+red*2);
+        aiz_palette(&s_aiz_intro,&v,out);
+        for(unsigned i=0;i<48;i++) {
+            CHECK(out[i+16]==genesis_dac_cram_to_argb(expected[i],GENESIS_DAC_NORMAL));
+            if(expected[i]!=targets[i%6]) {
+                if(expected[i]+0x200<=targets[i%6])expected[i]+=0x200;
+                else if(expected[i]+0x20<=targets[i%6])expected[i]+=0x20;
+                else expected[i]+=2;
+            }
+        }
+    }
+    word(s_world_frame,0xEE50,0);memcpy(s_aiz_intro.colors,saved,sizeof saved);
+}
+static int tree_palette_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{ (void)ram;(void)x;(void)y;*cell=background?0:1;return 1; }
+static void test_aiz_tree_palette_boundary(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320],out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;write32(0xB000,0x1234);word(g_ram,0x8000,97);
+    word(g_ram,0x8008,0x8100);word(g_ram,0xEEC2,8);
+    word(g_ram,0xEE80,0x2D80);word(g_ram,0xEE84,0x2E0);word(g_ram,0xEE90,0x2E0);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=v.vsram[1]=0x2E0;
+    word(v.vram,0xF000,(unsigned)-0x2D80);v.cram[17]=0xEEE;v.cram[47]=0xC02;
+    memset(v.vram+32,0xFF,32);
+    for(unsigned i=0;i<4;i++)word(g_ram,0x9008+i*2,0xC001);
+    for(unsigned x=0;x<320;x++)native[x]=genesis_dac_cram_to_argb(0xC02,GENESIS_DAC_NORMAL);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x2D80;s_build.camera_y=0x2E0;publish_sprites();
+    s3_video_set_world_cell(tree_palette_cell);memcpy(before,g_ram,sizeof before);GVDP unchanged=v;
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==genesis_dac_cram_to_argb(x<238?4:0xC02,GENESIS_DAC_NORMAL));
+    CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+    /* No world/palette correction is allowed in the true native viewport. */
+    CHECK(!memcmp(out+238,native,sizeof native));
+    CHECK(!aiz_tree_color(0x2D00,0x300,0,320,47));
+    CHECK(!aiz_tree_color(0x2D80,0x300,-1,320,47));
+    CHECK(!aiz_tree_color(0x2D00,0x480,-1,320,47));
+    CHECK(!aiz_tree_color(0x2D00,0x300,-1,320,46));
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    scanline(&v,0,native,320,out,320);CHECK(!memcmp(out,native,sizeof native));
+}
+static void test_aiz_intro_owned_pose(void)
+{
+    static GVDP v;static SceneFrame restored;uint32_t out[796],pal[64]={0};
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;word(g_ram,0x8000,97);word(g_ram,0x8008,0x8100);
+    write32(0xB000,0x1234);write32(0xB172,S3_AIZ_PLANE_INTRO);
+    write32(0xB17E,S3_SUPER_MAP);word(g_ram,0xB17C,0x680);
+    word(g_ram,0xB182,120);word(g_ram,0xB186,144);g_ram[0xB194]=33;
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB172);
+    word(g_rom,S3_SUPER_MAP+33*2,0x100);word(g_rom,S3_SUPER_MAP+0x100,1);
+    word(g_rom,S3_SUPER_MAP+0x102,4);word(g_rom,S3_SUPER_MAP+0x104,0);word(g_rom,S3_SUPER_MAP+0x106,0);
+    word(g_rom,S3_SUPER_PLC+33*2,0x100);word(g_rom,S3_SUPER_PLC+0x100,1);word(g_rom,S3_SUPER_PLC+0x102,0x1001);
+    memset(g_rom+0x100020,0x11,32);memset(g_rom+0x100040,0x22,32);
+    memset(v.vram+0x680*32,0x99,64);v.reg[5]=0x7C;
+    s_capture_frame=&s_build;s_capture_readonly=0;capture_objects();
+    CHECK(s_build.aiz_super_pose==1 && s_build.count==1 && !g_ram[0xFE19]);
+    publish_sprites();select_scene(&v,0);
+    CHECK(s_display && s_display->aiz_super_pose==1);
+    /* Exact pose lives with the publication, independently of newer RAM. */
+    g_ram[0xB194]=34;pal[1]=0xFF112233;pal[9]=0xFF998877;
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    GVDP unchanged=v;draw_scene_sprites(&v,16,out,796,0,pal);
+    for(int x=230;x<238;x++)CHECK(out[x]==pal[1]);
+    for(int x=238;x<246;x++)CHECK(out[x]==pal[9]); /* native centre untouched */
+    CHECK(!memcmp(&v,&unchanged,sizeof v) && !g_ram[0xFE19]);
+    uint8_t *state=(uint8_t *)malloc(sizeof s_build);CHECK(state);
+    S3StateIO save={state,sizeof s_build,0,0,1};scene_frame_state(&save,&s_build);CHECK(save.ok);
+    memset(&restored,0,sizeof restored);S3StateIO load={state,sizeof s_build,0,2,1};
+    scene_frame_state(&load,&restored);CHECK(load.ok && restored.aiz_super_pose==1);
+    unsigned bad_pose=3;memcpy(state+offsetof(SceneFrame,aiz_super_pose),&bad_pose,sizeof bad_pose);
+    S3StateIO bad={state,sizeof s_build,0,1,1};scene_frame_state(&bad,&restored);CHECK(!bad.ok);free(state);
+    write32(0xB17E,0x1000);capture_objects();CHECK(!s_build.aiz_super_pose);
+    s_display=NULL;CHECK(configure("off"));
 }
 static int ship_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
@@ -566,6 +917,27 @@ static void test_aiz2_ship_cameras(void)
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
     CHECK(s_camera==0x4288 && s_camera_y==0x1C0);
+    /* Native DoShipLoop wraps by $200. Its installed ground canvas differs
+     * from the adjacent raw-layout columns; those columns must not appear
+     * in either margin. Preserve the separate HInt ship band above it. */
+    word(g_ram,0xEEB2,4);word(g_ram,0xEEC0,8);
+    v.cram[3]=0xE00;memset(v.vram+96,0x33,32);
+    for(unsigned i=0;i<64*32;i++)word(v.vram,0xC000+i*2,3);
+    v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+    v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFF0000FFu);
+    /* The loop controller remains active after EndRefresh retires the
+     * ship. Its forest is a spatial world again, not a repeating table. */
+    word(g_ram,0xEED6,0);word(g_ram,0xEEC0,16);
+    v.vsram[0]=0x1C0;scanline(&v,0,native,320,out,796);
+    scanline(&v,65,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    word(g_ram,0xEED6,0xFF00);
+    word(g_ram,0xEEB2,0);
+    v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
+    v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_campaign_background_edges(void)
@@ -582,7 +954,7 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0x20,0x22,0x28,0x34,0x40,0x5B};
+    const unsigned zones[]={0,4,8,0x20,0x22,0x28,0x34,0x40,0x5B};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         g_ram[0xFE10]=(uint8_t)zones[z];int canvas=widths[w];
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
@@ -617,6 +989,36 @@ static void test_hud_mapping(void)
     CHECK(s_build.sprites[0].size==12 && s_build.sprites[0].attr==0x86CC);
     s3_video_set_hud_mapping(NULL);capture_objects();
     CHECK(s_build.count==1 && !s_build.sprites[0].size && s_build.sprites[0].attr==0x86CB);
+}
+
+static void test_first_hud_fade(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(1,1,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=0x8C;g_ram[0xFE05]=8;
+    word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    /* Title-card/loading publications remain native until the initial HUD
+     * actually starts; the native entry sets this after installing planes. */
+    CHECK(!level_ready());capture_objects();CHECK(s_build.scene==0);
+    g_ram[0xF711]=1;CHECK(level_ready());
+    word(g_rom,S3_RINGS,0);longword(g_rom,S3_RINGS,0x1000);word(g_rom,0x1000,65535);
+    word(g_rom,S3_HUD_MAP,12);word(g_rom,S3_HUD_MAP+12,1);
+    word(g_rom,S3_HUD_MAP+14,0);word(g_rom,S3_HUD_MAP+16,1);word(g_rom,S3_HUD_MAP+18,1);
+    capture_objects();CHECK(s_build.scene==1 && s_build.count==1 && s_build.sprites[0].hud==1);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=14;
+    memset(v.vram+0x6CB*32,0x11,32);native[16]=0xFFFF0000;
+    publish_sprites();s3_video_vblank();
+    scanline(&v,0,native,320,out,796);scanline(&v,136,native,320,out,796);
+    CHECK(s_frame_level && s_display && s_display->scene==1);
+    CHECK(out[17]==0xFFFF0000 && out[255]!=0xFFFF0000);
+    /* The original per-row fade remains authoritative at the same anchor. */
+    v.cram[1]=6;scanline(&v,0,native,320,out,796);scanline(&v,136,native,320,out,796);
+    CHECK(out[17]==genesis_dac_cram_to_argb(6,GENESIS_DAC_NORMAL));
+    g_ram[0xF711]=0;CHECK(!level_ready());
+    g_ram[0xF711]=1;word(g_ram,0x8008,0);CHECK(!level_ready());
+    word(g_ram,0x8008,0x8100);write32(0xB000,0);CHECK(!level_ready());
 }
 
 static void life_test_font(void)
@@ -836,6 +1238,75 @@ static void test_time_minute_tens(void)
     }
     test_time_private_palette=0;CHECK(configure("off"));
 }
+#include "sonic3_rewind_test.inc"
+static void test_presentation_restore_before_tick(void)
+{
+    static GVDP v;static uint8_t menu_ram[65536],saved_ram[65536];
+    uint32_t native[320],expected[796],out[796];
+    CHECK(configure("off"));CHECK(configure("fit"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(&s_build,0,sizeof s_build);memset(s_history,0,sizeof s_history);
+    memset(&s_display_frame,0,sizeof s_display_frame);s_display=NULL;
+    s_real_context.level=s_real_context.special=s_real_context.bonus=0;
+    g_ram[0xF600]=0x28;v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;
+    v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=14;
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123400u+x;
+    scanline(&v,0,native,320,expected,796);memcpy(menu_ram,g_ram,sizeof menu_ram);
+    /* Same installed SAT/plane geometry, but the host now owns a level.
+     * This reproduces the fade-retention ambiguity on rewind to level select. */
+    g_ram[0xF600]=12;write32(0xB000,0x123456);
+    word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
+    s_build.scene=1;s_build.aiz_super_pose=1;publish_sprites();scanline(&v,0,native,320,out,796);
+    CHECK(s_frame_level && s_display && s_display->scene==1);
+    memcpy(g_ram,menu_ram,sizeof menu_ram);memcpy(saved_ram,g_ram,sizeof saved_ram);
+    GVDP restored=v;sonic3_video.presentation_reset();
+    /* No simulation or object publication between restore and this render. */
+    scanline(&v,0,native,320,out,796);
+    CHECK(!s_frame_level && !s_display);
+    CHECK(!s_build.aiz_super_pose && !s_display_frame.aiz_super_pose);
+    CHECK(!memcmp(expected,out,sizeof out));
+    CHECK(!memcmp(saved_ram,g_ram,sizeof saved_ram) && !memcmp(&restored,&v,sizeof v));
+    CHECK(configure("off"));
+}
+
+static void test_native_state_keeps_restored_publication(void)
+{
+    static GVDP v;uint32_t native[320]={0},expected[796],out[796];
+    static uint8_t ram_before[65536];
+    CHECK(configure("off"));CHECK(configure("fit"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    s_real_context.level=s_real_context.special=s_real_context.bonus=0;
+    s_display=NULL;memset(&s_display_frame,0,sizeof s_display_frame);
+    memset(s_history,0,sizeof s_history);memset(&s_build,0,sizeof s_build);s_visible_count=0;
+    g_ram[0xF600]=12;g_ram[0xFE10]=0x22;write32(0xB000,0x123456);
+    word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);word(g_ram,0xEE80,512);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=14;
+    word(v.vram,0xF000,(uint16_t)-512);memset(v.vram+32,0x11,32);
+    s_build.scene=1;s_build.camera_x=512;s_build.count=1;
+    s_build.sprites[0]=(SceneSprite){-16,0,1,0,0,256,0};publish_sprites();
+    g_ram[0xF62A]=8;s3_video_vblank();unsigned uploaded=s_upload_serial;
+    scanline(&v,0,native,320,expected,796);
+    int actor_x=s_native_x-16;CHECK(actor_x>=0 && actor_x+8<s_native_x);
+    CHECK(expected[actor_x]==0xFFFF0000u);
+    S3StateIO measure={0};measure.ok=1;s3_video_state(&measure);
+    uint8_t *blob=(uint8_t*)malloc(measure.pos);CHECK(blob);
+    S3StateIO io={blob,measure.pos,0,0,1};s3_video_state(&io);CHECK(io.ok);
+    s_build.sprites[0].x=48;publish_sprites();s3_video_vblank();
+    CHECK(s_upload_serial>uploaded);scanline(&v,0,native,320,out,796);
+    CHECK(out[actor_x]!=expected[actor_x]);
+    io=(S3StateIO){blob,measure.pos,0,2,1};s3_video_state(&io);CHECK(io.ok);
+    CHECK(s_upload_serial==uploaded);s3_video_state_loaded();
+    memcpy(ram_before,g_ram,sizeof ram_before);GVDP restored=v;
+    sonic3_video.presentation_reset();scanline(&v,0,native,320,out,796);
+    CHECK(!memcmp(expected,out,sizeof out));
+    CHECK(!memcmp(ram_before,g_ram,sizeof ram_before) && !memcmp(&restored,&v,sizeof v));
+    /* The marker is consumed once: a following raw RB reset must retire it. */
+    sonic3_video.presentation_reset();scanline(&v,0,native,320,out,796);
+    CHECK(!s_display && !s_upload_serial && out[actor_x]!=expected[actor_x]);
+    free(blob);CHECK(configure("off"));
+}
+
 static void test_time_interpolation(void)
 {
     GVDP v;static uint32_t row[320],image[320*224];
@@ -989,27 +1460,33 @@ static void test_interpolation_owned_and_readonly(void)
 static void test_s1_interpolation_installed_camera(void)
 {
     static GVDP v;static uint32_t row[398],half[398*224];uint32_t native[320]={0};
-    const unsigned zones[]={0x20,0x24,0x21};
-    for(unsigned z=0;z<sizeof zones/sizeof *zones;++z) {
+    /* AIZ intro, fire and act2 must keep their existing camera policy. */
+    const unsigned cases[][5]={{0x20,0,0,1},{0x24,0,0,1},{0,0,4,1},
+        {0,0,8,1},{0,0,0,0},{0,0,12,0},{0,1,8,0},{0x21,0,0,0},{0,0,8,0,1}};
+    for(unsigned z=0;z<sizeof cases/sizeof *cases;++z) {
         CHECK(configure("off"));interpolation_configure(0);
         CHECK(configure("fit"));width(398,224,320,224);interpolation_configure(1);
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-        g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)zones[z];write32(0xB000,0x123456);
+        g_ram[0xF600]=12;g_ram[0xFE10]=(uint8_t)cases[z][0];
+        g_ram[0xFE11]=(uint8_t)cases[z][1];word(g_ram,0xEEC2,cases[z][2]);write32(0xB000,0x123456);
         word(g_ram,0x8000,16);word(g_ram,0x8008,0x8100);
         for(unsigned i=0;i<4;i++)word(g_ram,0x9008+i*2,2);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+        if(cases[z][4])v.reg[11]=3;
         v.cram[1]=0xEEE;v.cram[2]=0xE;
         memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
         s3_video_set_world_cell(deformed_cell);s_world_publish=NULL;
         s_ix_overlay_seen=0;test_atlas_enabled=test_private_planes=0;
-        int undeformed=zones[z]!=0x21;
+        int undeformed=(int)cases[z][3];
         for(int phase=0;phase<2;++phase) {
             /* As in the real spring capture, the RAM camera is ahead of
              * the scroll/SAT currently installed by VBlank. */
             word(g_ram,0xEE80,(unsigned)(66+phase*4));
             word(g_ram,0xEE84,(unsigned)(98+phase*4));word(g_ram,0xFE04,phase+1);
             word(v.vram,0xF000,(unsigned)(-64-phase*4));v.vsram[0]=(uint16_t)(100+phase*4);
+            if(cases[z][4])for(unsigned y=1;y<224;++y)
+                word(v.vram,0xF000+y*4,(unsigned)(-64-phase*4+(int)(y&1)));
             memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
             s_build.camera_x=64+phase*4;s_build.camera_y=100+phase*4;
             s_build.sprites[0]=(SceneSprite){40-phase*4,20-phase*4,0x8001,0,0};
@@ -1024,16 +1501,161 @@ static void test_s1_interpolation_installed_camera(void)
         int left=undeformed?77:75,top=undeformed?18:20;
         for(int y=15;y<30;++y)for(int x=72;x<88;++x)
             CHECK((half[y*398+x]==0xFFFFFFFFu)==(x>=left && x<left+8 && y>=top && y<top+8));
-        /* LZ keeps the non-plane camera: water deformation is not an actor
-         * offset. The new basis is deliberately limited to GHZ/SYZ. */
+        /* Deformed LZ and the excluded AIZ phases keep the non-plane
+         * camera; their scroll deformation is not an actor offset. */
         CHECK(ix_current()->context.fg_x==(undeformed?68:70));
         CHECK(ix_current()->context.fg_y==(undeformed?104:102));
         s3_video_set_world_cell(NULL);interpolation_configure(0);CHECK(configure("off"));
     }
 }
+/* Original actor deletion is simulated here; render ownership must survive
+ * that boundary without keeping a guest slot or borrowing overwritten art. */
+static void test_aiz_wave_original_art(void)
+{
+    uint8_t compressed[]={0,1,0x87,0x71,0,0xFF,0},decoded[32];
+    CHECK(art_nem(compressed,sizeof compressed,decoded,sizeof decoded)==32);
+    for(unsigned i=0;i<32;++i)CHECK(decoded[i]==0x77);
+    compressed[0]=128;CHECK(art_nem(compressed,sizeof compressed,decoded,sizeof decoded)==32);
+    for(unsigned y=0;y<8;++y)for(unsigned x=0;x<4;++x)CHECK(decoded[y*4+x]==(y&1?0:0x77));
+    CHECK(!art_nem(compressed,sizeof compressed-1,decoded,sizeof decoded));
+    CHECK(!art_nem(compressed,sizeof compressed,decoded,sizeof decoded-1));
+    static GVDP v;uint32_t native[320]={0},row[796];
+    CHECK(configure("off"));CHECK(configure("fit"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
+    g_ram[0xF600]=12;write32(0xB000,0x123456);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xEEE;v.cram[2]=0xE;v.cram[3]=0xEE;
+    /* Tile4DE was transparent in the wave, then gets Knuckles' pixels. */
+    memset(s_aiz_wave_art,0,sizeof s_aiz_wave_art);s_aiz_wave_art_ready=s_aiz_wave_art_attempted=1;
+    s_aiz_wave_art[(0x4DE - 0x3D1)*32]=0x10;
+    memset(v.vram+0x4DE*32,0x33,32);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=2;s_build.code[1]=S3_AIZ_WAVE;
+    s_build.sprites[0]=(SceneSprite){-8,0,0x4DE,0,2,256,1};
+    s_build.sprites[1]=(SceneSprite){8,0,0x4DE,0,2,256,1};
+    publish_sprites();scanline(&v,0,native,320,row,796);
+    CHECK(row[230]==0xFFFFFFFFu && row[231]!=0xFFFFFF00u);
+    CHECK(row[246]==0xFFFFFF00u); /* native center keeps installed art */
+    /* The pose/pixel ownership survives a new guest pose and art upload. */
+    g_ram[0xB022]=99;memset(v.vram+0x4DE*32,0x22,32);
+    scanline(&v,0,native,320,row,796);
+    CHECK(row[230]==0xFFFFFFFFu && row[246]==0xFFFF0000u);
+    CHECK(!memcmp(&s_display_frame.sprites[0],&s_build.sprites[0],sizeof(SceneSprite)));
+    s_aiz_wave_art_ready=s_aiz_wave_art_attempted=0;CHECK(configure("off"));
+}
+static void test_aiz_plane_retirement(void)
+{
+    static GVDP v;static uint32_t native[320],row[796],half[796*224];
+    CHECK(configure("off"));interpolation_configure(0);CHECK(configure("fit"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
+    s_world_publish=NULL;s_actor_overlay=NULL;test_atlas_enabled=0;s_actor_interpolation_blocked=0;
+    g_ram[0xF600]=12;write32(0xB000,0x123456);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEEAA,0x7FF);word(g_ram,0xEE80,1600);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[3]=0xE0;v.cram[7]=0xE00;
+    word(v.vram,0xF000,(uint16_t)-1600);
+    /* Minimal original-style mapping frames; the production path uses the
+     * owned ROM's complete body, propeller and exhaust mapping tables. */
+    for(unsigned frame=0;frame<7;++frame) {
+        unsigned offset=16+frame*8;word(g_rom,S3_AIZ_PLANE_MAP+frame*2,offset);
+        word(g_rom,S3_AIZ_PLANE_MAP+offset,1);g_rom[S3_AIZ_PLANE_MAP+offset+2]=0;
+        g_rom[S3_AIZ_PLANE_MAP+offset+3]=0;word(g_rom,S3_AIZ_PLANE_MAP+offset+4,frame);
+        word(g_rom,S3_AIZ_PLANE_MAP+offset+6,0);
+    }
+    const uint8_t prop[]={0,1,2,3,4,3,2,0xFC},jet[]={0,5,6,0xFC};
+    memcpy(g_rom+S3_AIZ_PLANE_PROP_ANIM,prop,sizeof prop);
+    memcpy(g_rom+S3_AIZ_PLANE_EXHAUST_ANIM,jet,sizeof jet);
+    memset(s_aiz_plane_art,0x11,sizeof s_aiz_plane_art);s_aiz_plane_art_ready=1;
+    memset(v.vram+0x529*32,0x11,7*32);
+    const unsigned slots[]={0xB1BC,0xB206,0xB250};
+    const unsigned code[]={S3_AIZ_PLANE_DEPART,S3_AIZ_PLANE_PROP,S3_AIZ_PLANE_EXHAUST};
+    const unsigned frame[]={0,3,5};
+    word(g_ram,0xAC00,6);word(g_ram,0xFE04,100);
+    for(unsigned n=0;n<3;++n) {
+        unsigned o=slots[n];word(g_ram,0xAC02+n*2,o);write32(o,code[n]);
+        write32(o+12,S3_AIZ_PLANE_MAP);word(g_ram,o+10,0x529);
+        word(g_ram,o+16,35+(n==1?56:n==2?24:0));word(g_ram,o+20,281+(n==1?4:n==2?24:0));
+        g_ram[o+0x22]=(uint8_t)frame[n];g_ram[o+0x23]=(uint8_t)(n==1?4:0);
+        if(n)word(g_ram,o+0x46,slots[0]);
+    }
+    word(g_ram,slots[0]+0x1A,0xC0);
+    capture_objects();CHECK(s_build.aiz_plane.phase==1 && s_build.aiz_plane.mask==7);
+    CHECK(s_build.count==3 && s_build.aiz_plane.object[0].x==-93);
+    publish_sprites();
+    /* Owned fractional snapshots can interpolate the retirement handover. */
+    interpolation_configure(1);s_ix_overlay_seen=0;
+    for(int y=0;y<224;++y){scanline(&v,y,native,320,row,796);interpolation_capture(&v,y,row,796,320,NULL);}
+    for(unsigned n=0;n<3;++n)write32(slots[n],0);
+    word(g_ram,0xAC00,0);word(g_ram,0xFE04,101);
+    static uint8_t guest_before[65536];memcpy(guest_before,g_ram,sizeof guest_before);
+    capture_objects();publish_sprites();
+    CHECK(!memcmp(guest_before,g_ram,sizeof guest_before));
+    CHECK(s_build.aiz_plane.phase==2 && s_build.aiz_plane.object[0].x==-97);
+    CHECK(s_build.aiz_plane.y_velocity==0xB0 && s_build.aiz_plane.y_fraction==0xB000);
+    CHECK(s_build.aiz_plane.object[1].frame==2 && s_build.aiz_plane.object[2].frame==6);
+    CHECK(s_build.count==3 && s_build.sprites[0].hud==5);
+    AizPlanePose invalid_pose=s_build.aiz_plane;
+    invalid_pose.mask=8;CHECK(!aiz_plane_valid(&invalid_pose));invalid_pose=s_build.aiz_plane;
+    invalid_pose.object[1].cursor=6;CHECK(!aiz_plane_valid(&invalid_pose));invalid_pose=s_build.aiz_plane;
+    invalid_pose.y_velocity=0xC1;CHECK(!aiz_plane_valid(&invalid_pose));
+    /* The reused VRAM tile now has unrelated blue pixels. Retiring art is
+     * decoded from the original ROM, with the current row's native palette. */
+    memset(v.vram+0x529*32,0x77,7*32);
+    for(int y=0;y<224;++y){scanline(&v,y,native,320,row,796);interpolation_capture(&v,y,row,796,320,NULL);}
+    CHECK(ix_current()->valid && ix_previous()->valid);
+    SceneFrame before=s_build;AizPlanePose selected=s_display_frame.aiz_plane;
+    GVDP device=v;CHECK(interpolate(.5,half,796,224));
+    CHECK(half[153*796+143]==0xFFFF0000u && half[153*796+142]!=0xFFFF0000u);
+    CHECK(!memcmp(&before,&s_build,sizeof before) && !memcmp(&device,&v,sizeof v));
+    CHECK(!memcmp(guest_before,g_ram,sizeof guest_before));
+    CHECK(!memcmp(&selected,&s_display_frame.aiz_plane,sizeof selected));
+    for(int x=238;x<558;++x)CHECK(half[153*796+x]!=0xFFFF0000u);
+    interpolation_configure(0);scanline(&v,0,native,320,row,796);
+    scanline(&v,153,native,320,row,796);CHECK(row[141]==0xFFFF0000u);
+    v.cram[1]=6;scanline(&v,153,native,320,row,796);CHECK(row[141]==0xFF770000u);v.cram[1]=14;
+    /* Both supported state paths own the complete current pose. Invalid
+     * compact metadata is rejected before any part is applied. */
+    size_t bytes=presentation_state_save(NULL,0);uint8_t *blob=(uint8_t*)malloc(bytes);CHECK(blob);
+    CHECK(presentation_state_save(blob,bytes)==bytes);
+    size_t at=sizeof(unsigned)+sizeof(int)+sizeof(double)+offsetof(SceneFrame,aiz_plane)-offsetof(SceneFrame,count);
+    unsigned phase=0;memcpy(&phase,blob+at,sizeof phase);unsigned invalid=3;
+    memcpy(blob+at,&invalid,sizeof invalid);CHECK(!presentation_state_load(blob,bytes,1));
+    CHECK(s_build.aiz_plane.phase==2);memcpy(blob+at,&phase,sizeof phase);
+    memset(&s_build.aiz_plane,0,sizeof s_build.aiz_plane);CHECK(presentation_state_load(blob,bytes,1));
+    CHECK(s_build.aiz_plane.phase==2 && s_build.aiz_plane.object[0].x==-97);free(blob);
+    S3StateIO measure={0};measure.ok=1;s3_video_state(&measure);
+    blob=(uint8_t*)malloc(measure.pos);CHECK(blob);
+    S3StateIO io={blob,measure.pos,0,0,1};s3_video_state(&io);CHECK(io.ok);
+    memset(&s_build.aiz_plane,0,sizeof s_build.aiz_plane);
+    io=(S3StateIO){blob,measure.pos,0,2,1};s3_video_state(&io);CHECK(io.ok);
+    CHECK(s_build.aiz_plane.phase==2 && s_build.aiz_plane.object[0].x==-97);free(blob);
+    /* Original mapping bounds decide retirement, rather than a frame count. */
+    unsigned ticks=0;
+    while(s_build.aiz_plane.phase && ticks++<100) {
+        word(g_ram,0xFE04,102+ticks);capture_objects();
+    }
+    CHECK(!s_build.aiz_plane.phase && !s_build.count);
+    /* Video Off and native-only FPS cannot acquire a retiring plane. */
+    CHECK(configure("off"));s_capture_frame=&s_ix_build;s_capture_readonly=1;
+    capture_objects();CHECK(!s_ix_build.aiz_plane.phase);s_capture_frame=&s_build;s_capture_readonly=0;
+    s_aiz_plane_art_ready=0;
+}
 static void test_blue_spheres(void)
 {
     GVDP v={0};M68KState cpu_before=g_cpu;
+    /* Split GET/PERFECT banners must leave the whole canvas despite their
+     * original +/-192px endpoint; only anchors move, never glyph spacing. */
+    for(int canvas=320;canvas<=1600;canvas+=320) {
+        int x,left,right,second;
+        CHECK(ss_banner_x(0xA57B,132,96,canvas,1,&x));CHECK(x==(canvas-320)/2+132);
+        CHECK(ss_banner_x(0xA57B,-60,96,canvas,1,&left));CHECK(left+32<=0);
+        CHECK(ss_banner_x(0xA583,356,96,canvas,1,&right));CHECK(right>=canvas);
+        CHECK(ss_banner_x(0xA55F,32,96,canvas,0,&left));
+        CHECK(ss_banner_x(0xA565,64,96,canvas,0,&second));CHECK(second-left==32);
+        /* Right GET arrow wraps to -96 in the native 9-bit SAT. */
+        CHECK(ss_banner_x(0xAEF8,-96,96,canvas,0,&right));CHECK(right>=canvas);
+        CHECK(!ss_banner_x(0xC589,72,8,canvas,0,&x));
+    }
     /* Blue Spheres' forward and inverse projections agree on the same
      * surface, including expanded margins. Behind-horizon points are not
      * mistaken for the near intersection. */
@@ -1068,6 +1690,12 @@ static void test_blue_spheres(void)
     ss_capture();ss_begin(&v,1603);CHECK(ss_x==2);
     ss_begin(&v,398);CHECK(ss_ready && ss_width==398);
     ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
+    /* Collision's collected-blue contact marker is not an uncollected
+     * sphere. A turn can keep it under the runner until it becomes red. */
+    memset(g_ram+0xF100,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
+    g_ram[0xF100]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
+    g_ram[0xF100]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
+    CHECK(g_ram[0xF100]==10);
     /* A sprite's visible base stays on its actual board intersection while
      * moving, turning and resizing. This would fail with the old separate
      * sphere-camera lift even though the ground's inverse test passed. */
@@ -1133,6 +1761,17 @@ static void test_blue_spheres(void)
     CHECK(configure("fit") && width(320,224,320,224)==320);
     native_row_calls=0;scanline_lazy(&v,0,320,out,320,test_native_row,native,NULL);
     CHECK(native_row_calls==1 && !memcmp(out,native,sizeof native) && !ss_ready);
+    /* The native priority-one HUD icon covers plane A where they overlap. */
+    memset(&v,0,sizeof v);v.reg[2]=0x30;v.reg[5]=0x7C;
+    word(v.vram,0xF800,128+8);v.vram[0xF802]=10;
+    word(v.vram,0xF804,0xC589);word(v.vram,0xF806,128+72);
+    memset(v.vram+0x589*32,0x33,9*32);
+    for(unsigned x=0;x<40;++x)word(v.vram,0xC000+(x+40)*2,2);
+    memset(v.vram+64,0x22,32);
+    uint32_t hud_colors[64]={0};hud_colors[2]=0xFF112233;hud_colors[35]=0xFFABCDEF;
+    ss_count=0;ss_ready=1;ss_color_phase=0;ss_clear=0;
+    ss_scanline(&v,10,out,796,hud_colors,hud_colors,0);
+    CHECK(out[72]==hud_colors[35] && out[79]==hud_colors[35]);
     /* Retained native actors honor the existing private atlas and palette
      * contract in the projected stage, independently of the sphere artwork. */
     memset(v.vram+0xF800,0,8);word(v.vram,0xF800,128+80);
@@ -1147,6 +1786,7 @@ static void test_blue_spheres(void)
     interpolation_reset();CHECK(!ss_latched && !ss_ready);
 }
 
+#include "sonic3_aiz_join_test.inc"
 int main(int argc,char **argv)
 {
     if(argc==2) {
@@ -1156,6 +1796,8 @@ int main(int argc,char **argv)
         for(unsigned n=0;n<40*28;n++)CHECK((s_menu_map[n]&2047u)<0x29Fu);
         s_menu_map_ready=0;
         load_aiz_art();CHECK(s_aiz_art_ready);
+        CHECK(aiz_join_load());
+        printf("AIZ joined original-map caches: %zu bytes\n",sizeof s_aiz_join_map+sizeof s_aiz_join_second);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
         const unsigned expected[]={0x6994E873u,0x81D9433Bu,0x0D697F52u,0xFF50471Du};
@@ -1324,7 +1966,10 @@ int main(int argc,char **argv)
         word(g_ram,0xEEC2,canvases[c][2]);
         scanline(&v,0,native,320,out,796);
         for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
-        CHECK(s_bg_checks>0 && s_bg_errors==0);
+        /* At SOZ's clamped edge B deliberately keeps its centered native
+         * parallax; a column under A's displaced viewport is not its oracle. */
+        if(!c)CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
+        else CHECK(s_bg_checks>0 && s_bg_errors==0);
     }
     /* LBZ1 draws its lower band from X=0 (HScroll_table+$004), while the
      * finer water deformation scrolls through it. Repeat that 512px canvas
@@ -1377,8 +2022,9 @@ int main(int argc,char **argv)
     for(unsigned act=0;act<2;++act)for(unsigned event=0;event<=16;event+=4) {
         g_ram[0xFE11]=(uint8_t)act;word(g_ram,0xEEC2,event);
         scanline(&v,0,native,320,out,796);
+        int bg_anchor=act?s_native_x:238;
         for(int x=0;x<796;++x)
-            CHECK(out[x]==(((x-s_native_x+1024)&511)<256?0xFFFF0000:0xFF00FF00));
+            CHECK(out[x]==(((x-bg_anchor+1024)&511)<256?0xFFFF0000:0xFF00FF00));
     }
     g_ram[0xFE10]=0;
     /* The AIZ fire curtain lives in the uploaded name table while RAM
@@ -1529,15 +2175,17 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_object_zoom();test_file_select();test_menu_layers();test_world_snapshot();test_hud_mapping();
+    test_sprite_atlas();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
-    test_s1_undeformed_installed_camera();
+    test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_aiz_intro_canvas_edge();
+    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_aiz_intro_owned_pose();
+    test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();
+    test_native_bonus();test_bonus_margins();test_bonus_entry_publication();test_native_demo_publication();
+    test_title_card_edges();
 #ifndef SONIC3_STANDALONE
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
@@ -1546,7 +2194,10 @@ int main(int argc,char **argv)
     test_s1_interpolation_installed_camera();
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
+    test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
+    test_local_presentation_state();
     test_blue_spheres();
+    test_aiz_join();
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
 }

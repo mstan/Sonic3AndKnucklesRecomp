@@ -1,4 +1,4 @@
-Sonic & Knuckles Recomp v0.7.2
+Sonic & Knuckles Recomp v0.7.3
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -17,8 +17,9 @@ Requires Ubuntu 24.04 (glibc 2.39) or compatible x86_64 Linux with OpenGL.
 Older distributions and Steam Deck have not been validated.
 
 PLAY AND SETTINGS
-Configure keyboard/gamepad controls in the launcher. Enable widescreen in
-Mods > Widescreen; Adaptive fits the window. Up to four controller seats.
+Configure keyboard/gamepad controls in the launcher. Widescreen defaults to
+Adaptive (Fit to screen) in Mods > Widescreen. Saved choices are preserved.
+Up to four controller seats.
 Enable Mods > Knuckles & Knuckles for the optional local crowd mod.
 Type 1-74 extras (default 16). Play as Knuckles; controllers 2-4 can drive extras.
 Busy stages may temporarily use fewer extras to reserve room for level objects.

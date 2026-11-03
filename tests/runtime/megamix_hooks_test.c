@@ -16,6 +16,8 @@ int g_split_sp_popped;
 static int rte;
 int *g_rte_pending_ptr=&rte;
 static int active=1;
+static const uint8_t *sprite_pixels,*sprite_lines;
+static unsigned sprite_bytes;
 static S3VideoWorldCell video;
 void s3_video_set_world_cell(S3VideoWorldCell fn){video=fn;}
 void s3_video_set_world_publish(S3VideoWorldPublish fn){CHECK(!fn);}
@@ -25,7 +27,7 @@ int tri_scd_video_cell(const uint8_t *r,int x,int y,int b,uint16_t *c)
 {(void)r;(void)x;(void)y;(void)b;(void)c;return 0;}
 void tri_scd_publish(const uint8_t *ram){(void)ram;CHECK(0);}
 int gvdp_set_sprite_patterns(const uint8_t *pixels,unsigned bytes,const uint8_t *lines)
-{ (void)pixels;(void)bytes;(void)lines;return 1; }
+{ sprite_pixels=pixels;sprite_bytes=bytes;sprite_lines=lines;return 1; }
 uint32_t tri_dir(void){return active?0x400040:0;}
 uint8_t tri_rd8(uint32_t a){CHECK(a>=0x400000 && a<0x410000);return bank[a-0x400000];}
 uint16_t tri_rd16(uint32_t a){return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1));}
@@ -83,6 +85,27 @@ static void private_corpus(const char *layout,const char *chunks,unsigned blocks
 int main(int argc,char **argv)
 {
     fixture();uint16_t cell;
+    /* Level initializes geometry before the old menu fades. Its menu atlas
+     * may therefore replace bank0; the post-fade rebind must recover the
+     * incoming patterns without resetting layout changes or guest state. */
+    lng(bank,0x128,0x400600);lng(bank,0x12C,64);lng(bank,0x130,0x400700);
+    gvdp_set_sprite_patterns(bank+0x800,32,bank+0x900);
+    tri_megamix_geometry_begin();
+    CHECK(sprite_pixels==bank+0x800 && sprite_bytes==32 && sprite_lines==bank+0x900);
+    CHECK(tri_megamix_sprite_patterns());
+    CHECK(sprite_pixels==bank+0x600 && sprite_bytes==64 && sprite_lines==bank+0x700);
+    uint8_t unchanged_ram[65536];memcpy(unchanged_ram,g_ram,sizeof g_ram);
+    word(bank,0x20C,259); /* A reinitialization would replace the cached cell. */
+    gvdp_set_sprite_patterns(bank+0x800,32,bank+0x900);
+    CHECK(tri_megamix_sprite_patterns());
+    CHECK(sprite_pixels==bank+0x600 && sprite_bytes==64 && sprite_lines==bank+0x700);
+    CHECK(!memcmp(unchanged_ram,g_ram,sizeof g_ram));
+    CHECK(tri_megamix_geometry_cell(127,127,0,0,&cell) && cell==0xF123);
+    word(bank,0x20C,256);
+    word(g_ram,0xFE10,0x2000);CHECK(tri_megamix_sprite_patterns());
+    CHECK(!sprite_pixels && !sprite_bytes && !sprite_lines);
+    word(g_ram,0xFE10,0x3400);CHECK(tri_megamix_sprite_patterns());
+    CHECK(sprite_pixels==bank+0x600);
     CHECK(tri_megamix_geometry_cell(127,127,0,0,&cell) && cell==0xF123);
     CHECK(video(g_ram,127,127,1,&cell) && cell==0x8121);
     uint8_t snapshot[65536];memcpy(snapshot,g_ram,sizeof snapshot);snapshot[0xFE10]=0x20;

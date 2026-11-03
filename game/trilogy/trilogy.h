@@ -294,6 +294,7 @@ int  trilogy_dispatch(uint32_t addr);
 
 int  tri_level_hook(uint32_t pc);         /* trilogy_level.c */
 void tri_megamix_geometry_begin(void);
+int  tri_megamix_sprite_patterns(void);
 int  tri_megamix_geometry_owns(uint32_t pc);
 int  tri_megamix_geometry_hook(uint32_t pc);
 int  tri_megamix_sprite_hook(uint32_t pc);
@@ -303,6 +304,7 @@ int tri_mighty_active(void);
 uint16_t tri_mighty_color(int wet,unsigned color);
 int tri_mighty_presentation_hook(uint32_t pc);
 int tri_mighty_presentation_frame(uint8_t *tiles,uint16_t *top,uint16_t *bottom);
+int tri_data_select_visible(void);
 int tri_megamix_lz_scroll(int camera_x,unsigned line);
 int tri_megamix_water_event(unsigned act,uint16_t x,uint16_t y,
     uint16_t *mean,uint16_t *target,uint8_t *routine);

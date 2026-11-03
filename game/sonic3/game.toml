@@ -1,13 +1,13 @@
-# game.toml — Sonic the Hedgehog 3 (USA, 1994), STANDALONE (no lock-on).
+# game.toml â€” Sonic the Hedgehog 3 (USA, 1994), STANDALONE (no lock-on).
 # 68000, 2 MB ROM, flat at $000000-$1FFFFF. Identity-mapped (no banks).
 #
-# This is "Sonic 3 mode" — the first of three planned modes (Sonic 3 alone,
+# This is "Sonic 3 mode" â€” the first of three planned modes (Sonic 3 alone,
 # Sonic & Knuckles alone, Sonic 3 & Knuckles locked-on). Standalone Sonic 3
 # is the cleanest target: a single 2 MB ROM whose code runs at its own org-0
 # addresses, so file offset == runtime address == disasm address. NO +$200000
 # offset, no cross-half lock-on calls, no bank-switching.
 #
-# ROM identity (verified): CRC32 9BC192CE, MD5 d724ea4d…, == skdisasm s3built.bin
+# ROM identity (verified): CRC32 9BC192CE, MD5 d724ea4dâ€¦, == skdisasm s3built.bin
 # (buildS3.lua, Sonic3_Complete=0). Header: "SONIC THE HEDGEHOG 3", serial
 # GM MK-1079, region U. See memory project_canonical_s3k_rom.
 #
@@ -33,7 +33,7 @@ discovery_files = [
 ]
 
 # ---------------------------------------------------------------------------
-# Per-game RAM layout — Sonic 3 uses the shared Sonic engine WRAM map
+# Per-game RAM layout â€” Sonic 3 uses the shared Sonic engine WRAM map
 # (verified against s3.lst constants; same offsets as the S3K combined).
 # ---------------------------------------------------------------------------
 [ram_layout]
@@ -41,7 +41,7 @@ game_mode      = 0xFFF600   # Game_mode
 vint_runcount  = 0xFFFE0C   # V_int_run_count (longword)
 vint_routine   = 0xFFF62A   # V_int_routine
 plc_pending    = 0x000000
-initial_ssp    = 0xFFFE00   # System_stack — set by `lea (System_stack).w,sp` at EntryPoint
+initial_ssp    = 0xFFFE00   # System_stack â€” set by `lea (System_stack).w,sp` at EntryPoint
 vbla_stack     = 0xFFFE00
 intr_stack     = 0xFFFE00
 player_object  = 0xFFB000   # Player_1 / Object_RAM start
@@ -61,10 +61,10 @@ two_player_addr    = 0xFFFFD8    # Competition_mode (S3-alone map): require == 0
 # NO extra_ram_addr / redraw_flag_addr: those were the LEGACY disasm carved bytes
 # (Widescreen_extra/Widescreen_redraw in the ds.b $14 block) which the CANONICAL ROM
 # does NOT read. Content widening = the [[widescreen_site]] injection below (g_ws_margin).
-# Margin-fill-on-arm (if S3 needs it like S2) is handled separately — TBD after baseline.
+# Margin-fill-on-arm (if S3 needs it like S2) is handled separately â€” TBD after baseline.
 
 # ---------------------------------------------------------------------------
-# [[widescreen_site]] — PSX-style post-patch injection (canonical s3_canonical.lst).
+# [[widescreen_site]] â€” PSX-style post-patch injection (canonical s3_canonical.lst).
 # Render_Sprites culls + sprite-X masks + DrawTilesAsYouMove tile row/columns +
 # Render_Rings window. Addresses verified against s3_canonical.lst.
 # ---------------------------------------------------------------------------
@@ -111,9 +111,9 @@ kind = "subreg"
 reg  = 3
 
 # Tile-load columns (Draw_TileColumn / Draw_TileColumn2, on d0). LEFT subreg at the
-# tst.b d2 (after the beq) — applies to both paths but the RIGHT path reloads d0
+# tst.b d2 (after the beq) â€” applies to both paths but the RIGHT path reloads d0
 # (move.w d3,d0), so it nets to the LEFT column only. RIGHT addreg BEFORE the
-# addi #$150,d0 — this is RIGHT-PATH-ONLY because the `bpl` (moved-left) branched
+# addi #$150,d0 â€” this is RIGHT-PATH-ONLY because the `bpl` (moved-left) branched
 # past it to loc_*. (Injecting at the post-addi merge label instead would cancel the
 # LEFT subreg on the left path -> stale left-scroll tiles.)
 [[widescreen_site]]
@@ -134,7 +134,7 @@ kind = "addreg"
 reg  = 0
 
 # FG tile-row (DrawTilesAsYouMove @ 39C3C = moveq #$15,d6 right after move.w
-# Camera_X,d1): TWO transforms at one addr — subreg d1 (X-start, left) + addimm d6
+# Camera_X,d1): TWO transforms at one addr â€” subreg d1 (X-start, left) + addimm d6
 # (count = 21 + margin/8, both sides). Draw_TileRow uses the caller's d6, so this
 # widens ONLY the FG row (the BG twin moveq @ 39C60 is untouched).
 [[widescreen_site]]
@@ -172,6 +172,12 @@ extra = [
 
 # Opt-in host renderer. Stock skdisasm 1e1b5af S3 cartridge verified byte-perfect.
 # Infinite time extends the original clock to 99:59 without replacing results.
+# Native Nemesis FIFO pop: complete last destination and retire16th source.
+# Exact original-source FixBugs repair; always active, independent of mods.
+[[widescreen_site]]
+addr = 0x1B0A
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0xEAF2 # Native time-limit BEQ
 kind = "game_hook"

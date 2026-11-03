@@ -1,4 +1,4 @@
-Sonic 3 Recomp v0.7.2
+Sonic 3 Recomp v0.7.3
 ============================================================
 
 Native static recompilation for Windows x64 and Linux x86_64.
@@ -17,8 +17,9 @@ Requires Ubuntu 24.04 (glibc 2.39) or compatible x86_64 Linux with OpenGL.
 Older distributions and Steam Deck have not been validated.
 
 PLAY AND SETTINGS
-Configure keyboard/gamepad controls in the launcher. Enable widescreen in
-Mods > Widescreen; Adaptive fits the window. Up to four controller seats.
+Configure keyboard/gamepad controls in the launcher. Widescreen defaults to
+Adaptive (Fit to screen) in Mods > Widescreen. Saved choices are preserved.
+Up to four controller seats.
 
 Preserve settings.ini, rom-*.cfg, *-mods.ini and *.srm when upgrading.
 Linux refreshes bundled assets without replacing your settings or saves.
