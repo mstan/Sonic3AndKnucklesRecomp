@@ -19,7 +19,7 @@ static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *
         int wx=nx-hs;
         uint16_t attr=plane_attr(v,base,wx,wy);
         unsigned opaque=pattern_pixel(v,attr,wx,wy),pixel=opaque?opaque:v->reg[7]&63u;
-        int dark=(v->reg[12]&8) && !(opaque && (attr&0x8000u));
+        int dark=(v->reg[12]&8) && !(attr&0x8000u);
         int ext=opaque && !(attr&0x6000u)?presentation_plane_line(attr&2047u):0;
         out[x]=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,pixel&15u),
             dark?GENESIS_DAC_SHADOW:GENESIS_DAC_NORMAL):dark?shadow[pixel]:palette[pixel];

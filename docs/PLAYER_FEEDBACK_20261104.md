@@ -11,18 +11,18 @@ the applicable reproduction, regression, packaging and owner-review gates.
 
 | ID | Report | Disposition |
 | --- | --- | --- |
-| A01 | Launcher cover-art rating differs from other games | Pending identity check; cosmetic |
-| A02 | Competition background is dark | Pending original comparison |
+| A01 | Launcher cover-art rating differs from other games | No correctness change: the US Genesis Sonic 3 cover uses the period GA mark. Sonic 3 predates ESRB's September 1994 start. Uniform cover ratings would be a cosmetic asset request. |
+| A02 | Competition background is dark | Fixed candidate: transparent high-priority plane tiles must retain normal SHI intensity. Scalar, packed and raster-worker paths pass; actual S3 and S3K Competition submenus are bright at 32:9. Final package regression pending. |
 | A03 | Sound-test HCZ2 music briefly hitches early in track | Pending bounded reproduction |
 | A04 | Music may play faster than expected | Tentative; measure original timing |
-| A05 | Holding window caption buttons stalls or affects playback | Pending reproduction |
+| A05 | Holding window caption buttons stalls or affects playback | Existing upstream fix incorporated: cooperative event dispatch now covers caption-button tracking, as well as move/resize. Combined Windows modal-event regression passes. Package regression pending. |
 | A06 | AIZ1 bombing transition slightly slows | Pending original comparison |
 | A07 | Giant-ring entry lacks sound | Pending original comparison |
-| A08 | Blue Spheres disappear near screen edges at native aspect | Pending original comparison |
+| A08 | Blue Spheres disappear near screen edges at native aspect | Original native-canvas culling retained. Original-ROM special-stage captures reproduce the finite projection and clipped edge spheres. No change to the already accepted enhanced widescreen projection. |
 | A09 | AIZ heat haze disjoins waterfall across waterline | Pending original comparison |
 | A10 | Companion Tails behaves strangely at AIZ2 end | Pending replay reproduction |
-| A11 | Rolling early through HCZ1 spring/loop clips into wall and may zip | Pending replay reproduction; high priority |
-| A12 | Initial HCZ2 camera fails to follow, causing death; retry works | Reproduced: fixed splash slot B172 overwrites live end-sign controller before native act-size installation. Candidate reserves the slot in both native allocation loops; actual recorded-input transition now reaches stored bounds 6000/1000 and a living player in lower HCZ2 with camera following. Gameplay scope/CCR/RAM tests pass. Final regression and release pending; S3K occurrence unverified. |
+| A11 | Rolling early through HCZ1 spring/loop clips into wall and may zip | Original behavior reproduced. The native recording and original-ROM collision fixture both settle inside the wall at X1AF5/Y03EC, with matching actor position, velocity, collision and object-control state. Fixture starts before the spring traversal; it does not set the resulting collision state. No correctness patch. |
+| A12 | Initial HCZ2 camera fails to follow, causing death; retry works | Fixed candidate: fixed splash slot B172 overwrites live end-sign controller before native act-size installation. Both native allocation loops and the custom widescreen placement loader reserve the slot. Recorded-input transition reaches stored bounds 6000/1000 and a living player in lower HCZ2 with camera following. Gameplay scope/CCR/RAM and real widescreen placement tests pass. Final package regression pending; S3K occurrence unverified. |
 
 ## Sonic 3 & Knuckles
 
@@ -59,8 +59,8 @@ transformation/cutscene timing and guest simulation must remain correct.
 
 | ID | Report | Disposition |
 | --- | --- | --- |
-| B01 | Top of title screen corrupts when Sonic changes animation | Pending reproduction; also check native aspect |
-| B02 | Knuckles MHZ1 intro graphics corrupt during fade-in | Pending reproduction; also check native aspect |
+| B01 | Top of title screen corrupts when Sonic changes animation | Fixed candidate: native decoding uploads an overlapping landing-art module while the old falling-pose mapping remains visible. Retire that mapping before publishing the overlapping module through the original FIFO. Native and 32:9 captures remove the corruption; original-ROM comparison confirms the expected pose. Final package regression pending. |
+| B02 | Knuckles MHZ1 intro graphics corrupt during fade-in | Fixed candidate: complete the original queued scenery PLC before the opening fade. Native and 32:9 sequences no longer expose partially decompressed blocks. The uniform dark cliff during the first palette steps also occurs in the original ROM and is retained. Final package regression pending. |
 
 ## Lower-priority suggestions
 
@@ -69,7 +69,14 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Obscure the buried portions of AIZ2's raised/falling drawbridge; compare original.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 
-There are **37 report groups awaiting decisions**, including the two explicit
-prior-disposition reviews. None is counted as a new fix merely from capture or
-replay integrity checks. Previously approved asset and nonreproduction deferrals
-remain distinct from fixes.
+There are **37 report groups**: **29 awaiting decisions**, **5 implemented
+candidates awaiting final package regression**, and **3 non-fix dispositions**.
+The two explicit prior-disposition reviews remain open. No capture or replay
+integrity check alone counts as a fix. Approved asset and nonreproduction
+deferrals remain distinct from fixes.
+
+Original-ROM comparisons use Genesis Plus GX v1.7.4 f27655b with the same owned
+ROM revisions. The HCZ collision check is an actor/world-state fixture with the
+original CPU stack preserved, followed by normal original-ROM execution; it is
+not claimed as a complete original playthrough. Rejected setup attempts are
+excluded from acceptance.

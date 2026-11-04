@@ -708,7 +708,14 @@ static void spawn_scene(void)
         }
         if(best<0)break;
         Placement *p=&s_placements[best];unsigned o;
-        for(o=0xB0DE;o<0xCAE2 && scene_read32(0xFF0000u+o);o+=0x4A){}
+        for(o=0xB0DE;o<0xCAE2;o+=0x4A) {
+#ifdef SONIC3_STANDALONE
+            /* Same reservation as the native allocators: HCZ1's fixed
+             * splash must not overwrite a live act-transition controller. */
+            if(o==0xB172 && ram16(0xFE10)==0x100 && !ram16(S3_COMPETITION))continue;
+#endif
+            if(!scene_read32(0xFF0000u+o))break;
+        }
         if(o>=0xCAE2){++s_pool_pressure;break;}
         write16(o+0x10,p->x);write16(o+0x14,p->y&4095);
         unsigned flip=(p->y>>13)&3;
@@ -1372,7 +1379,7 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
             (a&64u)?a&63u:(b&64u)?b&63u:raster->backdrop;
         unsigned shade=GENESIS_DAC_NORMAL;
         if(raster->shadow_mode && pixel<64) {
-            int dark=!(ah||bh||sh);
+            int dark=!((a|b)&128u)&&!sh;
             if(shadow_op)dark=1;
             if(hilite_op){if(dark)dark=0;else shade=GENESIS_DAC_HIGHLIGHT;}
             if(dark)shade=GENESIS_DAC_SHADOW;

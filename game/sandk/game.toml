@@ -75,6 +75,15 @@ extra = [
 addr = 0x1880
 kind = "game_hook"
 
+# Wait for original MHZ scenery art before the standalone Knuckles entry fade.
+[[widescreen_site]]
+addr = 0x3BB8 # Before Animate_Palette's incoming level fade
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x1B28 # Publish queued title art after its previous mapping retires
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0xDD76 # Native time-limit BEQ
 kind = "game_hook"
