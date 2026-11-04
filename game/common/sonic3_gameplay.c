@@ -65,7 +65,24 @@ static int timer_site(uint32_t pc)
 static int nemesis_pop_site(uint32_t pc)
 {return pc==(standalone_s3?0x1B0Au:0x1880u);}
 int s3_gameplay_owns(uint32_t pc)
-{return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc);}
+{return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) ||
+        (standalone_s3 && (pc==0x1A0E0u || pc==0x1A0BCu));}
+void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
+                                 uint32_t candidate,uint16_t *sr)
+{
+    /* HCZ1BGE_DoTransition installs its splash at fixed slot B172. An
+     * ordinary allocation there can leave the end-sign controller awaiting
+     * results in that slot; the splash then destroys it before its native
+     * Change_Act2Sizes call. Make the original DBEQ allocator continue past
+     * this reserved slot. Its own counter, bounds and occupied-slot behavior
+     * remain intact; no result/camera flag or object contents are changed.
+     * Cover CreateNewSprite4 (level placements) as well as the loop shared
+     * by AllocateObject and AllocateObjectAfterCurrent. */
+    if(standalone_s3 && (pc==0x1A0E0u || pc==0x1A0BCu) && ram && sr && ram[0xF600]==12 &&
+       word(ram,0xFE10)==0x100 && !(word(ram,0xFFD8)) &&
+       (candidate&0xFFFFFFu)==0xFFB172u)
+        *sr&=(uint16_t)~4u;
+}
 /* Original skdisasm FixBugs repair for Process_Nem_Queue_ShiftUp. Retail
  * shifts only88 of90 bytes and never retires its16th source. Once occupied,
  * that source repeats forever and later append requests overwrite variables

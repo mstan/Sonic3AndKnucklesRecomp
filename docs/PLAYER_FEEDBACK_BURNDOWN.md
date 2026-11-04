@@ -1,5 +1,10 @@
 # Player-feedback burndown — 2026-11-01
 
+The historical v0.7.3 pass below is complete. The newer November 4 follow-up
+tracks 37 new/reopened candidate groups separately in
+[the current burndown](PLAYER_FEEDBACK_20261104.md); those are not included in
+this pass's completed totals.
+
 The follow-up is complete and published in [v0.7.3](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases/tag/v0.7.3). The S3-family ledger tracks **110 reports:75 released fixes,35 non-fix dispositions and no open reports**. This release delivers40 further fixes;35 were released earlier. The combined114-report chart also retains four historical standalone Sonic2 entries outside this session:77 fixes,37 non-fix dispositions and no open reports. Original behavior, bounded nonreproduction and approved asset deferrals remain distinct from fixes.
 
 All three Windows ZIPs and three Linux AppImages are published from game `294fd5be11a5eae508599f667aa1e7a7bcb8a688`, engine `13d065d0f68c0d497cbd22c35e166d56b1192481` and UI `aee41e1dc834c105fd290d7c833bbbd7fbc71c1e`. Fifteen focused checks pass per platform; final packaged gameplay/defaults, saved choices, replay/native-save preservation, importer and Windows/Linux parity checks pass. The owner cleared all three visual/play checks. All six public archives and six checksum sidecars were streamed and their bytes/SHA256 verified. Exact identities and limitations are in [the v0.7.3 release record](RELEASE_V0_7_3.md).
