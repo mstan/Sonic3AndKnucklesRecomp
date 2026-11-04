@@ -1840,7 +1840,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             }
         }
         int joined=level && s_display && width>320 &&
-            aiz_join_sample(s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
+            aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
         if(joined)apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.

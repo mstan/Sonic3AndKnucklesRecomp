@@ -13,11 +13,11 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | --- | --- | --- |
 | A01 | Launcher cover-art rating differs from other games | No correctness change: the US Genesis Sonic 3 cover uses the period GA mark. Sonic 3 predates ESRB's September 1994 start. Uniform cover ratings would be a cosmetic asset request. |
 | A02 | Competition background is dark | Fixed candidate: transparent high-priority plane tiles must retain normal SHI intensity. Scalar, packed and raster-worker paths pass; actual S3 and S3K Competition submenus are bright at 32:9. Final package regression pending. |
-| A03 | Sound-test HCZ2 music briefly hitches early in track | Pending bounded reproduction |
-| A04 | Music may play faster than expected | Tentative; measure original timing |
+| A03 | Sound-test HCZ2 music briefly hitches early in track | Deferred after bounded nonreproduction. Native sound-test ID04/C input produces35 seconds without a silent10ms block. This is generated PCM with muted output, not an actual-device dropout test; no hitch fix claimed. |
+| A04 | Music may play faster than expected | Not reproduced.35-second RMS-envelope comparison against original-ROM sound-test ID04 gives correlation0.91027, best time scale0.9995 (about one tick over the interval), with no sustained speed increase. Different synthesizer samples are not claimed bit-identical. |
 | A05 | Holding window caption buttons stalls or affects playback | Existing upstream fix incorporated: cooperative event dispatch now covers caption-button tracking, as well as move/resize. Combined Windows modal-event regression passes. Package regression pending. |
 | A06 | AIZ1 bombing transition slightly slows | Pending original comparison |
-| A07 | Giant-ring entry lacks sound | Pending original comparison |
+| A07 | Giant-ring entry lacks sound | Original conditional swish retained: S3's4429C entry path branches past the BigRing SFX when approaching from the left. The later443A8 warp SFX is unconditional unless all emeralds are collected. No new audio patch or blanket silence claim. |
 | A08 | Blue Spheres disappear near screen edges at native aspect | Original native-canvas culling retained. Original-ROM special-stage captures reproduce the finite projection and clipped edge spheres. No change to the already accepted enhanced widescreen projection. |
 | A09 | AIZ heat haze disjoins waterfall across waterline | Pending original comparison |
 | A10 | Companion Tails behaves strangely at AIZ2 end | Pending replay reproduction |
@@ -34,14 +34,14 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K01 | AIZ1 intro Super transformation looks wrong in extended view | Pending bounded assessment |
 | K02 | Horizontal background seams in pre-bombing AIZ1 and AIZ2 drain area | Pending reproduction |
 | K03 | Hollow trunk interior closes again near AIZ1 miniboss | Pending reproduction; original first-entry animation excluded |
-| K04 | AIZ1 miniboss background disjoins and right-side graphics corrupt | Pending reproduction |
-| K05 | Corruption slides back to normal after AIZ1 miniboss | Pending reproduction |
-| K06 | Slot bonus foreground remains confined to native canvas | Pending reproduction |
+| K04 | AIZ1 miniboss background disjoins and right-side graphics corrupt | Fixed candidate: the extended join exposed placeholder animation tiles and the next act before its burned art was installed. Use the original animation frames and extend the current coast through the inaccessible pre-fire margin. All867 actual cutscene RAM/VRAM/native-center samples match the baseline; package regression pending. |
+| K05 | Corruption slides back to normal after AIZ1 miniboss | Fixed candidate with K04: retain each installed art phase through the real fire transition and coordinate rebase. The actual controller completes the cutscene and reaches act2 with unchanged guest state; package regression pending. |
+| K06 | Slot bonus foreground remains confined to native canvas | Finite-arena presentation retained. The machine board and actors remain authored size; decorative B-plane scenery fills the margins. Extending the interactive foreground is a lower-priority enhancement, separate from the already fixed corrupt margins. |
 | K07 | Slot bonus red knot background jumps when animation loops | Pending original comparison |
 | K08 | Corruption near breakable entrance to AIZ1 second giant ring | Pending reproduction |
 | K09 | Companion Tails rapidly turns in corners, AIZ2 and previously LZ1 | Pending bounded assessment |
-| K10 | AIZ2 drain waterfall disappears instantly | Review prior approved asset/nonreproduction disposition; no fix claimed |
-| K11 | Gumball bonus remains at native aspect | Review prior disposition and renderer coverage |
+| K10 | AIZ2 drain waterfall disappears instantly | Prior S3-74 decision retained: original button0 drainage clears the exact four chunks and changes water target0528 to0618. Smooth retirement is an enhancement; no additional fix. |
+| K11 | Gumball bonus remains at native aspect | Prior S3-28 margin fix retained; the machine arena intentionally remains finite. A full-width interactive arena is a lower-priority renderer enhancement, not an unqualified claim from the previous margin repair. |
 | K12 | Monkey Dude art corrupts after bonus while title-card art is loaded | Pending reproduction |
 | K13 | AIZ2 Flying Battery opening and left/right margins flicker | Pending replay reproduction; retain each phase |
 | K14 | Tree scene pops in as Flying Battery disappears | Pending reproduction |
@@ -68,10 +68,11 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Smooth AIZ2 drain-palette retirement beyond original behavior.
 - Obscure the buried portions of AIZ2's raised/falling drawbridge; compare original.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
+- Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **37 report groups**: **29 awaiting decisions**, **5 implemented
-candidates awaiting final package regression**, and **3 non-fix dispositions**.
-The two explicit prior-disposition reviews remain open. No capture or replay
+There are **37 report groups**: **21 awaiting decisions**, **7 implemented
+candidates awaiting final package regression**, and **9 non-fix dispositions**.
+The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
 deferrals remain distinct from fixes.
 

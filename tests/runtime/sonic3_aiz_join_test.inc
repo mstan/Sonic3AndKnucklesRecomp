@@ -18,6 +18,16 @@ static void test_aiz_join(void)
     memset(&s_aiz_main,0,sizeof s_aiz_main);memset(&s_aiz_join_second,0,sizeof s_aiz_join_second);
     s_aiz_join_attempted=s_aiz_join_ready=s_aiz_art_ready=1;
     s3_video_set_world_cell(NULL);s_visible_count=0;s_placement_count=0;
+    /* Static placeholders must never appear in animated slots. A future
+     * neighbor uses its original first frame, a live bank its installed
+     * frame; transparent pixels and both flips retain normal semantics. */
+    memset(g_rom+S3_ART_BANK+0xA3F00,0x12,0x17*32);
+    memset(g_rom+S3_ART_BANK+0xA5880,0x34,0x460);
+    memset(v.vram+0xB3*32,0x56,0x17*32);
+    CHECK(aiz_join_pixel(&v,1,1,0,0,0x60B3)==49);
+    CHECK(aiz_join_pixel(&v,1,1,0,0,0x68B3)==50);
+    s_frame_act=1;CHECK(aiz_join_pixel(&v,1,3,0,0,0x60B3)==53);s_frame_act=0;
+    CHECK(aiz_join_pixel(&v,1,1,0,0,0x60CA)==51);
     /* Distinct neighbors and an authored common overlap. A one-sided fix
      * loses the red landscape before the original rebase. */
     for(unsigned map=0;map<2;++map) {
@@ -29,6 +39,9 @@ static void test_aiz_join(void)
         for(unsigned p=0;p<8;p+=2){word(a->blocks,8+p,1);word(a->blocks,16+p,2);}
         memset(a->video.vram+32,0x11,32);memset(a->video.vram+64,0x22,32);
     }
+    uint16_t margin_attr=0;uint8_t margin_pixel=0;
+    CHECK(aiz_join_sample(&v,1,0x2F10,400,0x3100,0x300,&margin_attr,&margin_pixel));
+    CHECK(margin_attr==2 && margin_pixel==2); /* current coast, not future art */
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
     v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
     v.cram[1]=14;v.cram[2]=0xE0;v.cram[3]=0xE00;
@@ -36,7 +49,10 @@ static void test_aiz_join(void)
     for(unsigned p=0;p<64*32;++p)word(v.vram,0xC000+p*2,2);
     aiz_join_test_world(0);word(v.vram,0xF000,(uint16_t)-0x2F10);v.vsram[0]=0x300;
     memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.aiz_join=aiz_join_tag(g_ram);
-    CHECK(s_build.aiz_join==1);s_build.camera_x=0x2F10;s_build.camera_y=0x300;s_build.count=1;
+    CHECK(s_build.aiz_join==1);
+    /* Rebase parity applies after the fire refresh installs the second
+     * bank, not to the preceding green-forest scene. */
+    s_build.aiz_join=2;s_build.camera_x=0x2F10;s_build.camera_y=0x300;s_build.count=1;
     s_build.sprites[0]=(SceneSprite){160,0,0x8003,0,0};publish_sprites();
     g_ram[0xF62A]=8;s3_video_vblank();memcpy(untouched,g_ram,sizeof untouched);
     scanline(&v,0,native,320,before,796);
@@ -48,7 +64,7 @@ static void test_aiz_join(void)
      * tag keeps both margins and the actor in their original positions. */
     aiz_join_test_world(1);memcpy(untouched,g_ram,sizeof untouched);
     scanline(&v,0,native,320,after,796);
-    CHECK(s_display->aiz_join==1 && s_native_x==238 && !memcmp(before,after,sizeof before));
+    CHECK(s_display->aiz_join==2 && s_native_x==238 && !memcmp(before,after,sizeof before));
     CHECK(!memcmp(untouched,g_ram,sizeof untouched));
     s_build.aiz_join=3;s_build.camera_x=0x10;s_build.camera_y=0x280;
     publish_sprites();s3_video_vblank();word(v.vram,0xF000,(uint16_t)-0x10);v.vsram[0]=0x280;

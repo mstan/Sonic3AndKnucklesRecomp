@@ -74,18 +74,54 @@ static int aiz_join_near(unsigned tag,int camera)
 {
     return tag && tag<=3 && (tag==3?camera<0x300:camera>=0x2E00);
 }
-static int aiz_join_sample(unsigned tag,int camera,int nx,int x,int y,
+static uint8_t aiz_join_pixel(const GVDP *v,unsigned map,unsigned tag,int x,int y,
+                              uint16_t attr)
+{
+    /* Compressed level art reserves these tiles for AnimateTiles. Those
+     * bytes are placeholders, not a valid waterfall/tree frame. Use the
+     * installed animation when its bank is live, otherwise the original
+     * initial AniPLC frame for the neighboring landscape. This lookup is
+     * read-only, including during interpolation and after rewind. */
+    static const unsigned first[]={0x2E6,0x2F2,0x2FE,0xB3,0xCA,0xD6,0xE2,0xE6};
+    static const unsigned count[]={0xC,0xC,6,0x17,0xC,0xC,4,0x18};
+    static const unsigned source[]={0xA2940+0x3C*32,0xA2940+0x18*32,0xA3240,
+        0xA3F00,0xA3600+0x3C*32,0xA3600+0x18*32,0xA5680,0xA4A80};
+    unsigned tile=attr&2047u;
+    for(unsigned i=map?3:0;i<(map?8:3);++i) {
+        if(tile<first[i] || tile>=first[i]+count[i])continue;
+        const uint8_t *pattern;
+        if((!map && tag==1 && s_frame_bg_event<=8) ||
+           (map && s_frame_act==1))pattern=v->vram+tile*32;
+        else if(map && x<0x1C0 && tile>=0xCA && tile<0xED)
+            pattern=g_rom+S3_ART_BANK+0xA5880+(tile-0xCA)*32;
+        else pattern=g_rom+S3_ART_BANK+source[i]+(tile-first[i])*32;
+        unsigned fx=(unsigned)x&7u,fy=(unsigned)y&7u;
+        if(attr&0x800u)fx^=7u;if(attr&0x1000u)fy^=7u;
+        unsigned byte=pattern[fy*4+fx/2],nibble=(fx&1)?byte&15u:byte>>4;
+        return nibble?(uint8_t)(((attr>>9)&48u)|nibble):0;
+    }
+    return pattern_pixel(map?&s_aiz_join_second.video:&s_aiz_main.video,attr,x,y);
+}
+static int aiz_join_sample(const GVDP *v,unsigned tag,int camera,int nx,int x,int y,
                            uint16_t *attr,uint8_t *pixel)
 {
     if(!aiz_join_near(tag,camera) || (nx>=0 && nx<320) || !aiz_join_load())return 0;
     /* Other parts of either level keep their live animated/native terrain.
      * Only the neighboring landscape exposed around this join is cached. */
     if(tag==3){x+=0x2F00;y+=0x80;}
+    /* Before the bombing has installed the burned bank, the original
+     * finite act ends at $3080. Exposing the next act here shows its
+     * uninitialized animated art and a prematurely burned landscape.
+     * Its coast backdrop is also drawn on A; making A transparent exposes
+     * an unrelated forest behind it. Reflect that existing coast strip
+     * through the inaccessible cutscene margin. Native player/camera bounds
+     * stay intact. The next map joins when fire installs its actual bank. */
+    if(tag==1 && x>=0x3080)x=0x307F-(x-0x3080);
     /* Main and burned art are installed before the logical act changes.
      * The native flame/redraw remains authoritative in its original view. */
     unsigned map=(unsigned)(x>=(tag==1?0x3080:0x2F00));
     if(map){x-=0x2F00;y-=0x80;}
     *attr=aiz_join_attr(map,x,y);
-    *pixel=pattern_pixel(map?&s_aiz_join_second.video:&s_aiz_main.video,*attr,x,y);
+    *pixel=aiz_join_pixel(v,map,tag,x,y,*attr);
     return 1;
 }
