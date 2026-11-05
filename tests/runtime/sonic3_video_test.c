@@ -77,6 +77,33 @@ static void test_sprite_atlas(void)
     draw_scene_sprites(&v,0,out,64,0,pal);CHECK(!out[8]); /* atlas bounds */
     test_atlas_enabled=0;s_display=previous;
 }
+static void test_aiz_monkey_owned_art(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    const SceneFrame *old=s_display;s_display=&scene;
+    int level=s_frame_level;unsigned zone=s_frame_zone;
+    s_frame_level=1;s_frame_zone=0;s_camera=s_camera_y=0;
+    scene.scene=1;scene.count=2;
+    scene.sprites[0]=(SceneSprite){-200,0,0x2548,0,0,256,1};
+    scene.sprites[1]=(SceneSprite){100,0,0x2548,0,0,256,1};
+    memset(s_aiz_monkey_art,0x12,sizeof s_aiz_monkey_art);
+    s_aiz_monkey_ready=s_aiz_monkey_attempted=1;
+    memset(v.vram+0x548*32,0x55,32);
+    pal[17]=0xFF110000;pal[18]=0xFF220000;pal[21]=0xFF550000;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[38]==pal[17] && out[39]==pal[18]);
+    CHECK(out[338]==pal[21]); /* native viewport retains the installed bank */
+    scene.sprites[0].attr=0x2547;memset(v.vram+0x547*32,0x55,32);
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    scene.sprites[0].attr=0x2548;s_frame_zone=1;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    s_display=old;s_frame_level=level;s_frame_zone=zone;
+    s_aiz_monkey_ready=s_aiz_monkey_attempted=0;
+}
 static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
 static void test_hcz_surface_extent(void)
 {
@@ -536,10 +563,13 @@ static void test_world_snapshot(void)
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
     v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;
     memset(v.vram+32,0x11,32);
-    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x3401;publish_sprites();
+    CHECK(s_history[s_serial%3].world_tag==0x3401);
     s3_video_set_world_cell(snapshot_cell);snapshot_calls=0;
     scanline(&v,0,native,320,out,398);
     CHECK(snapshot_calls && out[0]==0xFFFF0000);
+    /* Incoming zone assignment can precede its world/SAT publication even
+     * with the stale HUD-ready byte set. Keep the outgoing immutable world. */
     /* A later scanline uses the same published RAM, even if live RAM moves
      * into another act while that frame is being displayed. */
     g_ram[0xFE10]=0x20;g_ram[0xFFF0]=0;
@@ -547,6 +577,10 @@ static void test_world_snapshot(void)
     uint32_t lazy[398];native_row_calls=0;
     scanline_lazy(&v,1,320,lazy,398,test_native_row,native,NULL);
     CHECK(!native_row_calls && !memcmp(out,lazy,sizeof out));
+    g_ram[0xF600]=0x8C;g_ram[0xF711]=1;
+    scanline(&v,0,native,320,lazy,398);
+    CHECK(s_frame_level && s_frame_zone==0x34 && s_world_frame[0xFFF0]==0xA5);
+    CHECK(!memcmp(out,lazy,sizeof out));
     /* Title entry resets the live zone before fading the old SAT. Keep the
      * published world and its camera across that transition, using live CRAM. */
     g_ram[0xF600]=4;g_ram[0xFE10]=0;word(g_ram,0xEE80,0x1234);
@@ -1838,6 +1872,7 @@ int main(int argc,char **argv)
         s_menu_map_ready=0;
         load_aiz_art();CHECK(s_aiz_art_ready);
         CHECK(aiz_join_load());
+        CHECK(load_aiz_monkey_art());
         printf("AIZ joined original-map caches: %zu bytes\n",sizeof s_aiz_join_map+sizeof s_aiz_join_second);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
@@ -2230,7 +2265,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_hcz_surface_extent();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();

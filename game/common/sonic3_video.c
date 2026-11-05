@@ -513,6 +513,7 @@ typedef struct {
     uint8_t sat[640];
     int scene; /* 1 level, 2 special, 3 native bonus, 0 menu */
     int title; /* provenance survives Game_mode's outgoing fade transition */
+    unsigned world_tag; /* captured zone/act + 1; zero for non-world lists */
     int camera_x, camera_y; /* coordinates used when capturing world sprites */
     int16_t ox[SCENE_SLOTS],oy[SCENE_SLOTS];
     uint32_t code[SCENE_SLOTS];
@@ -863,6 +864,7 @@ static void capture_objects(void)
     /* Start changes the mode before the last demo Render_Sprites call.
      * That completed SAT still belongs to the outgoing level, not Title. */
     s_capture_frame->scene=bonus_stage()?3:(level_ready() || demo_level_exit())?1:0;
+    s_capture_frame->world_tag=s_capture_frame->scene==1?(unsigned)ram16(0xFE10)+1u:0u;
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
     s_capture_frame->preview_knux=s_capture_frame->scene==1 && s3_knux_preview_needed(g_ram);
@@ -982,6 +984,7 @@ static void publish_sprites(void)
     s_build.serial=++s_serial;memcpy(s_build.sat,g_ram+0xF800,640);
     SceneFrame *dst=&s_history[s_serial%3];
     dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
+    dst->world_tag=s_build.world_tag;
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
     dst->aiz_plane=s_build.aiz_plane;
@@ -1095,6 +1098,7 @@ static void select_scene(const GVDP *v,int retain_level)
     if(s_display && s_display!=&s_display_frame) {
         s_display_frame.count=s_display->count;s_display_frame.scene=s_display->scene;
         s_display_frame.title=s_display->title;
+        s_display_frame.world_tag=s_display->world_tag;
         s_display_frame.serial=s_display->serial;
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
         s_display_frame.preview_knux=s_display->preview_knux;s_display_frame.aiz_super_pose=s_display->aiz_super_pose;
@@ -1191,6 +1195,28 @@ static uint8_t aiz_plane_pixel(unsigned tile,int x,int y)
     unsigned byte=s_aiz_plane_art[(tile-0x529)*32u+(unsigned)y*4u+(unsigned)x/2u];
     return (uint8_t)((x&1)?byte&15:byte>>4);
 }
+/* The title card temporarily borrows Monkey Dude's tiles during a bonus
+ * return. Its culled native objects remain visible in the extended view.
+ * Bind their original mappings to their own ROM art outside that viewport. */
+static uint8_t s_aiz_monkey_art[0x2E0];
+static int s_aiz_monkey_ready,s_aiz_monkey_attempted;
+static int load_aiz_monkey_art(void)
+{
+    if(!s_aiz_monkey_attempted) {
+        s_aiz_monkey_attempted=1;
+        s_aiz_monkey_ready=art_kosm(S3_ART_BANK+0x16800C,0x1F2,
+            s_aiz_monkey_art,sizeof s_aiz_monkey_art)==sizeof s_aiz_monkey_art;
+    }
+    return s_aiz_monkey_ready;
+}
+static uint8_t aiz_monkey_pixel(unsigned attr,int x,int y)
+{
+    unsigned tile=attr&2047u;
+    if(tile<0x548 || tile>=0x548+sizeof s_aiz_monkey_art/32)return 0;
+    unsigned byte=s_aiz_monkey_art[(tile-0x548)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?byte&15u:byte>>4;
+    return p?(uint8_t)(p|((attr>>9)&48u)):0;
+}
 static int title_card_black(const GVDP *v)
 {
     if(!s_display || s_display->scene || v->reg[16]!=1)return 0;
@@ -1272,6 +1298,10 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(s_frame_level && !s_frame_zone && !s->hud &&
+                      (cell&2047u)>=0x548 && (cell&2047u)<0x55F &&
+                      (x<origin || x>=origin+320) && load_aiz_monkey_art()) {
+                p=aiz_monkey_pixel(cell,ix&7,iy&7);
             } else if(s->slot>0 && s->slot<SCENE_SLOTS &&
                       s_display->code[s->slot]==S3_AIZ_WAVE &&
                       (x<(width-320)/2 || x>=(width+320)/2) && load_aiz_wave_art()) {
@@ -1460,8 +1490,13 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* During $8C, readiness also needs the incoming level's installed
          * publication. A zone assignment after a bonus fade can still own
          * the old bonus SAT even with stale level/HUD RAM present. */
+        /* Load_Level can assign the incoming zone while the outgoing SAT,
+         * HUD-ready byte and world still belong to the previous level. Only
+         * its matching publication can authorize the new world snapshot. */
         int ready=level_ready() && (!(g_ram[0xF600]&128) ||
-            (s_display && s_display->scene==1));
+            (s_display && s_display->scene==1)) &&
+            (!s_display || !s_display->world_tag ||
+             s_display->world_tag==(unsigned)ram16(0xFE10)+1u);
         /* The title entry clears Current_zone before fading the old level.
          * Keep its published world/camera as well as its composition until
          * the native SAT is replaced. CRAM continues to follow every fade. */
@@ -2064,6 +2099,8 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     unsigned pose=frame->aiz_super_pose;
     s3_state_peek(io,offsetof(SceneFrame,aiz_super_pose),&pose,sizeof pose);
     if(pose>2)io->ok=0;
+    unsigned world=0;s3_state_peek(io,offsetof(SceneFrame,world_tag),&world,sizeof world);
+    if(world>0x10000u)io->ok=0;
     unsigned join=0;s3_state_peek(io,offsetof(SceneFrame,aiz_join),&join,sizeof join);
     if(join>3)io->ok=0;
     AizPlanePose plane=frame->aiz_plane;

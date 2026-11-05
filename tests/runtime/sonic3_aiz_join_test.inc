@@ -85,6 +85,11 @@ static void test_aiz_join(void)
         offsetof(SceneFrame,aiz_join)-offsetof(SceneFrame,count);
     memcpy(blob+at,&invalid,sizeof invalid);CHECK(!presentation_state_load(blob,bytes,1));
     invalid=3;memcpy(blob+at,&invalid,sizeof invalid);
+    size_t world_at=sizeof(unsigned)+sizeof(int)+sizeof(double)+
+        offsetof(SceneFrame,world_tag)-offsetof(SceneFrame,count);
+    invalid=0x10001u;memcpy(blob+world_at,&invalid,sizeof invalid);
+    CHECK(!presentation_state_load(blob,bytes,0));
+    memcpy(blob+world_at,&s_build.world_tag,sizeof s_build.world_tag);
     presentation_reset();CHECK(presentation_state_load(blob,bytes,1));
     scanline(&v,0,native,320,after,796);CHECK(s_display->aiz_join==3 && !memcmp(before,after,sizeof before));
     free(blob);
@@ -93,6 +98,9 @@ static void test_aiz_join(void)
     S3StateIO load={blob,sizeof s_build,0,2,1};scene_frame_state(&load,&restored);CHECK(load.ok && restored.aiz_join==3);
     invalid=4;memcpy(blob+offsetof(SceneFrame,aiz_join),&invalid,sizeof invalid);
     S3StateIO bad={blob,sizeof s_build,0,1,1};scene_frame_state(&bad,&restored);CHECK(!bad.ok);
+    invalid=3;memcpy(blob+offsetof(SceneFrame,aiz_join),&invalid,sizeof invalid);
+    invalid=0x10001u;memcpy(blob+offsetof(SceneFrame,world_tag),&invalid,sizeof invalid);
+    S3StateIO bad_world={blob,sizeof s_build,0,1,1};scene_frame_state(&bad_world,&restored);CHECK(!bad_world.ok);
     free(blob);
     /* Boss art can reuse the live patterns while the retired grove remains
      * visible to the left. Its immutable bank must not alter native pixels
