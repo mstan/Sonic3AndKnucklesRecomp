@@ -134,6 +134,43 @@ static void test_hcz_surface_extent(void)
     extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
     s_display=old;CHECK(configure("off"));
 }
+static void test_hcz_rush_extent(void)
+{
+    static GVDP v;uint32_t out[1603],pal[64]={0};
+    CHECK(configure("32:9"));g_ram[0xFE10]=1;g_ram[0xFE11]=0;
+    word(g_ram,0xEE78,0x680);
+    memset(&v,0,sizeof v);memset(v.vram+0x392*32,0x11,16*32);
+    memset(v.vram+0x3AA*32,0x22,16*32);pal[33]=0xFF123456;pal[34]=0xFF654321;
+    const SceneFrame *old=s_display;s_display=&s_build;
+    for(unsigned frame=0;frame<4;++frame) {
+        unsigned p=S3_HCZ_RUSH_MAP+0x10+frame*16;
+        word(g_rom,S3_HCZ_RUSH_MAP+frame*2,p-S3_HCZ_RUSH_MAP);word(g_rom,p,2);
+        word(g_rom,p+2,0xE00F);word(g_rom,p+4,0x18);word(g_rom,p+6,frame<2?0x50:0x30);
+        word(g_rom,p+8,0x000F);word(g_rom,p+10,0x30);word(g_rom,p+12,frame<2?0x60:0x20);
+        for(unsigned width=796;width<=1603;width+=807) {
+            s_requested_width=(int)width;memset(&s_build,0,sizeof s_build);
+            s_build.scene=1;s_build.camera_x=s_camera=0x680;s_camera_y=0;
+            extend_hcz_rush(S3_HCZ_RUSH_MAP,frame,0x437A,4,0x40,80,256);
+            CHECK(s_build.count>0);
+            int origin=((int)width-320)/2;
+            for(unsigned row=0;row<2;++row) {
+                memset(out,0,sizeof out);memset(s_priority,0,sizeof s_priority);
+                draw_scene_sprites(&v,row?80:48,out,(int)width,origin,pal);
+                for(int x=0;x<(int)width;++x) {
+                    int nx=x-origin;
+                    CHECK(out[x]==(nx>=320 && nx<0x300?pal[33+row]:0));
+                }
+            }
+        }
+    }
+    unsigned count=s_build.count;s_requested_width=320;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);CHECK(s_build.count==count);
+    s_requested_width=796;g_ram[0xFE11]=1;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);CHECK(s_build.count==count);
+    g_ram[0xFE11]=0;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,5,0x40,80,256);CHECK(s_build.count==count);
+    s_display=old;CHECK(configure("off"));
+}
 static void test_object_zoom(void)
 {
     memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));
@@ -2293,7 +2330,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();

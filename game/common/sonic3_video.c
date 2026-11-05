@@ -25,7 +25,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
        S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
-       S3_TITLE_CARD_MAP=0x2D90C, S3_HCZ_SURFACE_MAP=0x1CF2E,
+       S3_TITLE_CARD_MAP=0x2D90C, S3_HCZ_SURFACE_MAP=0x1CF2E, S3_HCZ_RUSH_MAP=0x2E60C,
        S3_MENU_BG_MAP=0x19D2A2,
        S3_TITLE_PLANE_SIZE=0x11,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
@@ -44,7 +44,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
        S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
-       S3_TITLE_CARD_MAP=0x2EE10, S3_HCZ_SURFACE_MAP=0x1F2CE,
+       S3_TITLE_CARD_MAP=0x2EE10, S3_HCZ_SURFACE_MAP=0x1F2CE, S3_HCZ_RUSH_MAP=0x22E60C,
        S3_MENU_BG_MAP=0x39D2A2,
        S3_TITLE_PLANE_SIZE=1,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
@@ -674,6 +674,35 @@ static void extend_hcz_surface(unsigned map,unsigned frame,unsigned gfx,unsigned
     for(int n=-reach;n<=reach;++n)if(n!=0 && n!=1)
         add_mapping(map,frame,gfx,flags,x+n*192,y,0,0,zoom);
 }
+static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
+                            int x,int y,unsigned zoom)
+{
+    if(map!=S3_HCZ_RUSH_MAP || frame>3 || flags!=4 || ram16(0xFE10)!=0x100 ||
+       !enabled() || s_requested_width<=320 || (zoom && zoom!=256))return;
+    /* The original moving water is a finite strip of blue brick sprites.
+     * Repeat each row's last full brick through the wide margin, up to the
+     * native current's retirement point. Keep the native viewport verbatim. */
+    unsigned p=map+(int16_t)scene_read16(map+frame*2),count=scene_read16(p);p+=2;
+    if(count>32)return;
+    int end=0x980-ram16(0xEE78),right=(s_requested_width+320+1)/2;
+    if(end>right)end=right;
+    for(unsigned n=0;n<count;++n) {
+        unsigned piece=p+n*6,attr=scene_read16(piece+2);
+        if(scene_read8(piece+1)!=15 || (attr!=0x18 && attr!=0x30))continue;
+        int dy=(int8_t)scene_read8(piece),dx=(int16_t)scene_read16(piece+4),last=1;
+        for(unsigned k=0;k<count;++k) {
+            unsigned other=p+k*6;
+            if(scene_read8(other)==scene_read8(piece) && scene_read8(other+1)==15 &&
+               scene_read16(other+2)==attr && (int16_t)scene_read16(other+4)>dx)last=0;
+        }
+        if(!last || y+dy>=224 || y+dy+32<=0)continue;
+        for(int sx=x+dx+32;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
+            SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
+            q->x=sx;q->y=y+dy;q->attr=(uint16_t)(gfx+attr);
+            q->size=0x4F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+        }
+    }
+}
 static void load_placements(void)
 {
     unsigned zone=ram16(0xFE10),index=(zone>>8)*8u+(zone&1u)*4u;
@@ -980,6 +1009,7 @@ static void capture_objects(void)
             } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
+            else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
         }
     }
     append_aiz_plane();
@@ -1294,6 +1324,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<drawn_width;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+            /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
+            if((s->size&0x40) && ((x>=origin && x<origin+320) ||
+                                 x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
             int ix=i*256/(int)zoom;
