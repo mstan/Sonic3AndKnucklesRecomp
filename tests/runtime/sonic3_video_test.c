@@ -966,7 +966,7 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0,4,8,0x20,0x22,0x28,0x34,0x40,0x5B};
+    const unsigned zones[]={0,1,4,8,0x20,0x22,0x28,0x34,0x40,0x5B};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         g_ram[0xFE10]=(uint8_t)zones[z];int canvas=widths[w];
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */

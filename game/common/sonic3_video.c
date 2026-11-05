@@ -1659,8 +1659,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * viewport adds a nearly full-speed reverse pan at the left boundary. */
     int fbz_background=level && s_frame_zone==4 && !s_frame_act;
     int soz_background=level && s_frame_zone==8 && !s_frame_act && !s_frame_bg_event;
+    /* HCZ1's parallax also belongs to the screen-centered B canvas. Its
+     * left-clamped foreground must not add another pan to the water bands. */
+    int hcz_background=level && s_frame_zone==1 && !s_frame_act;
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
-        intro_background || fbz_background || soz_background);
+        intro_background || fbz_background || soz_background || hcz_background);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives

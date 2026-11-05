@@ -50,7 +50,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K17 | Waiting Knuckles freezes and can pop in before outro cutscene | Fixed candidate for pop-in: retain the existing waiting pose while the defeated boss is still retiring, before the capsule wait begins. Actual defeat/outro route has507 paired images, no native-center changes, and6 margin-only changes; four renderer/predicate tests pass. The original120-tick wait and pose remain; a new walk-in staging is a lower-priority enhancement. Package regression pending. |
 | K18 | AIZ2–HCZ1 outgoing fade corrupts right margin | Pending reproduction |
 | K19 | HCZ1 title card corrupts before incoming level fade | Pending reproduction |
-| K20 | HCZ1 background scroll breaks at level's left boundary | Pending reproduction |
+| K20 | HCZ1 background scroll breaks at level's left boundary | Fixed candidate: keep B's original parallax on the centered screen while the foreground viewport clamps at the left edge. The added HCZ regression fails in both old renderer profiles and passes the correction at four widths. Actual HCZ1 camera sweep0..608 retains90 paired RAM/VRAM samples;37 pictures change only in the exposed background. Final package regression pending. |
 | K21 | HCZ surface interlacing retains native draw width | Pending reproduction |
 | K22 | HCZ1 opening current leaves foreground gap with wrong water palette | Pending reproduction |
 | K23 | Current tunnel changes palette before leaving extended view | Pending original/extended-view comparison |
@@ -71,7 +71,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **37 report groups**: **13 awaiting decisions**, **12 implemented
+There are **37 report groups**: **12 awaiting decisions**, **13 implemented
 candidates awaiting final package regression**, and **12 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
