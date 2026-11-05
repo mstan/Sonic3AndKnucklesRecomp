@@ -763,11 +763,9 @@ static void spawn_scene(void)
         if(best<0)break;
         Placement *p=&s_placements[best];unsigned o;
         for(o=0xB0DE;o<0xCAE2;o+=0x4A) {
-#ifdef SONIC3_STANDALONE
             /* Same reservation as the native allocators: HCZ1's fixed
              * splash must not overwrite a live act-transition controller. */
             if(o==0xB172 && ram16(0xFE10)==0x100 && !ram16(S3_COMPETITION))continue;
-#endif
             if(!scene_read32(0xFF0000u+o))break;
         }
         if(o>=0xCAE2){++s_pool_pressure;break;}

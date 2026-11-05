@@ -2074,7 +2074,6 @@ int main(int argc,char **argv)
     write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(g_ram[0xEB02]&128);
     CHECK(scene_read32(0xFFB172)==S3_AIZ_MINIBOSS_CUTSCENE);
-#ifdef SONIC3_STANDALONE
     /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
      * the two earlier slots and verify a real placement goes past it. */
     write32(0xB172,0);write32(0xB1BC,0);
@@ -2087,7 +2086,6 @@ int main(int argc,char **argv)
     CHECK(!scene_read32(0xFFB172));
     CHECK(scene_read32(0xFFB1BC)==0x123456);
     word(g_ram,0xFE10,0);
-#endif
     word(g_ram,0x8000,16);
     CHECK(configure("off"));g_cpu.D[0]=12345;s3_video_hook(0x1B594);CHECK(g_cpu.D[0]==12345);
     /* AIZ's x=$1870 platform can enter the extended window while its
