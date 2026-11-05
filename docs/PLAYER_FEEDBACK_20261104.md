@@ -14,7 +14,7 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | A01 | Launcher cover-art rating differs from other games | No correctness change: the US Genesis Sonic 3 cover uses the period GA mark. Sonic 3 predates ESRB's September 1994 start. Uniform cover ratings would be a cosmetic asset request. |
 | A02 | Competition background is dark | Fixed candidate: transparent high-priority plane tiles must retain normal SHI intensity. Scalar, packed and raster-worker paths pass; actual S3 and S3K Competition submenus are bright at 32:9. Final package regression pending. |
 | A03 | Sound-test HCZ2 music briefly hitches early in track | Deferred after bounded nonreproduction. Native sound-test ID04/C input produces35 seconds without a silent10ms block. This is generated PCM with muted output, not an actual-device dropout test; no hitch fix claimed. |
-| A04 | Music may play faster than expected | Not reproduced.35-second RMS-envelope comparison against original-ROM sound-test ID04 gives correlation0.91027, best time scale0.9995 (about one tick over the interval), with no sustained speed increase. Different synthesizer samples are not claimed bit-identical. |
+| A04 | Music may play faster than expected | Not reproduced.35-second RMS-envelope comparison against original-ROM sound-test ID04 gives correlation0.91027, best time scale0.9995 (about one tick over the interval), with no sustained speed increase. Later feedback treats the perceived speed difference as a tiredness/perception concern. Different synthesizer samples are not claimed bit-identical. |
 | A05 | Holding window caption buttons stalls or affects playback | Existing upstream fix incorporated: cooperative event dispatch now covers caption-button tracking, as well as move/resize. Combined Windows modal-event regression passes. Package regression pending. |
 | A06 | AIZ1 bombing transition slightly slows | Pending original comparison |
 | A07 | Giant-ring entry lacks sound | Original conditional swish retained: S3's4429C entry path branches past the BigRing SFX when approaching from the left. The later443A8 warp SFX is unconditional unless all emeralds are collected. No new audio patch or blanket silence claim. |
@@ -34,8 +34,8 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K01 | AIZ1 intro Super transformation looks wrong in extended view | Original offscreen pose handover retained. Dense32:9 captures show clean original blue/yellow flight poses; the instantaneous transformation was authored outside the320px view. A newly staged transformation/effect is a lower-priority cutscene enhancement, not an art-corruption fix. |
 | K02 | Horizontal background seams in pre-bombing AIZ1 and AIZ2 drain area | Pending reproduction |
 | K03 | Hollow trunk interior closes again near AIZ1 miniboss | Fixed candidate: use live revealed chunks before the fire instead of the cached unopened map. Full172118-execution input route passes every checkpoint;359 paired RAM/VRAM/native-center samples are unchanged and the exposed trunk stays open. Package regression pending; original first-entry animation retained. |
-| K04 | AIZ1 miniboss background disjoins and right-side graphics corrupt | Fixed candidate: the extended join exposed placeholder animation tiles and the next act before its burned art was installed. Use the original animation frames and extend the current coast through the inaccessible pre-fire margin. All867 actual cutscene RAM/VRAM/native-center samples match the baseline; package regression pending. |
-| K05 | Corruption slides back to normal after AIZ1 miniboss | Fixed candidate with K04: retain each installed art phase through the real fire transition and coordinate rebase. The actual controller completes the cutscene and reaches act2 with unchanged guest state; package regression pending. |
+| K04 | AIZ1 bombing set-piece background disjoins and right-side graphics corrupt | Fixed candidate: the extended join exposed placeholder animation tiles and the next act before its burned art was installed. Use the original animation frames and extend the current coast through the inaccessible pre-fire margin. All867 actual cutscene RAM/VRAM/native-center samples match the baseline; package regression pending. |
+| K05 | Corruption slides back to normal after AIZ1 bombing set-piece | Fixed candidate with K04: retain each installed art phase through the real fire transition and coordinate rebase. The actual controller completes the cutscene and reaches act2 with unchanged guest state; package regression pending. |
 | K06 | Slot bonus foreground remains confined to native canvas | Finite-arena presentation retained. The machine board and actors remain authored size; decorative B-plane scenery fills the margins. Extending the interactive foreground is a lower-priority enhancement, separate from the already fixed corrupt margins. |
 | K07 | Slot bonus red knot background jumps when animation loops | Original eight-frame loop retained. Original-ROM frames1204/1208 and native bonus samples41/42 show the same background animation index7-to0 wrap. The stock Slots background routine resets that frame index and redraws the band; no new animation patch. |
 | K08 | Corruption near breakable entrance to AIZ1 second giant ring | Pending reproduction |
@@ -45,7 +45,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K12 | Monkey Dude art corrupts after bonus while title-card art is loaded | Pending reproduction |
 | K13 | AIZ2 Flying Battery opening and left/right margins flicker | Fixed candidate for fractional camera selection: identify the HInt band using its completed scroll, then interpolate its position. The old selection fails the rendered bobbing-ship fixture; correction passes in both hosts. Actual32:9 route presents9743 interpolated images at144Hz. Native chase/bank handovers remain unchanged; no separate guest timing change. Final package/visual regression pending. |
 | K14 | Tree scene pops in as Flying Battery disappears | Fixed candidate: introduce the existing incoming canopy in the right margin during the last second of the final ship loop, before the native scenery handover.600 paired actual-route RAM/VRAM/native-center samples remain unchanged; only8 retained lead-in images change. Package/owner visual regression pending. |
-| K15 | Eggman crossing trees corrupts tree art | Pending reproduction |
+| K15 | Eggman crossing trees corrupts tree art | Pending enhanced-host reproduction. The corresponding standalone Sonic 3 route reportedly looked correct with enhancements disabled; distinguish host, widescreen and high-FPS settings rather than treating the two runs as equivalent. |
 | K16 | Unloaded tree art remains corrupt at left of AIZ2 boss | Fixed candidate: retain the retired grove's original ship-phase patterns outside the native view after boss art replaces them. Actual chase/boss route:600 paired RAM/VRAM/native-center samples unchanged;71 extended-view images repair the old tree bank. Both renderer fixtures pass; final package regression pending. |
 | K17 | Waiting Knuckles freezes and can pop in before outro cutscene | Fixed candidate for pop-in: retain the existing waiting pose while the defeated boss is still retiring, before the capsule wait begins. Actual defeat/outro route has507 paired images, no native-center changes, and6 margin-only changes; four renderer/predicate tests pass. The original120-tick wait and pose remain; a new walk-in staging is a lower-priority enhancement. Package regression pending. |
 | K18 | AIZ2–HCZ1 outgoing fade corrupts right margin | Pending reproduction |
@@ -54,6 +54,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K21 | HCZ surface interlacing retains native draw width | Fixed candidate: extend the original two192px sprite strips through the expanded view, retaining their animation,32px gaps and native copies. Both renderer profiles pass. Actual32:9 HCZ surface sequence retains120 paired RAM/VRAM samples and every native-center pixel;120 pictures extend only the original waterline into the margins. Final package regression pending. |
 | K22 | HCZ1 opening current leaves foreground gap with wrong water palette | Pending reproduction |
 | K23 | Current tunnel changes palette before leaving extended view | Pending original/extended-view comparison |
+| K24 | Level-select SONIC/MILES background lettering does not join the wide margins | New screenshot-confirmed candidate in S3K: letters are truncated at the native/extended canvas boundary. Reproduce both name variants and compare the original background repeat period. |
 
 ## Sonic & Knuckles Alone
 
@@ -65,13 +66,14 @@ transformation/cutscene timing and guest simulation must remain correct.
 ## Lower-priority suggestions
 
 - Optional Reversed Frequency soundtrack arrangements; outside this bugfix release.
+- Optional alternative/improved DAC sound driver; the cited original-like sample quality is an enhancement request, not a newly demonstrated playback defect.
 - Extend the standalone S&K Sega slide-away animation across widescreen.
 - Smooth AIZ2 drain-palette retirement beyond original behavior.
 - Obscure the buried portions of AIZ2's raised/falling drawbridge; compare original.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **37 report groups**: **10 awaiting decisions**, **14 implemented
+There are **38 report groups**: **11 awaiting decisions**, **14 implemented
 candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
