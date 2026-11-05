@@ -1325,7 +1325,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
             /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
-            if((s->size&0x40) && ((x>=origin && x<origin+320) ||
+            if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
                                  x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
@@ -1382,7 +1382,7 @@ static int attributes_differ(const GVDP *v,uint16_t a,uint16_t b,int x,int y)
 /* The native level-entry fade adds one B, then G, then R step per tick.
  * Its white entry exposes the installed step, even when main RAM has already
  * prepared the following palette. Cached art must run that same operation. */
-static uint16_t aiz_art_color(unsigned color,const GVDP *v)
+static uint16_t scene_art_color(unsigned color,const GVDP *v)
 {
     if((int16_t)((s_world_frame[0xEE50]<<8)|s_world_frame[0xEE51])>0) {
         unsigned white=v->cram[17],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
@@ -1423,7 +1423,7 @@ static void aiz_palette(const AizArt *art,const GVDP *v,uint32_t *out)
         if(installed || i<16) {
             out[i]=genesis_dac_cram_to_argb(v->cram[i],GENESIS_DAC_NORMAL);continue;
         }
-        out[i]=genesis_dac_cram_to_argb(aiz_art_color(art->colors[i-16],v),GENESIS_DAC_NORMAL);
+        out[i]=genesis_dac_cram_to_argb(scene_art_color(art->colors[i-16],v),GENESIS_DAC_NORMAL);
     }
 }
 
@@ -1766,6 +1766,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int file_select=!level && file_select_layout(v);
     int menu_background_period=!level && !special && !file_select && level_select_layout(v)?48:nw;
     int wy=camera_y+line;
+    /* HCZ1_Resize restores three shared colors at camera X=$900, Y=$500.
+     * Only the extra left view still contains the retired current tunnel.
+     * Keep its original colors there, following the native scene fade; the
+     * incoming world, native viewport and guest palette remain authoritative. */
+    int hcz_tunnel=level && s_frame_zone==1 && !s_frame_act &&
+        s_frame_fg_x>=0x900 && wy>=0x500 && wy<0x600;
+    uint32_t hcz_tunnel_colors[3];
+    if(hcz_tunnel) {
+        static const unsigned colors[]={0xB80,0x240,0x220};
+        for(unsigned i=0;i<3;++i)
+            hcz_tunnel_colors[i]=genesis_dac_cram_to_argb(scene_art_color(colors[i],v),GENESIS_DAC_NORMAL);
+    }
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
      * the world's current layout coordinates. AIZ1BGE_FireTransition
@@ -1982,7 +1994,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         uint8_t p=foreground?ap:bp;
         uint32_t ac=ap?plane_color(line,a,ap,apalette):backdrop;
         if(aiz_tree_color(wx,wy,nx,nw,ap))
-            ac=genesis_dac_cram_to_argb(aiz_art_color(4,v),GENESIS_DAC_NORMAL);
+            ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
+        if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
+            ac=hcz_tunnel_colors[ap-56];
         uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
         out[x]=foreground?ac:bc;
         if(tree_arrival && nx>=nw) {
