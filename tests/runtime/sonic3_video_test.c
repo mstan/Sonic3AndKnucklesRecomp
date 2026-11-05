@@ -78,6 +78,35 @@ static void test_sprite_atlas(void)
     test_atlas_enabled=0;s_display=previous;
 }
 static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
+static void test_hcz_surface_extent(void)
+{
+    static GVDP v;uint32_t out[796],pal[64]={0};
+    CHECK(configure("32:9"));s_requested_width=796;g_ram[0xFE10]=1;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    word(g_rom,S3_HCZ_SURFACE_MAP+2,0x10);unsigned p=S3_HCZ_SURFACE_MAP+0x10;
+    word(g_rom,p,3);
+    for(unsigned n=0;n<3;++n) {
+        word(g_rom,p+2+n*6,0x000C);word(g_rom,p+4+n*6,0);
+        word(g_rom,p+6+n*6,(unsigned)(-96+(int)n*64));
+    }
+    add_mapping(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,0,0,256);
+    add_mapping(S3_HCZ_SURFACE_MAP,1,0x842E,4,288,100,0,0,256);
+    CHECK(s_build.count==6);
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);
+    CHECK(s_build.count>6);
+    for(unsigned n=6;n<s_build.count;++n)
+        CHECK(s_build.sprites[n].x+32<=0 || s_build.sprites[n].x>=320);
+    memset(&v,0,sizeof v);memset(v.vram+0x42E*32,0x11,128);pal[1]=0xFF123456;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    const SceneFrame *old=s_display;s_display=&s_build;s_camera=s_camera_y=0;
+    draw_scene_sprites(&v,100,out,796,238,pal);
+    for(int x=0;x<796;++x)CHECK(out[x]==(((x-238)&63)<32?pal[1]:0));
+    unsigned count=s_build.count;s_requested_width=320;
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
+    s_requested_width=796;g_ram[0xFE10]=0;
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
+    s_display=old;CHECK(configure("off"));
+}
 static void test_object_zoom(void)
 {
     memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));
@@ -2201,7 +2230,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_hcz_surface_extent();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
