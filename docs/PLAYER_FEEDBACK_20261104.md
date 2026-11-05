@@ -15,7 +15,7 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | A02 | Competition background is dark | Fixed candidate: transparent high-priority plane tiles must retain normal SHI intensity. Scalar, packed and raster-worker paths pass; actual S3 and S3K Competition submenus are bright at 32:9. Final package regression pending. |
 | A03 | Sound-test HCZ2 music briefly hitches early in track | Deferred after bounded nonreproduction. Native sound-test ID04/C input produces35 seconds without a silent10ms block. This is generated PCM with muted output, not an actual-device dropout test; no hitch fix claimed. |
 | A04 | Music may play faster than expected | Not reproduced.35-second RMS-envelope comparison against original-ROM sound-test ID04 gives correlation0.91027, best time scale0.9995 (about one tick over the interval), with no sustained speed increase. Later feedback treats the perceived speed difference as a tiredness/perception concern. Different synthesizer samples are not claimed bit-identical. |
-| A05 | Holding window caption buttons stalls or affects playback | Existing upstream fix incorporated: cooperative event dispatch now covers caption-button tracking, as well as move/resize. Combined Windows modal-event regression passes. Package regression pending. |
+| A05 | Holding window caption buttons stalls or affects playback | Existing upstream fix incorporated: cooperative event dispatch now covers caption-button tracking, as well as move/resize. Combined Windows modal-event regression passes. Package regression pending. Later feedback asks about minimize/audio/netplay behavior without reporting an observed failure; retain that as a window-lifecycle validation question, not a confirmed new defect. |
 | A06 | AIZ1 bombing transition slightly slows | Pending timing correction/decision: the original also delays during art loading, but native cadence differs between the two loading phases. Matched native-main controls with compiled versus interpreted IRQ handlers have identical phase boundaries; IRQ implementation is not the cause. The loaded-state control does not interpret the main CPU and is not an interpreter-parity claim. |
 | A07 | Giant-ring entry lacks sound | Original conditional swish retained: S3's4429C entry path branches past the BigRing SFX when approaching from the left. The later443A8 warp SFX is unconditional unless all emeralds are collected. No new audio patch or blanket silence claim. |
 | A08 | Blue Spheres disappear near screen edges at native aspect | Original native-canvas culling retained. Original-ROM special-stage captures reproduce the finite projection and clipped edge spheres. No change to the already accepted enhanced widescreen projection. |
@@ -23,6 +23,8 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | A10 | Companion Tails behaves strangely at AIZ2 end | Original fly-away/retirement reproduced for the recorded route. A592-frame original-ROM actor/world fixture before the final hit also sends Tails to7F00 with the same fly-away pose and control state; the complete74-byte act-clear actor record matches at its original animation phase. The earlier moving position differs by a few pixels, so whole-route parity is not claimed. This is a bounded original CPU execution from recorded world/actor state, not an original full playthrough or every possible companion behavior. No AI patch. |
 | A11 | Rolling early through HCZ1 spring/loop clips into wall and may zip | Original behavior reproduced. The native recording and original-ROM collision fixture both settle inside the wall at X1AF5/Y03EC, with matching actor position, velocity, collision and object-control state. Fixture starts before the spring traversal; it does not set the resulting collision state. No correctness patch. Explicit S3K occurrence/original-ROM comparison remains to be checked separately. |
 | A12 | Initial HCZ2 camera fails to follow, causing death; retry works | Fixed candidate: fixed splash slot B172 overwrites live end-sign controller before native act-size installation. Both native allocation loops and the custom widescreen placement loader reserve the slot. Recorded-input transition reaches stored bounds 6000/1000 and a living player in lower HCZ2 with camera following. Gameplay scope/CCR/RAM and real widescreen placement tests pass. Final package regression pending; S3K occurrence unverified; explicitly assess its real first-entry transition too. |
+| A13 | Special Stage6 background is dark in standalone Sonic3 | Pending reproduction/original comparison. Supplied native-game and Fusion screenshots show different sky brightness. New diagnostic session identifies released v0.7.3 (game294fd5be11, engine13d065d0f6), native aspect and rewind disabled; this does not retest the unreleased renderer candidates. |
+| A14 | HCZ2 softlocks near Knuckles sabotage set-piece | Pending replay reproduction. Supplied native screenshot places Sonic/Tails on the blue platform beside the spring; a new matching v0.7.3 replay and sidecars are retained. Rewind is disabled in the supplied profile. The same session reports successful HCZ2 first entry on one attempt, which does not clear A12 or qualify its unreleased fix. |
 
 ## Sonic 3 & Knuckles
 
@@ -55,6 +57,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K22 | HCZ1 opening current leaves foreground gap with wrong water palette | Fixed candidate: the moving water uses finite blue-brick sprites, leaving a dry-looking gap beyond their fill. Extend the original final brick rows through the wide margin up to the original X980 retirement point. The real button/current sequence preserves300 RAM/VRAM pairs and every native-center pixel;10 of300 pictures repair only the right-margin gap. Both renderer profiles pass all four original poses and retirement/native-view guards. Package regression pending; the later global palette switch is tracked separately as K23. |
 | K23 | Current tunnel changes palette before leaving extended view | Fixed candidate after owner identified the visible failure at0:06 (button190). Original HCZ1_Resize repurposes colors56..58 at cameraX900/Y500 while the wide left view still sees the current tunnel. Retain its original three colors only in that margin, following scene fades. Both renderer profiles pass five widths and area/act/camera/row guards; the old renderer fails the new regression. Actual300 RAM/VRAM pairs and every native-center pixel remain unchanged; only7 images repair the exposed tunnel. Also keep imported sprite-atlas bank1 distinct from the current-fill flag. Final package/owner regression pending. |
 | K24 | Level-select SONIC/MILES background lettering does not join the wide margins | Fixed candidate: extend the installed six-tile/48px word period rather than the cropped320px canvas. Actual SONIC, MILES and both transition-art frames are coherent across the boundaries in240 images;240 RAM/VRAM pairs and all native-center pixels remain unchanged. Both address profiles pass native/398/523/796/1603 widths and shifted-scroll boundary tests. Package regression pending. |
+| K25 | S3K launcher rejects a Sega Classics Steam ROM | Pending format/hash assessment. Existing [GitHub issue15](https://github.com/mstan/Sonic3AndKnucklesRecomp/issues/15), "No ROM's recognized", reports NTSC-U rejection; later feedback specifically corroborates Steam S3K rejection while another dump imports. Exact rejected bytes/hash are unknown; do not assume every dump or the current launcher is affected. |
 
 ## Sonic & Knuckles Alone
 
@@ -65,16 +68,18 @@ transformation/cutscene timing and guest simulation must remain correct.
 
 ## Lower-priority suggestions
 
-- Optional Reversed Frequency soundtrack arrangements; outside this bugfix release.
+- Optional Reversed Frequency soundtrack arrangements and additional licensed music selections; outside this bugfix release.
+- Optional music/SFX replacement API, sound-driver choices and zoom-out mod compatibility; suggestions, not this bugfix scope.
+- Clarify native versus imported checkpoint bonus-entry ring thresholds; a documentation/behavior question, not a reproduced failure.
 - Optional Clone Driver v2 / improved DAC sound driver; the cited original-like sample quality is an enhancement request, not a newly demonstrated playback defect. Prioritize stable gameplay across the games before optional music features.
 - Optional shared launcher themes/customization, including scanline styling; outside this gameplay bugfix release.
 - Extend the standalone S&K Sega slide-away animation across widescreen.
 - Smooth AIZ2 drain-palette retirement beyond original behavior.
 - Obscure the buried portions of AIZ2's raised/falling drawbridge; compare original.
-- Alternative aspect targets/experimental labels are suggestions, not adopted policy.
+- Alternative aspect targets, experimental labels and pre-v1.0 GitHub prerelease tags are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **38 report groups**: **5 awaiting decisions**, **20 implemented
+There are **41 report groups**: **8 awaiting decisions**, **20 implemented
 candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
