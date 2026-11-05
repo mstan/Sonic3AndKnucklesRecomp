@@ -20,7 +20,7 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | A07 | Giant-ring entry lacks sound | Original conditional swish retained: S3's4429C entry path branches past the BigRing SFX when approaching from the left. The later443A8 warp SFX is unconditional unless all emeralds are collected. No new audio patch or blanket silence claim. |
 | A08 | Blue Spheres disappear near screen edges at native aspect | Original native-canvas culling retained. Original-ROM special-stage captures reproduce the finite projection and clipped edge spheres. No change to the already accepted enhanced widescreen projection. |
 | A09 | AIZ heat haze disjoins waterfall across waterline | Original behavior reproduced: original-ROM AIZ2 at X2780/Y057B shows the same waterfall offset at the waterline as the native recording. Retain the original per-band underwater deformation; no correction. |
-| A10 | Companion Tails behaves strangely at AIZ2 end | Pending replay reproduction |
+| A10 | Companion Tails behaves strangely at AIZ2 end | Original fly-away/retirement reproduced for the recorded route. A592-frame original-ROM actor/world fixture before the final hit also sends Tails to7F00 with the same fly-away pose and control state; the complete74-byte act-clear actor record matches at its original animation phase. The earlier moving position differs by a few pixels, so whole-route parity is not claimed. This is a bounded original CPU execution from recorded world/actor state, not an original full playthrough or every possible companion behavior. No AI patch. |
 | A11 | Rolling early through HCZ1 spring/loop clips into wall and may zip | Original behavior reproduced. The native recording and original-ROM collision fixture both settle inside the wall at X1AF5/Y03EC, with matching actor position, velocity, collision and object-control state. Fixture starts before the spring traversal; it does not set the resulting collision state. No correctness patch. Explicit S3K occurrence/original-ROM comparison remains to be checked separately. |
 | A12 | Initial HCZ2 camera fails to follow, causing death; retry works | Fixed candidate: fixed splash slot B172 overwrites live end-sign controller before native act-size installation. Both native allocation loops and the custom widescreen placement loader reserve the slot. Recorded-input transition reaches stored bounds 6000/1000 and a living player in lower HCZ2 with camera following. Gameplay scope/CCR/RAM and real widescreen placement tests pass. Final package regression pending; S3K occurrence unverified; explicitly assess its real first-entry transition too. |
 
@@ -71,8 +71,8 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **37 report groups**: **12 awaiting decisions**, **13 implemented
-candidates awaiting final package regression**, and **12 non-fix dispositions**.
+There are **37 report groups**: **11 awaiting decisions**, **13 implemented
+candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
 deferrals remain distinct from fixes.
