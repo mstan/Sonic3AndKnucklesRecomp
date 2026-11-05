@@ -10,8 +10,8 @@
 # (dc.b/w/l, ds.b/w/l, binclude, etc.) are filtered — emitting those
 # would let the recompiler decode data bytes as 68K instructions and
 # synthesize calls into garbage addresses.
-# Source: sonic3k/skdisasm/s3.lst
-# Global code labels emitted (extra):       10819
+# Source: game/skdisasm/s3.lst
+# Global code labels emitted (extra):       10836
 # Local  code labels emitted (extra_seeds): 147
 # Data labels skipped:                      3296
 
@@ -7327,6 +7327,7 @@ extra = [
     0x044A78,   # loc_44A78
     0x044A9E,   # CutsceneKnux_Delete
     0x044AA4,   # CutsceneKnux_HCZ2
+    0x044AAE,   # ReturnHandler_044AA8
     0x044AE2,   # loc_44AE2
     0x044B00,   # loc_44B00
     0x044B1A,   # loc_44B1A
@@ -7338,6 +7339,7 @@ extra = [
     0x044BAE,   # loc_44BAE
     0x044BE0,   # loc_44BE0
     0x044BFA,   # CutsceneKnux_CNZ2A
+    0x044C04,   # ReturnHandler_044BFE
     0x044C36,   # loc_44C36
     0x044CA2,   # loc_44CA2
     0x044CAE,   # loc_44CAE
@@ -7359,6 +7361,7 @@ extra = [
     0x044E40,   # loc_44E40
     0x044E4E,   # loc_44E4E
     0x044E62,   # CutsceneKnux_CNZ2B
+    0x044E6C,   # ReturnHandler_044E66
     0x044EA2,   # loc_44EA2
     0x044EC8,   # loc_44EC8
     0x044EDC,   # locret_44EDC
@@ -7783,6 +7786,7 @@ extra = [
     0x047AFA,   # sub_47AFA
     0x047B08,   # loc_47B08
     0x047CF6,   # Obj_HCZMiniboss
+    0x047D00,   # ReturnHandler_047CFA
     0x047D30,   # loc_47D30
     0x047D54,   # loc_47D54
     0x047D78,   # loc_47D78
@@ -7927,6 +7931,7 @@ extra = [
     0x048AE8,   # locret_48AE8
     0x048AEA,   # loc_48AEA
     0x048CDA,   # Obj_HCZEndBoss
+    0x048CEA,   # ReturnHandler_048CE4
     0x048D2E,   # loc_48D2E
     0x048D34,   # loc_48D34
     0x048D3A,   # locret_48D3A
@@ -8360,6 +8365,7 @@ extra = [
     0x04BE70,   # loc_4BE70
     0x04BE7C,   # loc_4BE7C
     0x04BF90,   # Obj_CNZEndBoss
+    0x04BF9A,   # ReturnHandler_04BF94
     0x04BFF4,   # loc_4BFF4
     0x04BFFA,   # loc_4BFFA
     0x04C000,   # locret_4C000
@@ -8461,6 +8467,7 @@ extra = [
     0x04C834,   # loc_4C834
     0x04C83E,   # loc_4C83E
     0x04C93E,   # Obj_FBZMiniboss
+    0x04C948,   # ReturnHandler_04C942
     0x04C976,   # loc_4C976
     0x04C9C4,   # loc_4C9C4
     0x04C9CA,   # loc_4C9CA
@@ -8735,6 +8742,7 @@ extra = [
     0x04E254,   # locret_4E254
     0x04E256,   # loc_4E256
     0x04E37E,   # Obj_ICZMiniboss
+    0x04E390,   # ReturnHandler_04E38A
     0x04E3E6,   # loc_4E3E6
     0x04E3F4,   # loc_4E3F4
     0x04E3FA,   # loc_4E3FA
@@ -8826,6 +8834,7 @@ extra = [
     0x04EB0E,   # loc_4EB0E
     0x04EB2A,   # sub_4EB2A
     0x04ECCE,   # Obj_ICZEndBoss
+    0x04ECD8,   # ReturnHandler_04ECD2
     0x04ED30,   # loc_4ED30
     0x04ED34,   # loc_4ED34
     0x04ED3A,   # locret_4ED3A
@@ -9054,6 +9063,7 @@ extra = [
     0x050258,   # locret_50258
     0x05025A,   # sub_5025A
     0x05040E,   # Obj_LBZEndBoss
+    0x050418,   # ReturnHandler_050412
     0x050444,   # loc_50444
     0x0504AE,   # loc_504AE
     0x0504B4,   # loc_504B4
@@ -9201,6 +9211,7 @@ extra = [
     0x0511CC,   # locret_511CC
     0x0511CE,   # loc_511CE
     0x0511DC,   # loc_511DC
+    0x0511E0,   # ReturnHandler_0511DC
     0x0511E8,   # loc_511E8
     0x051202,   # loc_51202
     0x051226,   # loc_51226
@@ -9211,6 +9222,7 @@ extra = [
     0x051298,   # loc_51298
     0x0512A6,   # loc_512A6
     0x0512D4,   # loc_512D4
+    0x0512D8,   # ReturnHandler_0512D4
     0x0512FC,   # loc_512FC
     0x051336,   # loc_51336
     0x05133A,   # loc_5133A
@@ -9219,8 +9231,10 @@ extra = [
     0x05138C,   # loc_5138C
     0x051392,   # loc_51392
     0x0513A0,   # loc_513A0
+    0x0513A4,   # ReturnHandler_0513A0
     0x0513AC,   # loc_513AC
     0x0513BA,   # loc_513BA
+    0x0513C2,   # ReturnHandler_0513BE
     0x0513E2,   # loc_513E2
     0x0513E8,   # loc_513E8
     0x0513F4,   # loc_513F4
@@ -9253,6 +9267,7 @@ extra = [
     0x0516A4,   # loc_516A4
     0x0516C0,   # loc_516C0
     0x0516FA,   # loc_516FA
+    0x0516FE,   # ReturnHandler_0516FA
     0x051730,   # loc_51730
     0x05173E,   # loc_5173E
     0x05174A,   # sub_5174A
@@ -10048,6 +10063,7 @@ extra = [
     0x056342,   # loc_56342
     0x056346,   # loc_56346
     0x056354,   # Obj_MGZMiniboss
+    0x05635E,   # ReturnHandler_056358
     0x056390,   # loc_56390
     0x0563E8,   # loc_563E8
     0x0563F0,   # loc_563F0
@@ -10741,6 +10757,7 @@ extra = [
     0x05A248,   # loc_5A248
     0x05A272,   # loc_5A272
     0x05A2C0,   # Obj_LBZ1Robotnik
+    0x05A2C8,   # ReturnHandler_05A2C4
     0x05A2F8,   # loc_5A2F8
     0x05A348,   # loc_5A348
     0x05A368,   # loc_5A368

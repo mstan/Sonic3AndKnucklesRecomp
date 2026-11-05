@@ -10,8 +10,8 @@
 # (dc.b/w/l, ds.b/w/l, binclude, etc.) are filtered — emitting those
 # would let the recompiler decode data bytes as 68K instructions and
 # synthesize calls into garbage addresses.
-# Source: sonic3k/skdisasm/sonic3k.lst
-# Global code labels emitted (extra):       18946
+# Source: game/skdisasm/sonic3k.lst
+# Global code labels emitted (extra):       18973
 # Local  code labels emitted (extra_seeds): 394
 # Data labels skipped:                      4621
 
@@ -11981,6 +11981,7 @@ extra = [
     0x0620E4,   # loc_620E4
     0x0620EA,   # loc_620EA
     0x062112,   # CutsceneKnux_HCZ2
+    0x062124,   # ReturnHandler_06211E
     0x062158,   # CutsceneKnux_Delete
     0x06215E,   # loc_6215E
     0x06218C,   # loc_6218C
@@ -11994,6 +11995,7 @@ extra = [
     0x062242,   # loc_62242
     0x062274,   # loc_62274
     0x06229E,   # CutsceneKnux_CNZ2A
+    0x0622B2,   # ReturnHandler_0622AC
     0x0622E4,   # loc_622E4
     0x062318,   # loc_62318
     0x062332,   # loc_62332
@@ -12017,6 +12019,7 @@ extra = [
     0x0624BC,   # loc_624BC
     0x0624CA,   # loc_624CA
     0x0624DE,   # CutsceneKnux_CNZ2B
+    0x0624F2,   # ReturnHandler_0624EC
     0x062528,   # loc_62528
     0x06254E,   # loc_6254E
     0x062562,   # locret_62562
@@ -12138,6 +12141,7 @@ extra = [
     0x0630A6,   # loc_630A6
     0x0630BE,   # loc_630BE
     0x0630E0,   # CutsceneKnux_MHZ2
+    0x0630FC,   # ReturnHandler_0630F6
     0x06311A,   # loc_6311A
     0x063134,   # loc_63134
     0x063170,   # loc_63170
@@ -12244,6 +12248,7 @@ extra = [
     0x063CFC,   # CutsceneKnux_HPZ
     0x063D0E,   # loc_63D0E
     0x063D1A,   # loc_63D1A
+    0x063D2E,   # ReturnHandler_063D28
     0x063D5C,   # loc_63D5C
     0x063DBC,   # loc_63DBC
     0x063DD4,   # loc_63DD4
@@ -12997,6 +13002,7 @@ extra = [
     0x069CA4,   # sub_69CA4
     0x069CB2,   # loc_69CB2
     0x069EA0,   # Obj_HCZMiniboss
+    0x069EAA,   # ReturnHandler_069EA4
     0x069EDA,   # loc_69EDA
     0x069EFE,   # loc_69EFE
     0x069F22,   # loc_69F22
@@ -13142,6 +13148,7 @@ extra = [
     0x06ACA6,   # loc_6ACA6
     0x06AEB6,   # Obj_HCZEndBoss
     0x06AEC6,   # loc_6AEC6
+    0x06AECC,   # ReturnHandler_06AEC6
     0x06AEFE,   # loc_6AEFE
     0x06AF04,   # loc_6AF04
     0x06AF0A,   # locret_6AF0A
@@ -13363,6 +13370,7 @@ extra = [
     0x06C658,   # loc_6C658
     0x06C66C,   # loc_6C66C
     0x06C698,   # Obj_MGZEndBossKnux
+    0x06C6A2,   # ReturnHandler_06C69C
     0x06C6F4,   # loc_6C6F4
     0x06C6FA,   # loc_6C6FA
     0x06C702,   # loc_6C702
@@ -13600,6 +13608,7 @@ extra = [
     0x06E270,   # loc_6E270
     0x06E27C,   # loc_6E27C
     0x06E47E,   # Obj_CNZEndBoss
+    0x06E488,   # ReturnHandler_06E482
     0x06E4B8,   # loc_6E4B8
     0x06E4BE,   # loc_6E4BE
     0x06E4C4,   # locret_6E4C4
@@ -13702,6 +13711,7 @@ extra = [
     0x06ED5C,   # loc_6ED5C
     0x06ED66,   # loc_6ED66
     0x06EE68,   # Obj_FBZMiniboss
+    0x06EE72,   # ReturnHandler_06EE6C
     0x06EEA8,   # loc_6EEA8
     0x06EF0E,   # loc_6EF0E
     0x06EF14,   # loc_6EF14
@@ -13841,6 +13851,7 @@ extra = [
     0x06FA14,   # sub_6FA14
     0x06FA22,   # loc_6FA22
     0x06FD0C,   # Obj_FBZ2Subboss
+    0x06FD16,   # ReturnHandler_06FD10
     0x06FD38,   # loc_6FD38
     0x06FD76,   # loc_6FD76
     0x06FD9A,   # loc_6FD9A
@@ -14004,6 +14015,7 @@ extra = [
     0x070E68,   # loc_70E68
     0x071162,   # Obj_ICZMiniboss
     0x071178,   # loc_71178
+    0x07117E,   # ReturnHandler_071178
     0x0711AA,   # loc_711AA
     0x0711B0,   # loc_711B0
     0x0711B6,   # loc_711B6
@@ -14095,6 +14107,7 @@ extra = [
     0x071926,   # loc_71926
     0x071946,   # sub_71946
     0x071BCE,   # Obj_ICZEndBoss
+    0x071BD8,   # ReturnHandler_071BD2
     0x071C08,   # loc_71C08
     0x071C0E,   # loc_71C0E
     0x071C14,   # locret_71C14
@@ -14296,6 +14309,7 @@ extra = [
     0x072FB2,   # loc_72FB2
     0x072FD8,   # loc_72FD8
     0x072FFA,   # Obj_LBZFinalBossKnux
+    0x073004,   # ReturnHandler_072FFE
     0x07302E,   # sub_7302E
     0x073046,   # loc_73046
     0x07304C,   # loc_7304C
@@ -14366,6 +14380,7 @@ extra = [
     0x073680,   # locret_73680
     0x073682,   # sub_73682
     0x0738D6,   # Obj_LBZEndBoss
+    0x0738E0,   # ReturnHandler_0738DA
     0x073906,   # loc_73906
     0x07395A,   # loc_7395A
     0x073960,   # loc_73960
@@ -14526,6 +14541,7 @@ extra = [
     0x07498E,   # loc_7498E
     0x0749AE,   # loc_749AE
     0x0749BE,   # loc_749BE
+    0x0749C4,   # ReturnHandler_0749BE
     0x0749D0,   # loc_749D0
     0x0749EC,   # loc_749EC
     0x074A14,   # loc_74A14
@@ -14536,6 +14552,7 @@ extra = [
     0x074A88,   # loc_74A88
     0x074A9A,   # loc_74A9A
     0x074ACA,   # loc_74ACA
+    0x074AD0,   # ReturnHandler_074ACA
     0x074AFA,   # loc_74AFA
     0x074B36,   # loc_74B36
     0x074B3C,   # loc_74B3C
@@ -14544,8 +14561,10 @@ extra = [
     0x074B96,   # loc_74B96
     0x074B9E,   # loc_74B9E
     0x074BAE,   # loc_74BAE
+    0x074BB4,   # ReturnHandler_074BAE
     0x074BC0,   # loc_74BC0
     0x074BD0,   # loc_74BD0
+    0x074BD8,   # ReturnHandler_074BD4
     0x074BFA,   # loc_74BFA
     0x074C00,   # loc_74C00
     0x074C0C,   # loc_74C0C
@@ -14715,6 +14734,7 @@ extra = [
     0x075E46,   # loc_75E46
     0x075E4C,   # loc_75E4C
     0x075F50,   # Obj_MHZEndBoss
+    0x075F5A,   # ReturnHandler_075F54
     0x075FD4,   # loc_75FD4
     0x076004,   # loc_76004
     0x07601A,   # loc_7601A
@@ -15021,6 +15041,7 @@ extra = [
     0x078230,   # loc_78230
     0x07825E,   # sub_7825E
     0x0784F0,   # Obj_LRZMiniboss
+    0x0784FA,   # ReturnHandler_0784F4
     0x078522,   # loc_78522
     0x078528,   # loc_78528
     0x078536,   # locret_78536
@@ -15777,6 +15798,7 @@ extra = [
     0x07D39E,   # loc_7D39E
     0x07D3BE,   # sub_7D3BE
     0x07DDB4,   # Obj_DEZMiniboss
+    0x07DDBE,   # ReturnHandler_07DDB8
     0x07DE28,   # loc_7DE28
     0x07DE2C,   # loc_7DE2C
     0x07DE44,   # locret_7DE44
@@ -15993,6 +16015,7 @@ extra = [
     0x07EEEE,   # sub_7EEEE
     0x07EF00,   # loc_7EF00
     0x07F06C,   # Obj_DEZEndBoss
+    0x07F076,   # ReturnHandler_07F070
     0x07F0CE,   # loc_7F0CE
     0x07F0D2,   # loc_7F0D2
     0x07F0D8,   # locret_7F0D8
@@ -17492,6 +17515,7 @@ extra = [
     0x088556,   # loc_88556
     0x08855A,   # loc_8855A
     0x088568,   # Obj_MGZMiniboss
+    0x088572,   # ReturnHandler_08856C
     0x0885A4,   # loc_885A4
     0x0885FC,   # loc_885FC
     0x088604,   # loc_88604
@@ -18237,6 +18261,7 @@ extra = [
     0x08CADA,   # loc_8CADA
     0x08CB08,   # loc_8CB08
     0x08CB56,   # Obj_LBZ1Robotnik
+    0x08CB66,   # ReturnHandler_08CB62
     0x08CB90,   # loc_8CB90
     0x08CB9E,   # loc_8CB9E
     0x08CBF2,   # loc_8CBF2
@@ -18287,6 +18312,7 @@ extra = [
     0x08CF52,   # loc_8CF52
     0x08CF5C,   # loc_8CF5C
     0x08CF80,   # Obj_LBZMinibossBoxKnux
+    0x08CF8A,   # ReturnHandler_08CF84
     0x08CFB2,   # loc_8CFB2
     0x08CFC6,   # locret_8CFC6
     0x08CFC8,   # loc_8CFC8
@@ -18690,6 +18716,7 @@ extra = [
     0x09001A,   # loc_9001A
     0x0900F0,   # Obj_LRZRockCrusher
     0x0900FE,   # loc_900FE
+    0x090104,   # ReturnHandler_0900FE
     0x090154,   # loc_90154
     0x09017C,   # loc_9017C
     0x090188,   # loc_90188

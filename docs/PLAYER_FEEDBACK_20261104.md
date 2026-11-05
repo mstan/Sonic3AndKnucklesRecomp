@@ -24,7 +24,7 @@ the applicable reproduction, regression, packaging and owner-review gates.
 | A11 | Rolling early through HCZ1 spring/loop clips into wall and may zip | Original behavior reproduced. The native recording and original-ROM collision fixture both settle inside the wall at X1AF5/Y03EC, with matching actor position, velocity, collision and object-control state. Fixture starts before the spring traversal; it does not set the resulting collision state. No correctness patch. Explicit S3K occurrence/original-ROM comparison remains to be checked separately. |
 | A12 | Initial HCZ2 camera fails to follow, causing death; retry works | Fixed candidate: fixed splash slot B172 overwrites live end-sign controller before native act-size installation. Both native allocation loops and the custom widescreen placement loader reserve the slot. Recorded-input transition reaches stored bounds 6000/1000 and a living player in lower HCZ2 with camera following. Gameplay scope/CCR/RAM and real widescreen placement tests pass. Final package regression pending; S3K occurrence unverified; explicitly assess its real first-entry transition too. |
 | A13 | Special Stage6 background is dark in standalone Sonic3 | Fixed candidate in both S3 and S3K by the existing transparent high-priority plane correction (engine6db5a82, A02). Released v0.7.3 reproduces the dark sky; current builds restore normal brightness with16 identical paired RAM/VRAM samples per host. Original-ROM stage6 controls confirm normal brightness in both hosts. Native and reference DAC color curves differ, so exact RGB/whole-image parity is not claimed. Final package regression pending. |
-| A14 | HCZ2 softlocks near Knuckles sabotage set-piece | Pending replay reproduction. Supplied native screenshot places Sonic/Tails on the blue platform beside the spring; a new matching v0.7.3 replay and sidecars are retained. Rewind is disabled in the supplied profile. The same session reports successful HCZ2 first entry on one attempt, which does not clear A12 or qualify its unreleased fix. |
+| A14 | HCZ2 softlocks near Knuckles sabotage set-piece | Fixed candidate in S3 and S3K: Check_CameraInRange installs its caller continuation as an object handler, but the unlabeled entry was absent from generated discovery. Source-derived metadata now includes these entries through the normal regeneration pipeline. The exact released replay reproduces S3 with all83650 checkpoints matching. Both released hosts remain at routine2/X39F5; both candidates and original-ROM controls traverse routines2/4/6/8/10/12, release the camera and drop the platform. Candidates continue to X3D34. Controlled setup places only the player before the native trigger; approach traversal and whole-route parity are not claimed. Current-engine/final package regression pending. |
 
 ## Sonic 3 & Knuckles
 
@@ -79,7 +79,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Alternative aspect targets, experimental labels and pre-v1.0 GitHub prerelease tags are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **41 report groups**: **7 awaiting decisions**, **21 implemented
+There are **41 report groups**: **6 awaiting decisions**, **22 implemented
 candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
