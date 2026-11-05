@@ -40,6 +40,7 @@ static void test_aiz_join(void)
         memset(a->video.vram+32,0x11,32);memset(a->video.vram+64,0x22,32);
     }
     uint16_t margin_attr=0;uint8_t margin_pixel=0;
+    CHECK(!aiz_join_sample(&v,1,0x2F10,-100,0x2CF0,0x300,&margin_attr,&margin_pixel));
     CHECK(aiz_join_sample(&v,1,0x2F10,400,0x3100,0x300,&margin_attr,&margin_pixel));
     CHECK(margin_attr==2 && margin_pixel==2); /* current coast, not future art */
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
@@ -92,7 +93,27 @@ static void test_aiz_join(void)
     S3StateIO load={blob,sizeof s_build,0,2,1};scene_frame_state(&load,&restored);CHECK(load.ok && restored.aiz_join==3);
     invalid=4;memcpy(blob+offsetof(SceneFrame,aiz_join),&invalid,sizeof invalid);
     S3StateIO bad={blob,sizeof s_build,0,1,1};scene_frame_state(&bad,&restored);CHECK(!bad.ok);
-    free(blob);CHECK(configure("off"));s_aiz_join_ready=0;
+    free(blob);
+    /* Boss art can reuse the live patterns while the retired grove remains
+     * visible to the left. Its immutable bank must not alter native pixels
+     * or extend into the boss arena or another zone. */
+    s_aiz_ship_art=s_aiz_join_second;
+    s_aiz_ship_art_attempted=s_aiz_ship_art_ready=1;
+    s_frame_zone=0;s_frame_act=1;s_frame_fg_x=0x4880;
+    memcpy(s_world_frame,g_ram,sizeof g_ram);
+    memset(v.vram+64,0x55,32);
+    CHECK(aiz_retired_tree_sample(-100,320,0x4780,0x300,&margin_attr,&margin_pixel));
+    CHECK(margin_attr==2 && margin_pixel==2);
+    CHECK(!aiz_retired_tree_sample(0,320,0x4780,0x300,&margin_attr,&margin_pixel));
+    CHECK(!aiz_retired_tree_sample(-100,320,0x4880,0x300,&margin_attr,&margin_pixel));
+    s_frame_zone=1;
+    CHECK(!aiz_retired_tree_sample(-100,320,0x4780,0x300,&margin_attr,&margin_pixel));
+    CHECK(!aiz_tree_arrival_alpha(0x4300,8,0x3D100000));
+    CHECK(!aiz_tree_arrival_alpha(0x4430,8,0x3CE00000));
+    CHECK(aiz_tree_arrival_alpha(0x4380,8,0x3CEC0000)>0);
+    CHECK(aiz_tree_arrival_alpha(0x4400,12,0x3CDB0000)==255);
+    s_aiz_ship_art_attempted=s_aiz_ship_art_ready=0;
+    CHECK(configure("off"));s_aiz_join_ready=0;
     CHECK(aiz_join_left(0x2F10,796,1,0x3080)==0x2D64);
     s_aiz_join_attempted=0;
 }

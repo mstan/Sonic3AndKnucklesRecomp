@@ -938,6 +938,18 @@ static void test_aiz2_ship_cameras(void)
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    /* A ship bob between completed frames must not turn its upper band
+     * into ground during fractional presentation. The two cameras use
+     * different 1024px pages, so choosing the wrong bank is observable. */
+    v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
+    memcpy(ix_current()->cram[0],v.cram,sizeof v.cram);
+    ix_previous()->fg_scroll[0]=0xAB1;ix_current()->fg_scroll[0]=0xAB3;
+    ix_previous()->hs[0][0]=ix_current()->hs[0][0]=-0x3FB5;
+    ix_previous()->hs[0][1]=ix_current()->hs[0][1]=0;
+    s_interpolating=1;s_interpolation_phase=.5;
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+    s_interpolating=0;
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_campaign_background_edges(void)

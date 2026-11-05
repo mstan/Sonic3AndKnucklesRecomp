@@ -5,6 +5,8 @@ typedef struct { uint8_t chunks[0x8000],layout[0x1000]; } AizJoinMap;
 static AizJoinMap s_aiz_join_map[2];
 static AizArt s_aiz_join_second;
 static int s_aiz_join_attempted,s_aiz_join_ready;
+static AizArt s_aiz_ship_art;
+static int s_aiz_ship_art_attempted,s_aiz_ship_art_ready;
 
 static int aiz_join_load(void)
 {
@@ -29,6 +31,51 @@ static int aiz_join_load(void)
         }
     }
     return s_aiz_join_ready=1;
+}
+
+static int aiz_ship_art_load(void)
+{
+    if(s_aiz_ship_art_attempted)return s_aiz_ship_art_ready;
+    s_aiz_ship_art_attempted=1;
+    if(!aiz_join_load())return 0;
+    s_aiz_ship_art=s_aiz_join_second;
+    size_t used=0;
+    if(art_kos(g_rom+S3_ART_BANK+0x1B1372,0x260,
+               s_aiz_ship_art.blocks+0xAB8,0x338,&used)!=0x338 ||
+       art_kosm(S3_ART_BANK+0x1B48C6,0x922,
+                s_aiz_ship_art.video.vram+0x3F80,0x1160)!=0x1160)return 0;
+    return s_aiz_ship_art_ready=1;
+}
+
+static int aiz_ship_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
+{
+    if(wx<0x4440 || wx>=0x4880 || !aiz_ship_art_load())return 0;
+    *attr=world_attr_blocks(s_world_frame,s_aiz_ship_art.blocks,wx,wy,0);
+    *pixel=pattern_pixel(&s_aiz_ship_art.video,*attr,wx,wy);
+    return 1;
+}
+static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
+                                    uint16_t *attr,uint8_t *pixel)
+{
+    /* The boss replaces patterns after the native view leaves this grove.
+     * Wider views still see its leftmost trees. Retain only that retired
+     * scenery's original ship-phase bank; the native view stays live. */
+    if(s_frame_zone || s_frame_act!=1 || s_frame_fg_x<0x4880 ||
+       (nx>=0 && nx<nw))return 0;
+    return aiz_ship_tree_sample(wx,wy,attr,pixel);
+}
+static unsigned aiz_tree_arrival_alpha(int camera,unsigned phase,uint32_t ship)
+{
+    /* The native five-row handover hides the incoming grove until the
+     * battleship retires. Its wider right margin already sees that grove.
+     * Introduce its existing canopy during the last second of the final
+     * loop, rather than switching the entire visible tree on in one tick.
+     * Do not preview it on an earlier $200 camera loop. */
+    if(phase==12)return 255;
+    if(phase!=8 || ship<0x3CDC0000u)return 0;
+    unsigned ticks=(ship-0x3CDC0000u)/0x8800u+1u;
+    if(ticks>=64 || camera+(int)ticks*4>=0x4440)return 0;
+    return (64-ticks)*255u/64u;
 }
 
 static unsigned aiz_join_tag(const uint8_t *ram)
@@ -106,6 +153,11 @@ static int aiz_join_sample(const GVDP *v,unsigned tag,int camera,int nx,int x,in
                            uint16_t *attr,uint8_t *pixel)
 {
     if(!aiz_join_near(tag,camera) || (nx>=0 && nx<320) || !aiz_join_load())return 0;
+    /* Before fire replaces the current map, its live chunks include the
+     * completed hollow-tree reveal. A cached copy would close the trunk
+     * again as the camera approaches the miniboss. Only the finite coast
+     * extension needs a cached sample in this phase. */
+    if(tag==1 && x<0x3080)return 0;
     /* Other parts of either level keep their live animated/native terrain.
      * Only the neighboring landscape exposed around this join is cached. */
     if(tag==3){x+=0x2F00;y+=0x80;}
