@@ -69,6 +69,10 @@ static void test_sprite_atlas(void)
     }
     memset(out,0,sizeof out);memset(s_priority,0,64);
     draw_scene_sprites(&v,8,out,64,0,pal);CHECK(!out[8]);
+    /* Atlas bank 1 uses bit 6 too; it is not a margin-only current strip. */
+    scene.sprites[0].size=0xC5;scene.sprites[0].zoom=256;scene.sprites[0].attr=0x8000;
+    memset(out,0,sizeof out);memset(s_priority,0,64);
+    draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[1]);
     scene.sprites[0].zoom=0;
     scene.sprites[0].size=5;scene.sprites[0].attr=0x8000;
     memset(s_priority,0,64);draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[5]);
@@ -154,7 +158,7 @@ static void test_hcz_rush_extent(void)
             CHECK(s_build.count>0);
             int origin=((int)width-320)/2;
             for(unsigned row=0;row<2;++row) {
-                memset(out,0,sizeof out);memset(s_priority,0,sizeof s_priority);
+                memset(out,0,sizeof out);memset(s_priority,0,width);
                 draw_scene_sprites(&v,row?80:48,out,(int)width,origin,pal);
                 for(int x=0;x<(int)width;++x) {
                     int nx=x-origin;
@@ -942,6 +946,56 @@ static void test_aiz_tree_palette_boundary(void)
     CHECK(!aiz_tree_color(0x2D00,0x300,-1,320,46));
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
     scanline(&v,0,native,320,out,320);CHECK(!memcmp(out,native,sizeof native));
+}
+static void test_hcz_tunnel_palette_retirement(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320],out[1603];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=1;
+    write32(0xB000,0x1234);word(g_ram,0x8000,97);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x960);word(g_ram,0xEE84,0x580);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x580;
+    word(v.vram,0xF000,(unsigned)-0x960);v.cram[17]=0xEEE;
+    const unsigned old_colors[]={0xB80,0x240,0x220};
+    const unsigned incoming[]={0xCEE,0xACE,0x8A};
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x101;
+    s_build.camera_x=0x960;s_build.camera_y=0x580;publish_sprites();
+    s3_video_set_world_cell(tree_palette_cell);
+    const int widths[]={320,398,523,796,1603};
+    for(unsigned color=0;color<3;++color) {
+        v.cram[56+color]=(uint16_t)incoming[color];
+        memset(v.vram+32,(int)(8+color)*17,32);
+        for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x6001);
+        uint32_t live=genesis_dac_cram_to_argb(incoming[color],GENESIS_DAC_NORMAL);
+        uint32_t retained=genesis_dac_cram_to_argb(old_colors[color],GENESIS_DAC_NORMAL);
+        for(unsigned i=0;i<320;++i)native[i]=live;
+        for(unsigned c=0;c<5;++c) {
+            int w=widths[c],origin=(w-320)/2;
+            width(w,224,320,224);memcpy(before,g_ram,sizeof before);GVDP unchanged=v;
+            scanline(&v,0,native,320,out,w);
+            for(int x=0;x<w;++x) {
+                int nx=x-origin,wx=0x960+nx;
+                CHECK(out[x]==(nx<0 && wx<0x900?retained:live));
+            }
+            CHECK(!memcmp(out+origin,native,sizeof native));
+            CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+        }
+    }
+    /* Another host area/act, the original pre-switch camera and rows outside
+     * the current tunnel retain their installed palette everywhere. */
+    for(unsigned c=0;c<5;++c) {
+        unsigned camera=c==2?0x8E0:0x960,cy=c==3?0x4F0:c==4?0x600:0x580;
+        g_ram[0xFE10]=c==0?2:1;g_ram[0xFE11]=c==1;
+        word(g_ram,0xEE80,camera);word(g_ram,0xEE84,cy);
+        word(v.vram,0xF000,(unsigned)-camera);v.vsram[0]=(uint16_t)cy;
+        s_build.camera_x=(int)camera;s_build.camera_y=(int)cy;
+        s_build.world_tag=(unsigned)ram16(0xFE10)+1u;publish_sprites();
+        width(796,224,320,224);scanline(&v,0,native,320,out,796);
+        for(unsigned x=0;x<796;++x)CHECK(out[x]==native[0]);
+    }
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_aiz_intro_owned_pose(void)
 {
@@ -2334,7 +2388,7 @@ int main(int argc,char **argv)
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_aiz_intro_owned_pose();
+    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_ship_cameras();
     test_private_plane_colors();

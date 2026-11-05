@@ -53,7 +53,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K20 | HCZ1 background scroll breaks at level's left boundary | Fixed candidate: keep B's original parallax on the centered screen while the foreground viewport clamps at the left edge. The added HCZ regression fails in both old renderer profiles and passes the correction at four widths. Actual HCZ1 camera sweep0..608 retains90 paired RAM/VRAM samples;37 pictures change only in the exposed background. Final package regression pending. |
 | K21 | HCZ surface interlacing retains native draw width | Fixed candidate: extend the original two192px sprite strips through the expanded view, retaining their animation,32px gaps and native copies. Both renderer profiles pass. Actual32:9 HCZ surface sequence retains120 paired RAM/VRAM samples and every native-center pixel;120 pictures extend only the original waterline into the margins. Final package regression pending. |
 | K22 | HCZ1 opening current leaves foreground gap with wrong water palette | Fixed candidate: the moving water uses finite blue-brick sprites, leaving a dry-looking gap beyond their fill. Extend the original final brick rows through the wide margin up to the original X980 retirement point. The real button/current sequence preserves300 RAM/VRAM pairs and every native-center pixel;10 of300 pictures repair only the right-margin gap. Both renderer profiles pass all four original poses and retirement/native-view guards. Package regression pending; the later global palette switch is tracked separately as K23. |
-| K23 | Current tunnel changes palette before leaving extended view | Pending original/extended-view comparison |
+| K23 | Current tunnel changes palette before leaving extended view | Fixed candidate after owner identified the visible failure at0:06 (button190). Original HCZ1_Resize repurposes colors56..58 at cameraX900/Y500 while the wide left view still sees the current tunnel. Retain its original three colors only in that margin, following scene fades. Both renderer profiles pass five widths and area/act/camera/row guards; the old renderer fails the new regression. Actual300 RAM/VRAM pairs and every native-center pixel remain unchanged; only7 images repair the exposed tunnel. Also keep imported sprite-atlas bank1 distinct from the current-fill flag. Final package/owner regression pending. |
 | K24 | Level-select SONIC/MILES background lettering does not join the wide margins | Fixed candidate: extend the installed six-tile/48px word period rather than the cropped320px canvas. Actual SONIC, MILES and both transition-art frames are coherent across the boundaries in240 images;240 RAM/VRAM pairs and all native-center pixels remain unchanged. Both address profiles pass native/398/523/796/1603 widths and shifted-scroll boundary tests. Package regression pending. |
 
 ## Sonic & Knuckles Alone
@@ -74,7 +74,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **38 report groups**: **6 awaiting decisions**, **19 implemented
+There are **38 report groups**: **5 awaiting decisions**, **20 implemented
 candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction
