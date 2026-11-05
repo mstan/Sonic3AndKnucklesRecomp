@@ -64,9 +64,12 @@ static int timer_site(uint32_t pc)
                      (pc==0xDD76u || pc==0xDD98u || pc==0xDDAAu);}
 static int nemesis_pop_site(uint32_t pc)
 {return pc==(standalone_s3?0x1B0Au:0x1880u);}
+static int allocation_site(uint32_t pc)
+{return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
+        combined_mode && (pc==0x1BB10u || pc==0x1BAECu);}
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) ||
-        (standalone_s3 && (pc==0x1A0E0u || pc==0x1A0BCu));}
+        allocation_site(pc);}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
 {
@@ -78,8 +81,8 @@ void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
      * remain intact; no result/camera flag or object contents are changed.
      * Cover CreateNewSprite4 (level placements) as well as the loop shared
      * by AllocateObject and AllocateObjectAfterCurrent. */
-    if(standalone_s3 && (pc==0x1A0E0u || pc==0x1A0BCu) && ram && sr && ram[0xF600]==12 &&
-       word(ram,0xFE10)==0x100 && !(word(ram,0xFFD8)) &&
+    if(allocation_site(pc) && ram && sr && ram[0xF600]==12 &&
+       word(ram,0xFE10)==0x100 && !word(ram,standalone_s3?0xFFD8:0xFFE8) &&
        (candidate&0xFFFFFFu)==0xFFB172u)
         *sr&=(uint16_t)~4u;
 }

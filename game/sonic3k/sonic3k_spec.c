@@ -56,6 +56,7 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 static int s3k_instruction(uint32_t pc)
 {
     if(s3_gameplay_owns(pc)) {
+        s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],!tri_character_active()))g_cpu.SR|=4u;

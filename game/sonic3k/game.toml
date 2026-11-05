@@ -447,6 +447,15 @@ kind = "game_hook"
 addr = 0x1BAFA # Yield a slot before allocation fails (AllocateObjectAfterCurrent)
 kind = "game_hook"
 
+# HCZ1's fixed splash slot must not hold an act-transition controller.
+[[widescreen_site]]
+addr = 0x1BAEC # DBEQ in CreateNewSprite4
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x1BB10 # DBEQ in AllocateObject / AllocateObjectAfterCurrent
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x4F3B0 # Correct history across seamless acts (Offset_ObjectsDuringTransition)
 kind = "game_hook"
