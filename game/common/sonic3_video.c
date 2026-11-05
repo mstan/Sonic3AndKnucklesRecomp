@@ -120,6 +120,7 @@ static int interpolation_lerp(int a,int b,int limit)
     return b-d+(int)(d*s_interpolation_phase+(d<0?-.5:.5));
 }
 static unsigned presentation_fg_scroll(int row,unsigned fallback);
+static unsigned presentation_fg_identity(int row,unsigned fallback);
 static unsigned presentation_cram(int row,unsigned color,unsigned fallback);
 static void presentation_scroll(int row,int *a,int *b);
 static int presentation_camera(int axis,int fallback);
@@ -1594,7 +1595,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
-    int ship_band=aiz_ship && !((fg_scroll^(unsigned)ship_y)&1023u);
+    /* A fractional scroll can lie between two bobbing ship positions.
+     * Select the camera from this row's completed HInt identity, then
+     * interpolate its position. A fractional value cannot identify a bank. */
+    unsigned fg_identity=presentation_fg_identity(line,live_fg_scroll);
+    int ship_band=aiz_ship && !((fg_identity^(unsigned)ship_y)&1023u);
     int plane_x=s_frame_fg_x,plane_y=s_frame_fg_y;
     if(level && width>320 && s_display && aiz_join_near(s_display->aiz_join,s_display->camera_x)) {
         /* The next map assignment can precede this SAT/scroll upload.
@@ -1687,6 +1692,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_loop_fg=bg_world && aiz_ship && !s_frame_zone && s_frame_act==1 &&
         ((s_world_frame[0xEEB2]<<8)|s_world_frame[0xEEB3])==4 &&
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])>=8 && !ship_band;
+    unsigned tree_arrival=0;
+    if(aiz_ship && !s_frame_zone && s_frame_act==1) {
+        uint32_t ship=((uint32_t)s_world_frame[0xEE98]<<24)|
+            ((uint32_t)s_world_frame[0xEE99]<<16)|
+            ((unsigned)s_world_frame[0xEE9A]<<8)|s_world_frame[0xEE9B];
+        tree_arrival=aiz_tree_arrival_alpha(s_frame_fg_x,
+            (s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1],ship);
+    }
     /* FBZ streams complete 512px rows from one of two layout canvases
      * (X=0 indoors, X=$200 outdoors). Its doorway events replace that
      * canvas a row/column at a time. The uploaded plane is authoritative
@@ -1842,6 +1855,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int joined=level && s_display && width>320 &&
             aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
         if(joined)apalette=palette;
+        if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.
          * Its locked camera keeps the entire 256px reveal strip resident
@@ -1872,6 +1886,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ac=genesis_dac_cram_to_argb(aiz_art_color(4,v),GENESIS_DAC_NORMAL);
         uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
         out[x]=foreground?ac:bc;
+        if(tree_arrival && nx>=nw) {
+            uint16_t tree_attr;uint8_t tree_pixel;
+            if(aiz_ship_tree_sample(s_camera+nx,s_frame_fg_y+line,&tree_attr,&tree_pixel) &&
+               (tree_attr&0x8000u) && tree_pixel) {
+                uint32_t color=plane_color(line,tree_attr,tree_pixel,palette),mixed=0xFF000000u;
+                for(unsigned shift=0;shift<24;shift+=8) {
+                    unsigned a=(color>>shift)&255u,b=(out[x]>>shift)&255u;
+                    mixed|=((a*tree_arrival+b*(255-tree_arrival)+127)/255)<<shift;
+                }
+                out[x]=mixed;s_priority[x]|=1;
+            }
+        }
         /* Outside a native special-stage projection only planes are drawn,
          * so plane priority alone
          * determines shadow; native operator sprites remain in the center. */
@@ -2181,6 +2207,11 @@ static unsigned presentation_fg_scroll(int row,unsigned fallback)
 {
     if(!s_interpolating || row<0 || row>=IX_LINES)return fallback;
     return (unsigned)interpolation_lerp(ix_previous()->fg_scroll[row],ix_current()->fg_scroll[row],128);
+}
+static unsigned presentation_fg_identity(int row,unsigned fallback)
+{
+    return s_interpolating && row>=0 && row<IX_LINES?
+        ix_current()->fg_scroll[row]:fallback;
 }
 static int presentation_bg_scroll(int fallback)
 {

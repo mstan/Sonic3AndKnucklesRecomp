@@ -19,6 +19,7 @@ static void predicate_test(void)
     CHECK(s3_knux_preview_needed(ram));
     /* Real capsule-wait controller and the native far-right camera cap:
      * the ledge enters the margin before automatic approach starts. */
+    lng(ram,0xCF82,0x6923E);CHECK(s3_knux_preview_needed(ram));
     lng(ram,0xCF82,0x694D4);word(ram,0xEE80,0x4980);
     uint8_t before[65536];memcpy(before,ram,sizeof before);
     CHECK(s3_knux_preview_needed(ram));CHECK(!memcmp(before,ram,sizeof before));
