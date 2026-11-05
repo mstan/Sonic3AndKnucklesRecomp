@@ -423,6 +423,17 @@ static int competition_layout(const GVDP *v)
     return (v->reg[12]&1) && (v->reg[2]&56)==0x30 &&
         (v->reg[4]&7)==7 && v->reg[16]==0x11 && !(v->reg[11]&3) && !v->reg[18];
 }
+static int level_select_layout(const GVDP *v)
+{
+    if(!(v->reg[12]&1) || (v->reg[2]&56)!=0x30 || (v->reg[4]&7)!=7 ||
+       v->reg[16]!=1 || (v->reg[11]&3) || v->reg[18])return 0;
+    /* MapEni_S22POptions repeats six animated SONIC/MILES tiles. The
+     * initialized 40-column view ends in the middle of that word. Identify
+     * its installed map so the outgoing fade keeps the same repeat too. */
+    for(unsigned x=0;x<12;++x)
+        if(vram16(v,0xE000+x*2)!=(uint16_t)(0x6000+(x+1)%6))return 0;
+    return 1;
+}
 static int menu_raster_enabled(const GVDP *v)
 {
     int mode=g_ram[0xF600]&127;
@@ -1720,6 +1731,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * holds the complete 1024px card strip (128 tiles per row).
      * Use the installed layout through both entry and exit fades. */
     int file_select=!level && file_select_layout(v);
+    int menu_background_period=!level && !special && !file_select && level_select_layout(v)?48:nw;
     int wy=camera_y+line;
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
@@ -1839,7 +1851,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 if(ax>=nw)ax=nw*2-1-ax;
                 bx=ax-hs_b;
             }
-            bx%=nw;if(bx<0)bx+=nw;
+            int repeat=nx<0 || nx>=nw?menu_background_period:nw;
+            bx%=repeat;if(bx<0)bx+=repeat;
+            if(menu_background_period!=nw && (nx==0 || nx==nw))bg.remaining=0;
         }
 
         if(!fg.remaining) {

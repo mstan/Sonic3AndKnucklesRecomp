@@ -54,7 +54,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 | K21 | HCZ surface interlacing retains native draw width | Fixed candidate: extend the original two192px sprite strips through the expanded view, retaining their animation,32px gaps and native copies. Both renderer profiles pass. Actual32:9 HCZ surface sequence retains120 paired RAM/VRAM samples and every native-center pixel;120 pictures extend only the original waterline into the margins. Final package regression pending. |
 | K22 | HCZ1 opening current leaves foreground gap with wrong water palette | Pending reproduction |
 | K23 | Current tunnel changes palette before leaving extended view | Pending original/extended-view comparison |
-| K24 | Level-select SONIC/MILES background lettering does not join the wide margins | New screenshot-confirmed candidate in S3K: letters are truncated at the native/extended canvas boundary. Reproduce both name variants and compare the original background repeat period. |
+| K24 | Level-select SONIC/MILES background lettering does not join the wide margins | Fixed candidate: extend the installed six-tile/48px word period rather than the cropped320px canvas. Actual SONIC, MILES and both transition-art frames are coherent across the boundaries in240 images;240 RAM/VRAM pairs and all native-center pixels remain unchanged. Both address profiles pass native/398/523/796/1603 widths and shifted-scroll boundary tests. Package regression pending. |
 
 ## Sonic & Knuckles Alone
 
@@ -73,7 +73,7 @@ transformation/cutscene timing and guest simulation must remain correct.
 - Alternative aspect targets/experimental labels are suggestions, not adopted policy.
 - Extend the finite Slots/Gumball interactive foregrounds beyond their authored arenas.
 
-There are **38 report groups**: **8 awaiting decisions**, **17 implemented
+There are **38 report groups**: **7 awaiting decisions**, **18 implemented
 candidates awaiting final package regression**, and **13 non-fix dispositions**.
 The two explicit prior-disposition reviews are complete. No capture or replay
 integrity check alone counts as a fix. Approved asset and nonreproduction

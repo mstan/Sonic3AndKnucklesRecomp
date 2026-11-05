@@ -147,6 +147,34 @@ static void test_object_zoom(void)
     CHECK(s_build.sprites[0].zoom==128);
     s3_video_set_object_zoom(NULL);CHECK(!enabled());
 }
+static void test_level_select_word_edges(void)
+{
+    static GVDP v;uint32_t native[320],out[1603];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));g_ram[0xF600]=0x28;
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    for(unsigned t=0;t<6;++t) {
+        memset(v.vram+t*32,(int)(t+1)*17,32);v.cram[49+t]=(uint16_t)(t*0x222);
+    }
+    for(unsigned y=0;y<32;++y)for(unsigned x=0;x<64;++x)
+        word(v.vram,0xE000+(y*64+x)*2,0x6000+(x<40?(x+1)%6:5));
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
+    memset(&s_build,0,sizeof s_build);publish_sprites();
+    const int canvases[]={320,398,523,796,1603};
+    for(unsigned c=0;c<5;++c)for(int scroll=0;scroll<48;scroll+=7) {
+        word(v.vram,0xF002,(unsigned)-scroll);
+        scanline(&v,0,native,320,out,canvases[c]);int origin=(canvases[c]-320)/2;
+        for(int x=0;x<canvases[c];++x) {
+            int nx=x-origin,bx=(nx+scroll)%48;if(bx<0)bx+=48;
+            uint32_t expected=genesis_dac_cram_to_argb(v.cram[49+(bx/8+1)%6],GENESIS_DAC_NORMAL);
+            if(out[x]!=(nx>=0 && nx<320?native[nx]:expected))
+                fprintf(stderr,"level-select width%d scroll%d x%d actual%08x expected%08x layout%d level%d\n",canvases[c],scroll,x,out[x],expected,level_select_layout(&v),s_frame_level);
+            CHECK(out[x]==(nx>=0 && nx<320?native[nx]:expected));
+        }
+    }
+    CHECK(configure("off"));
+}
 static void test_native_bonus(void)
 {
     static GVDP v;uint32_t native[320],out[796];
@@ -2265,7 +2293,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
