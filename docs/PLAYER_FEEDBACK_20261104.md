@@ -66,7 +66,8 @@ transformation/cutscene timing and guest simulation must remain correct.
 ## Lower-priority suggestions
 
 - Optional Reversed Frequency soundtrack arrangements; outside this bugfix release.
-- Optional alternative/improved DAC sound driver; the cited original-like sample quality is an enhancement request, not a newly demonstrated playback defect.
+- Optional Clone Driver v2 / improved DAC sound driver; the cited original-like sample quality is an enhancement request, not a newly demonstrated playback defect. Prioritize stable gameplay across the games before optional music features.
+- Optional shared launcher themes/customization, including scanline styling; outside this gameplay bugfix release.
 - Extend the standalone S&K Sega slide-away animation across widescreen.
 - Smooth AIZ2 drain-palette retirement beyond original behavior.
 - Obscure the buried portions of AIZ2's raised/falling drawbridge; compare original.
