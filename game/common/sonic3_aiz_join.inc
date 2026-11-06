@@ -44,6 +44,16 @@ static int aiz_ship_art_load(void)
                s_aiz_ship_art.blocks+0xAB8,0x338,&used)!=0x338 ||
        art_kosm(S3_ART_BANK+0x1B48C6,0x922,
                 s_aiz_ship_art.video.vram+0x3F80,0x1160)!=0x1160)return 0;
+    /* AnimateTiles owns these slots; the compressed scenery contains
+     * numbered placeholders. A retired bank keeps the original first
+     * animation frame after the live slots are reused by the boss. */
+    static const unsigned first[]={0xB3,0xCA,0xD6,0xE2,0xE6};
+    static const unsigned count[]={0x17,0xC,0xC,4,0x18};
+    static const unsigned source[]={0xA3F00,0xA3600+0x3C*32,
+        0xA3600+0x18*32,0xA5680,0xA4A80};
+    for(unsigned i=0;i<5;++i)
+        memcpy(s_aiz_ship_art.video.vram+first[i]*32,
+               g_rom+S3_ART_BANK+source[i],count[i]*32);
     return s_aiz_ship_art_ready=1;
 }
 
@@ -57,11 +67,17 @@ static int aiz_ship_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
 static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
                                     uint16_t *attr,uint8_t *pixel)
 {
-    /* The boss replaces patterns after the native view leaves this grove.
-     * Wider views still see its leftmost trees. Retain only that retired
-     * scenery's original ship-phase bank; the native view stays live. */
+    /* The boss and capsule replace patterns after the native view leaves
+     * this scenery. Retain the grove to the left and the finite far-right
+     * cliff in their original bank; the native view and active arena stay
+     * live. */
     if(s_frame_zone || s_frame_act!=1 || s_frame_fg_x<0x4880 ||
        (nx>=0 && nx<nw))return 0;
+    if(wx>=0x4B80 && wx<0x4C80 && aiz_ship_art_load()) {
+        *attr=world_attr_blocks(s_world_frame,s_aiz_ship_art.blocks,wx,wy,0);
+        *pixel=pattern_pixel(&s_aiz_ship_art.video,*attr,wx,wy);
+        return 1;
+    }
     return aiz_ship_tree_sample(wx,wy,attr,pixel);
 }
 static unsigned aiz_tree_arrival_alpha(int camera,unsigned phase,uint32_t ship)

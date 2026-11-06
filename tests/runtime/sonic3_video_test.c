@@ -1572,6 +1572,11 @@ static void test_knux_preview_publication(void)
     write32(0xB206,0x69526);
     capture_objects();CHECK(s_build.preview_knux);publish_sprites();
     CHECK(s_history[s_serial%3].preview_knux);
+    write32(0xB206,0x8488A);write32(0xB23A,0x694A4);
+    capture_objects();CHECK(s_build.preview_knux);publish_sprites();
+    CHECK(s_history[s_serial%3].preview_knux);
+    write32(0xB23A,0x1234);capture_objects();CHECK(!s_build.preview_knux);
+    write32(0xB206,0x69526);capture_objects();publish_sprites();
     /* The earlier allocated slot has not reached its initializer/Draw_Sprite. */
     write32(0xB206,0x69588);write32(0xB128,0x61D4C);
     capture_objects();CHECK(s_build.preview_knux);publish_sprites();
