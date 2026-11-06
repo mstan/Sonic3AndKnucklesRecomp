@@ -304,10 +304,9 @@ const GameSpec g_game_spec = {
     .short_name             = "SonicK",
     .boxart                 = "boxart-sonick.tga",
 
-    /* S&K standalone â€” CRC check skipped (runner CRC calc vs file byteswap
-     * unverified); ROM identity is gated by size + external hash check.
-     * Expected MD5 of the file is 4ea493ea4e9f6c9ebfccbdb15110367e. */
-    .expected_rom_crc32     = 0u,
+    /* Original file bytes: MD5 4ea493ea4e9f6c9ebfccbdb15110367e.
+     * Launcher and runtime validate the same unmodified cartridge. */
+    .expected_rom_crc32     = 0x0658F691u,
     .expected_rom_size      = 0x200000u,   /* 2 MB standalone cart */
 
     /* No battery SRAM: standalone S&K has no data-select / save game (Start at

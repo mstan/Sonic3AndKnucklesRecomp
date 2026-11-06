@@ -430,6 +430,7 @@ static void test_file_select(void)
     }
     for(unsigned n=0;n<40*28;++n)s_menu_map[n]=(n%40)<20?1:2;
     s_menu_map_ready=1;
+    word(v.vram,0xE000+128+10*2,0x829F);
     for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
     /* Capture a native-queued multi-sprite crossing the right edge and its
      * offscreen child; no SAT wrapping and no extra writes to guest state. */
@@ -460,6 +461,7 @@ static void test_file_select(void)
             if((nx>=320 && nx<324)||(nx>=330 && nx<338))CHECK(out[x]==0xFFFFFFFF);
         }
         memset(raster.opaque,0,sizeof raster.opaque);
+        for(unsigned x=0;x<320;x++)raster.plane_a[x]=(uint8_t)(64+(x<160?1:2));
         for(unsigned x=80;x<88;x++)raster.plane_a[x]=0xC3;
         scanline_lazy(&v,8,320,out,canvas,test_native_row,native,&raster);
         for(int x=0;x<canvas;++x) {
@@ -474,6 +476,29 @@ static void test_file_select(void)
     }
     CHECK(!memcmp(before,g_ram,sizeof before));
     s_menu_map_ready=0;
+}
+static void test_competition_margin_sprites(void)
+{
+    static GVDP v;GVDPRasterRow raster={0};uint32_t native[320]={0},out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("fit"));
+    g_ram[0xF600]=0x40;
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=9;v.reg[16]=0x11;v.cram[4]=0xEEE;
+    memset(v.vram+4*32,0x44,32);
+    word(v.vram,0xC000+50*2,0x8004);
+    write32(0xB172,0x1234);write32(0xB17E,0x1000);g_ram[0xB176]=64;
+    word(g_ram,0xB182,128+316);word(g_ram,0xB186,128);g_ram[0xB194]=1;
+    word(g_ram,0xB188,1);word(g_ram,0xB18A,128+330);word(g_ram,0xB18C,128);g_ram[0xB18F]=1;
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB172);
+    word(g_rom,0x1002,4);word(g_rom,0x1004,1);word(g_rom,0x1006,0);
+    word(g_rom,0x1008,0x8004);word(g_rom,0x100A,0);
+    capture_objects();CHECK(s_build.count==2 && s_build.sprites[0].hud==3);
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    raster.width=raster.count=320;raster.display=1;
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,&raster);
+    for(unsigned x=330;x<338;x++)CHECK(out[238+x]==0xFFFFFFFFu);
+    for(unsigned x=400;x<408;x++)CHECK(out[238+x]==0xFFFFFFFFu);
 }
 static void test_results_margin_sprites(void)
 {
@@ -589,6 +614,14 @@ static void test_menu_layers(void)
             unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:nx>=200&&nx<208?4:sx<160?1:2;
             CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],ui?GENESIS_DAC_NORMAL:GENESIS_DAC_SHADOW));
         }
+        for(unsigned x=0;x<320;x++)raster.plane_a[x]|=128;
+        scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
+        for(int x=0;x<canvas;x++) {
+            int nx=x-origin,sx=(int)((int64_t)x*320/canvas);
+            unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:nx>=200&&nx<208?4:sx<160?1:2;
+            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],GENESIS_DAC_NORMAL));
+        }
+        memcpy(raster.plane_a,saved.plane_a,sizeof raster.plane_a);
         v.reg[11]=3;v.reg[12]=1;v.reg[16]=S3_TITLE_PLANE_SIZE;raster.shadow_mode=0;
     }
     g_ram[0xF600]=4;
@@ -1957,6 +1990,15 @@ static void test_blue_spheres(void)
     scanline_lazy(&v,180,320,out,796,test_native_row,native,NULL);
     CHECK(ss_ready && native_row_calls==0);
     CHECK(out[0]==0xFFFF0000 || out[0]==0xFF00FF00);
+    /* Stage skies inherit SHI priority even where plane A is transparent.
+     * Native A coverage extends across the panorama without repeating HUD. */
+    v.reg[16]=0x11;v.cram[1]=0xEEE;memset(v.vram+32,0x11,32);
+    for(unsigned x=0;x<64;++x) {
+        word(v.vram,0xC000+x*2,0x8000);
+        word(v.vram,0xE000+x*2,1);
+    }
+    scanline_lazy(&v,0,320,out,796,test_native_row,native,NULL);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFFFFFFu);
     /* The native exit keeps the last board until SHI display retirement. */
     g_ram[0xF600]=0x0C;ss_capture();
     scanline_lazy(&v,0,320,out,796,test_native_row,native,NULL);
@@ -2394,7 +2436,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();

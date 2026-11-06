@@ -992,6 +992,10 @@ static void capture_objects(void)
             /* The title plane is queued even beyond the hardware viewport.
              * Retain its signed position instead of the wrapped/cut SAT. */
             if((g_ram[0xF600]&127)==4 && map==S3_TITLE_PLANE_MAP)anchor=3;
+            /* Competition queues signed screen-space cards beyond the SAT's
+             * viewport too. Keep their original mappings through the margin. */
+            unsigned mode=g_ram[0xF600]&127;
+            if(!(flags&4) && mode>=0x38 && mode<=0x44)anchor=3;
             /* Data Select queues every card, including those culled by the
              * native SAT builder. Preserve their signed carousel positions. */
             if(map==S3_FILE_SELECT_MAP)anchor=4;
@@ -1432,6 +1436,7 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
 {
     int origin=(width-nw)/2;
     unsigned hsbase=(v->reg[13]&63u)<<10;
+    int hs_a=(int16_t)vram16(v,hsbase);
     int hs_b=(int16_t)vram16(v,hsbase+2);
     int clean_save=s_frame_menu==MENU_SAVE && load_menu_map();
     for(int x=0;x<width;++x) {
@@ -1455,8 +1460,29 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
         } else if(s_frame_menu!=MENU_TITLE_ANIMATION) {
             b=raster->plane_b[sx];
         }
+        /* A transparent high-priority A tile still selects normal SHI
+         * intensity. Carry that native coverage with the widened scenery. */
+        if(s_frame_menu==MENU_COMPETITION && (nx<0 || nx>=nw)) {
+            a=raster->plane_a[nx<0?0:nw-1]&128u;
+            int ax=nx-hs_a,ay=line+(v->vsram[0]&1023);
+            /* The stage selector also stores offscreen card columns in its
+             * finite plane A table. Expose them without wrapping that UI. */
+            if(ax>=0 && ax<plane_tiles(v->reg[16]&3)*8) {
+                unsigned base_a=(v->reg[2]&56u)<<10;
+                uint16_t attr=plane_attr(v,base_a,ax,ay);
+                unsigned p=pattern_pixel(v,attr,ax,ay);
+                if(p)a=menu_plane(attr,p);
+            }
+        }
         if(nx>=0 && nx<nw) {
             a=raster->plane_a[nx];
+            /* SaveScreen's full-screen Window is the same unobscured menu
+             * scenery reconstructed above. Keeping it centered over the
+             * widened copy repeats the mural and makes a vertical seam. */
+            if(clean_save) {
+                uint16_t attr=vram16(v,0xE000u+(unsigned)(line/8*64+nx/8)*2u);
+                if((attr&2047u)<0x29Fu)a=0;
+            }
             if(s_frame_menu==MENU_TITLE_ANIMATION)b=raster->plane_b[nx];
             sp=raster->sprite[nx];opaque=raster->opaque[nx];high=raster->high[nx];
             shadow_op=raster->shadow_op[nx];hilite_op=raster->hilite_op[nx];
