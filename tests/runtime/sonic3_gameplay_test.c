@@ -346,6 +346,28 @@ int main(void)
     CHECK(!s3_gameplay.infinite_lives && !s3_gameplay.infinite_time);
     remove("test-gameplay-gameplay.ini");
     test_native_nemesis_fifo();test_native_access();test_provider_composition();test_checkpoint_option();test_shield_transform();test_extended_timer();
+    for(unsigned variant=0;variant<3;variant++) {
+        s3_gameplay_load("settings.ini",(const char*[]){"sonic3","sonic3k","sandk"}[variant]);
+        memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=1;
+        memcpy(before,ram,sizeof ram);
+        unsigned allocation_pc=variant?0x1BB10u:0x1A0E0u;
+        unsigned placement_pc=variant?0x1BAECu:0x1A0BCu;
+        unsigned competition=variant?0xFFE8u:0xFFD8u;
+        uint16_t expected=variant==2?0xA714:0xA710;
+        uint16_t flags=0xA714;
+        s3_gameplay_allocation_hook(allocation_pc,ram,0xFFFFB172,&flags);
+        CHECK(flags==expected);
+        flags=0xA714;s3_gameplay_allocation_hook(placement_pc,ram,0xFFFFB172,&flags);
+        CHECK(flags==expected);
+        if(variant<2)CHECK(s3_gameplay_owns(allocation_pc)&&s3_gameplay_owns(placement_pc));
+        CHECK(!memcmp(before,ram,sizeof ram));
+        flags=0xA714;s3_gameplay_allocation_hook(allocation_pc,ram,0xFFFFB1BC,&flags);CHECK(flags==0xA714);
+        ram[0xFE11]=1;flags=0xA714;s3_gameplay_allocation_hook(allocation_pc,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
+        ram[0xFE11]=0;ram[0xF600]=8;flags=0xA714;s3_gameplay_allocation_hook(allocation_pc,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
+        ram[0xF600]=12;ram[competition+1]=1;flags=0xA714;s3_gameplay_allocation_hook(allocation_pc,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
+        ram[competition+1]=0;flags=0xA714;
+        s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
+    }
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

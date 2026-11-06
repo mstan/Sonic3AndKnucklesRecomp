@@ -25,7 +25,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
        S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
-       S3_TITLE_CARD_MAP=0x2D90C,
+       S3_TITLE_CARD_MAP=0x2D90C, S3_HCZ_SURFACE_MAP=0x1CF2E, S3_HCZ_RUSH_MAP=0x2E60C,
        S3_MENU_BG_MAP=0x19D2A2,
        S3_TITLE_PLANE_SIZE=0x11,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442,
@@ -44,7 +44,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
        S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
-       S3_TITLE_CARD_MAP=0x2EE10,
+       S3_TITLE_CARD_MAP=0x2EE10, S3_HCZ_SURFACE_MAP=0x1F2CE, S3_HCZ_RUSH_MAP=0x22E60C,
        S3_MENU_BG_MAP=0x39D2A2,
        S3_TITLE_PLANE_SIZE=1,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC,
@@ -120,6 +120,7 @@ static int interpolation_lerp(int a,int b,int limit)
     return b-d+(int)(d*s_interpolation_phase+(d<0?-.5:.5));
 }
 static unsigned presentation_fg_scroll(int row,unsigned fallback);
+static unsigned presentation_fg_identity(int row,unsigned fallback);
 static unsigned presentation_cram(int row,unsigned color,unsigned fallback);
 static void presentation_scroll(int row,int *a,int *b);
 static int presentation_camera(int axis,int fallback);
@@ -422,6 +423,17 @@ static int competition_layout(const GVDP *v)
     return (v->reg[12]&1) && (v->reg[2]&56)==0x30 &&
         (v->reg[4]&7)==7 && v->reg[16]==0x11 && !(v->reg[11]&3) && !v->reg[18];
 }
+static int level_select_layout(const GVDP *v)
+{
+    if(!(v->reg[12]&1) || (v->reg[2]&56)!=0x30 || (v->reg[4]&7)!=7 ||
+       v->reg[16]!=1 || (v->reg[11]&3) || v->reg[18])return 0;
+    /* MapEni_S22POptions repeats six animated SONIC/MILES tiles. The
+     * initialized 40-column view ends in the middle of that word. Identify
+     * its installed map so the outgoing fade keeps the same repeat too. */
+    for(unsigned x=0;x<12;++x)
+        if(vram16(v,0xE000+x*2)!=(uint16_t)(0x6000+(x+1)%6))return 0;
+    return 1;
+}
 static int menu_raster_enabled(const GVDP *v)
 {
     int mode=g_ram[0xF600]&127;
@@ -512,6 +524,7 @@ typedef struct {
     uint8_t sat[640];
     int scene; /* 1 level, 2 special, 3 native bonus, 0 menu */
     int title; /* provenance survives Game_mode's outgoing fade transition */
+    unsigned world_tag; /* captured zone/act + 1; zero for non-world lists */
     int camera_x, camera_y; /* coordinates used when capturing world sprites */
     int16_t ox[SCENE_SLOTS],oy[SCENE_SLOTS];
     uint32_t code[SCENE_SLOTS];
@@ -649,6 +662,47 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
     }
 }
 
+static void extend_hcz_surface(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
+                               int x,int y,unsigned zoom)
+{
+    if(map!=S3_HCZ_SURFACE_MAP || !(flags&4) || g_ram[0xFE10]!=1 ||
+       !enabled() || s_requested_width<=320)return;
+    /* The native waterline publishes two 192px strips. Repeat its original
+     * moving/paused pose through the extended view without adding objects or
+     * duplicating either native strip. Their 32px gaps and phase stay intact. */
+    int reach=s_requested_width/192+2;
+    for(int n=-reach;n<=reach;++n)if(n!=0 && n!=1)
+        add_mapping(map,frame,gfx,flags,x+n*192,y,0,0,zoom);
+}
+static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
+                            int x,int y,unsigned zoom)
+{
+    if(map!=S3_HCZ_RUSH_MAP || frame>3 || flags!=4 || ram16(0xFE10)!=0x100 ||
+       !enabled() || s_requested_width<=320 || (zoom && zoom!=256))return;
+    /* The original moving water is a finite strip of blue brick sprites.
+     * Repeat each row's last full brick through the wide margin, up to the
+     * native current's retirement point. Keep the native viewport verbatim. */
+    unsigned p=map+(int16_t)scene_read16(map+frame*2),count=scene_read16(p);p+=2;
+    if(count>32)return;
+    int end=0x980-ram16(0xEE78),right=(s_requested_width+320+1)/2;
+    if(end>right)end=right;
+    for(unsigned n=0;n<count;++n) {
+        unsigned piece=p+n*6,attr=scene_read16(piece+2);
+        if(scene_read8(piece+1)!=15 || (attr!=0x18 && attr!=0x30))continue;
+        int dy=(int8_t)scene_read8(piece),dx=(int16_t)scene_read16(piece+4),last=1;
+        for(unsigned k=0;k<count;++k) {
+            unsigned other=p+k*6;
+            if(scene_read8(other)==scene_read8(piece) && scene_read8(other+1)==15 &&
+               scene_read16(other+2)==attr && (int16_t)scene_read16(other+4)>dx)last=0;
+        }
+        if(!last || y+dy>=224 || y+dy+32<=0)continue;
+        for(int sx=x+dx+32;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
+            SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
+            q->x=sx;q->y=y+dy;q->attr=(uint16_t)(gfx+attr);
+            q->size=0x4F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+        }
+    }
+}
 static void load_placements(void)
 {
     unsigned zone=ram16(0xFE10),index=(zone>>8)*8u+(zone&1u)*4u;
@@ -708,7 +762,12 @@ static void spawn_scene(void)
         }
         if(best<0)break;
         Placement *p=&s_placements[best];unsigned o;
-        for(o=0xB0DE;o<0xCAE2 && scene_read32(0xFF0000u+o);o+=0x4A){}
+        for(o=0xB0DE;o<0xCAE2;o+=0x4A) {
+            /* Same reservation as the native allocators: HCZ1's fixed
+             * splash must not overwrite a live act-transition controller. */
+            if(o==0xB172 && ram16(0xFE10)==0x100 && !ram16(S3_COMPETITION))continue;
+            if(!scene_read32(0xFF0000u+o))break;
+        }
         if(o>=0xCAE2){++s_pool_pressure;break;}
         write16(o+0x10,p->x);write16(o+0x14,p->y&4095);
         unsigned flip=(p->y>>13)&3;
@@ -843,6 +902,7 @@ static void capture_objects(void)
     /* Start changes the mode before the last demo Render_Sprites call.
      * That completed SAT still belongs to the outgoing level, not Title. */
     s_capture_frame->scene=bonus_stage()?3:(level_ready() || demo_level_exit())?1:0;
+    s_capture_frame->world_tag=s_capture_frame->scene==1?(unsigned)ram16(0xFE10)+1u:0u;
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
     s_capture_frame->preview_knux=s_capture_frame->scene==1 && s3_knux_preview_needed(g_ram);
@@ -945,6 +1005,9 @@ static void capture_objects(void)
                     add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
             } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
+            if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
+                gfx,flags,x,y,zoom);
+            else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
         }
     }
     append_aiz_plane();
@@ -960,6 +1023,7 @@ static void publish_sprites(void)
     s_build.serial=++s_serial;memcpy(s_build.sat,g_ram+0xF800,640);
     SceneFrame *dst=&s_history[s_serial%3];
     dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
+    dst->world_tag=s_build.world_tag;
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
     dst->aiz_plane=s_build.aiz_plane;
@@ -1073,6 +1137,7 @@ static void select_scene(const GVDP *v,int retain_level)
     if(s_display && s_display!=&s_display_frame) {
         s_display_frame.count=s_display->count;s_display_frame.scene=s_display->scene;
         s_display_frame.title=s_display->title;
+        s_display_frame.world_tag=s_display->world_tag;
         s_display_frame.serial=s_display->serial;
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
         s_display_frame.preview_knux=s_display->preview_knux;s_display_frame.aiz_super_pose=s_display->aiz_super_pose;
@@ -1169,6 +1234,28 @@ static uint8_t aiz_plane_pixel(unsigned tile,int x,int y)
     unsigned byte=s_aiz_plane_art[(tile-0x529)*32u+(unsigned)y*4u+(unsigned)x/2u];
     return (uint8_t)((x&1)?byte&15:byte>>4);
 }
+/* The title card temporarily borrows Monkey Dude's tiles during a bonus
+ * return. Its culled native objects remain visible in the extended view.
+ * Bind their original mappings to their own ROM art outside that viewport. */
+static uint8_t s_aiz_monkey_art[0x2E0];
+static int s_aiz_monkey_ready,s_aiz_monkey_attempted;
+static int load_aiz_monkey_art(void)
+{
+    if(!s_aiz_monkey_attempted) {
+        s_aiz_monkey_attempted=1;
+        s_aiz_monkey_ready=art_kosm(S3_ART_BANK+0x16800C,0x1F2,
+            s_aiz_monkey_art,sizeof s_aiz_monkey_art)==sizeof s_aiz_monkey_art;
+    }
+    return s_aiz_monkey_ready;
+}
+static uint8_t aiz_monkey_pixel(unsigned attr,int x,int y)
+{
+    unsigned tile=attr&2047u;
+    if(tile<0x548 || tile>=0x548+sizeof s_aiz_monkey_art/32)return 0;
+    unsigned byte=s_aiz_monkey_art[(tile-0x548)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?byte&15u:byte>>4;
+    return p?(uint8_t)(p|((attr>>9)&48u)):0;
+}
 static int title_card_black(const GVDP *v)
 {
     if(!s_display || s_display->scene || v->reg[16]!=1)return 0;
@@ -1235,6 +1322,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<drawn_width;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+            /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
+            if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
+                                 x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
             int ix=i*256/(int)zoom;
@@ -1250,6 +1340,10 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(s_frame_level && !s_frame_zone && !s->hud &&
+                      (cell&2047u)>=0x548 && (cell&2047u)<0x55F &&
+                      (x<origin || x>=origin+320) && load_aiz_monkey_art()) {
+                p=aiz_monkey_pixel(cell,ix&7,iy&7);
             } else if(s->slot>0 && s->slot<SCENE_SLOTS &&
                       s_display->code[s->slot]==S3_AIZ_WAVE &&
                       (x<(width-320)/2 || x>=(width+320)/2) && load_aiz_wave_art()) {
@@ -1286,7 +1380,7 @@ static int attributes_differ(const GVDP *v,uint16_t a,uint16_t b,int x,int y)
 /* The native level-entry fade adds one B, then G, then R step per tick.
  * Its white entry exposes the installed step, even when main RAM has already
  * prepared the following palette. Cached art must run that same operation. */
-static uint16_t aiz_art_color(unsigned color,const GVDP *v)
+static uint16_t scene_art_color(unsigned color,const GVDP *v)
 {
     if((int16_t)((s_world_frame[0xEE50]<<8)|s_world_frame[0xEE51])>0) {
         unsigned white=v->cram[17],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
@@ -1327,7 +1421,7 @@ static void aiz_palette(const AizArt *art,const GVDP *v,uint32_t *out)
         if(installed || i<16) {
             out[i]=genesis_dac_cram_to_argb(v->cram[i],GENESIS_DAC_NORMAL);continue;
         }
-        out[i]=genesis_dac_cram_to_argb(aiz_art_color(art->colors[i-16],v),GENESIS_DAC_NORMAL);
+        out[i]=genesis_dac_cram_to_argb(scene_art_color(art->colors[i-16],v),GENESIS_DAC_NORMAL);
     }
 }
 
@@ -1372,7 +1466,7 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
             (a&64u)?a&63u:(b&64u)?b&63u:raster->backdrop;
         unsigned shade=GENESIS_DAC_NORMAL;
         if(raster->shadow_mode && pixel<64) {
-            int dark=!(ah||bh||sh);
+            int dark=!((a|b)&128u)&&!sh;
             if(shadow_op)dark=1;
             if(hilite_op){if(dark)dark=0;else shade=GENESIS_DAC_HIGHLIGHT;}
             if(dark)shade=GENESIS_DAC_SHADOW;
@@ -1438,8 +1532,13 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* During $8C, readiness also needs the incoming level's installed
          * publication. A zone assignment after a bonus fade can still own
          * the old bonus SAT even with stale level/HUD RAM present. */
+        /* Load_Level can assign the incoming zone while the outgoing SAT,
+         * HUD-ready byte and world still belong to the previous level. Only
+         * its matching publication can authorize the new world snapshot. */
         int ready=level_ready() && (!(g_ram[0xF600]&128) ||
-            (s_display && s_display->scene==1));
+            (s_display && s_display->scene==1)) &&
+            (!s_display || !s_display->world_tag ||
+             s_display->world_tag==(unsigned)ram16(0xFE10)+1u);
         /* The title entry clears Current_zone before fading the old level.
          * Keep its published world/camera as well as its composition until
          * the native SAT is replaced. CRAM continues to follow every fade. */
@@ -1587,7 +1686,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
-    int ship_band=aiz_ship && !((fg_scroll^(unsigned)ship_y)&1023u);
+    /* A fractional scroll can lie between two bobbing ship positions.
+     * Select the camera from this row's completed HInt identity, then
+     * interpolate its position. A fractional value cannot identify a bank. */
+    unsigned fg_identity=presentation_fg_identity(line,live_fg_scroll);
+    int ship_band=aiz_ship && !((fg_identity^(unsigned)ship_y)&1023u);
     int plane_x=s_frame_fg_x,plane_y=s_frame_fg_y;
     if(level && width>320 && s_display && aiz_join_near(s_display->aiz_join,s_display->camera_x)) {
         /* The next map assignment can precede this SAT/scroll upload.
@@ -1647,8 +1750,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * viewport adds a nearly full-speed reverse pan at the left boundary. */
     int fbz_background=level && s_frame_zone==4 && !s_frame_act;
     int soz_background=level && s_frame_zone==8 && !s_frame_act && !s_frame_bg_event;
+    /* HCZ1's parallax also belongs to the screen-centered B canvas. Its
+     * left-clamped foreground must not add another pan to the water bands. */
+    int hcz_background=level && s_frame_zone==1 && !s_frame_act;
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
-        intro_background || fbz_background || soz_background);
+        intro_background || fbz_background || soz_background || hcz_background);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
@@ -1656,7 +1762,20 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * holds the complete 1024px card strip (128 tiles per row).
      * Use the installed layout through both entry and exit fades. */
     int file_select=!level && file_select_layout(v);
+    int menu_background_period=!level && !special && !file_select && level_select_layout(v)?48:nw;
     int wy=camera_y+line;
+    /* HCZ1_Resize restores three shared colors at camera X=$900, Y=$500.
+     * Only the extra left view still contains the retired current tunnel.
+     * Keep its original colors there, following the native scene fade; the
+     * incoming world, native viewport and guest palette remain authoritative. */
+    int hcz_tunnel=level && s_frame_zone==1 && !s_frame_act &&
+        s_frame_fg_x>=0x900 && wy>=0x500 && wy<0x600;
+    uint32_t hcz_tunnel_colors[3];
+    if(hcz_tunnel) {
+        static const unsigned colors[]={0xB80,0x240,0x220};
+        for(unsigned i=0;i<3;++i)
+            hcz_tunnel_colors[i]=genesis_dac_cram_to_argb(scene_art_color(colors[i],v),GENESIS_DAC_NORMAL);
+    }
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
      * the world's current layout coordinates. AIZ1BGE_FireTransition
@@ -1680,6 +1799,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_loop_fg=bg_world && aiz_ship && !s_frame_zone && s_frame_act==1 &&
         ((s_world_frame[0xEEB2]<<8)|s_world_frame[0xEEB3])==4 &&
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])>=8 && !ship_band;
+    unsigned tree_arrival=0;
+    if(aiz_ship && !s_frame_zone && s_frame_act==1) {
+        uint32_t ship=((uint32_t)s_world_frame[0xEE98]<<24)|
+            ((uint32_t)s_world_frame[0xEE99]<<16)|
+            ((unsigned)s_world_frame[0xEE9A]<<8)|s_world_frame[0xEE9B];
+        tree_arrival=aiz_tree_arrival_alpha(s_frame_fg_x,
+            (s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1],ship);
+    }
     /* FBZ streams complete 512px rows from one of two layout canvases
      * (X=0 indoors, X=$200 outdoors). Its doorway events replace that
      * canvas a row/column at a time. The uploaded plane is authoritative
@@ -1767,7 +1894,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 if(ax>=nw)ax=nw*2-1-ax;
                 bx=ax-hs_b;
             }
-            bx%=nw;if(bx<0)bx+=nw;
+            int repeat=nx<0 || nx>=nw?menu_background_period:nw;
+            bx%=repeat;if(bx<0)bx+=repeat;
+            if(menu_background_period!=nw && (nx==0 || nx==nw))bg.remaining=0;
         }
 
         if(!fg.remaining) {
@@ -1833,8 +1962,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             }
         }
         int joined=level && s_display && width>320 &&
-            aiz_join_sample(s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
+            aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
         if(joined)apalette=palette;
+        if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.
          * Its locked camera keeps the entire 256px reveal strip resident
@@ -1862,9 +1992,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         uint8_t p=foreground?ap:bp;
         uint32_t ac=ap?plane_color(line,a,ap,apalette):backdrop;
         if(aiz_tree_color(wx,wy,nx,nw,ap))
-            ac=genesis_dac_cram_to_argb(aiz_art_color(4,v),GENESIS_DAC_NORMAL);
+            ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
+        if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
+            ac=hcz_tunnel_colors[ap-56];
         uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
         out[x]=foreground?ac:bc;
+        if(tree_arrival && nx>=nw) {
+            uint16_t tree_attr;uint8_t tree_pixel;
+            if(aiz_ship_tree_sample(s_camera+nx,s_frame_fg_y+line,&tree_attr,&tree_pixel) &&
+               (tree_attr&0x8000u) && tree_pixel) {
+                uint32_t color=plane_color(line,tree_attr,tree_pixel,palette),mixed=0xFF000000u;
+                for(unsigned shift=0;shift<24;shift+=8) {
+                    unsigned a=(color>>shift)&255u,b=(out[x]>>shift)&255u;
+                    mixed|=((a*tree_arrival+b*(255-tree_arrival)+127)/255)<<shift;
+                }
+                out[x]=mixed;s_priority[x]|=1;
+            }
+        }
         /* Outside a native special-stage projection only planes are drawn,
          * so plane priority alone
          * determines shadow; native operator sprites remain in the center. */
@@ -2014,6 +2158,8 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     unsigned pose=frame->aiz_super_pose;
     s3_state_peek(io,offsetof(SceneFrame,aiz_super_pose),&pose,sizeof pose);
     if(pose>2)io->ok=0;
+    unsigned world=0;s3_state_peek(io,offsetof(SceneFrame,world_tag),&world,sizeof world);
+    if(world>0x10000u)io->ok=0;
     unsigned join=0;s3_state_peek(io,offsetof(SceneFrame,aiz_join),&join,sizeof join);
     if(join>3)io->ok=0;
     AizPlanePose plane=frame->aiz_plane;
@@ -2174,6 +2320,11 @@ static unsigned presentation_fg_scroll(int row,unsigned fallback)
 {
     if(!s_interpolating || row<0 || row>=IX_LINES)return fallback;
     return (unsigned)interpolation_lerp(ix_previous()->fg_scroll[row],ix_current()->fg_scroll[row],128);
+}
+static unsigned presentation_fg_identity(int row,unsigned fallback)
+{
+    return s_interpolating && row>=0 && row<IX_LINES?
+        ix_current()->fg_scroll[row]:fallback;
 }
 static int presentation_bg_scroll(int fallback)
 {

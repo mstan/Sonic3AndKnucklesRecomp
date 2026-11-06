@@ -69,6 +69,10 @@ static void test_sprite_atlas(void)
     }
     memset(out,0,sizeof out);memset(s_priority,0,64);
     draw_scene_sprites(&v,8,out,64,0,pal);CHECK(!out[8]);
+    /* Atlas bank 1 uses bit 6 too; it is not a margin-only current strip. */
+    scene.sprites[0].size=0xC5;scene.sprites[0].zoom=256;scene.sprites[0].attr=0x8000;
+    memset(out,0,sizeof out);memset(s_priority,0,64);
+    draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[1]);
     scene.sprites[0].zoom=0;
     scene.sprites[0].size=5;scene.sprites[0].attr=0x8000;
     memset(s_priority,0,64);draw_scene_sprites(&v,0,out,64,0,pal);CHECK(out[8]==pal[5]);
@@ -77,7 +81,100 @@ static void test_sprite_atlas(void)
     draw_scene_sprites(&v,0,out,64,0,pal);CHECK(!out[8]); /* atlas bounds */
     test_atlas_enabled=0;s_display=previous;
 }
+static void test_aiz_monkey_owned_art(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    const SceneFrame *old=s_display;s_display=&scene;
+    int level=s_frame_level;unsigned zone=s_frame_zone;
+    s_frame_level=1;s_frame_zone=0;s_camera=s_camera_y=0;
+    scene.scene=1;scene.count=2;
+    scene.sprites[0]=(SceneSprite){-200,0,0x2548,0,0,256,1};
+    scene.sprites[1]=(SceneSprite){100,0,0x2548,0,0,256,1};
+    memset(s_aiz_monkey_art,0x12,sizeof s_aiz_monkey_art);
+    s_aiz_monkey_ready=s_aiz_monkey_attempted=1;
+    memset(v.vram+0x548*32,0x55,32);
+    pal[17]=0xFF110000;pal[18]=0xFF220000;pal[21]=0xFF550000;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[38]==pal[17] && out[39]==pal[18]);
+    CHECK(out[338]==pal[21]); /* native viewport retains the installed bank */
+    scene.sprites[0].attr=0x2547;memset(v.vram+0x547*32,0x55,32);
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    scene.sprites[0].attr=0x2548;s_frame_zone=1;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    s_display=old;s_frame_level=level;s_frame_zone=zone;
+    s_aiz_monkey_ready=s_aiz_monkey_attempted=0;
+}
 static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
+static void test_hcz_surface_extent(void)
+{
+    static GVDP v;uint32_t out[796],pal[64]={0};
+    CHECK(configure("32:9"));s_requested_width=796;g_ram[0xFE10]=1;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    word(g_rom,S3_HCZ_SURFACE_MAP+2,0x10);unsigned p=S3_HCZ_SURFACE_MAP+0x10;
+    word(g_rom,p,3);
+    for(unsigned n=0;n<3;++n) {
+        word(g_rom,p+2+n*6,0x000C);word(g_rom,p+4+n*6,0);
+        word(g_rom,p+6+n*6,(unsigned)(-96+(int)n*64));
+    }
+    add_mapping(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,0,0,256);
+    add_mapping(S3_HCZ_SURFACE_MAP,1,0x842E,4,288,100,0,0,256);
+    CHECK(s_build.count==6);
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);
+    CHECK(s_build.count>6);
+    for(unsigned n=6;n<s_build.count;++n)
+        CHECK(s_build.sprites[n].x+32<=0 || s_build.sprites[n].x>=320);
+    memset(&v,0,sizeof v);memset(v.vram+0x42E*32,0x11,128);pal[1]=0xFF123456;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    const SceneFrame *old=s_display;s_display=&s_build;s_camera=s_camera_y=0;
+    draw_scene_sprites(&v,100,out,796,238,pal);
+    for(int x=0;x<796;++x)CHECK(out[x]==(((x-238)&63)<32?pal[1]:0));
+    unsigned count=s_build.count;s_requested_width=320;
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
+    s_requested_width=796;g_ram[0xFE10]=0;
+    extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
+    s_display=old;CHECK(configure("off"));
+}
+static void test_hcz_rush_extent(void)
+{
+    static GVDP v;uint32_t out[1603],pal[64]={0};
+    CHECK(configure("32:9"));g_ram[0xFE10]=1;g_ram[0xFE11]=0;
+    word(g_ram,0xEE78,0x680);
+    memset(&v,0,sizeof v);memset(v.vram+0x392*32,0x11,16*32);
+    memset(v.vram+0x3AA*32,0x22,16*32);pal[33]=0xFF123456;pal[34]=0xFF654321;
+    const SceneFrame *old=s_display;s_display=&s_build;
+    for(unsigned frame=0;frame<4;++frame) {
+        unsigned p=S3_HCZ_RUSH_MAP+0x10+frame*16;
+        word(g_rom,S3_HCZ_RUSH_MAP+frame*2,p-S3_HCZ_RUSH_MAP);word(g_rom,p,2);
+        word(g_rom,p+2,0xE00F);word(g_rom,p+4,0x18);word(g_rom,p+6,frame<2?0x50:0x30);
+        word(g_rom,p+8,0x000F);word(g_rom,p+10,0x30);word(g_rom,p+12,frame<2?0x60:0x20);
+        for(unsigned width=796;width<=1603;width+=807) {
+            s_requested_width=(int)width;memset(&s_build,0,sizeof s_build);
+            s_build.scene=1;s_build.camera_x=s_camera=0x680;s_camera_y=0;
+            extend_hcz_rush(S3_HCZ_RUSH_MAP,frame,0x437A,4,0x40,80,256);
+            CHECK(s_build.count>0);
+            int origin=((int)width-320)/2;
+            for(unsigned row=0;row<2;++row) {
+                memset(out,0,sizeof out);memset(s_priority,0,width);
+                draw_scene_sprites(&v,row?80:48,out,(int)width,origin,pal);
+                for(int x=0;x<(int)width;++x) {
+                    int nx=x-origin;
+                    CHECK(out[x]==(nx>=320 && nx<0x300?pal[33+row]:0));
+                }
+            }
+        }
+    }
+    unsigned count=s_build.count;s_requested_width=320;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);CHECK(s_build.count==count);
+    s_requested_width=796;g_ram[0xFE11]=1;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);CHECK(s_build.count==count);
+    g_ram[0xFE11]=0;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,5,0x40,80,256);CHECK(s_build.count==count);
+    s_display=old;CHECK(configure("off"));
+}
 static void test_object_zoom(void)
 {
     memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));
@@ -90,6 +187,34 @@ static void test_object_zoom(void)
     CHECK(s_build.count==1 && s_build.sprites[0].x==24 && s_build.sprites[0].y==24);
     CHECK(s_build.sprites[0].zoom==128);
     s3_video_set_object_zoom(NULL);CHECK(!enabled());
+}
+static void test_level_select_word_edges(void)
+{
+    static GVDP v;uint32_t native[320],out[1603];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));g_ram[0xF600]=0x28;
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    for(unsigned t=0;t<6;++t) {
+        memset(v.vram+t*32,(int)(t+1)*17,32);v.cram[49+t]=(uint16_t)(t*0x222);
+    }
+    for(unsigned y=0;y<32;++y)for(unsigned x=0;x<64;++x)
+        word(v.vram,0xE000+(y*64+x)*2,0x6000+(x<40?(x+1)%6:5));
+    for(unsigned x=0;x<320;++x)native[x]=0xFF123456;
+    memset(&s_build,0,sizeof s_build);publish_sprites();
+    const int canvases[]={320,398,523,796,1603};
+    for(unsigned c=0;c<5;++c)for(int scroll=0;scroll<48;scroll+=7) {
+        word(v.vram,0xF002,(unsigned)-scroll);
+        scanline(&v,0,native,320,out,canvases[c]);int origin=(canvases[c]-320)/2;
+        for(int x=0;x<canvases[c];++x) {
+            int nx=x-origin,bx=(nx+scroll)%48;if(bx<0)bx+=48;
+            uint32_t expected=genesis_dac_cram_to_argb(v.cram[49+(bx/8+1)%6],GENESIS_DAC_NORMAL);
+            if(out[x]!=(nx>=0 && nx<320?native[nx]:expected))
+                fprintf(stderr,"level-select width%d scroll%d x%d actual%08x expected%08x layout%d level%d\n",canvases[c],scroll,x,out[x],expected,level_select_layout(&v),s_frame_level);
+            CHECK(out[x]==(nx>=0 && nx<320?native[nx]:expected));
+        }
+    }
+    CHECK(configure("off"));
 }
 static void test_native_bonus(void)
 {
@@ -507,10 +632,13 @@ static void test_world_snapshot(void)
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
     v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;
     memset(v.vram+32,0x11,32);
-    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x3401;publish_sprites();
+    CHECK(s_history[s_serial%3].world_tag==0x3401);
     s3_video_set_world_cell(snapshot_cell);snapshot_calls=0;
     scanline(&v,0,native,320,out,398);
     CHECK(snapshot_calls && out[0]==0xFFFF0000);
+    /* Incoming zone assignment can precede its world/SAT publication even
+     * with the stale HUD-ready byte set. Keep the outgoing immutable world. */
     /* A later scanline uses the same published RAM, even if live RAM moves
      * into another act while that frame is being displayed. */
     g_ram[0xFE10]=0x20;g_ram[0xFFF0]=0;
@@ -518,6 +646,10 @@ static void test_world_snapshot(void)
     uint32_t lazy[398];native_row_calls=0;
     scanline_lazy(&v,1,320,lazy,398,test_native_row,native,NULL);
     CHECK(!native_row_calls && !memcmp(out,lazy,sizeof out));
+    g_ram[0xF600]=0x8C;g_ram[0xF711]=1;
+    scanline(&v,0,native,320,lazy,398);
+    CHECK(s_frame_level && s_frame_zone==0x34 && s_world_frame[0xFFF0]==0xA5);
+    CHECK(!memcmp(out,lazy,sizeof out));
     /* Title entry resets the live zone before fading the old SAT. Keep the
      * published world and its camera across that transition, using live CRAM. */
     g_ram[0xF600]=4;g_ram[0xFE10]=0;word(g_ram,0xEE80,0x1234);
@@ -815,6 +947,56 @@ static void test_aiz_tree_palette_boundary(void)
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
     scanline(&v,0,native,320,out,320);CHECK(!memcmp(out,native,sizeof native));
 }
+static void test_hcz_tunnel_palette_retirement(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320],out[1603];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=1;
+    write32(0xB000,0x1234);word(g_ram,0x8000,97);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x960);word(g_ram,0xEE84,0x580);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x580;
+    word(v.vram,0xF000,(unsigned)-0x960);v.cram[17]=0xEEE;
+    const unsigned old_colors[]={0xB80,0x240,0x220};
+    const unsigned incoming[]={0xCEE,0xACE,0x8A};
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x101;
+    s_build.camera_x=0x960;s_build.camera_y=0x580;publish_sprites();
+    s3_video_set_world_cell(tree_palette_cell);
+    const int widths[]={320,398,523,796,1603};
+    for(unsigned color=0;color<3;++color) {
+        v.cram[56+color]=(uint16_t)incoming[color];
+        memset(v.vram+32,(int)(8+color)*17,32);
+        for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x6001);
+        uint32_t live=genesis_dac_cram_to_argb(incoming[color],GENESIS_DAC_NORMAL);
+        uint32_t retained=genesis_dac_cram_to_argb(old_colors[color],GENESIS_DAC_NORMAL);
+        for(unsigned i=0;i<320;++i)native[i]=live;
+        for(unsigned c=0;c<5;++c) {
+            int w=widths[c],origin=(w-320)/2;
+            width(w,224,320,224);memcpy(before,g_ram,sizeof before);GVDP unchanged=v;
+            scanline(&v,0,native,320,out,w);
+            for(int x=0;x<w;++x) {
+                int nx=x-origin,wx=0x960+nx;
+                CHECK(out[x]==(nx<0 && wx<0x900?retained:live));
+            }
+            CHECK(!memcmp(out+origin,native,sizeof native));
+            CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+        }
+    }
+    /* Another host area/act, the original pre-switch camera and rows outside
+     * the current tunnel retain their installed palette everywhere. */
+    for(unsigned c=0;c<5;++c) {
+        unsigned camera=c==2?0x8E0:0x960,cy=c==3?0x4F0:c==4?0x600:0x580;
+        g_ram[0xFE10]=c==0?2:1;g_ram[0xFE11]=c==1;
+        word(g_ram,0xEE80,camera);word(g_ram,0xEE84,cy);
+        word(v.vram,0xF000,(unsigned)-camera);v.vsram[0]=(uint16_t)cy;
+        s_build.camera_x=(int)camera;s_build.camera_y=(int)cy;
+        s_build.world_tag=(unsigned)ram16(0xFE10)+1u;publish_sprites();
+        width(796,224,320,224);scanline(&v,0,native,320,out,796);
+        for(unsigned x=0;x<796;++x)CHECK(out[x]==native[0]);
+    }
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 static void test_aiz_intro_owned_pose(void)
 {
     static GVDP v;static SceneFrame restored;uint32_t out[796],pal[64]={0};
@@ -938,6 +1120,18 @@ static void test_aiz2_ship_cameras(void)
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    /* A ship bob between completed frames must not turn its upper band
+     * into ground during fractional presentation. The two cameras use
+     * different 1024px pages, so choosing the wrong bank is observable. */
+    v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
+    memcpy(ix_current()->cram[0],v.cram,sizeof v.cram);
+    ix_previous()->fg_scroll[0]=0xAB1;ix_current()->fg_scroll[0]=0xAB3;
+    ix_previous()->hs[0][0]=ix_current()->hs[0][0]=-0x3FB5;
+    ix_previous()->hs[0][1]=ix_current()->hs[0][1]=0;
+    s_interpolating=1;s_interpolation_phase=.5;
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+    s_interpolating=0;
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_campaign_background_edges(void)
@@ -954,7 +1148,7 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0,4,8,0x20,0x22,0x28,0x34,0x40,0x5B};
+    const unsigned zones[]={0,1,4,8,0x20,0x22,0x28,0x34,0x40,0x5B};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         g_ram[0xFE10]=(uint8_t)zones[z];int canvas=widths[w];
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
@@ -1643,6 +1837,14 @@ static void test_aiz_plane_retirement(void)
 static void test_blue_spheres(void)
 {
     GVDP v={0};M68KState cpu_before=g_cpu;
+    /* Draw_SSSprites reads the 32x32 board at $8000 in S3, and at
+     * SStage_layout_buffer+$100 ($F100) in S&K/lock-on. Keep the fixture's
+     * source addresses independent of the renderer constants. */
+#ifdef SONIC3_STANDALONE
+    const unsigned native_board=0x8000;
+#else
+    const unsigned native_board=0xF100;
+#endif
     /* Split GET/PERFECT banners must leave the whole canvas despite their
      * original +/-192px endpoint; only anchors move, never glyph spacing. */
     for(int canvas=320;canvas<=1600;canvas+=320) {
@@ -1680,7 +1882,11 @@ static void test_blue_spheres(void)
     for(unsigned i=0;i<16;++i)word(g_rom,0x1000+i*2,32);
     word(g_rom,0x1020,1);g_rom[0x1022]=240;g_rom[0x1023]=15;
     word(g_rom,0x1024,0);word(g_rom,0x1026,65520);
-    memset(v.vram+64,0x11,512);memset(g_ram+0xF100,2,1024);
+    memset(v.vram+64,0x11,512);memset(g_ram+native_board,2,1024);
+#ifdef SONIC3_STANDALONE
+    /* Unrelated S3 RAM at the lock-on address must not replace its board. */
+    g_ram[0xF100]=2;
+#endif
     g_ram[0xF600]=0x34;ss_capture();
     static uint8_t before[65536];memcpy(before,g_ram,sizeof before);
     ss_begin(&v,1603);CHECK(ss_ready && ss_count>80 && ss_margin_count>80);
@@ -1692,10 +1898,10 @@ static void test_blue_spheres(void)
     ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
     /* Collision's collected-blue contact marker is not an uncollected
      * sphere. A turn can keep it under the runner until it becomes red. */
-    memset(g_ram+0xF100,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
-    g_ram[0xF100]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
-    g_ram[0xF100]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
-    CHECK(g_ram[0xF100]==10);
+    memset(g_ram+native_board,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
+    g_ram[native_board]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
+    g_ram[native_board]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
+    CHECK(g_ram[native_board]==10);
     /* A sprite's visible base stays on its actual board intersection while
      * moving, turning and resizing. This would fail with the old separate
      * sphere-camera lift even though the ground's inverse test passed. */
@@ -1705,8 +1911,8 @@ static void test_blue_spheres(void)
     for(int canvas=320;canvas<=1600;canvas+=320) {
         double angle=turn*6.2831853071795864769/8;
         int ix=(int)round(-2*sin(angle)),iy=(int)round(-2*cos(angle));
-        memset(g_ram+0xF100,0,1024);
-        g_ram[0xF100+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
+        memset(g_ram+native_board,0,1024);
+        g_ram[native_board+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
         word(g_ram,0xE422,motion*32);word(g_ram,0xE424,motion*16);g_ram[0xE426]=(uint8_t)(turn*32);
         ss_capture();ss_begin(&v,canvas);CHECK(ss_ready && ss_count>=1);
         double dx=ix-ss_x,dy=iy-ss_y;
@@ -1797,6 +2003,7 @@ int main(int argc,char **argv)
         s_menu_map_ready=0;
         load_aiz_art();CHECK(s_aiz_art_ready);
         CHECK(aiz_join_load());
+        CHECK(load_aiz_monkey_art());
         printf("AIZ joined original-map caches: %zu bytes\n",sizeof s_aiz_join_map+sizeof s_aiz_join_second);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
@@ -1879,6 +2086,18 @@ int main(int argc,char **argv)
     write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(g_ram[0xEB02]&128);
     CHECK(scene_read32(0xFFB172)==S3_AIZ_MINIBOSS_CUTSCENE);
+    /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
+     * the two earlier slots and verify a real placement goes past it. */
+    write32(0xB172,0);write32(0xB1BC,0);
+    longword(g_rom,S3_PLACEMENTS+8,0x100000); /* HCZ1 placement table */
+    word(g_rom,0x100000,640);word(g_rom,0x100002,0x8060);
+    word(g_rom,0x100006,65535);
+    g_rom[0x100004]=1;g_ram[0xEB00]=0;
+    word(g_ram,0xFE10,0x100);write16(0xEE78,128);s_placement_count=0;
+    s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(!scene_read32(0xFFB172));
+    CHECK(scene_read32(0xFFB1BC)==0x123456);
+    word(g_ram,0xFE10,0);
     word(g_ram,0x8000,16);
     CHECK(configure("off"));g_cpu.D[0]=12345;s3_video_hook(0x1B594);CHECK(g_cpu.D[0]==12345);
     /* AIZ's x=$1870 platform can enter the extended window while its
@@ -2175,11 +2394,11 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_object_zoom();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_aiz_intro_owned_pose();
+    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_ship_cameras();
     test_private_plane_colors();

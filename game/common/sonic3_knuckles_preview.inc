@@ -30,12 +30,14 @@ static int s3_knux_preview_needed(const uint8_t *ram)
 #else
     if(!ram || ram[0xF600]!=0x0C || s3_knux_preview_word(ram,0xFE10)!=1 ||
        ram[0xB038]==2)return 0;
-    /* A far-right capsule clear already exposes the ledge during loc_694D4.
-     * loc_69526 then drives the approach; its successor allocates the real
-     * actor. Keep the tag with that scene so the handover stays atomic. */
+    /* Defeat can release the camera while the boss is still retiring.
+     * Keep the waiting actor on its ledge throughout that controller,
+     * before loc_694D4's capsule wait. Its native pose and 120-tick wait
+     * stay unchanged; its successor still allocates the real actor. */
     for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
         if(s3_knux_preview_word(ram,o)==6 &&
-           (s3_knux_preview_word(ram,o+2)==0x94D4 ||
+           (s3_knux_preview_word(ram,o+2)==0x923E ||
+            s3_knux_preview_word(ram,o+2)==0x94D4 ||
             s3_knux_preview_word(ram,o+2)==0x9526))return 1;
     return 0;
 #endif

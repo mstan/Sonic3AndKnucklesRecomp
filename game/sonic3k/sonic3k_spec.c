@@ -16,6 +16,7 @@
 #include "sonic3_knuckles_army.h"
 #include "sonic3_mods.h"
 #include "sonic3_gameplay.h"
+#include "sonic3_kos.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
 #include "trilogy.h"
@@ -29,6 +30,13 @@
 #endif
 #include <stdio.h>
 #include <stdlib.h>
+
+/* Installed Sega Classics Steam dump: identical supported code/data except
+ * locked-on S3's region header at $2001F0 ('J' rather than 'U'). Keep the
+ * original file and its distinct replay identity; no in-place ROM edits. */
+static const GameRomAlias s3k_rom_aliases[] = {
+    { "Sonic 3 & Knuckles (Sega Classics Steam)", 0x0C06AA82u },
+};
 
 #if OWN_BACKEND
 #include "backend_decls.h"   /* own decls â€” native builds have no clownmdemu paths */
@@ -48,7 +56,9 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static int s3k_instruction(uint32_t pc)
 {
+    if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
+        s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],!tri_character_active()))g_cpu.SR|=4u;
@@ -264,6 +274,8 @@ const GameSpec g_game_spec = {
      * internal checksum. Supply it to both the launcher and runtime. */
     .expected_rom_crc32     = 0x63522553u,
     .expected_rom_size      = 0x400000u,   /* 4 MB combined cart */
+    .rom_aliases            = s3k_rom_aliases,
+    .num_rom_aliases        = sizeof(s3k_rom_aliases) / sizeof(s3k_rom_aliases[0]),
 #ifdef GENESIS_Z80_RECOMP
     .z80_step               = s3kz80_step,
 #endif
