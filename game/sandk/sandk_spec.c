@@ -58,6 +58,7 @@ static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 /* Mode-aware save-state resume (sonic3k.lst, org 0):
  *   GM $0C Level / $08 Demo -> LevelLoop ($00650C): the per-frame loop top.
  *     Re-entering here continues the level moment-in-time from restored RAM.
+ *   GM $34 -> SpecialStage's established per-frame loop ($0084C2).
  *   Anything else (Sega/title/menus, bonus-stage init) -> 0: fall back to
  *   GameLoop dispatch, which re-runs the mode handler â€” those states WANT
  *   their init. */
@@ -66,6 +67,7 @@ static uint32_t sandk_save_resume_pc(uint8_t game_mode)
     switch (game_mode) {
         case 0x08:
         case 0x0C: return 0x00650Cu;   /* LevelLoop */
+        case 0x34: return s3_state_resume_pc(game_mode);
         default:   return 0u;
     }
 }

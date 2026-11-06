@@ -2198,6 +2198,11 @@ void s3_video_state(S3StateIO *io)
     S3_STATE(io, s_loader_active); S3_STATE(io, s_visible_objects);
     if (s3_state_peek_unsigned(io, s_visible_count) > 144) io->ok = 0;
     S3_STATE(io, s_visible_count); S3_STATE(io, s_background_frame);
+    /* The projection uses the last completed native sphere publication,
+     * which can precede live collision RAM. Retain it for a cold/paused load. */
+    S3_STATE(io, ss_state);
+    if (s3_state_peek_unsigned(io, (unsigned)ss_latched) > 1) io->ok = 0;
+    S3_STATE(io, ss_latched);
     if (io->mode == 2) {
         interpolation_reset();
         s_display = display ? &s_display_frame : NULL;
