@@ -100,6 +100,7 @@ def stage(build, dest, version, mode, engine_root=None):
     license_text = license_path.read_text().upper()
     assert "POLYFORM NONCOMMERCIAL" in license_text and "AFFERO GENERAL PUBLIC LICENSE" not in license_text
     shutil.copy2(license_path, dest / "LICENSE")
+    shutil.copy2(ROOT / "PERMISSIONS.md", dest / "PERMISSIONS.md")
     shutil.copy2(engine / "THIRD-PARTY-LICENSES.md", dest)
     shutil.copy2(metadata, dest / "build-info.json")
     (dest / "docs").mkdir(exist_ok=True)
