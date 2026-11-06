@@ -118,6 +118,11 @@ extra = [
 # its assembled S&K half matches the combined ROM byte-for-byte.
 # Infinite time extends the original clock to 99:59 without replacing results.
 # Native Nemesis FIFO pop: complete last destination and retire16th source.
+# Preserve the queued decompressor's original interrupt bookmark contract.
+[[widescreen_site]]
+addr = 0x1C1A # Process_Kos_Queue: explicit-PC native interrupt context
+kind = "game_hook"
+
 # Exact original-source FixBugs repair; always active, independent of mods.
 [[widescreen_site]]
 addr = 0x1880
