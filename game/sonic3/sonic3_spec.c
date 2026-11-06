@@ -17,6 +17,7 @@
 #include "sonic_extras.h"
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
 #include "sonic3_gameplay.h"
+#include "sonic3_kos.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -233,6 +234,7 @@ static const GameDebugCommand s3_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);

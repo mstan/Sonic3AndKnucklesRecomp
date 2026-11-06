@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.7.3 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.7.4 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -228,6 +228,29 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     )
     list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
         "${S3_GAME_COMMON}/sonic3_gameplay.c")
+    # The source's queued decompressor changes its IRQ return PC. Compile this
+    # small program with the existing explicit-PC native backend so its RTE
+    # bookmark semantics do not depend on a suspended C call continuation.
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    set(KOS_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PREFIX}-kos-native")
+    set(KOS_CORE "${RECOMP_ROOT}/external/m68k-recomp-core/runtime")
+    set(KOS_NATIVE "${KOS_DIR}/sonic3_kos_native_module.c")
+    foreach(SHARD RANGE 0 31)
+        if(SHARD LESS 10)
+            set(SHARD_NAME "0${SHARD}")
+        else()
+            set(SHARD_NAME "${SHARD}")
+        endif()
+        list(APPEND KOS_NATIVE "${KOS_DIR}/sonic3_kos_native_part${SHARD_NAME}.c")
+    endforeach()
+    add_custom_command(OUTPUT ${KOS_NATIVE} "${KOS_DIR}/sonic3_kos_native.h"
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/gen_kos_native.py"
+            --compiler "$<TARGET_FILE:M68kStepRecomp>" --rom "${GAME}/${ROM}"
+            --out "${KOS_DIR}" --mode "${GAME_DIR}"
+        DEPENDS M68kStepRecomp "${GAME}/${ROM}" "${CMAKE_SOURCE_DIR}/tools/gen_kos_native.py"
+        VERBATIM)
+    list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_kos.c"
+        "${KOS_CORE}/m68k_step.c" ${KOS_NATIVE})
     # Game-owned mods that run S&K code: the combined cart and S&K alone.
     if(NOT PREFIX STREQUAL "sonic3")
         list(APPEND SHARED_SRC
@@ -259,6 +282,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # enforcement that no AGPL header can be compiled into a release binary
     # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
     set(INCLUDES_NATIVE
+        "${KOS_DIR}" "${KOS_CORE}"
         "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
         "${RUNNER_ROOT}/external/ymfm/src"
         "${RUNNER_ROOT}/external/superzazu"

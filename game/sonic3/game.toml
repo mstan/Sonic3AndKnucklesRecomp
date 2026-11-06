@@ -182,6 +182,11 @@ kind = "game_hook"
 addr = 0x1A0E0 # DBEQ after testing native allocation candidate
 kind = "game_hook"
 
+# Preserve the queued decompressor's original interrupt bookmark contract.
+[[widescreen_site]]
+addr = 0x1EA4 # Process_Kos_Queue: explicit-PC native interrupt context
+kind = "game_hook"
+
 # Exact original-source FixBugs repair; always active, independent of mods.
 [[widescreen_site]]
 addr = 0x1B0A
