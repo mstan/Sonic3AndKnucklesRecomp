@@ -151,7 +151,7 @@ static void s1_slz_event(void)
     s1.bgy += sy << 7;
     int camx = (int16_t)r16(RAM_Camera_X_pos_copy);
     int bgy = (int16_t)(s1.bgy >> 16);
-    int16_t rows[64];
+    int16_t rows[0x1C + 5 + 5 + 0x1E];
     int n = 0, d2 = -s3_video_presentation_camera_x(camx);
     n += s1_interp(rows + n, 0x1C, d2, s1_step((d2 >> 3) - d2, 0x1C, 4));
     int d0 = (d2 >> 3);
