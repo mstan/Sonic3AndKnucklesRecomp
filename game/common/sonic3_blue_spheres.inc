@@ -13,9 +13,9 @@
 
 enum { SS_HEIGHT=224, SS_TEXTURE=64, SS_KINDS=14 };
 #ifdef SONIC3_STANDALONE
-enum { SS_EXTRA=0x8400 };
+enum { SS_BOARD=0x8000, SS_EXTRA=0x8400 };
 #else
-enum { SS_EXTRA=0xE480 };
+enum { SS_BOARD=0xF100, SS_EXTRA=0xE480 };
 #endif
 static const double ss_radius=15.18430653,ss_distance=3.35173470;
 static const double ss_focal=345.3564589,ss_pitch=.69874597;
@@ -46,7 +46,7 @@ static void ss_capture(void)
      * movement/collection tick alongside the previous character sprites. */
     memcpy(ss_state+0xE420,g_ram+0xE420,0x32);
     memcpy(ss_state+SS_EXTRA,g_ram+SS_EXTRA,SS_KINDS*8);
-    memcpy(ss_state+0xF100,g_ram+0xF100,1024);
+    memcpy(ss_state+SS_BOARD,g_ram+SS_BOARD,sizeof ss_board);
 }
 
 static unsigned ss_word(const uint8_t *p,unsigned a)
@@ -134,7 +134,7 @@ static void ss_begin(const GVDP *v,int width)
         for(int y=0;y<SS_HEIGHT;++y)for(int x=0;x<width;++x)
             ss_ground[(size_t)y*width+x]=ss_intersect(x-(width-1)*.5,y,ss_stretch);
     }
-    memcpy(ss_board,ss_state+0xF100,sizeof ss_board);
+    memcpy(ss_board,ss_state+SS_BOARD,sizeof ss_board);
     ss_x=ss_word(ss_state,0xE422)/256.0;ss_y=ss_word(ss_state,0xE424)/256.0;
     double angle=ss_state[0xE426]*(6.2831853071795864769/256);
     ss_sin=sin(angle);ss_cos=cos(angle);

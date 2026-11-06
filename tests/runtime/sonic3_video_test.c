@@ -1837,6 +1837,14 @@ static void test_aiz_plane_retirement(void)
 static void test_blue_spheres(void)
 {
     GVDP v={0};M68KState cpu_before=g_cpu;
+    /* Draw_SSSprites reads the 32x32 board at $8000 in S3, and at
+     * SStage_layout_buffer+$100 ($F100) in S&K/lock-on. Keep the fixture's
+     * source addresses independent of the renderer constants. */
+#ifdef SONIC3_STANDALONE
+    const unsigned native_board=0x8000;
+#else
+    const unsigned native_board=0xF100;
+#endif
     /* Split GET/PERFECT banners must leave the whole canvas despite their
      * original +/-192px endpoint; only anchors move, never glyph spacing. */
     for(int canvas=320;canvas<=1600;canvas+=320) {
@@ -1874,7 +1882,11 @@ static void test_blue_spheres(void)
     for(unsigned i=0;i<16;++i)word(g_rom,0x1000+i*2,32);
     word(g_rom,0x1020,1);g_rom[0x1022]=240;g_rom[0x1023]=15;
     word(g_rom,0x1024,0);word(g_rom,0x1026,65520);
-    memset(v.vram+64,0x11,512);memset(g_ram+0xF100,2,1024);
+    memset(v.vram+64,0x11,512);memset(g_ram+native_board,2,1024);
+#ifdef SONIC3_STANDALONE
+    /* Unrelated S3 RAM at the lock-on address must not replace its board. */
+    g_ram[0xF100]=2;
+#endif
     g_ram[0xF600]=0x34;ss_capture();
     static uint8_t before[65536];memcpy(before,g_ram,sizeof before);
     ss_begin(&v,1603);CHECK(ss_ready && ss_count>80 && ss_margin_count>80);
@@ -1886,10 +1898,10 @@ static void test_blue_spheres(void)
     ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
     /* Collision's collected-blue contact marker is not an uncollected
      * sphere. A turn can keep it under the runner until it becomes red. */
-    memset(g_ram+0xF100,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
-    g_ram[0xF100]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
-    g_ram[0xF100]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
-    CHECK(g_ram[0xF100]==10);
+    memset(g_ram+native_board,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
+    g_ram[native_board]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
+    g_ram[native_board]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
+    CHECK(g_ram[native_board]==10);
     /* A sprite's visible base stays on its actual board intersection while
      * moving, turning and resizing. This would fail with the old separate
      * sphere-camera lift even though the ground's inverse test passed. */
@@ -1899,8 +1911,8 @@ static void test_blue_spheres(void)
     for(int canvas=320;canvas<=1600;canvas+=320) {
         double angle=turn*6.2831853071795864769/8;
         int ix=(int)round(-2*sin(angle)),iy=(int)round(-2*cos(angle));
-        memset(g_ram+0xF100,0,1024);
-        g_ram[0xF100+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
+        memset(g_ram+native_board,0,1024);
+        g_ram[native_board+((unsigned)iy&31)*32+((unsigned)ix&31)]=2;
         word(g_ram,0xE422,motion*32);word(g_ram,0xE424,motion*16);g_ram[0xE426]=(uint8_t)(turn*32);
         ss_capture();ss_begin(&v,canvas);CHECK(ss_ready && ss_count>=1);
         double dx=ix-ss_x,dy=iy-ss_y;
