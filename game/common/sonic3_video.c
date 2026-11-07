@@ -23,7 +23,7 @@
 enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_HUD_MAP=0xE932, S3_RING_MAP=0xF87E,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
-       S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8,
+       S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8, S3_COMP_PUBLISH=0x19A4C,
        S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
        S3_TITLE_CARD_MAP=0x2D90C, S3_HCZ_SURFACE_MAP=0x1CF2E, S3_HCZ_RUSH_MAP=0x2E60C,
        S3_MENU_BG_MAP=0x19D2A2,
@@ -42,7 +42,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
 enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
-       S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56,
+       S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56, S3_COMP_PUBLISH=0x1B3EA,
        S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
        S3_TITLE_CARD_MAP=0x2EE10, S3_HCZ_SURFACE_MAP=0x1F2CE, S3_HCZ_RUSH_MAP=0x22E60C,
        S3_MENU_BG_MAP=0x39D2A2,
@@ -534,6 +534,9 @@ typedef struct {
     unsigned aiz_super_pose; /* original Super DPLC pose 33/34, or zero */
     AizPlanePose aiz_plane;
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
+    uint8_t competition_sat[640]; /* paired lower-view upload */
+    int competition_x,competition_y;
+    unsigned competition_page;
 } SceneFrame;
 static SceneFrame s_build, s_history[3], s_display_frame;
 static const SceneFrame *s_display;
@@ -552,13 +555,14 @@ static SceneFrame *s_capture_frame=&s_build;
 static unsigned s_capture_slot;
 static int s_capture_readonly;
 static void interpolation_native_publish(void);
+static void competition_capture_objects(void);
 void s3_video_vblank(void)
 {
     if(s_mode!=VIDEO_OFF)ss_capture();
     if(s_interpolation_enabled && !enabled() && g_ram[0xF62A])s_ix_upload_serial=s_ix_serial;
     /* The V-int uploads the last completed display list. Camera-follow can
      * leave its SAT byte-identical to a newer, not-yet-uploaded world pose. */
-    if(enabled() && g_ram[0xF62A])s_upload_serial=s_serial;
+    if(enabled() && (g_ram[0xF62A] || (ram16(S3_COMPETITION) && g_ram[0xEF3E])))s_upload_serial=s_serial;
     unsigned tick=ram16(0xFE04),zone=ram16(0xFE10);
     /* The following V-int uploads this completed tile queue. Main-thread
      * deformation may advance its RAM counters again before scanline zero,
@@ -897,6 +901,7 @@ static void append_aiz_plane(void)
 }
 static void capture_objects(void)
 {
+    if(ram16(S3_COMPETITION)){competition_capture_objects();return;}
     int prior_preview=s_capture_frame->preview_knux;
     s_capture_frame->count=0;s_capture_slot=0;s_capture_frame->aiz_super_pose=0;
     memset(s_capture_frame->code,0,sizeof s_capture_frame->code);
@@ -1026,7 +1031,10 @@ static void publish_sprites(void)
     for(unsigned n=0;!native_demo() && n<s_visible_count;++n) {
         unsigned o=s_visible_objects[n]; if(scene_read32(0xFF0000u+o))write8(o+4,g_ram[o+4]|128);
     }
-    s_build.serial=++s_serial;memcpy(s_build.sat,g_ram+0xF800,640);
+    s_build.serial=++s_serial;
+    unsigned sat=s_build.scene==4 && s_build.competition_page?0x7880:0xF800;
+    memcpy(s_build.sat,g_ram+sat,640);
+    if(s_build.scene==4)memcpy(s_build.competition_sat,g_ram+(s_build.competition_page?0x7D80:0x7B00),640);
     SceneFrame *dst=&s_history[s_serial%3];
     dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
     dst->world_tag=s_build.world_tag;
@@ -1034,6 +1042,9 @@ static void publish_sprites(void)
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
     dst->aiz_plane=s_build.aiz_plane;
     dst->aiz_join=s_build.aiz_join;
+    memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
+    dst->competition_x=s_build.competition_x;dst->competition_y=s_build.competition_y;
+    dst->competition_page=s_build.competition_page;
     memcpy(dst->ox,s_build.ox,sizeof dst->ox);memcpy(dst->oy,s_build.oy,sizeof dst->oy);memcpy(dst->code,s_build.code,sizeof dst->code);
     memcpy(dst->sat,s_build.sat,640);
     memcpy(dst->sprites,s_build.sprites,s_build.count*sizeof(SceneSprite));
@@ -1045,6 +1056,13 @@ int s3_video_hook(uint32_t pc)
     if(pc==S3_HUD_LIFE_VALUE) {
         /* Change only the formatter argument, never the earned counter. */
         if(g_cpu.D[1]>=100)g_cpu.D[1]/=10;
+        return 0;
+    }
+    if(ram16(S3_COMPETITION)) {
+        if(enabled()) {
+            if(pc==S3_CAPTURE)competition_capture_objects();
+            else if(pc==S3_COMP_PUBLISH)publish_sprites();
+        }
         return 0;
     }
     if(s_interpolation_enabled && !enabled()) {
@@ -1122,7 +1140,7 @@ static void select_scene(const GVDP *v,int retain_level)
     for(unsigned n=0;n<4;++n) {
         const SceneFrame *p=n==3?&s_display_frame:&s_history[n];
         if(retain_level && p->scene!=1)continue;
-        if(p->scene==1 && s_upload_serial && p->serial>s_upload_serial)continue;
+        if((p->scene==1 || p->scene==4) && s_upload_serial && p->serial>s_upload_serial)continue;
         if(!p->serial || (s_display && p->serial<s_display->serial))continue;
         int matches=1;
         for(unsigned k=0;k<640;++k)
@@ -1131,7 +1149,7 @@ static void select_scene(const GVDP *v,int retain_level)
     }
     if(!s_display) {
         ++s_scene_misses;
-        int scene=retain_level?1:bonus_stage()?3:level_ready()?1:(g_ram[0xF600]&127)==0x34?2:0;
+        int scene=retain_level?1:ram16(S3_COMPETITION)?4:bonus_stage()?3:level_ready()?1:(g_ram[0xF600]&127)==0x34?2:0;
         /* An in-progress native SAT is not a custom-scene publication. Keep
          * the completed scene until its replacement is ready, without
          * flashing the native centered HUD or dropping host-only rings. */
@@ -1149,6 +1167,9 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.preview_knux=s_display->preview_knux;s_display_frame.aiz_super_pose=s_display->aiz_super_pose;
         s_display_frame.aiz_plane=s_display->aiz_plane;
         s_display_frame.aiz_join=s_display->aiz_join;
+        memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
+        s_display_frame.competition_x=s_display->competition_x;s_display_frame.competition_y=s_display->competition_y;
+        s_display_frame.competition_page=s_display->competition_page;
         memcpy(s_display_frame.ox,s_display->ox,sizeof s_display_frame.ox);memcpy(s_display_frame.oy,s_display->oy,sizeof s_display_frame.oy);memcpy(s_display_frame.code,s_display->code,sizeof s_display_frame.code);
         memcpy(s_display_frame.sat,s_display->sat,sizeof s_display_frame.sat);
         memcpy(s_display_frame.sprites,s_display->sprites,s_display->count*sizeof(SceneSprite));
@@ -1279,7 +1300,7 @@ static int title_card_black(const GVDP *v)
 static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                                int origin,const uint32_t *palette)
 {
-    if(!s_display)return;
+    if(!s_display || s_display->scene==4)return;
     unsigned card_slot=UINT_MAX;int card_offset=0;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
@@ -2183,6 +2204,13 @@ static int s_native_publication_restored;
 void s3_video_state_loaded(void) { s_native_publication_restored=1; }
 static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
 {
+    int scene=frame->scene,cx=frame->competition_x,cy=frame->competition_y;
+    unsigned page=frame->competition_page;
+    s3_state_peek(io,offsetof(SceneFrame,scene),&scene,sizeof scene);
+    s3_state_peek(io,offsetof(SceneFrame,competition_x),&cx,sizeof cx);
+    s3_state_peek(io,offsetof(SceneFrame,competition_y),&cy,sizeof cy);
+    s3_state_peek(io,offsetof(SceneFrame,competition_page),&page,sizeof page);
+    if(scene<0 || scene>4 || cx<0 || cx>65535 || cy<0 || cy>65535 || page>1)io->ok=0;
     unsigned count = frame->count;
     s3_state_peek(io, offsetof(SceneFrame, count), &count, sizeof count);
     if (count > SCENE_SPRITES) io->ok = 0;

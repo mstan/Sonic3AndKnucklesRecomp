@@ -176,6 +176,10 @@ addr = 0x1AE56 # Publish completed native SAT signature
 kind = "game_hook"
 
 [[widescreen_site]]
+addr = 0x1B3EA # Publish paired Competition sprite tables
+kind = "game_hook"
+
+[[widescreen_site]]
 addr = 0xEA32 # Expand ring collision search pointers
 kind = "game_hook"
 

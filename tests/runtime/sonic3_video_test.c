@@ -528,6 +528,55 @@ static void test_competition_race(void)
     CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
     CHECK(configure("off"));
 }
+static void test_competition_pre_cull(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320],out[796];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(1,1,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=14;
+    word(g_ram,S3_COMPETITION,1);word(g_ram,0xEEA8,1023);word(g_ram,0xEEAA,511);word(g_ram,0xEEAE,12);
+    word(g_ram,0x8000,8);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,400);word(g_ram,0xEE6C,16);word(g_ram,0xEF3C,65535);
+    word(g_ram,0xAC00,4);word(g_ram,0xAC02,0xB000);word(g_ram,0xAC04,0xB094);
+    for(unsigned n=0;n<2;++n) {
+        unsigned o=0xB000+n*0x94,map=0x1000+n*16;
+        longword(g_ram,o,0x1234);g_ram[o+4]=(uint8_t)(4+(n?8:0));g_ram[o+6]=16;
+        longword(g_ram,o+12,map);word(g_ram,o+10,0x8000);word(g_ram,o+16,n?730:350);word(g_ram,o+20,n?24:32);
+        word(g_rom,map,2);word(g_rom,map+2,1);word(g_rom,map+4,0);word(g_rom,map+6,n?2:3);word(g_rom,map+8,0);
+    }
+    g_ram[0x7880+600]=42;g_ram[0x7D80+600]=92;g_ram[0xEF3E]=255;
+    CHECK(competition_object_x(-864,12,1023)==160);
+    CHECK(competition_object_x(-162,12,511)==-162 && competition_object_x(350,12,511)==350);
+    memcpy(before,g_ram,sizeof before);s3_video_hook(S3_CAPTURE);
+    CHECK(s_build.scene==4 && s_build.count==3 && !memcmp(g_ram,before,sizeof before));
+    s3_video_hook(S3_COMP_PUBLISH);s3_video_vblank();
+    CHECK(!memcmp(g_ram,before,sizeof before) && s_history[s_serial%3].competition_sat[600]==92);
+    v.reg[1]=64;v.reg[2]=0x20;v.reg[4]=5;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=3;
+    v.cram[1]=14;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+    memcpy(v.vram+0xF800,g_ram+0x7880,640);
+    for(unsigned y=0;y<224;++y)word(v.vram,0xF000+y*4,(uint16_t)-400);
+    for(unsigned x=0;x<320;++x)native[x]=0xFF010203u+x;
+    scanline(&v,0,native,320,out,796);scanline(&v,32,native,320,out,796);
+    CHECK(out[188]==0xFF0000FFu && !memcmp(out+238,native,sizeof native));
+    scanline(&v,24,native,320,out,796);CHECK(out[568]==0xFF00FF00u);
+    memcpy(v.vram+0xF800,g_ram+0x7D80,640);v.vsram[0]=(16-112)&1023;
+    word(v.vram,0xF000+128*4,0);scanline(&v,128,native,320,out,796);
+    CHECK(out[588]==0xFF0000FFu && !memcmp(out+238,native,sizeof native));
+    /* The pre-cull publications, paired upload and lower camera must also
+     * survive a local rewind snapshot while the race is paused. */
+    size_t bytes=presentation_state_save(NULL,0);uint8_t *blob=(uint8_t*)malloc(bytes);CHECK(blob);
+    CHECK(presentation_state_save(blob,bytes)==bytes);
+    memset(&s_display_frame,0,sizeof s_display_frame);s_display=NULL;
+    CHECK(presentation_state_load(blob,bytes,1));
+    size_t page_offset=sizeof(unsigned)+sizeof(int)+sizeof(double)+offsetof(SceneFrame,competition_page)-offsetof(SceneFrame,count);
+    unsigned bad_page=2;memcpy(blob+page_offset,&bad_page,sizeof bad_page);
+    CHECK(!presentation_state_load(blob,bytes,0));free(blob);
+    scanline(&v,128,native,320,out,796);CHECK(out[588]==0xFF0000FFu);
+    CHECK(!memcmp(g_ram,before,sizeof before));
+    CHECK(configure("off"));
+}
 static void test_competition_margin_sprites(void)
 {
     static GVDP v;GVDPRasterRow raster={0};uint32_t native[320]={0},out[796];
@@ -2492,7 +2541,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_race();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
