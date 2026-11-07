@@ -38,6 +38,10 @@ size_t s3_state_size(void) { S3StateIO io = {0}; state(&io); return io.pos; }
 static int ready(void)
 {
     unsigned mode = g_ram[0xF600];
+#ifdef SONIC3_STANDALONE
+    /* The standalone adapter also maps its Sega/title wait continuations. */
+    if (mode == 4) return 1;
+#endif
     if (mode != 0x34 && (mode != 0x0C || !g_ram[0xF711])) return 0;
 #ifndef SONIC3_STANDALONE
     if (!s3_army_state_ready()) return 0;

@@ -18,6 +18,8 @@
 #include "sonic3_video.h"   /* game/common (shared family renderer) */
 #include "sonic3_gameplay.h"
 #include "sonic3_kos.h"
+#include "sonic3_state.h"
+#include "sonic3_state_build.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -58,6 +60,7 @@ static const S3StartupWait s_startup_waits[] = {
     {0x37BE,0}, {0x383E,0}, {0x38DE,0}
 };
 static uint32_t s_startup_resume_sp, s_startup_after_palette;
+static uint32_t s3_read32(uint32_t addr);
 static const S3StartupWait *s3_startup_wait(uint32_t pc)
 {
     for (unsigned i=0;i<sizeof s_startup_waits/sizeof s_startup_waits[0];++i)
@@ -72,7 +75,10 @@ static uint32_t s3_save_resume_pc(uint8_t game_mode)
             const S3StartupWait *wait=s3_startup_wait(g_cpu.PC);
             uint32_t sp=g_cpu.A[7];
             if (!wait || (sp&1u) || sp<0xFFFD00u || sp>0xFFFE00u) return 0;
-            s_startup_resume_sp=sp;
+            /* The parked BSR owns its guest return slot. Re-entering that
+             * BSR creates the slot again, so first remove the saved one. */
+            if (s3_read32(sp)!=(wait->wait+4)) return 0;
+            s_startup_resume_sp=sp+4;
             s_startup_after_palette=wait->after_palette;
             return wait->wait;
         }
@@ -132,7 +138,7 @@ static void s3_startup_wait_hook(uint32_t pc)
 }
 static int s3_startup_state_boundary(void)
 {
-    return s3_read8(0xFFF600u)!=4 || s3_startup_wait(g_cpu.PC)!=NULL;
+    return s3_read8(0xFFF600u)==4 ? s3_startup_wait(g_cpu.PC)!=NULL : s3_state_at_boundary();
 }
 
 #define S3_GAME_MODE       0xF600  /* Game_mode */
@@ -284,6 +290,10 @@ static int gameplay_instruction(uint32_t pc)
 }
 static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); }
 const GameSpec g_game_spec = {
+    .state_build_id         = SONIC3_STATE_BUILD_ID,
+    .state_size             = s3_state_size,
+    .state_save             = s3_state_save,
+    .state_load             = s3_state_load,
     .load_settings          = gameplay_settings,
     .mods                   = s3_gameplay_mods,
     .netplay_allowed        = s3_gameplay_netplay_allowed,

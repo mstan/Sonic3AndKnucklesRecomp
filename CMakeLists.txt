@@ -227,7 +227,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GAME}/${PREFIX}_spec.c"
     )
     list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
-        "${S3_GAME_COMMON}/sonic3_gameplay.c")
+        "${S3_GAME_COMMON}/sonic3_gameplay.c"
+        "${S3_GAME_COMMON}/sonic3_state.c")
     # The source's queued decompressor changes its IRQ return PC. Compile this
     # small program with the existing explicit-PC native backend so its RTE
     # bookmark semantics do not depend on a suspended C call continuation.
@@ -254,7 +255,6 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # Game-owned mods that run S&K code: the combined cart and S&K alone.
     if(NOT PREFIX STREQUAL "sonic3")
         list(APPEND SHARED_SRC
-            "${S3_GAME_COMMON}/sonic3_state.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_army.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_art.c"
             "${S3_GAME_COMMON}/sonic3_knuckles_title.c"
