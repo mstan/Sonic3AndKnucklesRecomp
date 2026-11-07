@@ -102,9 +102,9 @@ static void test_aiz_join(void)
     invalid=0x10001u;memcpy(blob+offsetof(SceneFrame,world_tag),&invalid,sizeof invalid);
     S3StateIO bad_world={blob,sizeof s_build,0,1,1};scene_frame_state(&bad_world,&restored);CHECK(!bad_world.ok);
     free(blob);
-    /* Boss art can reuse the live patterns while the retired grove remains
-     * visible to the left. Its immutable bank must not alter native pixels
-     * or extend into the boss arena or another zone. */
+    /* Boss/capsule art can reuse patterns while the grove and far-right
+     * cliff remain visible in margins. Preserve their bank, native pixels,
+     * the active arena, and the finite level boundary. */
     s_aiz_ship_art=s_aiz_join_second;
     s_aiz_ship_art_attempted=s_aiz_ship_art_ready=1;
     s_frame_zone=0;s_frame_act=1;s_frame_fg_x=0x4880;
@@ -114,6 +114,10 @@ static void test_aiz_join(void)
     CHECK(margin_attr==2 && margin_pixel==2);
     CHECK(!aiz_retired_tree_sample(0,320,0x4780,0x300,&margin_attr,&margin_pixel));
     CHECK(!aiz_retired_tree_sample(-100,320,0x4880,0x300,&margin_attr,&margin_pixel));
+    CHECK(aiz_retired_tree_sample(400,320,0x4C10,0x300,&margin_attr,&margin_pixel));
+    CHECK(margin_attr==2 && margin_pixel==2);
+    CHECK(!aiz_retired_tree_sample(0,320,0x4C10,0x300,&margin_attr,&margin_pixel));
+    CHECK(!aiz_retired_tree_sample(400,320,0x4C80,0x300,&margin_attr,&margin_pixel));
     s_frame_zone=1;
     CHECK(!aiz_retired_tree_sample(-100,320,0x4780,0x300,&margin_attr,&margin_pixel));
     CHECK(!aiz_tree_arrival_alpha(0x4300,8,0x3D100000));

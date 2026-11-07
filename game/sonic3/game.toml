@@ -240,6 +240,10 @@ addr = 0x194B8 # Publish completed SAT
 kind = "game_hook"
 
 [[widescreen_site]]
+addr = 0x19A4C # Publish paired Competition sprite tables
+kind = "game_hook"
+
+[[widescreen_site]]
 addr = 0xF6D8 # Ring collision range
 kind = "game_hook"
 

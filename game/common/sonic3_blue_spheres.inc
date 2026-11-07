@@ -302,7 +302,12 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
             int bx=x-origin-hs_b;
             unsigned attr=plane_attr(v,base_b,bx,by),pixel=pattern_pixel(v,(uint16_t)attr,bx,by);
             unsigned color=pixel?pixel:v->reg[7]&63;
-            out[x]=(attr&0x8000)?palette[color]:shadow[color];
+            /* Transparent high-priority A tiles still keep the sky at normal
+             * intensity. Repeat that native coverage with the expanded sky. */
+            int ax=(x-origin)%320;if(ax<0)ax+=320;
+            unsigned front=plane_attr(v,base_a,ax,line+(v->vsram[0]&1023));
+            int dark=(v->reg[12]&8) && !((attr|front)&0x8000u);
+            out[x]=dark?shadow[color]:palette[color];
         }
     }
     ss_draw_spheres(line,out,width,palette,0);

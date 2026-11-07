@@ -7,20 +7,26 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
     size_t tail=offsetof(SceneFrame,count);
     if(io->mode) {
         int scene=0;unsigned pose=0,join=0,world=0;
+        int cx=0,cy=0;unsigned page=0;
+        s3_state_peek(io,offsetof(SceneFrame,competition_x)-tail,&cx,sizeof cx);
+        s3_state_peek(io,offsetof(SceneFrame,competition_y)-tail,&cy,sizeof cy);
+        s3_state_peek(io,offsetof(SceneFrame,competition_page)-tail,&page,sizeof page);
+        if(cx<0 || cx>65535 || cy<0 || cy>65535 || page>1){io->ok=0;return;}
+
         s3_state_peek(io,offsetof(SceneFrame,scene)-tail,&scene,sizeof scene);
         s3_state_peek(io,offsetof(SceneFrame,aiz_super_pose)-tail,&pose,sizeof pose);
         s3_state_peek(io,offsetof(SceneFrame,aiz_join)-tail,&join,sizeof join);
         s3_state_peek(io,offsetof(SceneFrame,world_tag)-tail,&world,sizeof world);
         AizPlanePose plane={0};
         s3_state_peek(io,offsetof(SceneFrame,aiz_plane)-tail,&plane,sizeof plane);
-        if(scene<0 || scene>3 || pose>2 || join>3 || world>0x10000u || !aiz_plane_valid(&plane)){io->ok=0;return;}
+        if(scene<0 || scene>4 || pose>2 || join>3 || world>0x10000u || !aiz_plane_valid(&plane)){io->ok=0;return;}
     }
     s3_state_bytes(io,&f->count,sizeof *f-tail);
     s3_state_bytes(io,f->sprites,(size_t)count*sizeof f->sprites[0]);
 }
 static void rewind_presentation_state(S3StateIO *io)
 {
-    unsigned version=3;
+    unsigned version=4;
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
     int mode=s_mode;double ratio=s_ratio;

@@ -34,11 +34,18 @@ static int s3_knux_preview_needed(const uint8_t *ram)
      * Keep the waiting actor on its ledge throughout that controller,
      * before loc_694D4's capsule wait. Its native pose and 120-tick wait
      * stay unchanged; its successor still allocates the real actor. */
-    for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
+    for(unsigned o=0xB000;o<0xCFCC;o+=0x4A) {
         if(s3_knux_preview_word(ram,o)==6 &&
            (s3_knux_preview_word(ram,o+2)==0x923E ||
             s3_knux_preview_word(ram,o+2)==0x94D4 ||
             s3_knux_preview_word(ram,o+2)==0x9526))return 1;
+        /* Boss defeat temporarily replaces the controller with Obj_Wait.
+         * Its callback still owns this ledge until capsule publication. */
+        if(s3_knux_preview_word(ram,o)==8 &&
+           s3_knux_preview_word(ram,o+2)==0x488A &&
+           s3_knux_preview_word(ram,o+0x34)==6 &&
+           s3_knux_preview_word(ram,o+0x36)==0x94A4)return 1;
+    }
     return 0;
 #endif
 }

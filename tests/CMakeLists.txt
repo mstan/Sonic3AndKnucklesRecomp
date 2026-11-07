@@ -233,6 +233,15 @@ endif()
 s3_video_test(sonic3_video)
 s3_video_test(sonic3_standalone_video SONIC3_STANDALONE=1)
 
+foreach(profile sonic3_state sonic3_standalone_state)
+    add_executable(${profile}_test runtime/sonic3_state_test.c "${S3_GAME_COMMON}/sonic3_state.c")
+    target_include_directories(${profile}_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
+    if(profile STREQUAL "sonic3_standalone_state")
+        target_compile_definitions(${profile}_test PRIVATE SONIC3_STANDALONE=1)
+    endif()
+    add_test(NAME ${profile} COMMAND ${profile}_test)
+endforeach()
+
 add_executable(campaign_combined_test runtime/campaign_combined_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
 target_include_directories(campaign_combined_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")

@@ -58,6 +58,7 @@ static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 /* Mode-aware save-state resume (sonic3k.lst, org 0):
  *   GM $0C Level / $08 Demo -> LevelLoop ($00650C): the per-frame loop top.
  *     Re-entering here continues the level moment-in-time from restored RAM.
+ *   GM $34 -> SpecialStage's established per-frame loop ($0084C2).
  *   Anything else (Sega/title/menus, bonus-stage init) -> 0: fall back to
  *   GameLoop dispatch, which re-runs the mode handler â€” those states WANT
  *   their init. */
@@ -66,6 +67,7 @@ static uint32_t sandk_save_resume_pc(uint8_t game_mode)
     switch (game_mode) {
         case 0x08:
         case 0x0C: return 0x00650Cu;   /* LevelLoop */
+        case 0x34: return s3_state_resume_pc(game_mode);
         default:   return 0u;
     }
 }
@@ -302,10 +304,9 @@ const GameSpec g_game_spec = {
     .short_name             = "SonicK",
     .boxart                 = "boxart-sonick.tga",
 
-    /* S&K standalone â€” CRC check skipped (runner CRC calc vs file byteswap
-     * unverified); ROM identity is gated by size + external hash check.
-     * Expected MD5 of the file is 4ea493ea4e9f6c9ebfccbdb15110367e. */
-    .expected_rom_crc32     = 0u,
+    /* Original file bytes: MD5 4ea493ea4e9f6c9ebfccbdb15110367e.
+     * Launcher and runtime validate the same unmodified cartridge. */
+    .expected_rom_crc32     = 0x0658F691u,
     .expected_rom_size      = 0x200000u,   /* 2 MB standalone cart */
 
     /* No battery SRAM: standalone S&K has no data-select / save game (Start at

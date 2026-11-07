@@ -1,4 +1,4 @@
-/* Save only at the native gameplay Wait_VSync boundary. Restoring its
+/* Save only at a resumable native Wait_VSync boundary. Restoring its
  * per-frame loop avoids the stage initialization in GameLoop. */
 #include "sonic3_state.h"
 #include "sonic3_state_io.h"
@@ -9,14 +9,16 @@
  * LevelLoop / instruction after its BSR Wait_VSync / Pause_Loop's return.
  * All resume targets are existing discovered labels, not generated-C edits. */
 #ifdef SONIC3_STANDALONE
-enum { LEVEL_LOOP = 0x4B0C, LEVEL_WAIT_RETURN = 0x4B20, PAUSE_WAIT_RETURN = 0x16C0 };
+enum { LEVEL_LOOP = 0x4B0C, LEVEL_WAIT_RETURN = 0x4B20, PAUSE_WAIT_RETURN = 0x16C0,
+       SPECIAL_LOOP = 0x77D2, SPECIAL_WAIT_RETURN = 0x77E6 };
 #else
-enum { LEVEL_LOOP = 0x650C, LEVEL_WAIT_RETURN = 0x6520, PAUSE_WAIT_RETURN = 0x143A };
+enum { LEVEL_LOOP = 0x650C, LEVEL_WAIT_RETURN = 0x6520, PAUSE_WAIT_RETURN = 0x143A,
+       SPECIAL_LOOP = 0x84C2, SPECIAL_WAIT_RETURN = 0x84D6 };
 #endif
 
 static void state(S3StateIO *io)
 {
-    unsigned version = 2;
+    unsigned version = 3;
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
 #ifndef SONIC3_STANDALONE
@@ -35,7 +37,8 @@ static void state(S3StateIO *io)
 size_t s3_state_size(void) { S3StateIO io = {0}; state(&io); return io.pos; }
 static int ready(void)
 {
-    if (g_ram[0xF600] != 0x0C || !g_ram[0xF711]) return 0;
+    unsigned mode = g_ram[0xF600];
+    if (mode != 0x34 && (mode != 0x0C || !g_ram[0xF711])) return 0;
 #ifndef SONIC3_STANDALONE
     if (!s3_army_state_ready()) return 0;
 #endif
@@ -47,9 +50,15 @@ int s3_state_at_boundary(void)
     if (!ready() || sp > 65532) return 0;
     uint32_t caller = ((uint32_t)g_ram[sp] << 24) | ((uint32_t)g_ram[sp+1] << 16) |
         ((uint32_t)g_ram[sp+2] << 8) | g_ram[sp+3];
-    return caller == LEVEL_WAIT_RETURN || caller == PAUSE_WAIT_RETURN;
+    /* SS initialization/fades also wait for VBlank. Only its established
+     * per-frame loop (or Pause_Game within it) is safe to restart. */
+    return caller == (g_ram[0xF600] == 0x34 ? SPECIAL_WAIT_RETURN : LEVEL_WAIT_RETURN) ||
+           caller == PAUSE_WAIT_RETURN;
 }
-uint32_t s3_state_resume_pc(uint8_t mode) { return mode == 0x0C ? LEVEL_LOOP : 0; }
+uint32_t s3_state_resume_pc(uint8_t mode)
+{
+    return mode == 0x0C ? LEVEL_LOOP : mode == 0x34 ? SPECIAL_LOOP : 0;
+}
 int s3_state_save(void *data, size_t size)
 {
     if (!ready() || size != s3_state_size()) return 0;
