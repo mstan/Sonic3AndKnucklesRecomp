@@ -1,0 +1,22 @@
+# Native startup wait sites and palette-call continuations.
+[functions]
+extra = [
+    0x00328A,
+    0x00328E,
+    0x00334E,
+    0x003352,
+    0x003576,
+    0x0036CC,
+    0x0036DE,
+    0x0036E2,
+    0x00370A,
+    0x00370E,
+    0x00376A,
+    0x00376E,
+    0x0037BE,
+    0x0037C2,
+    0x00383E,
+    0x003842,
+    0x0038DE,
+    0x0038E2,
+]

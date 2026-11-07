@@ -28,6 +28,7 @@ code_addrs_file = "sonic3.code_addrs.txt"
 discovery_files = [
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3.special_vint_s3.toml",
+    "sonic3.startup_state.toml",       # native startup state continuations
     "sonic3.disasm_labels.toml",       # 10,966 code labels
     "sonic3.disasm_jumptables.toml",   # 272 tables / 1,448 targets
 ]
@@ -473,4 +474,68 @@ addr = 0x1299A # BEQ Sonic_BubbleShield (6720)
 kind = "game_hook"
 [[widescreen_site]]
 addr = 0x129C2 # BEQ Sonic_CheckTransform (6728)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x328A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x328E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x334E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x3352
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x36DE
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x36E2
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x370A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x370E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x376A
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x376E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x37BE
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x37C2
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x383E
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x3842
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x38DE
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x38E2
 kind = "game_hook"

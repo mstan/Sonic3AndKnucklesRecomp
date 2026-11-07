@@ -48,24 +48,47 @@ static void s3_call_entry_point(void) { recomp_call_addr(0x000206u); }
 static void s3_call_vblank(void)      { s3_video_vblank(); recomp_call_addr(0x000802u); }
 static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
 
-/* Mode-aware save-state resume (s3.asm, addresses from s3.lst org 0):
- *   GM $0C Level / $08 Demo -> LevelLoop  ($004B0C): the per-frame loop â€”
- *     "bsr Pause_Game / Wait_VSync / Process_Sprites / ... / cmpi.b #$C,
- *      (Game_mode) / beq LevelLoop". Re-entering here continues the level
- *     moment-in-time from the restored RAM.
- *   GM $34 SpecialStage (running) -> loc_77D2 ($0077D2): the SS per-frame
- *     loop ("bsr Pause_Game / ... / cmpi.b #$34,(Game_mode) / beq loc_77D2").
- *   Anything else (Sega/title/menus, SS init modes $2C/$30, or any mode with
- *   the bit-7 reinit flag, e.g. $88) -> 0: fall back to GameLoop dispatch,
- *   which re-runs the mode handler â€” those states WANT their init. */
+/* Native startup waits are resumable frame boundaries. Their instruction
+ * hints are part of the saved CPU, rather than restarting Title_Screen. */
+typedef struct { uint32_t wait, after_palette; } S3StartupWait;
+static const S3StartupWait s_startup_waits[] = {
+    {0x328A,0x36CC}, /* finish the Sega fade-in, then its original caller */
+    {0x334E,0x3576}, /* finish the initial fade-out, then load Sega art */
+    {0x36DE,0}, {0x370A,0}, {0x376A,0},
+    {0x37BE,0}, {0x383E,0}, {0x38DE,0}
+};
+static uint32_t s_startup_resume_sp, s_startup_after_palette;
+static const S3StartupWait *s3_startup_wait(uint32_t pc)
+{
+    for (unsigned i=0;i<sizeof s_startup_waits/sizeof s_startup_waits[0];++i)
+        if (pc==s_startup_waits[i].wait) return &s_startup_waits[i];
+    return NULL;
+}
 static uint32_t s3_save_resume_pc(uint8_t game_mode)
 {
+    s_startup_resume_sp=0; s_startup_after_palette=0;
     switch (game_mode) {
+        case 0x04: {
+            const S3StartupWait *wait=s3_startup_wait(g_cpu.PC);
+            uint32_t sp=g_cpu.A[7];
+            if (!wait || (sp&1u) || sp<0xFFFD00u || sp>0xFFFE00u) return 0;
+            s_startup_resume_sp=sp;
+            s_startup_after_palette=wait->after_palette;
+            return wait->wait;
+        }
         case 0x08:
-        case 0x0C: return 0x004B0Cu;   /* LevelLoop                */
-        case 0x34: return 0x0077D2u;   /* SS per-frame loop        */
-        default:   return 0u;
+        case 0x0C: return 0x004B0Cu;
+        case 0x34: return 0x0077D2u;
+        default: return 0;
     }
+}
+static void s3_call_resume(uint32_t pc)
+{
+    uint32_t sp=s_startup_resume_sp, after=s_startup_after_palette;
+    s_startup_resume_sp=0; s_startup_after_palette=0;
+    if (sp) g_cpu.A[7]=sp;
+    recomp_call_addr(pc);
+    if (sp && after) recomp_call_addr(after);
 }
 
 /* ---- 68K work-RAM accessors ---- */
@@ -98,6 +121,20 @@ static uint32_t s3_read32(uint32_t addr) {
 }
 
 /* ---- Sonic 3 RAM offsets (relative to $FF0000); shared Sonic engine map ---- */
+static void s3_startup_wait_hook(uint32_t pc)
+{
+    if (s3_read8(0xFFF600u)!=4) return;
+    for (unsigned i=0;i<sizeof s_startup_waits/sizeof s_startup_waits[0];++i) {
+        uint32_t wait=s_startup_waits[i].wait;
+        if (pc==wait) { g_cpu.PC=wait; return; }
+        if (pc==wait+4) { g_cpu.PC=0; return; }
+    }
+}
+static int s3_startup_state_boundary(void)
+{
+    return s3_read8(0xFFF600u)!=4 || s3_startup_wait(g_cpu.PC)!=NULL;
+}
+
 #define S3_GAME_MODE       0xF600  /* Game_mode */
 #define S3_VINT_ROUTINE    0xF62A  /* V_int_routine */
 #define S3_CTRL_1_HELD     0xF604  /* Ctrl_1_held */
@@ -234,6 +271,7 @@ static const GameDebugCommand s3_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    s3_startup_wait_hook(pc);
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
@@ -269,6 +307,8 @@ const GameSpec g_game_spec = {
     .call_entry_point       = s3_call_entry_point,
     .call_vblank            = s3_call_vblank,
     .call_hblank            = s3_call_hblank,
+    .call_resume            = s3_call_resume,
+    .state_at_boundary      = s3_startup_state_boundary,
     .resume_main_loop_pc    = 0x000734u,   /* GameLoop â€” fallback for modes without a loop map */
     .save_resume_pc         = s3_save_resume_pc,   /* mode -> per-frame loop top (moment-in-time) */
     .dispatch_main_loop_pc  = 0x000734u,   /* GameLoop */
