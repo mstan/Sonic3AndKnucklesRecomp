@@ -350,14 +350,14 @@ static S3VideoWorldCell s_world_cell;
 void s3_video_set_world_cell(S3VideoWorldCell read) { s_world_cell=read; }
 static S3VideoWorldPublish s_world_publish;
 void s3_video_set_world_publish(S3VideoWorldPublish publish) { s_world_publish=publish; }
-static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background)
+static uint16_t world_attr_blocks_mask(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background,unsigned row_mask)
 {
     uint16_t block;
     if (!(s_world_cell && s_world_cell(ram,wx,wy,background,&block))) {
         unsigned header=background?0x8002u:0x8000u;
         int width=((ram[header]<<8)|ram[header+1])*128;
         if(width<=0 || (!background && (wx<0 || wx>=width)))return 0;
-        unsigned row=((unsigned)wy>>5)&0x7Cu;
+        unsigned row=((unsigned)wy>>5)&row_mask;
         unsigned p=0x8008u+row+(background?2u:0u);
         unsigned rowaddr=(ram[p]<<8)|ram[p+1];
         /* Get_ChunkRow uses a signed chunk offset. A moving background can
@@ -376,6 +376,8 @@ static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int w
     address-=0x9000;
     return (uint16_t)(((blocks[address]<<8)|blocks[address+1])^((block&0xC00u)<<1));
 }
+static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background)
+{ return world_attr_blocks_mask(ram,blocks,wx,wy,background,0x7Cu); }
 static uint16_t world_attr(const uint8_t *ram,int wx,int wy,int background)
 { return world_attr_blocks(ram,ram+0x9000,wx,wy,background); }
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
@@ -1508,6 +1510,8 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
     if(!line){++s_frames;s_native_x=origin;}
 }
 
+#include "sonic3_competition.inc"
+
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
                             GameVideoNativeRow native_row, void *native_ctx,
@@ -1616,6 +1620,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                     ((v->reg[2]&56u)<<10)!=((v->reg[4]&7u)<<13))?MENU_TITLE:MENU_TITLE_ANIMATION;
         }
     }
+    if(competition_scanline(v,line,native,nw,out,width,native_row,native_ctx,palette))return;
     v=&s_video_frame;
     if(s_frame_bonus) {
         if(!native)native=native_row(native_ctx);

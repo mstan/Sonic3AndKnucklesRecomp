@@ -477,6 +477,57 @@ static void test_file_select(void)
     CHECK(!memcmp(before,g_ram,sizeof before));
     s_menu_map_ready=0;
 }
+static void test_competition_race(void)
+{
+    static GVDP v,before;uint32_t native[320],out[796];static uint8_t ram[65536];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(1,1,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
+    s3_video_set_world_cell(NULL);s3_video_set_world_publish(NULL);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=14;
+    word(g_ram,S3_COMPETITION,1);word(g_ram,0xEEAE,12);
+    word(g_ram,0x8000,8);word(g_ram,0x8002,8);
+    for(unsigned row=0;row<4;++row) {
+        word(g_ram,0x8008+row*4,0x8100+row*8);
+        word(g_ram,0x800A+row*4,0x8200+row*8);
+        memset(g_ram+0x8200+row*8,(int)(row%3)+1,8);
+    }
+    for(unsigned n=1;n<=3;++n) {
+        for(unsigned i=0;i<128;i+=2)word(g_ram,n*128+i,n);
+        for(unsigned i=0;i<8;i+=2)word(g_ram,0x9000+n*8+i,n);
+        memset(v.vram+n*32,(int)(n*17),32);
+    }
+    v.reg[1]=64;v.reg[2]=0x20;v.reg[4]=5;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=3;
+    v.cram[1]=14;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    for(unsigned i=0;i<320;++i)native[i]=0xFF010203u+i;
+    memcpy(ram,g_ram,sizeof ram);before=v;
+    scanline(&v,0,native,320,out,796);
+    CHECK(out[0]==0xFFFF0000u && !memcmp(out+238,native,sizeof native));
+    CHECK(!memcmp(g_ram,ram,sizeof ram) && !memcmp(&v,&before,sizeof v));
+    /* The second view installs a different VSRAM during the same frame.
+     * It must not reuse line zero's background or a guessed split row. */
+    v.vsram[1]=128;scanline(&v,1,native,320,out,796);
+    CHECK(out[0]==0xFF00FF00u && !memcmp(out+238,native,sizeof native));
+    v.vsram[1]=16;scanline(&v,112,native,320,out,796);
+    CHECK(out[0]==0xFF00FF00u && !memcmp(out+238,native,sizeof native));
+    /* Competition's short row mask wraps its map; ordinary levels keep
+     * their existing 4096px mask. Foreground terrain extends in each view. */
+    CHECK(world_attr_blocks_mask(g_ram,g_ram+0x9000,0,512,1,12)==1);
+    CHECK(world_attr(g_ram,0,512,1)==0);
+    memset(g_ram+0x8100,3,8);v.vsram[1]=0;
+    scanline(&v,0,native,320,out,796);CHECK(out[558]==0xFF0000FFu);
+    for(unsigned i=0;i<8;i+=2)word(g_ram,0x9008+i,0x8001);
+    scanline(&v,0,native,320,out,796);CHECK(out[558]==0xFFFF0000u);
+    for(unsigned i=0;i<8;i+=2)word(g_ram,0x9018+i,0x8003);
+    scanline(&v,0,native,320,out,796);CHECK(out[558]==0xFF0000FFu);
+    /* Keep a native SAT piece whole when it crosses the viewport edge.
+     * Its original ordering/priority applies only to the added pixels. */
+    memset(g_ram+0x8100,0,8);word(v.vram,0xF800,128);
+    word(v.vram,0xF804,0x8003);word(v.vram,0xF806,128+318);
+    scanline(&v,0,native,320,out,796);
+    CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
+    CHECK(configure("off"));
+}
 static void test_competition_margin_sprites(void)
 {
     static GVDP v;GVDPRasterRow raster={0};uint32_t native[320]={0},out[796];
@@ -2441,7 +2492,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_race();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
