@@ -2048,6 +2048,9 @@ static void test_blue_spheres(void)
     double px,py,depth;
     CHECK(ss_project(0,0,1,&px,&py,&depth));
     CHECK(fabs(px)<.001 && fabs(py-(112+ss_focal*ss_ground_lift/ss_distance))<.001);
+    /* Original stationary checker boundary: the first lower quadrant is
+     * row 163, independent of the expanded canvas width. */
+    CHECK(py>162 && py<163);
     CHECK(ss_project(2,1,1,&px,&py,&depth));
     CHECK(fabs(px-155)<3);
     CHECK(!ss_project(100,0,1,&px,&py,&depth));
@@ -2081,15 +2084,15 @@ static void test_blue_spheres(void)
     uint32_t contact_blue[796],contact_grace[796],contact_palette[64]={0};
     contact_palette[33]=0xFF4488EE;contact_palette[1]=0xFFEE4444;
     g_ram[native_board]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
-    ss_scanline(&v,170,contact_blue,796,contact_palette,contact_palette,0);
+    ss_scanline(&v,155,contact_blue,796,contact_palette,contact_palette,0);
     CHECK(contact_blue[398]==contact_palette[33]);
     g_ram[native_board]=10;memcpy(before,g_ram,sizeof before);
     ss_capture();ss_begin(&v,796);CHECK(ss_count==1 && ss_spheres[0].kind==10);
-    ss_scanline(&v,170,contact_grace,796,contact_palette,contact_palette,0);
+    ss_scanline(&v,155,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(!memcmp(contact_blue,contact_grace,sizeof contact_blue));
     CHECK(!memcmp(before,g_ram,sizeof before));
     g_ram[native_board]=1;ss_capture();ss_begin(&v,796);
-    ss_scanline(&v,170,contact_grace,796,contact_palette,contact_palette,0);
+    ss_scanline(&v,155,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(contact_grace[398]==contact_palette[1]);
     /* A sprite's visible base stays on its actual board intersection while
      * moving, turning and resizing. This would fail with the old separate

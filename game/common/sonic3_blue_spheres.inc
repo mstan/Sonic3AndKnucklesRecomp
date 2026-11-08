@@ -19,7 +19,10 @@ enum { SS_BOARD=0xF100, SS_EXTRA=0xE480 };
 #endif
 static const double ss_radius=15.18430653,ss_distance=3.35173470;
 static const double ss_focal=345.3564589,ss_pitch=.69874597;
-static const double ss_ground_lift=.64;
+/* The native stationary checker intersection crosses row 163 beneath the
+ * fixed character anchor. Keep the wide ground and sphere contact points
+ * on that same vertical origin instead of lifting the field below it. */
+static const double ss_ground_lift=.49;
 typedef struct { float x,z,depth; } SSPoint;
 typedef struct { int x,y,w,h; float depth; unsigned kind,lod; } SSSphere;
 static SSPoint *ss_ground;
