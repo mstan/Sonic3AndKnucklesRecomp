@@ -1379,7 +1379,7 @@ static int ship_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cel
      * the ordinary camera's neighboring 1024px page. */
     CHECK(y>=0xA00 || (y>=0x1C0 && y<0x300));
     if(y>=0xA00){CHECK(x>=0x3E00 && x<0x4300);*cell=1;}
-    else {CHECK(x>=0x4100 && x<0x4600);*cell=2;}
+    else {CHECK(x>=0x4100 && x<0x4800);*cell=2;}
     return 1;
 }
 static int private_plane_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
@@ -1458,6 +1458,17 @@ static void test_aiz2_ship_cameras(void)
         int wx=0x4288+x-238;
         CHECK(out[x]==(wx>=0x4380 && wx<0x4880?0xFF0000FFu:0xFF00FF00u));
     }
+    /* The incoming complete grove is a spatial layout again; a retained
+     * outgoing canvas must not repeat over its future columns. */
+    word(g_ram,0xEE80,0x4580);
+    for(unsigned y=0;y<224;y++)word(v.vram,0xF000+y*4,(uint16_t)-0x4580);
+    scanline(&v,0,native,320,out,796);scanline(&v,65,native,320,out,796);
+    for(int x=0;x<796;x++) {
+        int wx=0x4580+x-238;
+        CHECK(out[x]==(wx>=0x4380 && wx<0x4640?0xFF0000FFu:0xFF00FF00u));
+    }
+    word(g_ram,0xEE80,0x4288);
+    for(unsigned y=0;y<224;y++)word(v.vram,0xF000+y*4,(unsigned)-(y<65?0x3FB5:0x4288));
     word(g_ram,0xEED6,0xFF00);word(g_ram,0xEEC0,8);
     word(g_ram,0xEEB2,0);
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);

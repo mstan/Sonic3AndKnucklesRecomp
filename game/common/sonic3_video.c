@@ -1997,8 +1997,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])>=8 && !ship_band;
     /* EndRefresh installs complete grove rows while DoShipLoop is still
      * active, then clears only the ship's upper-band flag. Keep that
-     * published foreground canvas until the arena takes over; the raw
-     * layout's partial tree columns do not describe this composition. */
+     * published foreground canvas over the outgoing partial columns. The
+     * complete incoming grove keeps its spatial layout and finite extent. */
     int aiz_grove_fg=bg_world && !s_frame_zone && s_frame_act==1 &&
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])>=16 &&
         s_frame_fg_x<0x4880;
@@ -2141,7 +2141,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             bp=pattern_pixel(v,b,reference_bx,fire_y);
         }
         if(aiz_fire_fg || aiz_loop_fg ||
-           (aiz_grove_fg && wx>=0x4380 && wx<0x4880)) {
+           (aiz_grove_fg && wx>=0x4380 && wx<0x4640)) {
             int ay=line+(((aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
             a=plane_attr(v,base_a,nx-hs_a,ay);
             ap=pattern_pixel(v,a,nx-hs_a,ay);
