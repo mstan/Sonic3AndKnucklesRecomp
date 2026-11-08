@@ -2140,7 +2140,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             b=plane_attr(v,base_b,reference_bx,fire_y);
             bp=pattern_pixel(v,b,reference_bx,fire_y);
         }
-        if(aiz_fire_fg || aiz_loop_fg ||
+        /* The first streamed loop still holds the unique outgoing ledge
+         * in unused columns. Its incoming right margin is authored flat
+         * ground, not another copy of that ledge. */
+        int incoming_chase=aiz_loop_fg && nx>=nw && wx>=0x4200 && wx<0x4440;
+        if(aiz_fire_fg || (aiz_loop_fg && !incoming_chase) ||
            (aiz_grove_fg && wx>=0x4380 && wx<0x4640)) {
             int ay=line+(((aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
             a=plane_attr(v,base_a,nx-hs_a,ay);

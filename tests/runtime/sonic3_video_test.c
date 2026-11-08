@@ -1447,7 +1447,12 @@ static void test_aiz2_ship_cameras(void)
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
-    for(int x=0;x<796;x++)CHECK(out[x]==0xFF0000FFu);
+    /* Unused native columns can still contain the unique outgoing ledge.
+     * They must not repeat over the incoming flat ground in a wide view. */
+    for(int x=0;x<796;x++) {
+        int wx=0x4288+x-238;
+        CHECK(out[x]==(x>=558 && wx>=0x4200 && wx<0x4440?0xFF00FF00u:0xFF0000FFu));
+    }
     /* EndRefresh retires the ship before the installed foreground rows.
      * Keep their canvas through the grove instead of exposing raw partial
      * tree columns when the upper ship flag clears. */
