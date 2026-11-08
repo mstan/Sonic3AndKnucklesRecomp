@@ -350,7 +350,7 @@ static S3VideoWorldCell s_world_cell;
 void s3_video_set_world_cell(S3VideoWorldCell read) { s_world_cell=read; }
 static S3VideoWorldPublish s_world_publish;
 void s3_video_set_world_publish(S3VideoWorldPublish publish) { s_world_publish=publish; }
-static uint16_t world_attr_blocks_mask(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background,unsigned row_mask)
+static int world_block(const uint8_t *ram,int wx,int wy,int background,unsigned row_mask,uint16_t *result)
 {
     uint16_t block;
     if (!(s_world_cell && s_world_cell(ram,wx,wy,background,&block))) {
@@ -368,6 +368,11 @@ static uint16_t world_attr_blocks_mask(const uint8_t *ram,const uint8_t *blocks,
         unsigned address=ram[cell]*128u+((unsigned)wy&112u)+((unsigned)wx&112u)/8u;
         block=(uint16_t)((ram[address]<<8)|ram[address+1]);
     }
+    *result=block;return 1;
+}
+static uint16_t world_attr_blocks_mask(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background,unsigned row_mask)
+{
+    uint16_t block;if(!world_block(ram,wx,wy,background,row_mask,&block))return 0;
     int tx=(wx>>3)&1,ty=(wy>>3)&1;
     if(block&0x400)tx^=1;
     if(block&0x800)ty^=1;
@@ -2141,7 +2146,13 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
-        if(level && s_frame_zone==1 && !s_frame_act && ap)s_priority[x]|=4u;
+        if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
+           wx>=0x360 && wx<0x980) {
+            /* The nonsolid blue backing is on A too. Clip new roof fill to
+             * actual terrain blocks, not every opaque foreground pixel. */
+            uint16_t roof=0;
+            if(world_block(s_world_frame,wx,wy,0,0x7Cu,&roof) && (roof&0xF000u))s_priority[x]|=4u;
+        }
         /* The authored transition viewport has no high-priority tree
          * canopy in front of its flame curtain. Expanded margins do: let
          * the opaque high-priority flames cover that extra scenery too.
