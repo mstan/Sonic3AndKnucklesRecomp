@@ -59,6 +59,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_AIZ_PLANE_INTRO=0x67472, S3_SUPER_MAP=0x146816, S3_SUPER_PLC=0x148378 };
 #endif
 
+enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
 static int s_mode;
 static void ss_capture(void);
@@ -673,6 +674,9 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
          * Its coverage moves; fractional drawing keeps the texture in world phase. */
         if(map==S3_HCZ_RUSH_MAP && size==15 && zoom==256 &&
            (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30))size|=0x20;
+        /* Bit4 records the immutable native mapping owner. It is separate
+         * from the atlas/roof bank flags, which already occupy upper bits. */
+        if(map==S3_MONKEY_MAP)size|=SPRITE_MONKEY_ART;
         dx=zoom_offset(dx,zoom);dy=zoom_offset(dy,zoom);
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
@@ -1499,6 +1503,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
             } else if(s_frame_level && !s_frame_zone && !s->hud &&
+                      (s->size&0xD0u)==SPRITE_MONKEY_ART &&
                       (cell&2047u)>=0x548 && (cell&2047u)<0x55F &&
                       (x<origin || x>=origin+320) && load_aiz_monkey_art()) {
                 p=aiz_monkey_pixel(cell,ix&7,iy&7);

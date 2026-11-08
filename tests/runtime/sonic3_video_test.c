@@ -89,7 +89,7 @@ static void test_aiz_monkey_owned_art(void)
     int level=s_frame_level;unsigned zone=s_frame_zone;
     s_frame_level=1;s_frame_zone=0;s_camera=s_camera_y=0;
     scene.scene=1;scene.count=2;
-    scene.sprites[0]=(SceneSprite){-200,0,0x2548,0,0,256,1};
+    scene.sprites[0]=(SceneSprite){-200,0,0x2548,0x10,0,256,1};
     scene.sprites[1]=(SceneSprite){100,0,0x2548,0,0,256,1};
     memset(s_aiz_monkey_art,0x12,sizeof s_aiz_monkey_art);
     s_aiz_monkey_ready=s_aiz_monkey_attempted=1;
@@ -99,12 +99,31 @@ static void test_aiz_monkey_owned_art(void)
     draw_scene_sprites(&v,0,out,796,238,pal);
     CHECK(out[38]==pal[17] && out[39]==pal[18]);
     CHECK(out[338]==pal[21]); /* native viewport retains the installed bank */
+    /* Another actor can own these same tile numbers during the act2 ship.
+     * Its edge pixels must use its installed art, never the monkey texture. */
+    scene.sprites[0].size=0;
+    memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    scene.sprites[0].size=0x10;
+
     scene.sprites[0].attr=0x2547;memset(v.vram+0x547*32,0x55,32);
     memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
     draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
     scene.sprites[0].attr=0x2548;s_frame_zone=1;
     memset(out,0,sizeof out);memset(s_priority,0,sizeof out/4);
     draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[38]==pal[21]);
+    /* Mapping capture establishes ownership before publication. A reuse
+     * of the same tile range by a different mapping carries no such tag. */
+    SceneFrame *previous_capture=s_capture_frame;s_capture_frame=&scene;
+    scene.count=0;s_capture_slot=1;
+    word(g_rom,S3_MONKEY_MAP,2);word(g_rom,S3_MONKEY_MAP+2,1);
+    memset(g_rom+S3_MONKEY_MAP+4,0,6);
+    add_mapping(S3_MONKEY_MAP,0,0x548,0,0,0,0,0,256);
+    CHECK(scene.count==1 && (scene.sprites[0].size&0xD0)==SPRITE_MONKEY_ART);
+    word(g_rom,0x1000,2);word(g_rom,0x1002,1);memset(g_rom+0x1004,0,6);
+    add_mapping(0x1000,0,0x548,0,0,0,0,0,256);
+    CHECK(scene.count==2 && !(scene.sprites[1].size&SPRITE_MONKEY_ART));
+    s_capture_frame=previous_capture;
     s_display=old;s_frame_level=level;s_frame_zone=zone;
     s_aiz_monkey_ready=s_aiz_monkey_attempted=0;
 }
