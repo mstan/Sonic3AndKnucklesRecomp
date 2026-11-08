@@ -560,3 +560,11 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x009C68
 kind = "game_hook"
+
+# Grand Prix uses its own player-selection loop.
+[[widescreen_site]]
+addr = 0x00A344
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00A34A
+kind = "game_hook"

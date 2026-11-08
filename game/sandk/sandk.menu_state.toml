@@ -1,6 +1,8 @@
 # Retail menu wait calls and their exact continuations.
 [functions]
 extra = [
+    0x00B4AE,
+    0x00B4B4,
     0x003FCE,
     0x003FD2,
     0x003FF6,

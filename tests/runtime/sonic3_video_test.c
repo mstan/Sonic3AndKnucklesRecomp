@@ -2072,12 +2072,25 @@ static void test_blue_spheres(void)
     ss_capture();ss_begin(&v,1603);CHECK(ss_x==2);
     ss_begin(&v,398);CHECK(ss_ready && ss_width==398);
     ss_begin(&v,320);CHECK(ss_ready && ss_width==320);
-    /* Collision's collected-blue contact marker is not an uncollected
-     * sphere. A turn can keep it under the runner until it becomes red. */
+    /* A collected contact marker still has the original blue artwork.
+     * The guest changes it to red later; host visibility must not shorten
+     * that grace period, including during a turn. */
     memset(g_ram+native_board,0,1024);word(g_ram,0xE422,0);word(g_ram,0xE424,0);
+    write32(SS_EXTRA+10*8,0x1000);word(g_ram,SS_EXTRA+10*8+4,0x4002);
+    write32(SS_EXTRA+1*8,0x1000);word(g_ram,SS_EXTRA+1*8+4,0x0002);
+    uint32_t contact_blue[796],contact_grace[796],contact_palette[64]={0};
+    contact_palette[33]=0xFF4488EE;contact_palette[1]=0xFFEE4444;
     g_ram[native_board]=2;ss_capture();ss_begin(&v,796);CHECK(ss_count==1);
-    g_ram[native_board]=10;ss_capture();ss_begin(&v,796);CHECK(ss_count==0);
-    CHECK(g_ram[native_board]==10);
+    ss_scanline(&v,170,contact_blue,796,contact_palette,contact_palette,0);
+    CHECK(contact_blue[398]==contact_palette[33]);
+    g_ram[native_board]=10;memcpy(before,g_ram,sizeof before);
+    ss_capture();ss_begin(&v,796);CHECK(ss_count==1 && ss_spheres[0].kind==10);
+    ss_scanline(&v,170,contact_grace,796,contact_palette,contact_palette,0);
+    CHECK(!memcmp(contact_blue,contact_grace,sizeof contact_blue));
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    g_ram[native_board]=1;ss_capture();ss_begin(&v,796);
+    ss_scanline(&v,170,contact_grace,796,contact_palette,contact_palette,0);
+    CHECK(contact_grace[398]==contact_palette[1]);
     /* A sprite's visible base stays on its actual board intersection while
      * moving, turning and resizing. This would fail with the old separate
      * sphere-camera lift even though the ground's inverse test passed. */

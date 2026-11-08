@@ -37,10 +37,10 @@ int main(void)
      * surrounding guest stack or replaying the screen loader. */
 #ifdef SONIC3_STANDALONE
     const unsigned menus[][3]={{0x4C,0xBA8E,6},{0x38,0x96BE,6},
-        {0x3C,0x9C62,6},{0x40,0x9C62,6},{0xC0,0x9C62,6}};
+        {0x3C,0xA344,6},{0x40,0x9C62,6},{0xC0,0x9C62,6}};
 #else
     const unsigned menus[][3]={{4,0x41DA,4},{4,0x52B2,4},{4,0x5388,4},
-        {0x4C,0xC808,6},{0x38,0xA9EE,6},{0x3C,0xADF8,6},
+        {0x4C,0xC808,6},{0x38,0xA9EE,6},{0x3C,0xB4AE,6},
         {0x40,0xADF8,6},{0xC0,0xADF8,6}};
 #endif
     for (unsigned i=0;i<sizeof menus/sizeof menus[0];++i) {
@@ -62,6 +62,15 @@ int main(void)
         CHECK(s3_state_menu_instruction(wait+length));CHECK(g_cpu.PC==0);
         CHECK(!s3_state_at_boundary());
     }
+    /* Grand Prix and Match Race are separate handlers despite adjacent
+     * game modes. A wrong menu PC must not become an accepted boundary. */
+    g_ram[0xF600]=0x3C;
+#ifdef SONIC3_STANDALONE
+    s3_state_menu_instruction(0x9C62);
+#else
+    s3_state_menu_instruction(0xADF8);
+#endif
+    CHECK(!s3_state_at_boundary());
     CHECK(!s3_state_menu_instruction(0x123456));
     g_ram[0xF600]=0x34; /* SS does not have a Level_started_flag. */
     caller(special);CHECK(s3_state_at_boundary());

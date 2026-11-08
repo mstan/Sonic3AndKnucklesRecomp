@@ -149,12 +149,9 @@ static void ss_begin(const GVDP *v,int width)
     for(int iy=cy-ry;iy<=cy+ry;++iy)for(int ix=cx-rx;ix<=cx+rx;++ix) {
         unsigned kind=ss_board[((unsigned)iy&31)*32+((unsigned)ix&31)];
         if(!kind || kind>=SS_KINDS)continue;
-        /* Native collision marks a collected blue sphere as $A while its
-         * short contact grace period finishes, then changes it to red. Its
-         * old blue mapping lies inside the native near-plane rejection.
-         * The expanded projection must not resurrect it over the runner
-         * when the player turns before that grace period retires. */
-        if(kind==10)continue;
+        /* $A keeps its original blue contact artwork until the guest
+         * grace period converts it to red. It is still a drawable mapping:
+         * collection changes gameplay state before that artwork retires. */
         double dx=ix-ss_x,dy=iy-ss_y;
         double x=dx*ss_cos-dy*ss_sin,z=-dx*ss_sin-dy*ss_cos;
         if(z< -2 || z>10 || fabs(x)>extent)continue;
