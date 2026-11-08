@@ -68,6 +68,7 @@ code_addrs_file = "sonic3k.code_addrs.txt"
 #   python <engine>/tests/tools/gen_disasm_labels.py ../skdisasm/s3.lst \
 #       --max-addr 0x200000 --offset 0x200000 > sonic3k.disasm_labels_s3.toml
 discovery_files = [
+    "sonic3k.palette_commands.toml",
     "sonic3k.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3k.special_vint_sk.toml",

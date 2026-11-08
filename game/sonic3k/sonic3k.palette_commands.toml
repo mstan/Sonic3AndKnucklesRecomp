@@ -1,0 +1,3 @@
+# Native palette command trampolines in the engine and locked-on S3 bank.
+[functions]
+extra = [0x0859DA, 0x0859DE, 0x253F3A, 0x253F3E]

@@ -1,0 +1,3 @@
+# Native palette commands index these BRA.W entries from a biased PC base.
+[functions]
+extra = [0x0859DA, 0x0859DE]

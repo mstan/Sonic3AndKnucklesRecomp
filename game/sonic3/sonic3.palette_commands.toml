@@ -1,0 +1,4 @@
+# The palette script's -8/-12 commands index two BRA.W trampolines.
+# Its PC-relative base precedes the table, so discover both entries explicitly.
+[functions]
+extra = [0x053F3A, 0x053F3E]

@@ -26,6 +26,7 @@ output_prefix = "sonic3"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sonic3.code_addrs.txt"
 discovery_files = [
+    "sonic3.palette_commands.toml",
     "sonic3.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3.special_vint_s3.toml",

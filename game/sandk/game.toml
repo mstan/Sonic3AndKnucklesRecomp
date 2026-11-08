@@ -34,6 +34,7 @@ output_prefix = "sandk"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sandk.code_addrs.txt"
 discovery_files = [
+    "sandk.palette_commands.toml",
     "sandk.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sandk.special_vint_sk.toml",
