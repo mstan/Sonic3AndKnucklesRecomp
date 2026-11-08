@@ -613,17 +613,27 @@ static uint32_t scene_read32(unsigned a) { return ((uint32_t)scene_read16(a)<<16
 static void write8(unsigned a, unsigned v) { glue_poke8(0xFF0000u|(a&65535u),(uint8_t)v); }
 static void write16(unsigned a, unsigned v) { glue_poke16(0xFF0000u|(a&65535u),(uint16_t)v); }
 static void write32(unsigned a, unsigned v) { glue_poke32(0xFF0000u|(a&65535u),v); }
+static int scene_view_left(int camera,int w,unsigned join,int physical_width,
+                           unsigned zone,unsigned act)
+{
+#ifndef SONIC3_STANDALONE
+    /* The flying scene continues beyond its finite scenery layout. Keep
+     * actors, activation and presentation centered on the native camera. */
+    if(zone==0x0C && !act)return camera-(w-320)/2;
+#else
+    (void)zone;(void)act;
+#endif
+    return aiz_join_left(camera,w,join,physical_width);
+}
 static int view_left(int camera, int w)
 {
-    int end = stage_width()-w, left = camera-(w-320)/2;
-    if (end<0) return end/2;
-    if (left<0) left=0;
-    return left>end ? end : left;
+    return scene_view_left(camera,w,0,stage_width(),g_ram[0xFE10],g_ram[0xFE11]);
 }
 int s3_video_presentation_camera_x(int camera)
 {
     if(s_mode==VIDEO_OFF || s_requested_width<=320)return camera;
-    return aiz_join_left(camera,s_requested_width,aiz_join_tag(g_ram),stage_width())+
+    return scene_view_left(camera,s_requested_width,aiz_join_tag(g_ram),stage_width(),
+        g_ram[0xFE10],g_ram[0xFE11])+
         (s_requested_width-320)/2;
 }
 static void activation_bounds(int camera,int w,int *lo,int *hi)
@@ -1914,7 +1924,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int object_y=owned_camera?s_display->camera_y:s_frame_fg_y;
         s_camera=level?presentation_camera(0,installed_camera?camera:object_x):camera;
         s_camera_y=level?presentation_camera(1,installed_camera?camera_y:object_y):camera_y;if(!s_interpolating)++s_frames;
-        s_left=level?aiz_join_left(s_camera,width,s_display?s_display->aiz_join:0,s_stage_width):
+        s_left=level?scene_view_left(s_camera,width,s_display?s_display->aiz_join:0,
+            s_stage_width,s_frame_zone,s_frame_act):
             camera-(width-nw)/2;
         if(level && s_display && s_display->preview_knux) {
             /* This AIZ2 waiting phase adds only 0/1px heat offsets to A.

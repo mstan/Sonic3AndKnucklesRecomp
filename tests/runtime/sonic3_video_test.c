@@ -1132,6 +1132,43 @@ static void test_imported_pylon_wrap(void)
     }
     CHECK(configure("off"));
 }
+static void test_doomsday_scrolling_viewport(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;uint32_t native[320]={0},out[796];
+    const int cameras[]={0,0x9B5,0x4000};
+    for(int ratio=0;ratio<2;++ratio)for(unsigned k=0;k<3;++k) {
+        CHECK(configure("off"));CHECK(configure(ratio?"32:9":"16:9"));
+        int canvas=width(3200,900,320,224),camera=cameras[k],origin=(canvas-320)/2;
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        g_ram[0xF600]=12;g_ram[0xF711]=1;word(g_ram,0xFE10,0x0C00);
+        /* The flying scene scrolls beyond its small scenery layout. */
+        word(g_ram,0x8000,20);word(g_ram,0x8008,0x8088);
+        word(g_ram,0xEE78,camera);word(g_ram,0xEE80,camera);
+        word(g_ram,0xEE7C,160);word(g_ram,0xEE84,160);word(g_ram,0xEEAA,0xFFF);
+        write32(0xB000,0x10A94);g_ram[0xB004]=132;g_ram[0xB006]=g_ram[0xB007]=24;
+        word(g_ram,0xB010,camera+138);word(g_ram,0xB014,260);
+        word(g_ram,0xB00A,0x8001);write32(0xB00C,0x100000);
+        word(g_rom,0x100000,2);word(g_rom,0x100002,1);
+        word(g_rom,0x100004,0);word(g_rom,0x100006,0);word(g_rom,0x100008,0);
+        word(g_ram,0xAD00,2);word(g_ram,0xAD02,0xB000);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;
+        memset(v.vram+32,0x11,32);word(v.vram,0xF000,-camera);
+        uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+        capture_objects();publish_sprites();s3_video_vblank();
+        memcpy(v.vram+0xF800,g_ram+0xF800,640);
+        scanline(&v,0,native,320,out,canvas);scanline(&v,100,native,320,out,canvas);
+        for(int x=0;x<8;++x)CHECK(out[origin+138+x]==0xFFFF0000u);
+        CHECK(s_left==camera-origin && s3_video_presentation_camera_x(camera)==camera);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        /* Finite ordinary levels retain their existing edge clamp. */
+        g_ram[0xFE10]=7;
+        if(camera>2560)CHECK(view_left(camera,canvas)==2560-canvas);
+    }
+    CHECK(configure("off"));
+#endif
+}
 static void test_uploaded_scene_camera(void)
 {
     static GVDP v;uint32_t native[320]={0},out[398];
@@ -2813,7 +2850,7 @@ int main(int argc,char **argv)
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
-    test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_uploaded_scene_camera();
+    test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
