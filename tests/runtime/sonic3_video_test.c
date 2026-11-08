@@ -167,6 +167,12 @@ static void test_hcz_rush_extent(void)
             }
         }
     }
+    /* The higher opening gains margin-only brick fill, clipped by the
+     * foreground roof even when its native tiles have low priority. */
+    memset(out,0,sizeof out);memset(s_priority,0,1603);
+    s_priority[641+400]=4;
+    draw_scene_sprites(&v,16,out,1603,641,pal);
+    CHECK(out[641+350]==pal[33] && !out[641+400]);
     unsigned count=s_build.count;s_requested_width=320;
     extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);CHECK(s_build.count==count);
     s_requested_width=796;g_ram[0xFE11]=1;
@@ -174,6 +180,35 @@ static void test_hcz_rush_extent(void)
     g_ram[0xFE11]=0;
     extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,5,0x40,80,256);CHECK(s_build.count==count);
     s_display=old;CHECK(configure("off"));
+}
+static void test_hcz_brick_fractional_phase(void)
+{
+    static GVDP v;uint32_t out[796],palette[64]={0};
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(&v,0,sizeof v);memset(&s_build,0,sizeof s_build);
+    for(unsigned col=0;col<4;col++)for(unsigned row=0;row<4;row++)
+        memset(v.vram+(1+col*4+row)*32,(int)((col+1)*17),32);
+    for(unsigned n=1;n<=4;n++)palette[n]=0xFF000000u+n;
+    s_build.scene=1;s_build.count=1;s_build.sprites[0].x=320;
+    s_build.sprites[0].y=0;s_build.sprites[0].size=0x2F;
+    s_build.sprites[0].attr=1;s_build.sprites[0].zoom=256;s_build.sprites[0].slot=1;
+    const SceneFrame *old=s_display;s_display=&s_build;
+    memset(&ix_previous()->scene,0,sizeof ix_previous()->scene);
+    memset(&ix_current()->scene,0,sizeof ix_current()->scene);
+    memset(ix_current()->pattern_bytes,0,sizeof ix_current()->pattern_bytes);
+    memset(ix_current()->sprite_lines,0,sizeof ix_current()->sprite_lines);
+    ix_previous()->scene.code[1]=ix_current()->scene.code[1]=1;
+    ix_previous()->scene.ox[1]=0;ix_current()->scene.ox[1]=32;
+    s_camera=s_camera_y=0;s_interpolating=1;
+    for(unsigned phase=1;phase<4;phase++) {
+        s_interpolation_phase=phase*.25;
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,palette);
+        /* Advancing a32px repeating brick field must not slide its texture
+         * by8/16/24px between native frames. Its leading edge still moves. */
+        CHECK(out[558]==palette[1]);
+    }
+    s_interpolating=0;s_display=old;CHECK(configure("off"));
 }
 static void test_object_zoom(void)
 {
@@ -2679,7 +2714,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();

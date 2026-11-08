@@ -663,6 +663,10 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         uint16_t attr=(uint16_t)(scene_read16(p+2)+gfx);
         if(flags&1){dx=-dx-(((size>>2)&3)+1)*8;attr^=0x800;}
         if(flags&2){dy=-dy-((size&3)+1)*8;attr^=0x1000;}
+        /* A full brick repeats every32px while the water front advances.
+         * Its coverage moves; fractional drawing keeps the texture in world phase. */
+        if(map==S3_HCZ_RUSH_MAP && size==15 && zoom==256 &&
+           (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30))size|=0x20;
         dx=zoom_offset(dx,zoom);dy=zoom_offset(dy,zoom);
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
@@ -687,9 +691,8 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
 {
     if(map!=S3_HCZ_RUSH_MAP || frame>3 || flags!=4 || ram16(0xFE10)!=0x100 ||
        !enabled() || s_requested_width<=320 || (zoom && zoom!=256))return;
-    /* The original moving water is a finite strip of blue brick sprites.
-     * Repeat each row's last full brick through the wide margin, up to the
-     * native current's retirement point. Keep the native viewport verbatim. */
+    /* The moving front owns a finite field of32px blue bricks. Continue
+     * those original patterns in the margins, stopping at native retirement. */
     unsigned p=map+(int16_t)scene_read16(map+frame*2),count=scene_read16(p);p+=2;
     if(count>32)return;
     int end=0x980-ram16(0xEE78),right=(s_requested_width+320+1)/2;
@@ -697,17 +700,31 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
     for(unsigned n=0;n<count;++n) {
         unsigned piece=p+n*6,attr=scene_read16(piece+2);
         if(scene_read8(piece+1)!=15 || (attr!=0x18 && attr!=0x30))continue;
-        int dy=(int8_t)scene_read8(piece),dx=(int16_t)scene_read16(piece+4),last=1;
+        int dy=(int8_t)scene_read8(piece),dx=(int16_t)scene_read16(piece+4),last=1,top=1,first=dx;
         for(unsigned k=0;k<count;++k) {
-            unsigned other=p+k*6;
-            if(scene_read8(other)==scene_read8(piece) && scene_read8(other+1)==15 &&
-               scene_read16(other+2)==attr && (int16_t)scene_read16(other+4)>dx)last=0;
+            unsigned other=p+k*6,oa=scene_read16(other+2);
+            if(scene_read8(other+1)!=15 || (oa!=0x18 && oa!=0x30))continue;
+            int oy=(int8_t)scene_read8(other),ox=(int16_t)scene_read16(other+4);
+            if(oy<dy)top=0;
+            if(oy==dy && oa==attr){if(ox>dx)last=0;if(ox<first)first=ox;}
         }
         if(!last || y+dy>=224 || y+dy+32<=0)continue;
         for(int sx=x+dx+32;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
             SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
             q->x=sx;q->y=y+dy;q->attr=(uint16_t)(gfx+attr);
-            q->size=0x4F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+            q->size=0x6F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+        }
+        /* The corridor roof rises partway through the flow. Fill above the
+         * first row as well; the real foreground opacity clips its roof.
+         * Bit4 marks this roof fill, bit5 the repeating texture, bit6 margins. */
+        if(top)for(int sy=y+dy-32;sy+32>0;sy-=32) {
+            int sx=x+first,margin=(s_requested_width-320)/2;
+            while(sx+32<=-margin)sx+=32;
+            for(;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
+                SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
+                q->x=sx;q->y=sy;q->attr=(uint16_t)(gfx+attr);
+                q->size=0x7F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+            }
         }
     }
 }
@@ -1423,6 +1440,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
          * coordinates; otherwise stationary rings jitter with the camera. */
         if(world)base+=s_display->camera_x-s_camera;
         int iy=(line-y)*256/(int)zoom;
+        if(s->size&0x20u)iy=(iy+dy)&31;
         if(s->attr&0x1000)iy=ch*8-1-iy;
         for(int i=0;i<drawn_width;++i) {
             int x=base+i;
@@ -1432,7 +1450,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                                  x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
+            if((s->size&0xD0u)==0x50u && (s_priority[x]&4u))continue;
             int ix=i*256/(int)zoom;
+            if(s->size&0x20u)ix=(ix+dx)&31;
             if(s->attr&0x800)ix=cw*8-1-ix;
             uint16_t cell=(uint16_t)((s->attr&0xE000u)|
                 (((s->attr&2047u)+(unsigned)(ix/8*ch+iy/8))&2047u));
@@ -2121,6 +2141,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
+        if(level && s_frame_zone==1 && !s_frame_act && ap)s_priority[x]|=4u;
         /* The authored transition viewport has no high-priority tree
          * canopy in front of its flame curtain. Expanded margins do: let
          * the opaque high-priority flames cover that extra scenery too.
