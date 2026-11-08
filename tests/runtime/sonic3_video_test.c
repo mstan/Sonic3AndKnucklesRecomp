@@ -2094,9 +2094,9 @@ static void test_blue_spheres(void)
     g_ram[native_board]=1;ss_capture();ss_begin(&v,796);
     ss_scanline(&v,155,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(contact_grace[398]==contact_palette[1]);
-    /* A sprite's visible base stays on its actual board intersection while
-     * moving, turning and resizing. This would fail with the old separate
-     * sphere-camera lift even though the ground's inverse test passed. */
+    /* Preserve the original mapping-center registration while moving,
+     * turning and resizing. Opaque distance-frame radii vary; aligning their
+     * bottoms instead moves the art relative to the fixed character. */
     uint32_t checker[1600],checker_colors[64]={0};
     checker_colors[56]=0xFF00FFFF;checker_colors[60]=0xFFFF00FF;
     for(unsigned turn=0;turn<8;++turn)for(unsigned motion=0;motion<3;++motion)
@@ -2117,9 +2117,8 @@ static void test_blue_spheres(void)
             if(distance<nearest){nearest=distance;sphere=&ss_spheres[n];}
         }
         CHECK(sphere!=NULL);
-        CHECK(ss_texture_floor[2][sphere->lod]==48);
         CHECK(fabs(sphere->x+sphere->w*.5-(px+(canvas-1)*.5))<=.501);
-        CHECK(fabs(sphere->y+48*sphere->h/64.0-py)<=.501);
+        CHECK(fabs(sphere->y+sphere->h*.5-(py-5))<=.501);
         /* Render the four quadrants around this object's board position.
          * Opposite quadrants must match and adjacent ones must differ. This
          * checks the actual checkerboard phase, not just projection algebra. */

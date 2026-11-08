@@ -32,7 +32,6 @@ static int ss_width,ss_ready;
 static double ss_stretch,ss_sin,ss_cos,ss_x,ss_y;
 static uint8_t ss_board[1024],ss_texture[SS_KINDS][16][SS_TEXTURE*SS_TEXTURE];
 static uint16_t ss_texture_ready[SS_KINDS];
-static uint8_t ss_texture_floor[SS_KINDS][16];
 static unsigned ss_color_phase,ss_clear;
 static uint8_t ss_state[65536];
 static int ss_latched;
@@ -84,8 +83,8 @@ static int ss_project(double x,double z,double stretch,double *px,double *py,dou
     double h=ss_radius-sqrt(rad),d=ss_distance+z+ss_pitch*h;
     if(d<=.4)return 0;
     /* Project the point on the grid, using the exact inverse-camera model.
-     * Sprite artwork is anchored to this contact point after choosing its
-     * native distance frame; a second fitted camera lift makes it float. */
+     * Native distance frames keep their mapping origin above this point;
+     * their changing opaque radius is not a second camera. */
     *px=ss_focal*x/d;*py=112+ss_focal*(ss_ground_lift-ss_pitch*z+h)/d;*depth=d;
     return 1;
 }
@@ -101,7 +100,6 @@ static void ss_load_texture(const GVDP *v,unsigned kind,unsigned lod)
     unsigned frame=(anim&0x7FFF)+((anim&0x8000)?0:lod);
     unsigned gfx=ss_word(ss_state,entry+4);
     memset(ss_texture[kind][lod],0,sizeof ss_texture[kind][lod]);
-    ss_texture_floor[kind][lod]=32;
     ss_texture_ready[kind]|=(uint16_t)(1u<<lod);
     if(map>=0x400000u || frame>255)return;
     unsigned p=map+(int16_t)ss_rom_word(map+frame*2),count=ss_rom_word(p);p+=2;
@@ -120,10 +118,6 @@ static void ss_load_texture(const GVDP *v,unsigned kind,unsigned lod)
             if(pixel)ss_texture[kind][lod][ty*SS_TEXTURE+tx]=(uint8_t)(((attr>>9)&48)|pixel);
         }
     }
-    /* Native distance frames have different radii, and ring frames differ
-     * from sphere frames. Transparent 64px canvas padding is not geometry. */
-    for(unsigned y=0;y<SS_TEXTURE;++y)for(unsigned x=0;x<SS_TEXTURE;++x)
-        if(ss_texture[kind][lod][y*SS_TEXTURE+x])ss_texture_floor[kind][lod]=(uint8_t)(y+1);
 }
 static void ss_begin(const GVDP *v,int width)
 {
@@ -170,7 +164,10 @@ static void ss_begin(const GVDP *v,int width)
         if(size>256)size=256;
         if(!(ss_texture_ready[kind]&(1u<<lod)))ss_load_texture(v,kind,(unsigned)lod);
         int sx=(int)floor(px+(width-1)*.5-size*.5+.5);
-        int sy=(int)floor(py-ss_texture_floor[kind][lod]*size/64.0+.5);
+        /* Original near-center projection anchors are five rows above the
+         * checker intersection. Register the mapping center, rather than
+         * moving every distance frame until its opaque bottom touches it. */
+        int sy=(int)floor(py-5-size*.5+.5);
         if(sx>=width || sx+size<=0 || sy>=SS_HEIGHT || sy+size<=0)continue;
         if(ss_count==ss_capacity) {
             unsigned capacity=ss_capacity?ss_capacity*2:512;
