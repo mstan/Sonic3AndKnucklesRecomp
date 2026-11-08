@@ -34,6 +34,7 @@ output_prefix = "sandk"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sandk.code_addrs.txt"
 discovery_files = [
+    "sandk.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sandk.special_vint_sk.toml",
     "sandk.disasm_labels.toml",       # 18,946 code labels + 394 interior seeds
@@ -561,4 +562,84 @@ kind = "game_hook"
 # Original queued Kosinski execution; VBlank owns its resumable return PC.
 [[widescreen_site]]
 addr = 0x1C1A
+kind = "game_hook"
+
+# Flush live native CPU registers at resumable menu waits.
+[[widescreen_site]]
+addr = 0x003FCE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FD2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FF6
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FFA
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004064
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004068
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0040B0
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0040B4
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004130
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004134
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0041DA
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0041DE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005218
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00521C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0052B2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0052B6
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005356
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00535A
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005388
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00538C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C808
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C80E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00A9EE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00A9F4
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00ADF8
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00ADFE
 kind = "game_hook"

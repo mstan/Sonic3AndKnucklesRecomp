@@ -85,7 +85,7 @@ static uint32_t s3_save_resume_pc(uint8_t game_mode)
         case 0x08:
         case 0x0C: return 0x004B0Cu;
         case 0x34: return 0x0077D2u;
-        default: return 0;
+        default: return s3_state_resume_pc(game_mode);
     }
 }
 static void s3_call_resume(uint32_t pc)
@@ -93,7 +93,7 @@ static void s3_call_resume(uint32_t pc)
     uint32_t sp=s_startup_resume_sp, after=s_startup_after_palette;
     s_startup_resume_sp=0; s_startup_after_palette=0;
     if (sp) g_cpu.A[7]=sp;
-    recomp_call_addr(pc);
+    s3_state_call_resume(pc);
     if (sp && after) recomp_call_addr(after);
 }
 
@@ -278,6 +278,7 @@ static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ra
 static int gameplay_instruction(uint32_t pc)
 {
     s3_startup_wait_hook(pc);
+    if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);

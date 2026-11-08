@@ -56,6 +56,7 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static int s3k_instruction(uint32_t pc)
 {
+    if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
@@ -249,6 +250,7 @@ const GameSpec g_game_spec = {
     .state_size             = s3_state_size,
     .state_save             = s3_state_save,
     .state_load             = s3_state_load,
+    .call_resume            = s3_state_call_resume,
     .state_at_boundary      = s3_state_at_boundary,
     .save_resume_pc         = s3_state_resume_pc,
     .video                  = &sonic3_video,

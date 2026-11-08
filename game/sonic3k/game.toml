@@ -68,6 +68,7 @@ code_addrs_file = "sonic3k.code_addrs.txt"
 #   python <engine>/tests/tools/gen_disasm_labels.py ../skdisasm/s3.lst \
 #       --max-addr 0x200000 --offset 0x200000 > sonic3k.disasm_labels_s3.toml
 discovery_files = [
+    "sonic3k.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3k.special_vint_sk.toml",
     "sonic3k.special_vint_s3.toml",
@@ -1044,3 +1045,83 @@ kind = "game_hook"
 addr = 0x00C402 # Megamix Write_SaveGame+1E
 kind = "game_hook"
 # END megamix geometry hooks
+
+# Flush live native CPU registers at resumable menu waits.
+[[widescreen_site]]
+addr = 0x003FCE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FD2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FF6
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x003FFA
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004064
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004068
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0040B0
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0040B4
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004130
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x004134
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0041DA
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0041DE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005218
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00521C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0052B2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0052B6
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005356
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00535A
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x005388
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00538C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C808
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00C80E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00A9EE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00A9F4
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00ADF8
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00ADFE
+kind = "game_hook"

@@ -16,6 +16,60 @@ enum { LEVEL_LOOP = 0x650C, LEVEL_WAIT_RETURN = 0x6520, PAUSE_WAIT_RETURN = 0x14
        SPECIAL_LOOP = 0x84C2, SPECIAL_WAIT_RETURN = 0x84D6 };
 #endif
 
+/* A menu resume must preserve the parked guest call, not run its loader.
+ * Addresses and instruction lengths match the pinned retail listings. */
+typedef struct { unsigned mode, wait, length; } MenuWait;
+static const MenuWait menu_waits[] = {
+#ifdef SONIC3_STANDALONE
+    {0x4C,0xBA8E,6}, {0x38,0x96BE,6}, {0x3C,0x9C62,6}
+#else
+    {4,0x3FCE,4}, {4,0x3FF6,4}, {4,0x4064,4}, {4,0x40B0,4},
+    {4,0x4130,4}, {4,0x41DA,4}, {4,0x5218,4}, {4,0x52B2,4},
+    {4,0x5356,4}, {4,0x5388,4},
+    {0x4C,0xC808,6}, {0x38,0xA9EE,6}, {0x3C,0xADF8,6}
+#endif
+};
+static uint32_t menu_resume_sp;
+static unsigned menu_mode(unsigned mode)
+{
+    return mode == 0x40 || mode == 0xC0 ? 0x3C : mode;
+}
+static const MenuWait *menu_wait(unsigned mode, uint32_t pc)
+{
+    for (unsigned i=0;i<sizeof menu_waits/sizeof menu_waits[0];++i)
+        if (menu_waits[i].mode==menu_mode(mode) && menu_waits[i].wait==pc)
+            return &menu_waits[i];
+    return NULL;
+}
+static int menu_boundary(void)
+{
+    const MenuWait *wait=menu_wait(g_ram[0xF600],g_cpu.PC);
+    uint32_t sp=g_cpu.A[7];
+    if (!wait || (sp&1u) || sp<0xFFFD00u || sp>0xFFFE00u) return 0;
+    unsigned off=sp&65535u;
+    uint32_t caller=((uint32_t)g_ram[off]<<24)|((uint32_t)g_ram[off+1]<<16)|
+                    ((uint32_t)g_ram[off+2]<<8)|g_ram[off+3];
+    return caller==wait->wait+wait->length;
+}
+int s3_state_menu_instruction(uint32_t pc)
+{
+    for (unsigned i=0;i<sizeof menu_waits/sizeof menu_waits[0];++i) {
+        const MenuWait *wait=&menu_waits[i];
+        if (pc!=wait->wait && pc!=wait->wait+wait->length) continue;
+        if (wait->mode==menu_mode(g_ram[0xF600]))
+            g_cpu.PC=pc==wait->wait ? pc : 0;
+        return 1;
+    }
+    return 0;
+}
+void s3_state_call_resume(uint32_t pc)
+{
+    uint32_t sp=menu_resume_sp;
+    menu_resume_sp=0;
+    if (sp) g_cpu.A[7]=sp;
+    recomp_call_addr(pc);
+}
+
 static void state(S3StateIO *io)
 {
     unsigned version = 3;
@@ -42,7 +96,8 @@ static int ready(void)
     /* The standalone adapter also maps its Sega/title wait continuations. */
     if (mode == 4) return 1;
 #endif
-    if (mode != 0x34 && (mode != 0x0C || !g_ram[0xF711])) return 0;
+    if (!menu_wait(mode,g_cpu.PC) && mode != 0x34 &&
+        (mode != 0x0C || !g_ram[0xF711])) return 0;
 #ifndef SONIC3_STANDALONE
     if (!s3_army_state_ready()) return 0;
 #endif
@@ -52,6 +107,7 @@ int s3_state_at_boundary(void)
 {
     unsigned sp = g_cpu.A[7] & 65535;
     if (!ready() || sp > 65532) return 0;
+    if (menu_wait(g_ram[0xF600],g_cpu.PC)) return menu_boundary();
     uint32_t caller = ((uint32_t)g_ram[sp] << 24) | ((uint32_t)g_ram[sp+1] << 16) |
         ((uint32_t)g_ram[sp+2] << 8) | g_ram[sp+3];
     /* SS initialization/fades also wait for VBlank. Only its established
@@ -61,6 +117,12 @@ int s3_state_at_boundary(void)
 }
 uint32_t s3_state_resume_pc(uint8_t mode)
 {
+    menu_resume_sp=0;
+    if (menu_wait(mode,g_cpu.PC) && menu_boundary()) {
+        /* Re-entering the saved JSR/BSR recreates only its own return slot. */
+        menu_resume_sp=g_cpu.A[7]+4;
+        return g_cpu.PC;
+    }
     return mode == 0x0C ? LEVEL_LOOP : mode == 0x34 ? SPECIAL_LOOP : 0;
 }
 int s3_state_save(void *data, size_t size)

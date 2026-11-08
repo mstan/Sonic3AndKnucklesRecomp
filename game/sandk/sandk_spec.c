@@ -56,23 +56,6 @@ static const struct RecompLauncherCModProvider *sandk_mods(const struct RecompLa
 static int sandk_netplay_allowed(void) { return s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
-/* Mode-aware save-state resume (sonic3k.lst, org 0):
- *   GM $0C Level / $08 Demo -> LevelLoop ($00650C): the per-frame loop top.
- *     Re-entering here continues the level moment-in-time from restored RAM.
- *   GM $34 -> SpecialStage's established per-frame loop ($0084C2).
- *   Anything else (Sega/title/menus, bonus-stage init) -> 0: fall back to
- *   GameLoop dispatch, which re-runs the mode handler â€” those states WANT
- *   their init. */
-static uint32_t sandk_save_resume_pc(uint8_t game_mode)
-{
-    switch (game_mode) {
-        case 0x08:
-        case 0x0C: return 0x00650Cu;   /* LevelLoop */
-        case 0x34: return s3_state_resume_pc(game_mode);
-        default:   return 0u;
-    }
-}
-
 /* ---- 68K work-RAM accessors ---- */
 
 #if OWN_BACKEND
@@ -240,6 +223,7 @@ static const GameDebugCommand sandk_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    if (s3_state_menu_instruction(pc)) return 0;
     /* Startup uses the original queued program and VBlank's saved return PC.
      * Keep the incoming fade and overlapping title modules on that clock. */
     if(s3_kos_owns(pc) &&
@@ -260,6 +244,7 @@ const GameSpec g_game_spec = {
     .state_size             = s3_state_size,
     .state_save             = s3_state_save,
     .state_load             = s3_state_load,
+    .call_resume            = s3_state_call_resume,
     .state_at_boundary      = s3_state_at_boundary,
     .video                  = &sonic3_video,
     .video_default          = "fit",
@@ -289,7 +274,7 @@ const GameSpec g_game_spec = {
     .call_vblank            = sandk_call_vblank,
     .call_hblank            = sandk_call_hblank,
     .resume_main_loop_pc    = 0x0004B6u,   /* GameLoop â€” fallback for modes without a loop map */
-    .save_resume_pc         = sandk_save_resume_pc,   /* mode -> per-frame loop top */
+    .save_resume_pc         = s3_state_resume_pc,
     .dispatch_main_loop_pc  = 0x0004B6u,   /* GameLoop */
     .call_periodic          = NULL,
 

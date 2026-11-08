@@ -26,6 +26,7 @@ output_prefix = "sonic3"
 annotations     = "annotations_from_disasm.csv"
 code_addrs_file = "sonic3.code_addrs.txt"
 discovery_files = [
+    "sonic3.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3.special_vint_s3.toml",
     "sonic3.startup_state.toml",       # native startup state continuations
@@ -538,4 +539,24 @@ kind = "game_hook"
 
 [[widescreen_site]]
 addr = 0x38E2
+kind = "game_hook"
+
+# Flush live native CPU registers at resumable menu waits.
+[[widescreen_site]]
+addr = 0x00BA8E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x00BA94
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0096BE
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x0096C4
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x009C62
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x009C68
 kind = "game_hook"

@@ -8,6 +8,8 @@
 M68KState g_cpu;
 uint8_t g_ram[65536];
 static int actor_ready=1;
+static unsigned called_pc,called_sp;
+void recomp_call_addr(uint32_t pc) { called_pc=pc;called_sp=g_cpu.A[7]; }
 static unsigned marker=17;
 void s3_video_state(S3StateIO *io) { S3_STATE(io,marker); }
 void s3_video_state_loaded(void) {}
@@ -30,6 +32,37 @@ int main(void)
 #else
     const unsigned level=0x6520,special=0x84D6,pause=0x143A,loop=0x84C2;
 #endif
+    /* Exact retail call lengths matter: menus use both JSR.l and BSR.w.
+     * A restored menu must recreate its wait slot without resetting the
+     * surrounding guest stack or replaying the screen loader. */
+#ifdef SONIC3_STANDALONE
+    const unsigned menus[][3]={{0x4C,0xBA8E,6},{0x38,0x96BE,6},
+        {0x3C,0x9C62,6},{0x40,0x9C62,6},{0xC0,0x9C62,6}};
+#else
+    const unsigned menus[][3]={{4,0x41DA,4},{4,0x52B2,4},{4,0x5388,4},
+        {0x4C,0xC808,6},{0x38,0xA9EE,6},{0x3C,0xADF8,6},
+        {0x40,0xADF8,6},{0xC0,0xADF8,6}};
+#endif
+    for (unsigned i=0;i<sizeof menus/sizeof menus[0];++i) {
+        unsigned mode=menus[i][0],wait=menus[i][1],length=menus[i][2];
+        g_ram[0xF600]=(uint8_t)mode;g_cpu.PC=0;
+        CHECK(s3_state_menu_instruction(wait));CHECK(g_cpu.PC==wait);
+        g_cpu.A[7]=0xFFFDF8;
+        for(unsigned b=0;b<4;++b)g_ram[0xFDF8+b]=(uint8_t)((wait+length)>>(24-b*8));
+        CHECK(s3_state_at_boundary());
+        CHECK(s3_state_resume_pc((uint8_t)mode)==wait);
+        g_cpu.A[7]=0xFFFE00; /* Engine fiber reset uses initial SSP. */
+        s3_state_call_resume(wait);
+        CHECK(called_pc==wait && called_sp==0xFFFDFC);
+        g_cpu.A[7]=0xFFFE00;s3_state_call_resume(wait);
+        CHECK(called_sp==0xFFFE00); /* No stale continuation on another load. */
+        g_cpu.A[7]=0xFFFDF9;CHECK(!s3_state_at_boundary());
+        g_cpu.A[7]=0xFFFDF8;g_ram[0xFDFB]^=2;CHECK(!s3_state_at_boundary());
+        CHECK(!s3_state_resume_pc((uint8_t)mode));g_ram[0xFDFB]^=2;
+        CHECK(s3_state_menu_instruction(wait+length));CHECK(g_cpu.PC==0);
+        CHECK(!s3_state_at_boundary());
+    }
+    CHECK(!s3_state_menu_instruction(0x123456));
     g_ram[0xF600]=0x34; /* SS does not have a Level_started_flag. */
     caller(special);CHECK(s3_state_at_boundary());
     caller(pause);CHECK(s3_state_at_boundary());
