@@ -609,6 +609,16 @@ static void test_competition_character_palette(void)
         CHECK(out[198]==genesis_dac_cram_to_argb((uint16_t)expected[phase],GENESIS_DAC_NORMAL));
         CHECK(out[237]==0 && out[238]==0);
     }
+    /* Low-priority characters retain native shadow/highlight dimming after
+     * their card leaves the hardware viewport. The selected sprite stays lit. */
+    v.cram[17]=0xEEE;v.reg[12]=8;
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[198]==genesis_dac_cram_to_argb(0x84E,GENESIS_DAC_SHADOW));
+    scene.sprites[0].attr|=0x8000;memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[198]==genesis_dac_cram_to_argb(0x84E,GENESIS_DAC_NORMAL));
+    scene.sprites[0].attr&=~0x8000;v.reg[12]=0;
     /* An identical tile in unrelated mappings keeps its installed palette. */
     scene.sprites[0].hud=3;memset(out,0,sizeof out);memset(s_priority,0,796);
     draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[198]==pal[34]);

@@ -1423,7 +1423,7 @@ static int title_card_black(const GVDP *v)
 /* The stage thumbnail borrows the character bank after its card leaves
  * the hardware viewport. Margin portraits retain their original menu colours.
  * The unchanged Sonic white entry identifies both original B/G/R fades. */
-static uint32_t competition_character_color(const GVDP *v,unsigned pixel)
+static uint32_t competition_character_color(const GVDP *v,unsigned pixel,unsigned attr)
 {
     if(pixel<16 || pixel>=64)return genesis_dac_cram_to_argb(v->cram[pixel&63],GENESIS_DAC_NORMAL);
     unsigned color=scene_read16(S3_ART_BANK+0xA55E + (pixel-16)*2);
@@ -1436,7 +1436,8 @@ static uint32_t competition_character_color(const GVDP *v,unsigned pixel)
         unsigned used=steps<n?steps:n;steps-=used;
         faded|=(incoming?used*2:part-used*2)<<(unsigned)shift;
     }
-    return genesis_dac_cram_to_argb((uint16_t)faded,GENESIS_DAC_NORMAL);
+    unsigned shade=(v->reg[12]&8u) && !(attr&0x8000u)?GENESIS_DAC_SHADOW:GENESIS_DAC_NORMAL;
+    return genesis_dac_cram_to_argb((uint16_t)faded,(int)shade);
 }
 static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                                int origin,const uint32_t *palette)
@@ -1534,7 +1535,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             /* extended sprite lines (game-added art keeping its own colours) */
             int ext=s->hud==5?0:presentation_sprite_line(s->size,cell&2047u,p>>4);
             uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):
-                s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p):palette[p];
+                s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p,s->attr):palette[p];
             /* Screen-relative coordinates are not HUD priority: AIZ2's
              * small Eggman must still pass behind the high tree canopy. */
             if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
