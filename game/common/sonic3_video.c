@@ -492,7 +492,7 @@ static int load_menu_map(void)
  * for the hardware pass and publishes a signature used to align our list
  * with the exact VBlank upload displayed by the VDP. */
 typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom,slot; } SceneSprite;
-enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112 };
+enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12 };
 /* Only render ownership survives the original off-left deletion. Original
  * mappings/art remain in ROM; no guest object or provider pointer is held. */
 typedef struct { int16_t x,y; uint8_t frame,cursor,timer,flip; } AizPlaneObject;
@@ -1003,6 +1003,8 @@ static void capture_objects(void)
              * viewport too. Keep their original mappings through the margin. */
             unsigned mode=g_ram[0xF600]&127;
             if(!(flags&4) && mode>=0x38 && mode<=0x44)anchor=3;
+            if(anchor==3 && map==S3_ART_BANK+0x1A1AEE)
+                anchor=SCENE_COMPETITION_CHARACTER;
             /* Data Select queues every card, including those culled by the
              * native SAT builder. Preserve their signed carousel positions. */
             if(map==S3_FILE_SELECT_MAP)anchor=4;
@@ -1297,6 +1299,24 @@ static int title_card_black(const GVDP *v)
         if(v->vram[(a+i)&65535u] || v->vram[(b+i)&65535u])return 0;
     return 1;
 }
+/* The stage thumbnail borrows the character bank after its card leaves
+ * the hardware viewport. Margin portraits retain their original menu colours.
+ * The unchanged Sonic white entry identifies both original B/G/R fades. */
+static uint32_t competition_character_color(const GVDP *v,unsigned pixel)
+{
+    if(pixel<16 || pixel>=64)return genesis_dac_cram_to_argb(v->cram[pixel&63],GENESIS_DAC_NORMAL);
+    unsigned color=scene_read16(S3_ART_BANK+0xA55E+(pixel-16)*2);
+    unsigned white=v->cram[17],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
+    int incoming=((white>>8)&14)>=(white&14);
+    if(!incoming)steps=21-steps;
+    unsigned faded=0;
+    for(int shift=8;shift>=0;shift-=4) {
+        unsigned part=(color>>(unsigned)shift)&14,n=part/2;
+        unsigned used=steps<n?steps:n;steps-=used;
+        faded|=(incoming?used*2:part-used*2)<<(unsigned)shift;
+    }
+    return genesis_dac_cram_to_argb((uint16_t)faded,GENESIS_DAC_NORMAL);
+}
 static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                                int origin,const uint32_t *palette)
 {
@@ -1310,8 +1330,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
          * the installed native row still owns the original viewport. Use
          * the published mode, including immediately after rewind. */
         int results=menu && (s_world_frame[0xF600]&127)==0x48;
+        int menu_hud=menu?(results?2:file_select_layout(v)?4:3):0;
         if(menu && (s_frame_menu==MENU_TITLE_CARD ? s->hud<6 || s->hud>9 :
-                    s->hud!=(results?2:file_select_layout(v)?4:3)))continue;
+                    s->hud!=menu_hud && !(menu_hud==3 && s->hud==SCENE_COMPETITION_CHARACTER)))continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
         unsigned zoom=s->zoom?s->zoom:256;
         int drawn_width=cw*8*(int)zoom/256,drawn_height=ch*8*(int)zoom/256;
@@ -1387,7 +1408,8 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             s_priority[x]|=2;
             /* extended sprite lines (game-added art keeping its own colours) */
             int ext=s->hud==5?0:presentation_sprite_line(s->size,cell&2047u,p>>4);
-            uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):palette[p];
+            uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):
+                s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p):palette[p];
             /* Screen-relative coordinates are not HUD priority: AIZ2's
              * small Eggman must still pass behind the high tree canopy. */
             if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
@@ -1483,10 +1505,10 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
         } else if(s_frame_menu!=MENU_TITLE_ANIMATION) {
             b=raster->plane_b[sx];
         }
-        /* A transparent high-priority A tile still selects normal SHI
-         * intensity. Carry that native coverage with the widened scenery. */
+        /* Read the finite UI's actual SHI coverage. Extending a moving
+         * edge pixel would turn a card's shadow into an infinite band. */
         if(s_frame_menu==MENU_COMPETITION && (nx<0 || nx>=nw)) {
-            a=raster->plane_a[nx<0?0:nw-1]&128u;
+            a=128u; /* Unobscured scenery outside the finite UI is normal. */
             int ax=nx-hs_a,ay=line+(v->vsram[0]&1023);
             /* The stage selector also stores offscreen card columns in its
              * finite plane A table. Expose them without wrapping that UI. */
@@ -1494,7 +1516,7 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
                 unsigned base_a=(v->reg[2]&56u)<<10;
                 uint16_t attr=plane_attr(v,base_a,ax,ay);
                 unsigned p=pattern_pixel(v,attr,ax,ay);
-                if(p)a=menu_plane(attr,p);
+                a=menu_plane(attr,p)|((attr&0x8000u)?128u:0u);
             }
         }
         if(nx>=0 && nx<nw) {

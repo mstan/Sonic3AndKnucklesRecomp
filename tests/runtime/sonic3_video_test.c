@@ -477,6 +477,34 @@ static void test_file_select(void)
     CHECK(!memcmp(before,g_ram,sizeof before));
     s_menu_map_ready=0;
 }
+static void test_competition_character_palette(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    const SceneFrame *old=s_display;s_display=&scene;s_frame_menu=MENU_COMPETITION;
+    scene.count=1;scene.sprites[0]=(SceneSprite){-40,0,0x4001,0,SCENE_COMPETITION_CHARACTER,256,1};
+    memset(v.vram+32,0x22,32);word(g_rom,S3_ART_BANK+0xA55E+(34-16)*2,0x84E);
+    v.cram[34]=0xE22;pal[34]=genesis_dac_cram_to_argb(v.cram[34],GENESIS_DAC_NORMAL);
+    /* Full, incoming and outgoing native white steps. The source portrait
+     * remains red when the live bank is replaced by a blue stage palette. */
+    const unsigned white[]={0xEEE,0x400,0xE20,0xEE,0xE,0};
+    const unsigned expected[]={0x84E,0x400,0x844,0xC,0,0};
+    for(unsigned phase=0;phase<sizeof white/sizeof white[0];phase++) {
+        v.cram[17]=(uint16_t)white[phase];memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);
+        CHECK(out[198]==genesis_dac_cram_to_argb((uint16_t)expected[phase],GENESIS_DAC_NORMAL));
+        CHECK(out[237]==0 && out[238]==0);
+    }
+    /* An identical tile in unrelated mappings keeps its installed palette. */
+    scene.sprites[0].hud=3;memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[198]==pal[34]);
+    /* Private atlases retain their own palette instead of borrowing retail colours. */
+    scene.sprites[0].hud=SCENE_COMPETITION_CHARACTER;test_private_planes=1;
+    memset(v.vram+32,0x11,32);memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[198]==genesis_dac_cram_to_argb(0xE,GENESIS_DAC_NORMAL));
+    test_private_planes=0;s_display=old;s_frame_menu=MENU_NONE;
+}
 static void test_competition_race(void)
 {
     static GVDP v,before;uint32_t native[320],out[796];static uint8_t ram[65536];
@@ -526,6 +554,14 @@ static void test_competition_race(void)
     word(v.vram,0xF804,0x8003);word(v.vram,0xF806,128+318);
     scanline(&v,0,native,320,out,796);
     CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
+    /* Time Attack chooses its menu before the outgoing race fades. Keep
+     * both view scrolls and sprite ownership until the native loader clears. */
+    g_ram[0xF600]=0xC0;memcpy(ram,g_ram,sizeof ram);
+    scanline(&v,0,native,320,out,796);
+    CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
+    CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+    word(g_ram,S3_COMPETITION,0);scanline(&v,0,native,320,out,796);
+    CHECK(!competition_world_ready());
     CHECK(configure("off"));
 }
 static void test_competition_pre_cull(void)
@@ -712,15 +748,17 @@ static void test_menu_layers(void)
             int nx=x-origin,sx=(int)((int64_t)x*320/canvas);
             int ui=(nx>=80&&nx<88)||(nx>=280&&nx<288)||(nx>=200&&nx<208);
             unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:nx>=200&&nx<208?4:sx<160?1:2;
-            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],ui?GENESIS_DAC_NORMAL:GENESIS_DAC_SHADOW));
+            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],(ui || nx<0 || nx>=512)?GENESIS_DAC_NORMAL:GENESIS_DAC_SHADOW));
         }
         for(unsigned x=0;x<320;x++)raster.plane_a[x]|=128;
+        for(unsigned col=0;col<64;col++)word(v.vram,0xC000+col*2,0x8000);
         scanline_lazy(&v,0,320,out,canvas,test_native_row,native,&raster);
         for(int x=0;x<canvas;x++) {
             int nx=x-origin,sx=(int)((int64_t)x*320/canvas);
             unsigned p=nx>=80&&nx<88?3:nx>=280&&nx<288?1:nx>=200&&nx<208?4:sx<160?1:2;
             CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[p],GENESIS_DAC_NORMAL));
         }
+        memset(v.vram+0xC000,0,128);
         memcpy(raster.plane_a,saved.plane_a,sizeof raster.plane_a);
         v.reg[11]=3;v.reg[12]=1;v.reg[16]=S3_TITLE_PLANE_SIZE;raster.shadow_mode=0;
     }
@@ -2541,7 +2579,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
     test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
     test_screen_actor_priority();
