@@ -556,8 +556,10 @@ static unsigned s_capture_slot;
 static int s_capture_readonly;
 static void interpolation_native_publish(void);
 static void competition_capture_objects(void);
+static void capture_slots_vblank(void);
 void s3_video_vblank(void)
 {
+    capture_slots_vblank();
     if(s_mode!=VIDEO_OFF)ss_capture();
     if(s_interpolation_enabled && !enabled() && g_ram[0xF62A])s_ix_upload_serial=s_ix_serial;
     /* The V-int uploads the last completed display list. Camera-follow can
@@ -924,10 +926,11 @@ static void capture_objects(void)
 #else
     (void)prior_preview;
 #endif
-    /* These stages stream machine/reel art independently of world layouts.
-     * Publish only their native SAT identity so entry/exit fades retain the
-     * correct composition; never add ordinary stage rings or mappings. */
-    if(s_capture_frame->scene==3){memset(&s_capture_frame->aiz_plane,0,sizeof s_capture_frame->aiz_plane);return;}
+    /* Gumball's original finite arena stays native. The two SK bonuses
+     * retain their complete queued mappings, without ordinary stage rings. */
+    if(s_capture_frame->scene==3 && g_ram[0xFE10]==0x13) {
+        memset(&s_capture_frame->aiz_plane,0,sizeof s_capture_frame->aiz_plane);return;
+    }
     capture_aiz_plane();
     int cam=ram16(0xEE80),cy=ram16(0xEE84);
     s_capture_frame->camera_x=cam;s_capture_frame->camera_y=cy;
@@ -974,7 +977,7 @@ static void capture_objects(void)
                 int radius=g_ram[o+7],height=g_ram[o+6];
                 y=((ram16(o+0x14)-cy+height)&mask)-height;
                 if(x+radius<left-cam || x-radius>=left-cam+s_requested_width || y+height<0 || y-height>=224)continue;
-                if(!s_capture_readonly && s_visible_count<144)s_visible_objects[s_visible_count++]=o;
+                if(!s_capture_readonly && s_capture_frame->scene!=3 && s_visible_count<144)s_visible_objects[s_visible_count++]=o;
             } else {
                 x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;
                 anchor=s_hud_object && s_hud_object(o)?1:2;
@@ -1050,6 +1053,56 @@ static void publish_sprites(void)
     memcpy(dst->ox,s_build.ox,sizeof dst->ox);memcpy(dst->oy,s_build.oy,sizeof dst->oy);memcpy(dst->code,s_build.code,sizeof dst->code);
     memcpy(dst->sat,s_build.sat,640);
     memcpy(dst->sprites,s_build.sprites,s_build.count*sizeof(SceneSprite));
+}
+/* Slots appends its rotating board after Render_Sprites. Publish it at
+ * the same V-int which uploads the finished SAT, not the earlier actor queue. */
+static int slots_shift8(int value)
+{
+    return value>=0?value/256:-((-value+255)/256);
+}
+static void capture_slots_board(void)
+{
+#ifndef SONIC3_STANDALONE
+    int cx=ram16(0xEE78),cy=ram16(0xEE7C),angle=g_ram[0xE400]&0xFC;
+    int sine=(int16_t)scene_read16(0x1D64u+(unsigned)angle*2u);
+    int cosine=(int16_t)scene_read16(0x1D64u+(unsigned)(angle+64)*2u);
+    /* The completed native matrix identifies this angle/camera publication.
+     * Do not expose an incomplete board during initialization or a lag IRQ. */
+    const unsigned corners[]={0,15,240,255};
+    for(unsigned n=0;n<4;n++) {
+        int x=(int)(corners[n]&15u)*24-cx%24-180;
+        int y=(int)(corners[n]>>4)*24-cy%24-180;
+        unsigned at=0x7800u+corners[n]*4u;
+        if((int16_t)ram16(at)!=slots_shift8(cosine*x-sine*y) ||
+           (int16_t)ram16(at+2)!=slots_shift8(sine*x+cosine*y))return;
+    }
+    int margin=(s_requested_width-320)/2;
+    for(int row=32;row<64;row++)for(int col=32;col<64;col++) {
+        unsigned kind=g_ram[0x3000+row*128+col];if(!kind || kind>19)continue;
+        int dx=(col-cx/24)*24-cx%24-180,dy=(row-cy/24)*24-cy%24-180;
+        int x=160+slots_shift8(cosine*dx-sine*dy),y=112+slots_shift8(sine*dx+cosine*dy);
+        unsigned record=0x7000+kind*8,map=scene_read32(0xFF0000u+record)&0xFFFFFFu;
+        if(!map)continue;
+        unsigned frame=ram16(record+4),gfx=ram16(record+6);
+        unsigned at=map+scene_read16(map+frame*2u),count=scene_read8(at++);
+        if(count>32)continue;
+        for(unsigned n=0;n<count && s_build.count<SCENE_SPRITES;n++,at+=5) {
+            int py=y+(int8_t)scene_read8(at),px=x+(int8_t)scene_read8(at+4);
+            unsigned size=scene_read8(at+1),w=(((size>>2)&3)+1)*8,h=((size&3)+1)*8;
+            if(py>=224 || py+(int)h<=0 || px>=320+margin || px+(int)w<=-margin)continue;
+            SceneSprite *q=&s_build.sprites[s_build.count++];
+            q->x=px;q->y=py;q->attr=(uint16_t)(scene_read16(at+2)+gfx);
+            q->size=(uint8_t)size;q->hud=0;q->slot=0;q->zoom=256;
+        }
+    }
+#endif
+}
+static void capture_slots_vblank(void)
+{
+    if(enabled() && g_ram[0xF62A]==8 && bonus_stage() &&
+       g_ram[0xFE10]==0x15 && s_build.scene==3) {
+        capture_slots_board();publish_sprites();
+    }
 }
 #include "sonic3_lives.inc"
 
@@ -1668,7 +1721,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(s_frame_bonus) {
         if(!native)native=native_row(native_ctx);
         int origin=(width-nw)/2;
-        bonus_scanline(v,line,(unsigned)s_frame_zone,native,nw,out,width,palette,shadow);
+        bonus_scanline(v,line,(unsigned)s_frame_zone,native,nw,out,width,palette,shadow,s_priority);
+        if(s_frame_zone==0x14 || s_frame_zone==0x15)
+            draw_scene_sprites(v,line,out,width,origin,palette);
         if(line==0){++s_frames;s_native_x=origin;}
         return;
     }

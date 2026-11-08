@@ -271,23 +271,81 @@ static void test_bonus_margins(void)
     for(unsigned n=0;n<64*32;n++)word(v.vram,0xE000+n*2,1);
     word(v.vram,0xE000+63*2,2);
     for(unsigned n=0;n<320;n++)native[n]=0xFF123400u+n;
-    bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow);
+    bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow,NULL);
     CHECK(out[237]==palette[2] && out[558]==palette[1]);
     for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
     /* Use the installed per-row scroll, not a stretched finite native image. */
     word(v.vram,0xFC00+8*4+2,8);
-    bonus_scanline(&v,8,0x14,native,320,out,796,palette,shadow);
+    bonus_scanline(&v,8,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[237]==palette[1]);
     test_private_planes=1;
-    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow);
+    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_NORMAL));
     v.reg[12]=8;
-    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow);
+    bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_SHADOW));
     test_private_planes=0;
-    bonus_scanline(&v,0,0x13,native,320,out,796,palette,shadow);
+    bonus_scanline(&v,0,0x13,native,320,out,796,palette,shadow,NULL);
     CHECK(out[0]==0xFF000000u && out[558]==0xFF000000u); /* Gumball unchanged */
     for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+}
+static int bonus_world_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)y;CHECK(x>=0 && x<(background?768:640));
+    *cell=background?(x>=512?3:2):1;return 1;
+}
+static void test_bonus_authored_planes(void)
+{
+    static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(s_world_frame,0,sizeof s_world_frame);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[16]=1;v.reg[13]=0x3C;
+    v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
+    for(unsigned i=0;i<64;i++)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
+    for(unsigned n=1;n<4;n++)memset(v.vram+n*32,(int)(n*17),32);
+    for(unsigned n=0;n<64*32;n++)word(v.vram,0xE000+n*2,2);
+    word(v.vram,0xF000,(unsigned)-160);word(v.vram,0xF002,(unsigned)-96);
+    word(s_world_frame,0x8000,5);word(s_world_frame,0x8002,6);
+    for(unsigned n=1;n<4;n++)for(unsigned i=0;i<4;i++)word(s_world_frame,0x9000+n*8+i*2,n);
+    s_frame_fg_x=160;s_frame_fg_y=0;s_frame_bg_y=0;
+    for(unsigned n=0;n<320;n++)native[n]=0xFF123400u+n;
+    s3_video_set_world_cell(bonus_world_cell);
+    bonus_scanline(&v,0,0x14,native,320,out,796,palette,shadow,NULL);
+    /* Finite foreground crosses the native edge; decorative B wraps its
+     * authored768px map instead of the partially installed512px cache. */
+    CHECK(out[237]==palette[1]);
+    CHECK(out[0]==palette[3] && out[795]==palette[3]);
+    for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+    s3_video_set_world_cell(NULL);
+}
+static void test_slots_complete_board(void)
+{
+#ifndef SONIC3_STANDALONE
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&s_build,0,sizeof s_build);
+    word(g_rom,0x1D64,0);word(g_rom,0x1D64+128,256);
+    word(g_ram,0xEE78,960);word(g_ram,0xEE7C,960);
+    for(unsigned y=0;y<16;y++)for(unsigned x=0;x<16;x++) {
+        word(g_ram,0x7800+(y*16+x)*4,(unsigned)((int)x*24-180));
+        word(g_ram,0x7802+(y*16+x)*4,(unsigned)((int)y*24-180));
+    }
+    g_ram[0x3000+43*128+32]=g_ram[0x3000+43*128+63]=1;
+    write32(0x7008,0x10000);word(g_ram,0x700C,0);word(g_ram,0x700E,1);
+    word(g_rom,0x10000,0x10);g_rom[0x10010]=1;
+    g_rom[0x10011]=0xF4;g_rom[0x10012]=0xA;word(g_rom,0x10013,0);g_rom[0x10015]=0xF4;
+    s_build.scene=3;capture_slots_board();
+    CHECK(s_build.count==2);
+    CHECK(s_build.sprites[0].x==-224 && s_build.sprites[1].x==520);
+    CHECK(s_build.sprites[0].y==-8 && s_build.sprites[1].y==-8);
+    CHECK(s_build.sprites[0].attr==1 && s_build.sprites[1].attr==1);
+    /* A partially initialized matrix cannot publish a different board pose. */
+    s_build.count=0;word(g_ram,0xEE78,961);capture_slots_board();CHECK(!s_build.count);
+    word(g_ram,0xEE78,960);g_ram[0xF600]=12;g_ram[0xFE10]=0x15;g_ram[0xF62A]=8;
+    g_ram[0xF806]=0x55;capture_slots_vblank();
+    CHECK(s_build.count==2 && s_history[s_serial%3].count==2);
+    CHECK(s_history[s_serial%3].sat[6]==0x55);
+    CHECK(configure("off"));
+#endif
 }
 static void test_bonus_entry_publication(void)
 {
@@ -2628,7 +2686,7 @@ int main(int argc,char **argv)
     test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();test_bonus_margins();test_bonus_entry_publication();test_native_demo_publication();
+    test_native_bonus();test_bonus_margins();test_bonus_authored_planes();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
 #ifndef SONIC3_STANDALONE
     test_knux_preview_publication();
