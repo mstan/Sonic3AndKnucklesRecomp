@@ -1416,7 +1416,7 @@ static int title_card_black(const GVDP *v)
 static uint32_t competition_character_color(const GVDP *v,unsigned pixel)
 {
     if(pixel<16 || pixel>=64)return genesis_dac_cram_to_argb(v->cram[pixel&63],GENESIS_DAC_NORMAL);
-    unsigned color=scene_read16(S3_ART_BANK+0xA55E+(pixel-16)*2);
+    unsigned color=scene_read16(S3_ART_BANK+0xA55E + (pixel-16)*2);
     unsigned white=v->cram[17],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
     int incoming=((white>>8)&14)>=(white&14);
     if(!incoming)steps=21-steps;

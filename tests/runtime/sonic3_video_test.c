@@ -597,7 +597,7 @@ static void test_competition_character_palette(void)
     memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
     const SceneFrame *old=s_display;s_display=&scene;s_frame_menu=MENU_COMPETITION;
     scene.count=1;scene.sprites[0]=(SceneSprite){-40,0,0x4001,0,SCENE_COMPETITION_CHARACTER,256,1};
-    memset(v.vram+32,0x22,32);word(g_rom,S3_ART_BANK+0xA55E+(34-16)*2,0x84E);
+    memset(v.vram+32,0x22,32);word(g_rom,S3_ART_BANK+0xA55E + (34-16)*2,0x84E);
     v.cram[34]=0xE22;pal[34]=genesis_dac_cram_to_argb(v.cram[34],GENESIS_DAC_NORMAL);
     /* Full, incoming and outgoing native white steps. The source portrait
      * remains red when the live bank is replaced by a blue stage palette. */
