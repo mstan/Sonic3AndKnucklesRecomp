@@ -1764,13 +1764,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * Select the camera from this row's completed HInt identity, then
      * interpolate its position. A fractional value cannot identify a bank. */
     unsigned fg_identity=presentation_fg_identity(line,live_fg_scroll);
-    int ship_band=aiz_ship && !((fg_identity^(unsigned)ship_y)&1023u);
     int plane_x=s_frame_fg_x,plane_y=s_frame_fg_y;
     if(level && width>320 && s_display && aiz_join_near(s_display->aiz_join,s_display->camera_x)) {
         /* The next map assignment can precede this SAT/scroll upload.
          * Unwrap both planes against the completed list's coordinate space. */
         plane_x=s_display->camera_x;plane_y=s_display->camera_y;
     }
+    /* A newly published bob can precede its VSRAM upload. Match the
+     * installed scroll to the nearest camera in the 10-bit VDP domain,
+     * rather than requiring exact equality with the next ship position. */
+    int ship_distance=abs(unwrap((int)fg_identity,ship_y)-ship_y);
+    int ground_distance=abs(unwrap((int)fg_identity,plane_y)-plane_y);
+    int ship_band=aiz_ship && ship_distance<=ground_distance;
     int camera=level?unwrap(-hs_a,ship_band?ship_x:plane_x):ram16(0xEE78);
     int camera_y=unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {

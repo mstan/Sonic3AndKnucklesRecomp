@@ -1291,6 +1291,19 @@ static void test_aiz2_ship_cameras(void)
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    /* The installed row can lag the published ship bob by one pixel,
+     * including across a 1024px boundary. Its scroll remains owned by the
+     * ship; ordinary HInt ground rows must keep the foreground camera. */
+    const unsigned ship_y[]={0xAB3,0xC00};
+    for(unsigned i=0;i<sizeof ship_y/sizeof *ship_y;i++)for(int delta=-1;delta<=1;delta+=2) {
+        word(g_ram,0xEE9C,ship_y[i]);
+        v.vsram[0]=(ship_y[i]+delta)&1023u;
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
+        v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
+        for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
+    }
+    word(g_ram,0xEE9C,0xAB3);
     /* A ship bob between completed frames must not turn its upper band
      * into ground during fractional presentation. The two cameras use
      * different 1024px pages, so choosing the wrong bank is observable. */
