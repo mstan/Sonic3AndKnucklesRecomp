@@ -497,6 +497,7 @@ static int load_menu_map(void)
  * for the hardware pass and publishes a signature used to align our list
  * with the exact VBlank upload displayed by the VDP. */
 typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom,slot; } SceneSprite;
+enum { IMPORTED_S1_PYLON = 0x7E0170u };
 enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12 };
 /* Only render ownership survives the original off-left deletion. Original
  * mappings/art remain in ROM; no guest object or provider pointer is held. */
@@ -1004,6 +1005,18 @@ static void capture_objects(void)
                 x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;
                 anchor=s_hud_object && s_hud_object(o)?1:2;
             }
+            /* Imported SLZ pylons retain the original 9-bit SAT phase.
+             * Use the clamped foreground view for their second camera term;
+             * never let a screen-space decoration become centered UI. */
+            int pylon=s_capture_frame->scene==1 && !(flags&4) &&
+                s_capture_frame->code[s_capture_slot]==IMPORTED_S1_PYLON;
+            if(pylon) {
+                int view_camera=left+(s_requested_width-320)/2;
+                x=((ram16(o+0x10)+cam-view_camera)&511)-128;
+                anchor=0;
+                s_capture_frame->ox[s_capture_slot]=(int16_t)(cam+x);
+                s_capture_frame->oy[s_capture_slot]=(int16_t)(cy+y);
+            }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
@@ -1033,6 +1046,7 @@ static void capture_objects(void)
             /* Data Select queues every card, including those culled by the
              * native SAT builder. Preserve their signed carousel positions. */
             if(map==S3_FILE_SELECT_MAP)anchor=4;
+            unsigned mapped_first=s_capture_frame->count;
             if(multi) {
                 if(g_ram[o+0x22])add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,0,zoom);
                 unsigned count=ram16(o+0x16);if(count>8)count=8;
@@ -1043,6 +1057,20 @@ static void capture_objects(void)
                     add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
             } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
+            if(pylon) {
+                unsigned end=s_capture_frame->count;
+                int lo=left-cam,hi=lo+s_requested_width;
+                for(unsigned n=mapped_first;n<end;++n) {
+                    const SceneSprite source=s_capture_frame->sprites[n];
+                    int cw=(((source.size>>2)&3)+1)*8,repeat=source.x;
+                    while(repeat+cw>lo)repeat-=512;
+                    for(repeat+=512;repeat<hi;repeat+=512)
+                        if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
+                            SceneSprite fill=source;fill.x=repeat;
+                            s_capture_frame->sprites[s_capture_frame->count++]=fill;
+                        }
+                }
+            }
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
@@ -2531,8 +2559,13 @@ static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy)
     unsigned slot=sprite->slot;
     const SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
     if(!slot || slot>=SCENE_SLOTS || !b->code[slot] || a->code[slot]!=b->code[slot])return;
-    *dx=interpolation_lerp(a->ox[slot],b->ox[slot],48)-b->ox[slot];
-    *dy=interpolation_lerp(a->oy[slot],b->oy[slot],48)-b->oy[slot];
+    int ax=a->ox[slot],ay=a->oy[slot];
+    if(b->code[slot]==IMPORTED_S1_PYLON) {
+        ax=b->ox[slot]+((ax-b->ox[slot]+256)&511)-256;
+        ay=b->oy[slot]+((ay-b->oy[slot]+32)&63)-32;
+    }
+    *dx=interpolation_lerp(ax,b->ox[slot],48)-b->ox[slot];
+    *dy=interpolation_lerp(ay,b->oy[slot],48)-b->oy[slot];
 }
 static void presentation_aiz_plane_delta(int *dx,int *dy)
 {

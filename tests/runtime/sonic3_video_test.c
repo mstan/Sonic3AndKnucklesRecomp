@@ -1059,6 +1059,60 @@ static void test_s1_undeformed_installed_camera(void)
         s3_video_set_world_cell(NULL);CHECK(configure("off"));
     }
 }
+static void test_imported_pylon_wrap(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],locked[796];
+    const int cameras[]={0,64,128,176,768,800,978,1000,1100,1216};
+    CHECK(configure("off"));CHECK(configure("32:9"));width(3200,900,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xFE10]=0x23;
+    word(g_ram,0x8000,12);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE00;memset(v.vram+32,0x11,32);
+    write32(0xB172,0x7E0170);write32(0xB17E,0x100000);
+    word(g_ram,0xB17C,0x8000);word(g_ram,0xB186,136);
+    word(g_rom,0x100000,2);word(g_rom,0x100002,1);
+    word(g_rom,0x100004,0);word(g_rom,0x100006,1);word(g_rom,0x100008,0);
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB172);
+    uint8_t before[65536];
+    for(unsigned n=0;n<sizeof cameras/sizeof *cameras;++n) {
+        int camera=cameras[n];word(g_ram,0xEE80,camera);word(g_ram,0xEE78,camera);
+        word(g_ram,0xB182,-2*camera);word(v.vram,0xF000,-camera);
+        memcpy(before,g_ram,sizeof before);capture_objects();publish_sprites();s3_video_vblank();
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        memcpy(v.vram+0xF800,g_ram+0xF800,640);
+        scanline(&v,0,native,320,out,796);scanline(&v,8,native,320,out,796);
+        const int phases[]={146,146,146,146,110,46,202,202,202,202};
+        int phase=phases[n];
+        for(int x=0;x<796;++x)if((out[x]==0xFF0000FFu)!=(((x-phase+512)%512)<8)) {fprintf(stderr,"pylon camera%d x%d phase%d color%x count%u first%d hud%d\n",camera,x,phase,out[x],s_build.count,s_build.sprites[0].x,s_build.sprites[0].hud);CHECK(0);}
+        if(n==0 || n==6)memcpy(locked,out,sizeof locked);
+        if((n>0 && n<4)||n>6)CHECK(!memcmp(locked,out,sizeof locked));
+    }
+    /* Real renderer publications must take the short wrapped path and
+     * keep both clamped foreground views stationary at fractional phases. */
+    const int pairs[][3]={{248,264,110},{0,176,146},{978,1216,202}};
+    static uint32_t image[796*224];
+    for(unsigned n=0;n<3;++n) {
+        interpolation_configure(1);
+        for(unsigned tick=0;tick<2;++tick) {
+            int camera=pairs[n][tick];word(g_ram,0xFE04,tick+1);
+            word(g_ram,0xEE80,camera);word(g_ram,0xEE78,camera);
+            word(g_ram,0xB182,-2*camera);word(v.vram,0xF000,-camera);
+            capture_objects();publish_sprites();s3_video_vblank();
+            memcpy(v.vram+0xF800,g_ram+0xF800,640);
+            for(int y=0;y<224;++y) {
+                scanline(&v,y,native,320,out,796);
+                interpolation_capture(&v,y,out,796,320,NULL);
+            }
+        }
+        CHECK(interpolate(.5,image,796,224));
+        for(int x=0;x<796;++x)
+            CHECK((image[8*796+x]==0xFF0000FFu)==(((x-pairs[n][2]+512)%512)<8));
+        interpolation_configure(0);
+    }
+    CHECK(configure("off"));
+}
 static void test_uploaded_scene_camera(void)
 {
     static GVDP v;uint32_t native[320]={0},out[398];
@@ -2716,7 +2770,7 @@ int main(int argc,char **argv)
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();
-    test_s1_undeformed_installed_camera();test_uploaded_scene_camera();
+    test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
