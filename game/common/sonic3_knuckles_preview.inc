@@ -39,12 +39,14 @@ static int s3_knux_preview_needed(const uint8_t *ram)
            (s3_knux_preview_word(ram,o+2)==0x923E ||
             s3_knux_preview_word(ram,o+2)==0x94D4 ||
             s3_knux_preview_word(ram,o+2)==0x9526))return 1;
-        /* Boss defeat temporarily replaces the controller with Obj_Wait.
-         * Its callback still owns this ledge until capsule publication. */
+        /* Defeat first waits for the music fade, then uses Obj_Wait.
+         * Both callbacks still own the ledge until capsule publication. */
         if(s3_knux_preview_word(ram,o)==8 &&
-           s3_knux_preview_word(ram,o+2)==0x488A &&
            s3_knux_preview_word(ram,o+0x34)==6 &&
-           s3_knux_preview_word(ram,o+0x36)==0x94A4)return 1;
+           ((s3_knux_preview_word(ram,o+2)==0x5668 &&
+             s3_knux_preview_word(ram,o+0x36)==0x9482) ||
+            (s3_knux_preview_word(ram,o+2)==0x488A &&
+             s3_knux_preview_word(ram,o+0x36)==0x94A4)))return 1;
     }
     return 0;
 #endif
