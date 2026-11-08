@@ -7,6 +7,7 @@ def check(exe,rom,mode,out):
     out.mkdir(exist_ok=False);results=[]
     for case in ['repeat','transition-return']:
         d=out/case;d.mkdir();(d/'settings.ini').write_text('[audio]\nvolume=0\n[video]\nfullscreen=0\npresentation_rate=0\n')
+        with(d/'settings.ini').open('a')as settings:settings.write(''.join(f'[input.p{i}]\ndevice=0\n'for i in range(1,7)))
         (d/(mode+'-gameplay.ini')).write_text('easy_level_select=1\n')
         route='WAIT 700\nPRESS UP 2\nWAIT 4\nPRESS START 2\nWAIT_RAM8 FFF600 28\nWAIT 120\nPRESS START 2\nWAIT_RAM8 FFF600 0C\nWAIT 360\n'
         if mode=='sandk':route='WAIT 700\nPRESS START 2\nWAIT_RAM8 FFF600 0C\nWAIT 360\n'
