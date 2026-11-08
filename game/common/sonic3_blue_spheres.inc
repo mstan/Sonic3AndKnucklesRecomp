@@ -308,8 +308,10 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
         }
     }
     ss_draw_spheres(line,out,width,palette,0);
-    ss_native_sprites(v,line,out,width,palette,shadow,0);
     ss_draw_spheres(line,out,width,palette,1);
+    /* The original appends field sprites after Render_Sprites. Earlier SAT
+     * entries win, so even a contact sphere stays behind the character. */
+    ss_native_sprites(v,line,out,width,palette,shadow,0);
     /* Counters are plane-A tiles, not SAT sprites. Move their two complete
      * 64x24 panels to the actual left/right edges; no centered HUD ghost. */
     if(line>=8 && line<32)for(int side=0;side<2;++side)for(int dx=0;dx<64;++dx) {

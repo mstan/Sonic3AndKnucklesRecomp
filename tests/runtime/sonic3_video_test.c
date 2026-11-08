@@ -2094,6 +2094,18 @@ static void test_blue_spheres(void)
     g_ram[native_board]=1;ss_capture();ss_begin(&v,796);
     ss_scanline(&v,155,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(contact_grace[398]==contact_palette[1]);
+    /* Render_Sprites precedes Draw_SSSprites in the original, so its
+     * earlier character entry wins even over a near contact sphere. */
+    unsigned saved_sat=v.reg[5];v.reg[5]=0x7C;
+    memset(v.vram+0xF800,0,8);word(v.vram,0xF800,128+160);
+    word(v.vram,0xF804,0x2780);word(v.vram,0xF806,128+156);
+    memset(v.vram+0x780*32,0x33,32);contact_palette[19]=0xFF00FF00;
+    g_ram[native_board]=2;word(g_ram,0xE424,32);g_ram[0xE426]=0x80;
+    ss_capture();ss_begin(&v,796);
+    CHECK(ss_count==1 && ss_spheres[0].depth<ss_distance);
+    ss_scanline(&v,160,contact_grace,796,contact_palette,contact_palette,0);
+    CHECK(contact_grace[398]==contact_palette[19]);
+    memset(v.vram+0xF800,0,8);memset(v.vram+0x780*32,0,32);v.reg[5]=(uint8_t)saved_sat;
     /* Preserve the original mapping-center registration while moving,
      * turning and resizing. Opaque distance-frame radii vary; aligning their
      * bottoms instead moves the art relative to the fixed character. */
