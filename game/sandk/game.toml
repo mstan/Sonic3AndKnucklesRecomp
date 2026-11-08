@@ -557,3 +557,8 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x119A8 # BEQ Sonic_CheckTransform (6728)
 kind = "game_hook"
+
+# Original queued Kosinski execution; VBlank owns its resumable return PC.
+[[widescreen_site]]
+addr = 0x1C1A
+kind = "game_hook"

@@ -51,6 +51,11 @@ int s3_kos_instruction(uint32_t pc)
     if(pc!=KOS_ENTRY || g_ram[0xF600]!=12 || !g_ram[0xF711] ||
        g_ram[0xFE10] || g_ram[0xFE11]>1 ||
        !(((unsigned)g_ram[0xFF0E]<<8|g_ram[0xFF0F])&0x7FFFu))return 0;
+    return s3_kos_execute(pc);
+}
+int s3_kos_execute(uint32_t pc)
+{
+    if(pc!=KOS_ENTRY || !(((unsigned)g_ram[0xFF0E]<<8|g_ram[0xFF0F])&0x7FFFu))return 0;
     const M68kStepBus bus={read8,read16,write8,write16,fetch16,NULL,NULL,NULL};
     M68kStepContext ctx;
     m68k_step_init(&ctx,&bus,NULL);

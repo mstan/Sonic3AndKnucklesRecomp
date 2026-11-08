@@ -24,6 +24,7 @@
 #include "sonic3_gameplay.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
+#include "sonic3_kos.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -237,46 +238,15 @@ static const GameDebugCommand sandk_commands[] = {
 };
 
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
-static void prepare_knuckles_intro_art(void)
-{
-    /* This opening has no title-card wait. Its visible cliff/grass pieces
-     * use MHZ Misc Art, which the normal incremental PLC loader otherwise
-     * finishes after the fade has already begun. Complete that original
-     * queued piece before starting the incoming fade. No new art,
-     * palette or cutscene/result state is substituted. */
-    if(sandk_read16(0xFE10)!=0x700 || sandk_read16(0xFF08)!=3 ||
-       !sandk_read16(0xEE50) || (sandk_read16(0xEE50)&0x8000))return;
-    int queued=0;
-    for(unsigned i=0;i<16;i++) {
-        uint32_t source=(uint32_t)sandk_read16(0xF680+i*6)<<16|sandk_read16(0xF682+i*6);
-        if(source>=0x14E846u && source<0x14F9FEu)queued=1;
-    }
-    if(!queued)return;
-    M68KState saved=g_cpu;
-    g_cpu.SR=0x2700; /* synchronous VRAM stream, as in Load_PLC_Immediate */
-    for(unsigned piece=0;piece<1024;piece++) {
-        uint32_t source=(uint32_t)sandk_read16(0xF680)<<16|sandk_read16(0xF682);
-        if(!source)break;
-        recomp_call_addr(0x1780u); /* Process_Nem_Queue_Init */
-        recomp_call_addr(0x17D8u); /* Process_Nem_Queue: original six-pattern decoder */
-    }
-    g_cpu=saved;
-}
 static int gameplay_instruction(uint32_t pc)
 {
-    if(pc==0x3BB8u) {prepare_knuckles_intro_art();return 0;}
-    if(pc==0x1B28u) {
-        /* Landing art shares VRAM with the falling pose. On hardware the
-         * second module is still decompressing as the plane scrolls off.
-         * Native decoding finishes sooner; retire the old mapping before
-         * publishing the overlapping module, then resume the original FIFO. */
-        unsigned y=sandk_read16(0xEE7C),dest=sandk_read16(0xFF68);
-        uint32_t source=sandk_read32(0xFF64);
-        if(g_ram[0xF600]==4 && y>=0xC8 && y<0x100 &&
-           source>=0xD0E12u && source<0xD2504u && dest>=0x9C40u &&
-           (g_ram[0xFF60]&0x80))return 1;
-        return 0;
-    }
+    /* Startup uses the original queued program and VBlank's saved return PC.
+     * Keep the incoming fade and overlapping title modules on that clock. */
+    if(s3_kos_owns(pc) &&
+       (g_ram[0xF600]==4 ||
+        ((g_ram[0xF600]&0x7F)==12 && !g_ram[0xF711] &&
+         sandk_read16(0xFE10)==0x700 && sandk_read16(0xFF08)==3)))
+        return s3_kos_execute(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
