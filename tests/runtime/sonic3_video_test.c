@@ -1448,13 +1448,17 @@ static void test_aiz2_ship_cameras(void)
     for(int x=0;x<796;x++)CHECK(out[x]==0xFFFF0000u);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
     for(int x=0;x<796;x++)CHECK(out[x]==0xFF0000FFu);
-    /* The loop controller remains active after EndRefresh retires the
-     * ship. Its forest is a spatial world again, not a repeating table. */
+    /* EndRefresh retires the ship before the installed foreground rows.
+     * Keep their canvas through the grove instead of exposing raw partial
+     * tree columns when the upper ship flag clears. */
     word(g_ram,0xEED6,0);word(g_ram,0xEEC0,16);
     v.vsram[0]=0x1C0;scanline(&v,0,native,320,out,796);
     scanline(&v,65,native,320,out,796);
-    for(int x=0;x<796;x++)CHECK(out[x]==0xFF00FF00u);
-    word(g_ram,0xEED6,0xFF00);
+    for(int x=0;x<796;x++) {
+        int wx=0x4288+x-238;
+        CHECK(out[x]==(wx>=0x4380 && wx<0x4880?0xFF0000FFu:0xFF00FF00u));
+    }
+    word(g_ram,0xEED6,0xFF00);word(g_ram,0xEEC0,8);
     word(g_ram,0xEEB2,0);
     v.vsram[0]=0xAB3;scanline(&v,0,native,320,out,796);
     v.vsram[0]=0x1C0;scanline(&v,65,native,320,out,796);
