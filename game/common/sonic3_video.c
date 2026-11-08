@@ -1101,7 +1101,11 @@ static void capture_slots_vblank(void)
 {
     if(enabled() && g_ram[0xF62A]==8 && bonus_stage() &&
        g_ram[0xFE10]==0x15 && s_build.scene==3) {
+        unsigned queued=s_build.count;
         capture_slots_board();publish_sprites();
+        /* Keep the queued actor base reusable after a restored wait or lag
+         * IRQ. The published history owns the completed board pieces. */
+        s_build.count=queued;
     }
 }
 #include "sonic3_lives.inc"

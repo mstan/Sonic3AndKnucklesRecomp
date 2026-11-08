@@ -342,8 +342,10 @@ static void test_slots_complete_board(void)
     s_build.count=0;word(g_ram,0xEE78,961);capture_slots_board();CHECK(!s_build.count);
     word(g_ram,0xEE78,960);g_ram[0xF600]=12;g_ram[0xFE10]=0x15;g_ram[0xF62A]=8;
     g_ram[0xF806]=0x55;capture_slots_vblank();
-    CHECK(s_build.count==2 && s_history[s_serial%3].count==2);
+    CHECK(s_build.count==0 && s_history[s_serial%3].count==2);
     CHECK(s_history[s_serial%3].sat[6]==0x55);
+    capture_slots_vblank();
+    CHECK(s_build.count==0 && s_history[s_serial%3].count==2);
     CHECK(configure("off"));
 #endif
 }
