@@ -994,17 +994,13 @@ static void capture_objects(void)
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
     s_capture_frame->preview_knux=s_capture_frame->scene==1 && s3_knux_preview_needed(g_ram);
-#ifndef SONIC3_STANDALONE
     /* Allocation can target an earlier slot than the controller. Keep the
      * waiting pose for that one queued-display handover until the real actor
      * below has actually reached Draw_Sprite. The tag is saved with the scene. */
     if(prior_preview && s_capture_frame->scene==1 && g_ram[0xF600]==12 &&
        ram16(0xFE10)==1 && g_ram[0xB038]!=2)
         for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
-            if(scene_read32(0xFF0000u+o)==0x69588)s_capture_frame->preview_knux=1;
-#else
-    (void)prior_preview;
-#endif
+            if(scene_read32(0xFF0000u+o)==S3_KNUX_PREVIEW_HANDOVER)s_capture_frame->preview_knux=1;
     /* Gumball's finite chamber keeps its native actors and machine column;
      * only the authored outer scenery extends beyond that chamber. The two
      * SK bonuses retain complete mappings; Glowing Sphere also owns the
@@ -1097,7 +1093,7 @@ static void capture_objects(void)
                (g_ram[o+0x22]==33 || g_ram[o+0x22]==34))
                 s_capture_frame->aiz_super_pose=(unsigned)g_ram[o+0x22]-32;
 
-            if(map==0x364016)s_capture_frame->preview_knux=0;
+            if(map==S3_KNUX_PREVIEW_MAP)s_capture_frame->preview_knux=0;
             unsigned zoom=(flags&4) && s_object_zoom?s_object_zoom(o):0;
             /* The title plane is queued even beyond the hardware viewport.
              * Retain its signed position instead of the wrapped/cut SAT. */

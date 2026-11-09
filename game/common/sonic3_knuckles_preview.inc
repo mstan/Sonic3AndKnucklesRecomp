@@ -6,14 +6,18 @@
 #include <string.h>
 #include "video/genesis_dac.h"
 
-enum { S3_KNUX_PREVIEW_ROM_SIZE=0x400000, S3_KNUX_PREVIEW_SIZE=64,
-       S3_KNUX_PREVIEW_PATTERN_BYTES=18*32, S3_KNUX_PREVIEW_FRAME=22,
-       S3_KNUX_PREVIEW_MAP=0x364016, S3_KNUX_PREVIEW_DPLC=0x36430E,
-       S3_KNUX_PREVIEW_ART=0x382DC6 };
+enum { S3_KNUX_PREVIEW_SIZE=64,
+       S3_KNUX_PREVIEW_PATTERN_BYTES=18*32, S3_KNUX_PREVIEW_FRAME=22 };
 #ifdef SONIC3_STANDALONE
-enum { S3_KNUX_PREVIEW_PALETTE=0x457AE };
+enum { S3_KNUX_PREVIEW_ROM_SIZE=0x200000,
+       S3_KNUX_PREVIEW_MAP=0x164016, S3_KNUX_PREVIEW_DPLC=0x16430E,
+       S3_KNUX_PREVIEW_ART=0x182DC6, S3_KNUX_PREVIEW_PALETTE=0x457AE,
+       S3_KNUX_PREVIEW_HANDOVER=0x4744A };
 #else
-enum { S3_KNUX_PREVIEW_PALETTE=0x66912 };
+enum { S3_KNUX_PREVIEW_ROM_SIZE=0x400000,
+       S3_KNUX_PREVIEW_MAP=0x364016, S3_KNUX_PREVIEW_DPLC=0x36430E,
+       S3_KNUX_PREVIEW_ART=0x382DC6, S3_KNUX_PREVIEW_PALETTE=0x66912,
+       S3_KNUX_PREVIEW_HANDOVER=0x69588 };
 #endif
 static struct {
     const uint8_t *rom;
@@ -29,10 +33,6 @@ static inline unsigned s3_knux_preview_word(const uint8_t *p,unsigned a)
 
 static int s3_knux_preview_needed(const uint8_t *ram)
 {
-#ifdef SONIC3_STANDALONE
-    (void)ram;
-    return 0;
-#else
     if(!ram || ram[0xF600]!=0x0C || s3_knux_preview_word(ram,0xFE10)!=1 ||
        ram[0xB038]==2)return 0;
     /* Defeat can release the camera while the boss is still retiring.
@@ -40,6 +40,15 @@ static int s3_knux_preview_needed(const uint8_t *ram)
      * before loc_694D4's capsule wait. Its native pose and 120-tick wait
      * stay unchanged; its successor still allocates the real actor. */
     for(unsigned o=0xB000;o<0xCFCC;o+=0x4A) {
+#ifdef SONIC3_STANDALONE
+        unsigned code=(unsigned)s3_knux_preview_word(ram,o)<<16 |
+                      s3_knux_preview_word(ram,o+2);
+        unsigned callback=(unsigned)s3_knux_preview_word(ram,o+0x34)<<16 |
+                          s3_knux_preview_word(ram,o+0x36);
+        if(code==0x47360 || code==0x473C6 || code==0x47402 ||
+           (code==0x53CE2 && callback==0x47360) ||
+           (code==0x53008 && callback==0x47390))return 1;
+#else
         if(s3_knux_preview_word(ram,o)==6 &&
            (s3_knux_preview_word(ram,o+2)==0x923E ||
             s3_knux_preview_word(ram,o+2)==0x94D4 ||
@@ -52,9 +61,9 @@ static int s3_knux_preview_needed(const uint8_t *ram)
              s3_knux_preview_word(ram,o+0x36)==0x9482) ||
             (s3_knux_preview_word(ram,o+2)==0x488A &&
              s3_knux_preview_word(ram,o+0x36)==0x94A4)))return 1;
+#endif
     }
     return 0;
-#endif
 }
 
 static inline int s3_knux_preview_load(const uint8_t *rom)
@@ -111,9 +120,6 @@ static inline int s3_knux_preview_load(const uint8_t *rom)
 static void s3_knux_preview_scanline(const uint8_t *rom,int line,uint32_t *out,
                                    int width,int origin,int camera_x,int camera_y)
 {
-#ifdef SONIC3_STANDALONE
-    (void)rom;(void)line;(void)out;(void)width;(void)origin;(void)camera_x;(void)camera_y;
-#else
     int64_t y=(int64_t)line-0x17D+camera_y+32;
     if(!out || width<=320 || y<0 || y>=64 || !s3_knux_preview_load(rom))return;
     int64_t left=(int64_t)origin+0x4B8E - camera_x-32;
@@ -123,5 +129,4 @@ static void s3_knux_preview_scanline(const uint8_t *rom,int line,uint32_t *out,
         unsigned nib=s3_knux_preview_cache.pixels[(unsigned)y*64+(unsigned)dx];
         if(nib)out[(int)x]=s3_knux_preview_cache.colors[nib];
     }
-#endif
 }

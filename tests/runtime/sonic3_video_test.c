@@ -2233,36 +2233,45 @@ static void test_time_interpolation(void)
     }
     CHECK(g_ram[0xFE23]==99);interpolation_configure(0);
 }
-#ifndef SONIC3_STANDALONE
 static void test_knux_preview_publication(void)
 {
+#ifdef SONIC3_STANDALONE
+    const unsigned wait=0x473C6,draw_wait=0x53CE2,fade=0x47360,
+        timer_wait=0x53008,capsule=0x47390,handover=0x4744A,
+        initializer=0x446F2,actor=0x44926;
+#else
+    const unsigned wait=0x69526,draw_wait=0x85668,fade=0x69482,
+        timer_wait=0x8488A,capsule=0x694A4,handover=0x69588,
+        initializer=0x61D4C,actor=0x61F98;
+#endif
+    const unsigned map=S3_ART_BANK+0x164016;
     memset(g_ram,0,sizeof g_ram);memset(&s_build,0,sizeof s_build);
     CHECK(configure("32:9"));width(796,224,320,224);
     g_ram[0xF600]=12;word(g_ram,0xFE10,1);write32(0xB000,0x1234);
     word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
     word(g_ram,0xEE80,0x4A38);word(g_ram,0xEE84,0x15A);word(g_ram,0xEEAA,0x7FF);
-    write32(0xB206,0x69526);
+    write32(0xB206,wait);
     capture_objects();CHECK(s_build.preview_knux);publish_sprites();
     CHECK(s_history[s_serial%3].preview_knux);
-    write32(0xB206,0x85668);write32(0xB23A,0x69482);
-    capture_objects();CHECK(s_build.preview_knux);publish_sprites();
-    CHECK(s_history[s_serial%3].preview_knux);
-    write32(0xB23A,0x1234);capture_objects();CHECK(!s_build.preview_knux);
-    write32(0xB206,0x8488A);write32(0xB23A,0x694A4);
+    write32(0xB206,draw_wait);write32(0xB23A,fade);
     capture_objects();CHECK(s_build.preview_knux);publish_sprites();
     CHECK(s_history[s_serial%3].preview_knux);
     write32(0xB23A,0x1234);capture_objects();CHECK(!s_build.preview_knux);
-    write32(0xB206,0x69526);capture_objects();publish_sprites();
+    write32(0xB206,timer_wait);write32(0xB23A,capsule);
+    capture_objects();CHECK(s_build.preview_knux);publish_sprites();
+    CHECK(s_history[s_serial%3].preview_knux);
+    write32(0xB23A,0x1234);capture_objects();CHECK(!s_build.preview_knux);
+    write32(0xB206,wait);capture_objects();publish_sprites();
     /* The earlier allocated slot has not reached its initializer/Draw_Sprite. */
-    write32(0xB206,0x69588);write32(0xB128,0x61D4C);
+    write32(0xB206,handover);write32(0xB128,initializer);
     capture_objects();CHECK(s_build.preview_knux);publish_sprites();
     CHECK(s_history[s_serial%3].preview_knux);
     /* The real pose is now queued in this same completed display list. */
-    write32(0xB128,0x61F98);write32(0xB134,0x364016);
+    write32(0xB128,actor);write32(0xB134,map);
     g_ram[0xB12C]=5;g_ram[0xB12E]=24;g_ram[0xB12F]=28;g_ram[0xB14A]=22;
     word(g_ram,0xB132,0xA4DA);word(g_ram,0xB138,0x4B8E);word(g_ram,0xB13C,0x17D);
-    word(g_rom,0x364016+44,0x80);word(g_rom,0x364096,1);
-    word(g_rom,0x364098,0xF800);word(g_rom,0x36409A,0);word(g_rom,0x36409C,0);
+    word(g_rom,map+44,0x80);word(g_rom,map+0x80,1);
+    word(g_rom,map+0x82,0xF800);word(g_rom,map+0x84,0);word(g_rom,map+0x86,0);
     word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB128);
     capture_objects();CHECK(!s_build.preview_knux && s_build.count==1);publish_sprites();
     CHECK(!s_history[s_serial%3].preview_knux);
@@ -2297,7 +2306,6 @@ static void test_knux_preview_installed_scroll(void)
     memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
     CHECK(configure("off"));
 }
-#endif
 
 static void test_interpolation_owned_and_readonly(void)
 {
@@ -3168,10 +3176,8 @@ int main(int argc,char **argv)
     test_hud_object_anchor();
     test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
-#ifndef SONIC3_STANDALONE
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
-#endif
     test_interpolation_owned_and_readonly();
     test_s1_interpolation_installed_camera();
     test_three_digit_lives();test_life_interpolation();
