@@ -95,7 +95,8 @@ def stage(build, dest, version, mode, engine_root=None):
                          ("engine commit", info["engine_commit"][:10])):
         assert stamp.encode() + b"\0" in image, f"Missing binary {label} stamp"
     dest.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / f"release/README_{mode}.txt", dest / "README.txt")
+    readme = (ROOT / f"release/README_{mode}.txt").read_text(encoding="utf-8")
+    (dest / "README.txt").write_text(readme.replace("@VERSION@", version), encoding="utf-8")
     license_path = ROOT / "LICENSE.md"
     license_text = license_path.read_text().upper()
     assert "POLYFORM NONCOMMERCIAL" in license_text and "AFFERO GENERAL PUBLIC LICENSE" not in license_text
