@@ -1631,21 +1631,25 @@ static void test_campaign_background_edges(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
-static int hcz2_background_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+static int panorama_source_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     (void)ram;(void)y;
     *cell=background?(x>=0 && x<512?1:2):0;return 1;
 }
-static void test_hcz2_background_sources(void)
+static void test_streamed_background_sources(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
-    const unsigned phases[]={4,8,12,16};
-    for(unsigned n=0;n<4;++n) {
+    const struct { unsigned zone,event,bank,source; } cases[]={
+        {0x101,4,0,0},{0x101,8,0,1},{0x101,12,0,1},{0x101,16,0,2},
+        {0x201,4,0,2},{0x201,4,12,2},{0x201,4,4,0},{0x201,4,8,0},
+        {0x201,8,0,1},{0x201,8,8,0}
+    };
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-        g_ram[0xF600]=12;word(g_ram,0xFE10,0x101);write32(0xB000,0x1234);
+        g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n].zone);write32(0xB000,0x1234);
         word(g_ram,0x8000,64);word(g_ram,0x8002,20);word(g_ram,0x8008,0x8100);
-        word(g_ram,0xEEC2,phases[n]);word(g_ram,0xEE80,0x1500);
+        word(g_ram,0xEEC2,cases[n].event);word(g_ram,0xEED2,cases[n].bank);word(g_ram,0xEE80,0x1500);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
         v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;
@@ -1654,19 +1658,54 @@ static void test_hcz2_background_sources(void)
         word(v.vram,0xF000,(unsigned)-0x1500);word(v.vram,0xF002,(unsigned)-0x500);
         for(unsigned i=0;i<64*32;++i)word(v.vram,0xE000+i*2,i&1?3:1);
         memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
-        s3_video_set_world_cell(hcz2_background_cell);memcpy(before,g_ram,sizeof before);
+        s3_video_set_world_cell(panorama_source_cell);memcpy(before,g_ram,sizeof before);
         scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
             int nx=x-s_native_x;
-            uint32_t expected=phases[n]==4?0xFF00FF00u:phases[n]==16?0xFFFF0000u:
+            uint32_t expected=cases[n].source==0?0xFF00FF00u:cases[n].source==2?0xFFFF0000u:
                 ((unsigned)(nx+0x500)&8?0xFF0000FFu:0xFFFF0000u);
-            if(out[x]!=expected)fprintf(stderr,"HCZ2 phase=%u x=%d nx=%d color=%08X expected=%08X level=%d event=%u\n",phases[n],x,nx,out[x],expected,s_frame_level,s_frame_bg_event);
+            if(out[x]!=expected)fprintf(stderr,"zone=%04X event=%u bank=%u x=%d nx=%d color=%08X expected=%08X\n",cases[n].zone,cases[n].event,cases[n].bank,x,nx,out[x],expected);
             CHECK(out[x]==expected);
         }
         CHECK(!memcmp(before,g_ram,sizeof before));
         s3_video_set_world_cell(NULL);
     }
     CHECK(configure("off"));
+}
+static int empty_arena_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{ (void)ram;(void)x;(void)y;(void)background;*cell=0;return 1; }
+static void test_mgz2_falling_arena(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x201);write32(0xB000,0x1234);
+    word(g_ram,0x8000,128);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEEC0,4);word(g_ram,0xEE80,0x3C80);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=7;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+    for(unsigned y=0;y<32;++y)for(unsigned x=0;x<64;++x)
+        word(v.vram,0xC000+(y*64+x)*2,y&1?3:1);
+    for(unsigned c=0;c<20;++c)v.vsram[c*2]=(uint16_t)((c&1)*8);
+    word(v.vram,0xF000,(unsigned)-0x3C80);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(empty_arena_cell);memcpy(before,g_ram,sizeof before);
+    /* Cleared layout must not remove the installed falling floor. Each
+     * native 16px column retains its own scroll; adjacent scenery does not
+     * acquire a repeated copy of that floor. */
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;++x) {
+        int nx=x-s_native_x;
+        unsigned expected=nx<0 || nx>=384?0xFF000000u:
+            ((nx>=320 || (nx/16)&1)?0xFF0000FFu:0xFFFF0000u);
+        CHECK(out[x]==expected);
+    }
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    word(g_ram,0xFE10,0x101);publish_sprites();scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF000000u);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_hud_mapping(void)
 {
@@ -2941,7 +2980,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_hcz2_background_sources();test_native_sprite_art_ownership();
+    test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_native_sprite_art_ownership();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();

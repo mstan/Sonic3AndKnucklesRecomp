@@ -139,6 +139,7 @@ static void presentation_scroll(int row,int *a,int *b);
 static int presentation_camera(int axis,int fallback);
 static int installed_actor_camera(const GVDP *v,int level,int zone,int act,int event);
 static int presentation_bg_scroll(int fallback);
+static unsigned presentation_column_scroll(unsigned column,unsigned fallback);
 static void presentation_overlay_begin(int width);
 static void presentation_overlay_end(int width);
 static int presentation_plane_line(unsigned tile);
@@ -1931,6 +1932,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * installed scroll identity, not a guessed scanline or frame count. */
     int aiz_ship=level && !s_frame_zone && s_frame_act==1 &&
         ((s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7]);
+    /* MGZ2 clears the arena's layout before its installed tiles fall in
+     * independently scrolled columns. Keep the surrounding world attached
+     * to the camera, rather than moving it with the first falling column. */
+    int mgz2_collapse=level && s_frame_zone==2 && s_frame_act==1 &&
+        ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==4 && (v->reg[11]&4);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
@@ -1951,7 +1957,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ground_distance=abs(unwrap((int)fg_identity,plane_y)-plane_y);
     int ship_band=aiz_ship && ship_distance<=ground_distance;
     int camera=level?unwrap(-hs_a,ship_band?ship_x:plane_x):ram16(0xEE78);
-    int camera_y=unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
+    int camera_y=mgz2_collapse?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
         if(level) {
             int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
@@ -2088,7 +2094,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * normal panorama is installed. Preserve those mixed uploaded rows. */
     int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
         (s_frame_bg_event==8 || s_frame_bg_event==12);
-    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas;
+    unsigned mgz2_bank=((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3];
+    int mgz2_panorama=bg_world && s_frame_zone==2 && s_frame_act==1 &&
+        (mgz2_bank==0 || mgz2_bank==12);
+    int mgz2_canvas=mgz2_panorama && s_frame_bg_event==8;
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || mgz2_canvas;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
@@ -2130,6 +2140,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * its repeating panorama. The remaining layout belongs to the moving
      * crushing wall and must never be sampled as normal parallax. */
     if(bg_world && s_frame_zone==1 && s_frame_act==1 && s_frame_bg_event>=16)
+        bg_width=512;
+    /* MGZ2's normal and post-lift scenery also streams a 32-block canvas.
+     * The other layout banks are physical moving rooms used only by events
+     * 4/8; scrolling the panorama through them substitutes unrelated walls. */
+    if(mgz2_panorama)
         bg_width=512;
     /* HCZ2's crushing wall is a moving world, not a repeating panorama.
      * Negative coordinates to its left must remain blank. */
@@ -2217,6 +2232,13 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             a=plane_attr(v,base_a,nx-hs_a,ay);
             ap=pattern_pixel(v,a,nx-hs_a,ay);
         }
+        if(mgz2_collapse && wx>=0x3C80 && wx<0x3E00) {
+            int column=nx<0?0:nx>=nw?(nw-1)/16:nx/16;
+            unsigned scroll=presentation_column_scroll((unsigned)column*2,v->vsram[column*2]);
+            int ax=nx-hs_a,ay=line+(scroll&1023);
+            a=plane_attr(v,base_a,ax,ay);
+            ap=pattern_pixel(v,a,ax,ay);
+        }
         if(aiz_banks && (nx<0 || nx>=nw)) {
             /* The hollow tree at $1300 shares primary blocks across both
              * banks. The coast behind it and forest ahead need independent
@@ -2302,7 +2324,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!s_interpolating && nx>=0 && nx<nw && !(x&7) && !missing_scroll && (!level || s_display)) {
             if(level && !native_terrain_streamed(wy,s_frame_fg_y)) {
                 ++s_terrain_unstreamed;
-            } else if(level && !aiz_fire_fg) {
+            } else if(level && !aiz_fire_fg && !mgz2_collapse) {
                 uint16_t expected=plane_attr(v,base_a,nx-hs_a,line+(fg_scroll&1023));
                 ++s_terrain_checks;
                 int bad=attributes_differ(v,a,expected,wx,wy);
@@ -2624,6 +2646,13 @@ static int presentation_bg_scroll(int fallback)
 {
     return s_interpolating?interpolation_lerp(ix_previous()->context.video.vsram[1],
         ix_current()->context.video.vsram[1],128):fallback;
+}
+static unsigned presentation_column_scroll(unsigned column,unsigned fallback)
+{
+    if(!s_interpolating || column>=40)return fallback;
+    int b=ix_current()->context.video.vsram[column];
+    int a=unwrap(ix_previous()->context.video.vsram[column],b);
+    return (unsigned)interpolation_lerp(a,b,128);
 }
 static void presentation_scroll(int row,int *a,int *b)
 {
