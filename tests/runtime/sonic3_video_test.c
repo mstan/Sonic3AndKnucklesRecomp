@@ -166,6 +166,7 @@ static void test_native_sprite_art_ownership(void)
     CHECK(native_art_owner(S3_ART_BANK+0x30502u)==3);
     CHECK(native_art_owner(S3_SPRING_MAP)==4);
     CHECK(native_art_owner(S3_SPRING_MAP+22u)==4);
+    CHECK(native_art_owner(S3_ART_BANK+0x164016u)==5);
     CHECK(!native_art_owner(0));
     scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
@@ -203,6 +204,26 @@ static void test_native_sprite_art_ownership(void)
     s_interpolation_phase=phase;
     uint8_t pixel=99;CHECK(!native_art_pixel(65535,0,0,0,&pixel) && pixel==99);
     memset(s_native_art_cache,0,sizeof s_native_art_cache);s_display=previous;s_frame_level=level;
+}
+static void test_waiting_knuckles_palette(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    CHECK(configure("32:9"));width(796,224,320,224);
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    v.cram[17]=0xEEE;memset(v.vram+32,0x22,32);
+    word(g_rom,S3_KNUX_PREVIEW_PALETTE+4,0xE00);
+    pal[18]=0xFFFF0000;scene.scene=1;scene.count=1;
+    scene.sprites[0]=(SceneSprite){-230,0,0x2001,0,0,256,0x500};
+    s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
+    GVDP original=v;static uint8_t ram[65536];memcpy(ram,g_ram,sizeof ram);
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[8]==genesis_dac_cram_to_argb(0xE00,GENESIS_DAC_NORMAL));
+    scene.sprites[0].x=8;memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[246]==pal[18]);
+    CHECK(!memcmp(&v,&original,sizeof v) && !memcmp(ram,g_ram,sizeof ram));
+    s_display=NULL;CHECK(configure("off"));
 }
 static void test_hcz_rush_extent(void)
 {
@@ -3137,7 +3158,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();
+    test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();

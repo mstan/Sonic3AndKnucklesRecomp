@@ -75,6 +75,7 @@ static unsigned native_art_owner(unsigned map)
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
     if(map==S3_SPRING_MAP || map==S3_SPRING_MAP+22u)return 4;
+    if(map==S3_ART_BANK+0x164016u)return 5;
     return 0;
 }
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -149,6 +150,7 @@ static void presentation_overlay_begin(int width);
 static void presentation_overlay_end(int width);
 static int presentation_plane_line(unsigned tile);
 static uint16_t presentation_ext_color(int row,int line,int nib);
+static uint16_t scene_art_color(unsigned color,const GVDP *v);
 static const uint8_t *presentation_sprite_patterns(unsigned flags,unsigned *bytes);
 static int presentation_sprite_line(unsigned flags,unsigned tile,unsigned source);
 static int s_bg_draw_at_vblank[2],s_bg_draw_ready;
@@ -1616,6 +1618,14 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             int ext=s->hud==5?0:presentation_sprite_line(s->size,cell&2047u,p>>4);
             uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):
                 s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p,s->attr):palette[p];
+            /* The wider view can expose the waiting cutscene actor before
+             * its controller borrows palette 1. Preserve its authored colors
+             * there while the hardware viewport and private providers own
+             * their existing composition. */
+            if(!ext && s_frame_level && !s->hud && (s->slot>>8)==5 &&
+               (x<origin || x>=origin+320) && p>=16 && p<32)
+                c=genesis_dac_cram_to_argb(scene_art_color(scene_read16(
+                    S3_KNUX_PREVIEW_PALETTE+(p-16)*2),v),GENESIS_DAC_NORMAL);
             /* Screen-relative coordinates are not HUD priority: AIZ2's
              * small Eggman must still pass behind the high tree canopy. */
             if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
