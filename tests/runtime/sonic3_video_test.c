@@ -313,6 +313,20 @@ static void test_level_select_word_edges(void)
             CHECK(out[x]==(nx>=0 && nx<320?native[nx]:expected));
         }
     }
+    /* Native mode/zone assignments happen before the outgoing menu fades.
+     * Neither title reflection nor a bonus renderer owns those old planes. */
+    const unsigned destinations[][2]={{4,0},{0x8C,0x1300},{0x8C,0x1400},{0x8C,0x1500}};
+    word(v.vram,0xF002,0);
+    for(unsigned d=0;d<sizeof destinations/sizeof *destinations;++d) {
+        g_ram[0xF600]=(uint8_t)destinations[d][0];word(g_ram,0xFE10,destinations[d][1]);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int nx=x-238,bx=nx%48;if(bx<0)bx+=48;
+            uint32_t expected=genesis_dac_cram_to_argb(v.cram[49+(bx/8+1)%6],GENESIS_DAC_NORMAL);
+            CHECK(out[x]==(nx>=0 && nx<320?native[nx]:expected));
+        }
+        CHECK(!s_frame_bonus);
+    }
     CHECK(configure("off"));
 }
 static void test_native_bonus(void)

@@ -1782,7 +1782,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * Conversely, a bonus exit can select the next zone before its own
          * image fades. Retire either installed scene at the flat palette or
          * video-layout change, never at the early WRAM zone assignment. */
-        s_frame_bonus=!retain_level && !uniform_palette && (bonus_stage() || retain_bonus);
+        /* Level select assigns the incoming zone before fading its old
+         * planes. Its installed word pattern still owns that entire fade. */
+        s_frame_bonus=!retain_level && !uniform_palette && !level_select_layout(v) &&
+            (bonus_stage() || retain_bonus);
         /* HUD visibility is not level readiness: AIZ hides it for the whole
          * landing/emerald cutscene while displaying the real stage planes. */
         /* Special-stage mode is selected before the outgoing level fades.
@@ -2049,7 +2052,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * holds the complete 1024px card strip (128 tiles per row).
      * Use the installed layout through both entry and exit fades. */
     int file_select=!level && file_select_layout(v);
-    int menu_background_period=!level && !special && !file_select && level_select_layout(v)?48:nw;
+    int level_select=!level && !special && !file_select && level_select_layout(v);
+    int menu_background_period=level_select?48:nw;
     int wy=camera_y+line;
     /* HCZ1_Resize restores three shared colors at camera X=$900, Y=$500.
      * Only the extra left view still contains the retired current tunnel.
@@ -2198,7 +2202,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             /* Reflect only the title scenery at its boundary. Opposite-edge
              * wrapping makes a visible seam; stretching one pixel smears the
              * clouds into horizontal bars. Logos remain in the native center. */
-            if((g_ram[0xF600]&127)==4 && (nx<0 || nx>=nw)) {
+            if((g_ram[0xF600]&127)==4 && !level_select && (nx<0 || nx>=nw)) {
                 int ax=nx%(nw*2);if(ax<0)ax+=nw*2;
                 if(ax>=nw)ax=nw*2-1-ax;
                 bx=ax-hs_b;
