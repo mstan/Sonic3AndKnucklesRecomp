@@ -69,6 +69,7 @@ static unsigned native_art_owner(unsigned map)
 {
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
+    if(map==S3_ART_BANK+0x30502u)return 3;
     return 0;
 }
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -1427,12 +1428,13 @@ static uint8_t aiz_monkey_pixel(unsigned attr,int x,int y)
 typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
 static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
-    {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1}
+    {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
+    {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1}
 };
-static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[2];
+static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[3];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
-    if(!owner || owner>2)return 0;
+    if(!owner || owner>3)return 0;
     const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
     if(!s_native_art_cache[owner-1].attempted) {
