@@ -63,15 +63,18 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
 #ifdef SONIC3_STANDALONE
-enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0 };
+enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
+       S3_SPRING_MAP=0x21DEA, S3_SPRING_ART=0x15EFFC };
 #else
-enum { S3_EXPLOSION_MAP=0x1E758, S3_EXPLOSION_ART=0x19200A };
+enum { S3_EXPLOSION_MAP=0x1E758, S3_EXPLOSION_ART=0x19200A,
+       S3_SPRING_MAP=0x2375C, S3_SPRING_ART=0x1927FE };
 #endif
 static unsigned native_art_owner(unsigned map)
 {
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
+    if(map==S3_SPRING_MAP || map==S3_SPRING_MAP+22u)return 4;
     return 0;
 }
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -1459,12 +1462,13 @@ typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
 static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
     {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
-    {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1}
+    {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1},
+    {S3_SPRING_ART,0x2EF,0x600,0x494,0}
 };
-static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[3];
+static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[4];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
-    if(!owner || owner>3)return 0;
+    if(!owner || owner>4)return 0;
     const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
     if(!s_native_art_cache[owner-1].attempted) {

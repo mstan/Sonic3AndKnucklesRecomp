@@ -164,10 +164,12 @@ static void test_native_sprite_art_ownership(void)
     CHECK(native_art_owner(S3_EXPLOSION_MAP)==1);
     CHECK(native_art_owner(S3_ART_BANK+0x161CB8u)==2);
     CHECK(native_art_owner(S3_ART_BANK+0x30502u)==3);
+    CHECK(native_art_owner(S3_SPRING_MAP)==4);
+    CHECK(native_art_owner(S3_SPRING_MAP+22u)==4);
     CHECK(!native_art_owner(0));
     scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
-    for(unsigned owner=1;owner<=3;++owner) {
+    for(unsigned owner=1;owner<=4;++owner) {
         const NativeArt *a=&s_native_art[owner-1];
         memset(s_native_art_cache[owner-1].pixels,0x11,a->bytes);
         s_native_art_cache[owner-1].pixels[0]=0x10;
