@@ -2031,8 +2031,17 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* HCZ1's parallax also belongs to the screen-centered B canvas. Its
      * left-clamped foreground must not add another pan to the water bands. */
     int hcz_background=level && s_frame_zone==1 && !s_frame_act;
+    /* Distant MGZ/CNZ parallax keeps the same centered screen space as
+     * those scenes. MGZ2's collidable moving-room banks instead belong to
+     * the world, so retain their foreground-relative projection. */
+    unsigned mgz2_bank=((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3];
+    int mgz2_panorama=level && s_frame_zone==2 && s_frame_act==1 &&
+        (mgz2_bank==0 || mgz2_bank==12);
+    int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
+    int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
-        intro_background || fbz_background || soz_background || hcz_background);
+        intro_background || fbz_background || soz_background || hcz_background ||
+        mgz_background || cnz_background);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
@@ -2112,9 +2121,6 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * normal panorama is installed. Preserve those mixed uploaded rows. */
     int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
         (s_frame_bg_event==8 || s_frame_bg_event==12);
-    unsigned mgz2_bank=((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3];
-    int mgz2_panorama=bg_world && s_frame_zone==2 && s_frame_act==1 &&
-        (mgz2_bank==0 || mgz2_bank==12);
     int mgz2_canvas=mgz2_panorama && s_frame_bg_event==8;
     int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || mgz2_canvas;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
@@ -2223,7 +2229,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         const uint32_t *apalette=palette,*bpalette=palette;
         if(bg_canvas) {
-            int canvas_x=fbz_background?bx:reference_bx;
+            int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
         }
