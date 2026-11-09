@@ -157,6 +157,50 @@ static void test_hcz_surface_extent(void)
     extend_hcz_surface(S3_HCZ_SURFACE_MAP,1,0x842E,4,96,100,256);CHECK(s_build.count==count);
     s_display=old;CHECK(configure("off"));
 }
+static void test_native_sprite_art_ownership(void)
+{
+    GVDP v={0};SceneFrame scene={0};uint32_t out[32],pal[64]={0};
+    const SceneFrame *previous=s_display;int level=s_frame_level;
+    CHECK(native_art_owner(S3_EXPLOSION_MAP)==1);
+    CHECK(native_art_owner(S3_ART_BANK+0x161CB8u)==2);
+    CHECK(!native_art_owner(0));
+    scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
+    pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
+    for(unsigned owner=1;owner<=2;++owner) {
+        const NativeArt *a=&s_native_art[owner-1];
+        memset(s_native_art_cache[owner-1].pixels,0x11,a->bytes);
+        s_native_art_cache[owner-1].pixels[0]=0x10;
+        s_native_art_cache[owner-1].attempted=s_native_art_cache[owner-1].ready=1;
+        memset(v.vram+a->tile*32,0x22,a->bytes+32);
+        scene.sprites[0]=(SceneSprite){4,0,(uint16_t)a->tile,0,0,256,(uint16_t)(owner<<8)};
+        memset(out,0,sizeof out);memset(s_priority,0,32);draw_scene_sprites(&v,0,out,32,0,pal);
+        CHECK(out[4]==pal[1] && !out[5] && out[6]==pal[1]);
+        scene.sprites[0].attr=(uint16_t)(a->tile+a->bytes/32);
+        memset(out,0,sizeof out);memset(s_priority,0,32);draw_scene_sprites(&v,0,out,32,0,pal);
+        CHECK(out[4]==pal[2]); /* unrelated tiles keep their live owner */
+        scene.sprites[0].attr=(uint16_t)a->tile;scene.sprites[0].slot=0;
+        memset(out,0,sizeof out);memset(s_priority,0,32);draw_scene_sprites(&v,0,out,32,0,pal);CHECK(out[4]==pal[2]);
+    }
+    /* Mapping capture publishes the identity with the immutable scene. */
+    s_capture_frame=&s_build;memset(&s_build,0,sizeof s_build);
+    word(g_rom,S3_EXPLOSION_MAP,2);word(g_rom,S3_EXPLOSION_MAP+2,1);
+    memset(g_rom+S3_EXPLOSION_MAP+4,0,6);
+    add_mapping(S3_EXPLOSION_MAP,0,0x5A0,4,4,0,0,0,256);
+    CHECK(s_build.count==1 && (s_build.sprites[0].slot>>8)==1);
+    CHECK(sprite_slot(&s_build.sprites[0])==s_capture_slot);
+    /* Art identity must not obscure the object used by fractional motion. */
+    SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
+    unsigned ac=a->code[7],bc=b->code[7];
+    int16_t ax=a->ox[7],ay=a->oy[7],bx=b->ox[7],by=b->oy[7];
+    double phase=s_interpolation_phase;s_interpolation_phase=.5;
+    a->code[7]=b->code[7]=0x1234;a->ox[7]=100;b->ox[7]=108;a->oy[7]=50;b->oy[7]=54;
+    SceneSprite moving={0,0,0,0,0,256,0x107};int dx=0,dy=0;
+    presentation_object_delta(&moving,&dx,&dy);CHECK(dx==-4 && dy==-2);
+    a->code[7]=ac;b->code[7]=bc;a->ox[7]=ax;a->oy[7]=ay;b->ox[7]=bx;b->oy[7]=by;
+    s_interpolation_phase=phase;
+    uint8_t pixel=99;CHECK(!native_art_pixel(65535,0,0,0,&pixel) && pixel==99);
+    memset(s_native_art_cache,0,sizeof s_native_art_cache);s_display=previous;s_frame_level=level;
+}
 static void test_hcz_rush_extent(void)
 {
     static GVDP v;uint32_t out[1603],pal[64]={0};
@@ -2896,7 +2940,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_hcz2_background_sources();
+    test_deformation_keeps_actors_still();test_hcz2_background_sources();test_native_sprite_art_ownership();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();

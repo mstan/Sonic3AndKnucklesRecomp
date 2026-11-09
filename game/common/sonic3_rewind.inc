@@ -26,7 +26,7 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
 }
 static void rewind_presentation_state(S3StateIO *io)
 {
-    unsigned version=4;
+    unsigned version=5;
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
     int mode=s_mode;double ratio=s_ratio;

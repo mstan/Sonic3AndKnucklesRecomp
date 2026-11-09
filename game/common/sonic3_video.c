@@ -60,6 +60,17 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
+#ifdef SONIC3_STANDALONE
+enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0 };
+#else
+enum { S3_EXPLOSION_MAP=0x1E758, S3_EXPLOSION_ART=0x19200A };
+#endif
+static unsigned native_art_owner(unsigned map)
+{
+    if(map==S3_EXPLOSION_MAP)return 1;
+    if(map==S3_ART_BANK+0x161CB8u)return 2;
+    return 0;
+}
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
 static int s_mode;
 static void ss_capture(void);
@@ -497,7 +508,10 @@ static int load_menu_map(void)
  * ceiling, or 20-sprites-per-line ceiling. Native BuildSprites still executes
  * for the hardware pass and publishes a signature used to align our list
  * with the exact VBlank upload displayed by the VDP. */
+/* The low slot byte identifies the native object; its high byte owns ROM art.
+ * Keep each piece at 16 bytes so maximum rewind histories retain their budget. */
 typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom,slot; } SceneSprite;
+static unsigned sprite_slot(const SceneSprite *s) { return s->slot&255u; }
 enum { IMPORTED_S1_PYLON = 0x7E0170u };
 enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12 };
 /* Only render ownership survives the original off-left deletion. Original
@@ -690,7 +704,8 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         dx=zoom_offset(dx,zoom);dy=zoom_offset(dy,zoom);
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
-        q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;q->slot=(uint16_t)s_capture_slot;
+        q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
+        q->slot=(uint16_t)(s_capture_slot|(native_art_owner(map)<<8));
     }
 }
 
@@ -1406,6 +1421,32 @@ static uint8_t aiz_monkey_pixel(unsigned attr,int x,int y)
     unsigned p=(x&1)?byte&15u:byte>>4;
     return p?(uint8_t)(p|((attr>>9)&48u)):0;
 }
+/* Extra visible objects can outlive their shared native VRAM reservation.
+ * Bind only these known mappings to their original ROM patterns. The guest
+ * PLC queues, object lifetimes, palettes and private atlases stay authoritative. */
+typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
+static const NativeArt s_native_art[]={
+    {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
+    {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1}
+};
+static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[2];
+static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
+{
+    if(!owner || owner>2)return 0;
+    const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
+    if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
+    if(!s_native_art_cache[owner-1].attempted) {
+        s_native_art_cache[owner-1].attempted=1;
+        uint8_t *dst=s_native_art_cache[owner-1].pixels;
+        size_t bytes=a->kosm?art_kosm(a->address,a->compressed,dst,a->bytes):
+            art_nem(g_rom+a->address,a->compressed,dst,a->bytes);
+        s_native_art_cache[owner-1].ready=bytes==a->bytes;
+    }
+    if(!s_native_art_cache[owner-1].ready)return 0;
+    unsigned b=s_native_art_cache[owner-1].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?b&15u:b>>4;
+    *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+}
 static int title_card_black(const GVDP *v)
 {
     if(!s_display || s_display->scene || v->reg[16]!=1)return 0;
@@ -1446,6 +1487,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
     unsigned card_slot=UINT_MAX;int card_offset=0;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
+        unsigned slot=sprite_slot(s);
         int menu=s_display->scene==0;
         /* Results queue signed screen positions before the native SAT can
          * see them. Extend those original-size pieces through the margins;
@@ -1467,13 +1509,13 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int y=s->y+(world?s_display->camera_y-s_camera_y:0)+dy;
         if(line<y || line>=y+drawn_height)continue;
         int base=s->x+(s->hud==1?0:s->hud>=2?(width-320)/2:origin)+dx;
-        if(s->hud>=6 && s->hud<=8 && s->slot<SCENE_SLOTS) {
-            if(card_slot!=s->slot) {
-                card_slot=s->slot;
+        if(s->hud>=6 && s->hud<=8 && slot<SCENE_SLOTS) {
+            if(card_slot!=slot) {
+                card_slot=slot;
                 int target=s->hud==6?160:s->hud==7?252:260;
-                int distance=s_display->ox[s->slot]-128-target,left=INT_MAX;
+                int distance=s_display->ox[slot]-128-target,left=INT_MAX;
                 for(unsigned k=0;k<s_display->count;++k)
-                    if(s_display->sprites[k].slot==s->slot && s_display->sprites[k].hud==s->hud &&
+                    if(sprite_slot(&s_display->sprites[k])==slot && s_display->sprites[k].hud==s->hud &&
                        s_display->sprites[k].x<left)left=s_display->sprites[k].x;
                 int span=320-(left-distance);
                 /* Move the finite card from/to the requested right edge,
@@ -1513,18 +1555,20 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(s_frame_level && !s->hud && (s->slot>>8) && native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
             } else if(s_frame_level && !s_frame_zone && !s->hud &&
                       (s->size&0xD0u)==SPRITE_MONKEY_ART &&
                       (cell&2047u)>=0x548 && (cell&2047u)<0x55F &&
                       (x<origin || x>=origin+320) && load_aiz_monkey_art()) {
                 p=aiz_monkey_pixel(cell,ix&7,iy&7);
-            } else if(s->slot>0 && s->slot<SCENE_SLOTS &&
-                      s_display->code[s->slot]==S3_AIZ_WAVE &&
+            } else if(slot>0 && slot<SCENE_SLOTS &&
+                      s_display->code[slot]==S3_AIZ_WAVE &&
                       (x<(width-320)/2 || x>=(width+320)/2) && load_aiz_wave_art()) {
                 p=aiz_wave_pixel(cell&2047u,ix&7,iy&7);
                 if(!p)continue;p=(uint8_t)(p|((cell>>9)&48));
-            } else if(s_display->aiz_super_pose && s->slot>0 && s->slot<SCENE_SLOTS &&
-                      s_display->code[s->slot]==S3_AIZ_PLANE_INTRO &&
+            } else if(s_display->aiz_super_pose && slot>0 && slot<SCENE_SLOTS &&
+                      s_display->code[slot]==S3_AIZ_PLANE_INTRO &&
                       (x<(width-320)/2 || x>=(width+320)/2)) {
                 p=aiz_super_pixel(s_display->aiz_super_pose,cell&2047u,ix&7,iy&7);
                 if(!p)continue;
@@ -2594,7 +2638,7 @@ static int presentation_camera(int axis,int fallback)
 }
 static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy)
 {
-    unsigned slot=sprite->slot;
+    unsigned slot=sprite_slot(sprite);
     const SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
     if(!slot || slot>=SCENE_SLOTS || !b->code[slot] || a->code[slot]!=b->code[slot])return;
     int ax=a->ox[slot],ay=a->oy[slot];
