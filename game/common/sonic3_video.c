@@ -2029,11 +2029,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int base=hs_a;
             for(int y=0;y<224;++y) {
                 int row=hmode==0?0:hmode==2?y&~7:y;
-                int scroll=(int16_t)vram16(v,hsbase+(unsigned)row*4);
+                int scroll=(int16_t)vram16(v,hsbase+(unsigned)row*4),other=0;
+                presentation_scroll(row,&scroll,&other);
                 if(scroll<base)base=scroll;
             }
             s_knux_plane_camera_x=unwrap(-base,s_frame_fg_x);
-            s_knux_plane_camera_y=camera_y;
+            s_knux_plane_camera_y=presentation_camera(1,camera_y);
         }
     }
     int origin=level?s_camera-s_left:(width-nw)/2;
@@ -2814,7 +2815,7 @@ static void interpolation_capture(const GVDP *v,int line,const uint32_t *image,
         f->valid=native_width==320 && f->context.level && scene && scene->scene==1 &&
             !f->context.special && !f->context.bonus && !f->context.menu &&
             !(v->reg[12]&14) && (enabled() || !s_world_publish) && !s_ix_overlay_seen &&
-            !s_actor_interpolation_blocked && !scene->preview_knux;
+            !s_actor_interpolation_blocked;
         for(unsigned bank=0;bank<IX_BANKS;++bank) {
             unsigned bytes=0;const uint8_t *patterns=gvdp_sprite_patterns(128u|(bank<<6),&bytes);
             if(bytes>65536)bytes=0;

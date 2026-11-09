@@ -2303,6 +2303,29 @@ static void test_knux_preview_installed_scroll(void)
     scanline(&v,0x17D-0x160,native,320,out,796);
     CHECK(out[238 + 0x4B8E - 0x49F8]==0xFFFF0000);
     CHECK(out[238 + 0x4B8E - 0x4A00]==0xFF000000);
+    /* The original waiting pose follows the installed ledge between native
+     * frames too. A live camera one upload ahead is not its anchor. */
+    static uint32_t half[796*224];
+    s_actor_overlay=NULL;s_frame_overlay=NULL;s_world_publish=NULL;
+    s_actor_interpolation_blocked=0;s_ix_overlay_seen=0;
+    interpolation_configure(1);
+    for(unsigned tick=0;tick<2;++tick) {
+        word(g_ram,0xEE80,0x4A00+tick*8);word(g_ram,0xFE04,tick+1);
+        for(int y=0;y<224;++y)
+            word(v.vram,0xF000+(unsigned)y*4,(unsigned)(-0x49F8-(int)tick*8+(y%3==0)));
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.preview_knux=1;
+        s_build.camera_x=0x49F8+tick*8;s_build.camera_y=0x160;
+        publish_sprites();
+        for(int y=0;y<224;++y) {
+            scanline(&v,y,native,320,out,796);
+            interpolation_capture(&v,y,out,796,320,NULL);
+        }
+        CHECK(ix_current()->valid);
+    }
+    CHECK(interpolate(.5,half,796,224));
+    CHECK(half[(0x17D-0x160)*796 + 238 + 0x4B8E - 0x49FC]==0xFFFF0000);
+    CHECK(half[(0x17D-0x160)*796 + 238 + 0x4B8E - 0x4A00]!=0xFFFF0000);
+    interpolation_configure(0);
     memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
     CHECK(configure("off"));
 }
