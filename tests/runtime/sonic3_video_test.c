@@ -2622,6 +2622,19 @@ static void test_blue_spheres(void)
     CHECK(ss_count==1 && ss_spheres[0].depth<ss_distance);
     ss_scanline(&v,160,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(contact_grace[398]==contact_palette[19]);
+    /* A selected shadow texel hides later field sprites and shades the
+     * ground. Earlier character texels still win over that operator. */
+    uint32_t contact_shadow[64];memcpy(contact_shadow,contact_palette,sizeof contact_shadow);
+    contact_palette[56]=0xFF886644;contact_palette[60]=0xFFAA8844;
+    contact_shadow[56]=0xFF443322;contact_shadow[60]=0xFF554422;
+    contact_shadow[33]=0xFF224477;v.reg[12]=9;
+    v.vram[0xF803]=1;word(v.vram,0xF808,128+160);
+    word(v.vram,0xF80C,0xE781);word(v.vram,0xF80E,128+154);
+    memset(v.vram+0x781*32,0xFF,32);
+    ss_scanline(&v,160,contact_grace,796,contact_palette,contact_shadow,0);
+    CHECK(contact_grace[392]==contact_shadow[56] || contact_grace[392]==contact_shadow[60]);
+    CHECK(contact_grace[398]==contact_palette[19]);
+    memset(v.vram+0xF808,0,8);memset(v.vram+0x781*32,0,32);v.reg[12]=0;
     memset(v.vram+0xF800,0,8);memset(v.vram+0x780*32,0,32);v.reg[5]=(uint8_t)saved_sat;
     /* Preserve the original mapping-center registration while moving,
      * turning and resizing. Opaque distance-frame radii vary; aligning their
