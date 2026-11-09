@@ -317,7 +317,9 @@ static void test_level_select_word_edges(void)
      * Neither title reflection nor a bonus renderer owns those old planes. */
     const unsigned destinations[][2]={{4,0},{0x8C,0x1300},{0x8C,0x1400},{0x8C,0x1500}};
     word(v.vram,0xF002,0);
+    for(unsigned scroll_mode=0;scroll_mode<2;++scroll_mode)
     for(unsigned d=0;d<sizeof destinations/sizeof *destinations;++d) {
+        v.reg[11]=scroll_mode?3:0;
         g_ram[0xF600]=(uint8_t)destinations[d][0];word(g_ram,0xFE10,destinations[d][1]);
         scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
@@ -398,9 +400,31 @@ static void test_bonus_margins(void)
     bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_SHADOW));
     test_private_planes=0;
+}
+static void test_gumball_authored_extent(void)
+{
+    static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
+    memset(&v,0,sizeof v);memset(s_world_frame,0,sizeof s_world_frame);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[13]=0x3C;v.reg[16]=1;v.reg[11]=7;
+    v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
+    for(unsigned i=0;i<64;++i)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
+    for(unsigned i=1;i<4;++i)memset(v.vram+i*32,(int)(i*17),32);
+    for(unsigned i=0;i<64*32;++i)word(v.vram,0xE000+i*2,2);
+    word(v.vram,0xF000,(unsigned)-96);
+    word(s_world_frame,0x8000,4);word(s_world_frame,0x8002,4);
+    word(s_world_frame,0x8008,0x8100);word(s_world_frame,0x8028,0x8140);
+    memset(s_world_frame+0x8100,1,4);memset(s_world_frame+0x8140,2,4);
+    for(unsigned i=0;i<64;++i){word(s_world_frame,128+i*2,1);word(s_world_frame,256+i*2,3);}
+    for(unsigned i=0;i<4;++i){word(s_world_frame,0x9008+i*2,1);word(s_world_frame,0x9018+i*2,3);}
+    s_frame_fg_x=96;s_frame_fg_y=1024;s_frame_bg_y=0;
+    for(unsigned i=0;i<320;++i)native[i]=0xFF123400u+i;
     bonus_scanline(&v,0,0x13,native,320,out,796,palette,shadow,NULL);
-    CHECK(out[0]==0xFF000000u && out[558]==0xFF000000u); /* Gumball unchanged */
-    for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+    for(int x=0;x<796;++x) {
+        int nx=x-238,wx=nx+96;
+        CHECK(out[x]==(nx>=0 && nx<320?native[nx]:wx>=0 && wx<512?palette[1]:palette[2]));
+    }
+    /* The authored outer walls wrap their eight layout rows. The entire
+     * native chamber, including its independent machine column, is intact. */
 }
 static int bonus_world_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
@@ -3035,7 +3059,7 @@ int main(int argc,char **argv)
     test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();test_bonus_margins();test_bonus_authored_planes();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
+    test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
 #ifndef SONIC3_STANDALONE
     test_knux_preview_publication();

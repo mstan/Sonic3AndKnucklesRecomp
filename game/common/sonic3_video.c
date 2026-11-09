@@ -448,8 +448,11 @@ static int competition_layout(const GVDP *v)
 }
 static int level_select_layout(const GVDP *v)
 {
+    /* S3 inherits line scrolling from Title; S&K installs plane scrolling.
+     * Both publish the same word map before the incoming mode is selected. */
+    unsigned scroll=v->reg[11]&3;
     if(!(v->reg[12]&1) || (v->reg[2]&56)!=0x30 || (v->reg[4]&7)!=7 ||
-       v->reg[16]!=1 || (v->reg[11]&3) || v->reg[18])return 0;
+       v->reg[16]!=1 || (scroll!=0 && scroll!=3) || v->reg[18])return 0;
     /* MapEni_S22POptions repeats six animated SONIC/MILES tiles. The
      * initialized 40-column view ends in the middle of that word. Identify
      * its installed map so the outgoing fade keeps the same repeat too. */
@@ -997,8 +1000,9 @@ static void capture_objects(void)
 #else
     (void)prior_preview;
 #endif
-    /* Gumball's original finite arena stays native. The two SK bonuses
-     * retain their complete queued mappings, without ordinary stage rings. */
+    /* Gumball's finite chamber keeps its native actors and machine column;
+     * only the authored outer scenery extends beyond that chamber. The two
+     * SK bonuses retain complete mappings without ordinary stage rings. */
     if(s_capture_frame->scene==3 && g_ram[0xFE10]==0x13) {
         memset(&s_capture_frame->aiz_plane,0,sizeof s_capture_frame->aiz_plane);return;
     }
@@ -1847,7 +1851,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(p){s_priority=p;s_priority_capacity=width;}
         }
         s_frame_menu=MENU_NONE;
-        if(!s_frame_level && !s_frame_special && !s_frame_bonus) {
+        if(!s_frame_level && !s_frame_special && !s_frame_bonus && !level_select_layout(v)) {
             if(title_card_black(v))s_frame_menu=MENU_TITLE_CARD;
             else if(file_select_layout(v))s_frame_menu=MENU_SAVE;
             else if(competition_layout(v))s_frame_menu=MENU_COMPETITION;

@@ -22,7 +22,7 @@ static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *
         int nx=x-origin;
         if(priority)priority[x]=0;
         if(nx>=0 && nx<nw) {out[x]=native[nx];if(priority)priority[x]=2;continue;}
-        if(zone<0x14 || zone>0x15) {out[x]=0xFF000000u;continue;}
+        if(zone<0x13 || zone>0x15) {out[x]=0xFF000000u;continue;}
         if(!(v->reg[1]&64)) {out[x]=native[0];continue;}
         int wx=nx-hs,sy=wy;
         uint16_t attr=plane_attr(v,base,wx,sy);
@@ -36,7 +36,7 @@ static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *
         int ax=nx+fg_x;
         if(fg_width>0 && ax>=0 && ax<fg_width) {
             uint16_t a=world_attr_blocks_mask(s_world_frame,s_world_frame+0x9000,ax,fg_y,0,
-                zone==0x15?0x3Cu:0x7Cu);
+                zone==0x13?0x1Cu:zone==0x15?0x3Cu:0x7Cu);
             unsigned ap=pattern_pixel(v,a,ax,fg_y);
             if(ap && ((a&0x8000u) || !(attr&0x8000u) || !opaque)) {
                 attr=a;pixel=opaque=ap;
