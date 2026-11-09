@@ -1707,6 +1707,39 @@ static void test_mgz2_falling_arena(void)
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF000000u);
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static void test_mgz2_perspective_owner(void)
+{
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);g_ram[0xF600]=12;word(g_ram,0xFE10,0x201);
+    write32(0xB000,0x1234);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,800);word(g_ram,0xEE84,100);word(g_ram,0xEEAA,0x7FF);
+    const unsigned objects[]={0xB094,0xB0DE,0xB128,0xB172,0xB1BC};
+    const unsigned maps[]={S3_ART_BANK+0x162608u,S3_ART_BANK+0x160058u,0x3000};
+    for(unsigned i=0;i<3;++i) {
+        word(g_rom,maps[i],2);word(g_rom,maps[i]+2,1);
+        word(g_rom,maps[i]+4,0);word(g_rom,maps[i]+6,1);word(g_rom,maps[i]+8,0);
+    }
+    word(g_ram,0xAC00,10);
+    for(unsigned i=0;i<5;++i) {
+        unsigned o=objects[i];word(g_ram,0xAC02+i*2,o);
+        write32(o,i?0x1234:S3_MGZ_END_BOSS);g_ram[o+4]=4;g_ram[o+6]=g_ram[o+7]=16;
+        write32(o+12,maps[i==1?1:i==4?2:0]);
+        word(g_ram,o+16,1200);word(g_ram,o+20,140);
+        if(i)word(g_ram,o+0x46,i==3?objects[2]:objects[0]);
+    }
+    g_ram[objects[0]+5]=0x1E;
+    uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+    capture_objects();CHECK(s_build.count==1 && sprite_slot(&s_build.sprites[0])==7);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    /* The scaled pass remains; body, pilot and nested attachments return
+     * together for the next actual foreground entrance. */
+    g_ram[objects[0]+5]=0x20;capture_objects();CHECK(s_build.count==5);
+    g_ram[objects[0]+5]=0x1E;word(g_ram,0xFE10,0x200);
+    capture_objects();CHECK(s_build.count==5);
+    word(g_ram,0xFE10,0x201);write32(objects[0],0x1234);
+    capture_objects();CHECK(s_build.count==5);
+    CHECK(configure("off"));
+}
 static void test_hud_mapping(void)
 {
     memset(g_ram,0,sizeof g_ram);write32(0xB000,0x123456);
@@ -2980,7 +3013,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_native_sprite_art_ownership();
+    test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();

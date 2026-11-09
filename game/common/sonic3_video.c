@@ -37,7 +37,8 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
        S3_AIZ_WAVE=0x45CB6, S3_AIZ_PLANE_DEPART=0x45BDC, S3_AIZ_PLANE_PROP=0x45C26,
        S3_AIZ_PLANE_EXHAUST=0x45C64, S3_AIZ_PLANE_MAP=0x164470,
        S3_AIZ_PLANE_PROP_ANIM=0x45E6B, S3_AIZ_PLANE_EXHAUST_ANIM=0x45E73,
-       S3_AIZ_PLANE_INTRO=0x4584E, S3_SUPER_MAP=0x141194, S3_SUPER_PLC=0x142A60 };
+       S3_AIZ_PLANE_INTRO=0x4584E, S3_SUPER_MAP=0x141194, S3_SUPER_PLC=0x142A60,
+       S3_MGZ_END_BOSS=0x4A0F8 };
 #else
 enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
@@ -56,7 +57,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_AIZ_WAVE=0x678DA, S3_AIZ_PLANE_DEPART=0x67800, S3_AIZ_PLANE_PROP=0x6784A,
        S3_AIZ_PLANE_EXHAUST=0x67888, S3_AIZ_PLANE_MAP=0x364470,
        S3_AIZ_PLANE_PROP_ANIM=0x67A8F, S3_AIZ_PLANE_EXHAUST_ANIM=0x67A97,
-       S3_AIZ_PLANE_INTRO=0x67472, S3_SUPER_MAP=0x146816, S3_SUPER_PLC=0x148378 };
+       S3_AIZ_PLANE_INTRO=0x67472, S3_SUPER_MAP=0x146816, S3_SUPER_PLC=0x148378,
+       S3_MGZ_END_BOSS=0x6C31A };
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
@@ -955,6 +957,21 @@ static void append_aiz_plane(void)
     }
     if(!visible){s_capture_frame->count=first;memset(p,0,sizeof *p);}
 }
+static int mgz2_parked_body(unsigned o,unsigned map)
+{
+    if(ram16(0xFE10)!=0x201 ||
+       (map!=S3_ART_BANK+0x162608u && map!=S3_ART_BANK+0x160058u))return 0;
+    /* The perspective pass owns a separate scaled object. Its full-size
+     * body, pilot and nested attachments wait outside the native viewport
+     * until that pass ends. They are not extra actors in the wider world. */
+    for(unsigned depth=0;depth<3;++depth) {
+        if(scene_read32(0xFF0000u+o)==S3_MGZ_END_BOSS)return g_ram[o+5]==0x1E;
+        unsigned parent=ram16(o+0x46);
+        if(parent<0xB000 || parent>=0xCFE0 || (parent-0xB000)%0x4A)return 0;
+        o=parent;
+    }
+    return 0;
+}
 static void capture_objects(void)
 {
     if(ram16(S3_COMPETITION)){competition_capture_objects();return;}
@@ -1049,6 +1066,7 @@ static void capture_objects(void)
                 s_capture_frame->oy[s_capture_slot]=(int16_t)(cy+y);
             }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
+            if(mgz2_parked_body(o,map))continue;
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
             if(map==S3_TITLE_CARD_MAP && !(flags&4)) {
