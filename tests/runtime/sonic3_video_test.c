@@ -453,7 +453,44 @@ static void test_bonus_authored_planes(void)
     CHECK(out[237]==palette[1]);
     CHECK(out[0]==palette[3] && out[795]==palette[3]);
     for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
+    /* Glowing Sphere reaches camera B=-4 at its left wall. A 16-bit
+     * unsigned reference adds 65536, which changes the phase of its 768px
+     * authored map by 256px and selects an unrelated strip in the margin. */
+    word(s_world_frame,0x8000,0);word(s_world_frame,0xEE8C,0xFFFC);
+    word(v.vram,0xF002,4);
+    bonus_scanline(&v,0,0x14,native,320,out,796,palette,shadow,NULL);
+    CHECK(out[0]==palette[3]);
+    for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
     s3_video_set_world_cell(NULL);
+}
+static void test_glowing_ring_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);g_ram[0xF600]=12;word(g_ram,0xFE10,0x1400);
+    write32(0xB000,0x1234);word(g_ram,0xEE80,160);word(g_ram,0xEEAA,0xFFF);
+    const unsigned pointer=S3_RINGS+0x14*8,table=0x180000;
+    uint8_t old_pointer[4],old_map[8],old_table[20];
+    memcpy(old_pointer,g_rom+pointer,4);memcpy(old_map,g_rom+S3_RING_MAP,8);
+    memcpy(old_table,g_rom+table,20);s3_video_set_ring_layout(NULL);
+    longword(g_rom,pointer,table);
+    const unsigned xs[]={64,400,600,800};
+    for(unsigned i=0;i<4;++i){word(g_rom,table+i*4,xs[i]);word(g_rom,table+i*4+2,100);}
+    longword(g_rom,table+16,0xFFFFFFFFu);
+    word(g_rom,S3_RING_MAP,0);word(g_rom,S3_RING_MAP+2,0);
+    word(g_rom,S3_RING_MAP+4,1);word(g_rom,S3_RING_MAP+6,0);
+    /* The vertically sorted bonus list has no leading sentinel and owns
+     * its separate status table. Do not invent rings after collection. */
+    word(g_ram,0x8604,0x8000);uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+    capture_objects();CHECK(s_build.scene==3 && s_build.count==2);
+    CHECK(s_build.sprites[0].x==-96 && s_build.sprites[1].x==240);
+    CHECK(!s_build.sprites[0].slot && !s_build.sprites[0].hud);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    word(g_ram,0x8600,0x8000);capture_objects();
+    CHECK(s_build.count==1 && s_build.sprites[0].x==240);
+    memcpy(g_rom+pointer,old_pointer,4);memcpy(g_rom+S3_RING_MAP,old_map,8);
+    memcpy(g_rom+table,old_table,20);CHECK(configure("off"));
+#endif
 }
 static void test_slots_complete_board(void)
 {
@@ -3059,7 +3096,7 @@ int main(int argc,char **argv)
     test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
+    test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
 #ifndef SONIC3_STANDALONE
     test_knux_preview_publication();

@@ -1002,7 +1002,8 @@ static void capture_objects(void)
 #endif
     /* Gumball's finite chamber keeps its native actors and machine column;
      * only the authored outer scenery extends beyond that chamber. The two
-     * SK bonuses retain complete mappings without ordinary stage rings. */
+     * SK bonuses retain complete mappings; Glowing Sphere also owns the
+     * separate, vertically sorted ring list sampled below. */
     if(s_capture_frame->scene==3 && g_ram[0xFE10]==0x13) {
         memset(&s_capture_frame->aiz_plane,0,sizeof s_capture_frame->aiz_plane);return;
     }
@@ -1011,15 +1012,21 @@ static void capture_objects(void)
     s_capture_frame->camera_x=cam;s_capture_frame->camera_y=cy;
     int left=gameplay()?view_left(cam,s_requested_width):cam-(s_requested_width-320)/2;
     int mask=ram16(0xEEAA);
-    if(gameplay() && g_ram[0xF711]) {
+    int level_hud=gameplay() && g_ram[0xF711];
+    int glowing_rings=s_capture_frame->scene==3 && g_ram[0xFE10]==0x14;
+    if(level_hud) {
         unsigned blink=(g_ram[0xFE05]&8)==0;
         unsigned frame=blink*((ram16(0xFE20)==0?1:0)+(g_ram[0xFE23]==9?2:0));
         int hudx=(int8_t)g_ram[0xF711];if(hudx<0)hudx+=8;
         unsigned hud=s_hud_mapping?s_hud_mapping():0;
         add_mapping(hud?hud:S3_HUD_MAP,frame,0x86CA,0,15+hudx,136,1,0,0);
-        unsigned base=rings_base(),end=rings_end();
-        for(unsigned p=base+4;p<end;p+=4) {
-            unsigned status=0xE700+(p-base)/2;
+    }
+    if(level_hud || glowing_rings) {
+        unsigned base=rings_base(),end=base?rings_end():0;
+        /* Glowing Sphere starts with a real ring and keeps its native
+         * consumption states in the layout buffer, not the stage table. */
+        for(unsigned p=base+(glowing_rings?0:4);p<end;p+=4) {
+            unsigned status=(glowing_rings?0x8600:0xE700)+(p-base)/2;
             if(ram16(status)&0x8000)continue;
             int x=scene_read16(p),y=((scene_read16(p+2)-cy+8)&mask)-8;
             if(x<left-16 || x>=left+s_requested_width+16 || y<-16 || y>=240)continue;

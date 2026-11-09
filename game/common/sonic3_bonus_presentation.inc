@@ -16,7 +16,7 @@ static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *
     int fg_ref_y=zone==0x15?((s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D]):s_frame_fg_y;
     int fg_x=unwrap(-(int16_t)vram16(v,hsbase+row*4u),fg_ref_x);
     int fg_y=line+unwrap(v->vsram[0],fg_ref_y);
-    int bg_ref_x=(s_world_frame[0xEE8C]<<8)|s_world_frame[0xEE8D];
+    int bg_ref_x=(int16_t)((s_world_frame[0xEE8C]<<8)|s_world_frame[0xEE8D]);
     int bg_x=unwrap(-hs,bg_ref_x),bg_y=line+unwrap(v->vsram[1],s_frame_bg_y);
     for(int x=0;x<width;++x) {
         int nx=x-origin;
