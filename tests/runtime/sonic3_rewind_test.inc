@@ -58,4 +58,32 @@ static void test_local_presentation_state(void)
     scanline(&v,0,native,320,out,796);CHECK(!memcmp(expected,out,sizeof out));
     CHECK(!memcmp(ram_before,g_ram,sizeof ram_before) && !memcmp(&restored,&v,sizeof v));
     free(blob);free(before);free(after);CHECK(configure("off"));
+
+    /* Exercise the production rewind reset/load sequence before any new
+     * native IRQ. The cached SS publication can legitimately precede WRAM. */
+    CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
+    g_ram[0xF600]=0x34;word(g_ram,0xE422,0x200);word(g_ram,0xE424,0x200);
+    write32(SS_EXTRA+16,0x1000);word(g_ram,SS_EXTRA+20,0x4002);
+    write32(SS_EXTRA+10*8,0x1000);word(g_ram,SS_EXTRA+10*8+4,0x4002);
+    for(unsigned i=0;i<16;++i)word(g_rom,0x1000+i*2,32);
+    word(g_rom,0x1020,1);g_rom[0x1022]=240;g_rom[0x1023]=15;
+    word(g_rom,0x1024,0);word(g_rom,0x1026,65520);
+    g_ram[SS_BOARD+2*32+2]=10;memset(v.vram+64,0x11,512);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;v.reg[12]=9;
+    v.cram[56]=0xE0;v.cram[60]=0xE00;v.cram[33]=0xE;
+    ss_capture();scanline(&v,0,native,320,out,796);
+    scanline(&v,180,native,320,expected,796);CHECK(ss_ready && ss_x==2);
+    word(g_ram,0xE422,0x900);g_ram[SS_BOARD+2*32+2]=1;
+    bytes=presentation_state_save(NULL,0);blob=(uint8_t*)malloc(bytes);CHECK(blob);
+    CHECK(presentation_state_save(blob,bytes)==bytes);
+    ss_capture();CHECK(ss_state[SS_BOARD+2*32+2]==1);
+    presentation_reset();CHECK(!ss_latched);
+    memcpy(ram_before,g_ram,sizeof ram_before);restored=v;
+    CHECK(presentation_state_load(blob,bytes,1));
+    CHECK(ss_latched && ss_state[SS_BOARD+2*32+2]==10);
+    scanline(&v,0,native,320,out,796);CHECK(ss_ready && ss_x==2);
+    scanline(&v,180,native,320,out,796);CHECK(!memcmp(expected,out,sizeof out));
+    CHECK(!memcmp(ram_before,g_ram,sizeof ram_before) && !memcmp(&restored,&v,sizeof v));
+    free(blob);CHECK(configure("off"));
 }

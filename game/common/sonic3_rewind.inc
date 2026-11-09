@@ -26,7 +26,7 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
 }
 static void rewind_presentation_state(S3StateIO *io)
 {
-    unsigned version=5;
+    unsigned version=6;
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
     int mode=s_mode;double ratio=s_ratio;
@@ -68,8 +68,20 @@ static void rewind_presentation_state(S3StateIO *io)
     S3_STATE(io,s_visible_count);
     s3_state_bytes(io,s_visible_objects,(size_t)visible*sizeof s_visible_objects[0]);
     S3_STATE(io,s_bg_draw_at_vblank);S3_STATE(io,s_bg_draw_ready);S3_STATE(io,s_bg_draw_zone);
+    /* The first restored row can precede the next special-stage IRQ. Keep
+     * the board publication that owned the displayed projection, including
+     * its contact grace state, rather than falling back to the native view. */
+    unsigned special=s3_state_peek_unsigned(io,(unsigned)ss_latched);
+    if(special>1)io->ok=0;
+    S3_STATE(io,special);
+    if(special) {
+        s3_state_bytes(io,ss_state+0xE420,0x32);
+        s3_state_bytes(io,ss_state+SS_EXTRA,SS_KINDS*8);
+        s3_state_bytes(io,ss_state+SS_BOARD,sizeof ss_board);
+    }
     if(io->mode==2 && io->ok) {
         interpolation_reset();s_render=&s_real_context;
+        ss_latched=(int)special;
         s_interpolating=0;s_ix_overlay_seen=0;s_native_publication_restored=0;
         s_capture_frame=&s_build;s_capture_readonly=0;s_capture_slot=0;
         s_display=display?&s_display_frame:NULL;
