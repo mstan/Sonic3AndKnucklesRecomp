@@ -2038,7 +2038,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * live Plane B canvas edited by the boss, independent of its layout. */
     int ssz_canvas=bg_world && s_frame_zone==10 && !s_frame_act && s_frame_bg_event;
     int dez3_canvas=bg_world && s_frame_zone==23;
-    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas;
+    /* HCZ2 replaces its moving wall in two bottom-up passes before the
+     * normal panorama is installed. Preserve those mixed uploaded rows. */
+    int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
+        (s_frame_bg_event==8 || s_frame_bg_event==12);
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
@@ -2075,6 +2079,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * layout banks are used as collidable scenery during the act-1 boss. */
     if(bg_world && s_frame_zone==3 &&
        ((!s_frame_act && !s_frame_bg_event) || (s_frame_act==1 && s_frame_bg_event>=4)))
+        bg_width=512;
+    /* HCZ2BGE_Normal streams X=0, d6=$20: only the first 512px are
+     * its repeating panorama. The remaining layout belongs to the moving
+     * crushing wall and must never be sampled as normal parallax. */
+    if(bg_world && s_frame_zone==1 && s_frame_act==1 && s_frame_bg_event>=16)
         bg_width=512;
     /* HCZ2's crushing wall is a moving world, not a repeating panorama.
      * Negative coordinates to its left must remain blank. */
