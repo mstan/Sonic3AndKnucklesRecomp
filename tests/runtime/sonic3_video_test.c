@@ -1503,6 +1503,40 @@ static void test_hcz_tunnel_palette_retirement(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static void test_hcz_boss_foreground_palette(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320],out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=1;
+    write32(0xB000,0x1234);word(g_ram,0x8000,160);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x3680);word(g_ram,0xEE84,0x638);word(g_ram,0xF646,0x6A0);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x638;
+    word(v.vram,0xF000,(unsigned)-0x3680);v.cram[17]=0xEEE;v.cram[20]=0xE;
+    word(g_rom,S3_ART_BANK+0x8C594+8,0xE0);
+    word(g_rom,S3_ART_BANK+0x8C654+32+8,0xE00);
+    memset(v.vram+32,0x44,32);
+    for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x2001);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x101;
+    s_build.camera_x=0x3680;s_build.camera_y=0x638;publish_sprites();
+    s3_video_set_world_cell(tree_palette_cell);
+    uint32_t live=genesis_dac_cram_to_argb(0xE,GENESIS_DAC_NORMAL);
+    for(unsigned x=0;x<320;++x)native[x]=live;
+    width(796,224,320,224);memcpy(before,g_ram,sizeof before);GVDP unchanged=v;
+    scanline(&v,0,native,320,out,796);
+    uint32_t dry=genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_NORMAL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<238?dry:live));
+    scanline(&v,104,native,320,out,796);
+    uint32_t wet=genesis_dac_cram_to_argb(0xE00,GENESIS_DAC_NORMAL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<238?wet:live));
+    CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+    /* The incoming act and the boss's native viewport keep their palette. */
+    g_ram[0xFE11]=1;s_build.world_tag=0x102;publish_sprites();
+    scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==live);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 static void test_aiz_intro_owned_pose(void)
 {
     static GVDP v;static SceneFrame restored;uint32_t out[796],pal[64]={0};
@@ -3091,7 +3125,7 @@ int main(int argc,char **argv)
     test_deformation_keeps_actors_still();test_streamed_background_sources();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_aiz_intro_owned_pose();
+    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_ship_cameras();
     test_private_plane_colors();

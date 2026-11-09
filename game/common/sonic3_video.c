@@ -2078,6 +2078,17 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         for(unsigned i=0;i<3;++i)
             hcz_tunnel_colors[i]=genesis_dac_cram_to_argb(scene_art_color(colors[i],v),GENESIS_DAC_NORMAL);
     }
+    /* The HCZ1 boss borrows palette 1 after locking its native arena.
+     * The wider left view still contains stage bricks using that line;
+     * retain their dry/wet stage colours instead of the boss damage flash. */
+    int hcz_boss=level && s_frame_zone==1 && !s_frame_act && s_frame_fg_x>=0x3680;
+    uint32_t hcz_boss_colors[16];
+    if(hcz_boss) {
+        unsigned water=((unsigned)s_world_frame[0xF646]<<8)|s_world_frame[0xF647];
+        unsigned source=S3_ART_BANK+(wy>=(int)water?0x8C654u+32u:0x8C594u);
+        for(unsigned i=0;i<16;++i)
+            hcz_boss_colors[i]=genesis_dac_cram_to_argb(scene_art_color(scene_read16(source+i*2),v),GENESIS_DAC_NORMAL);
+    }
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
      * the world's current layout coordinates. AIZ1BGE_FireTransition
@@ -2338,6 +2349,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
         if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
             ac=hcz_tunnel_colors[ap-56];
+        if(hcz_boss && nx<0 && wx<0x3680 && ap>=16 && ap<32)
+            ac=hcz_boss_colors[ap-16];
         uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
         out[x]=foreground?ac:bc;
         if(tree_arrival && nx>=nw) {
