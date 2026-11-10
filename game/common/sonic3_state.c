@@ -2,6 +2,7 @@
  * per-frame loop avoids the stage initialization in GameLoop. */
 #include "sonic3_state.h"
 #include "sonic3_state_io.h"
+#include "sonic3_sound_driver.h"
 #include "genesis_runtime.h"
 #include "audio/event_queue.h"
 
@@ -72,9 +73,10 @@ void s3_state_call_resume(uint32_t pc)
 
 static void state(S3StateIO *io)
 {
-    unsigned version = 3;
+    unsigned version = 4;
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
+    s3_sound_state(io);
 #ifndef SONIC3_STANDALONE
     s3_army_state(io);
 #endif

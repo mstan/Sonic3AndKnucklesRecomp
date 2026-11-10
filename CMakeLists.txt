@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.7.8 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.8.0 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -216,10 +216,26 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/state-$<CONFIG>/sonic3_state_build.h"
     CONTENT "#define SONIC3_STATE_BUILD_ID \"${_state_id}\"\n")
 include_directories("${CMAKE_BINARY_DIR}/state-$<CONFIG>")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
+include("${CMAKE_SOURCE_DIR}/cmake/Sonic3CloneDriver.cmake")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
+    set(NATIVE_GAME "${GAME}")
+    if(S3_CLONE_PROGRAM_DIR AND EXISTS "${GAME}/${ROM}")
+        set(NATIVE_GAME "${CMAKE_BINARY_DIR}/clone-inputs/${PREFIX}")
+        file(GLOB _clone_game_inputs CONFIGURE_DEPENDS "${GAME}/*.toml" "${GAME}/*.csv" "${GAME}/*.txt")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+            ${_clone_game_inputs} "${GAME}/${ROM}"
+            "${RECOMP_ROOT}/tools/sonic_disassembly.py"
+            "${S3_CLONE_PROGRAM_DIR}/program.json" "${S3_CLONE_PROGRAM_DIR}/clone-driver.bin")
+        execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_SOURCE_DIR}/tools/clone_driver/prepare_native.py"
+            --program "${S3_CLONE_PROGRAM_DIR}" --game "${GAME}" --engine "${RECOMP_ROOT}" --output "${NATIVE_GAME}"
+            RESULT_VARIABLE _clone_prepare_rc)
+        if(NOT _clone_prepare_rc EQUAL 0)
+            message(FATAL_ERROR "Unable to prepare ${PREFIX} sound software generation")
+        endif()
+    endif()
     genesisrecomp_add_generated_sources(
-        GENERATED_SOURCES "${PREFIX}" "${GAME}" "${ROM}"
+        GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${ROM}"
         REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
     set(SHARED_SRC
         ${RUNNER_SOURCES}
@@ -229,6 +245,13 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
         "${S3_GAME_COMMON}/sonic3_gameplay.c"
         "${S3_GAME_COMMON}/sonic3_state.c")
+    list(APPEND SHARED_SRC
+        "${S3_GAME_COMMON}/sonic3_sound_driver.c"
+        "${S3_GAME_COMMON}/sonic3_sound_mods.c"
+        "${S3_GAME_COMMON}/sonic3_sound_assets.c"
+        "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
+        "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
+        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
     # The source's queued decompressor changes its IRQ return PC. Compile this
     # small program with the existing explicit-PC native backend so its RTE
     # bookmark semantics do not depend on a suspended C call continuation.
@@ -291,6 +314,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GAME}"
         "${S3_GAME_ROOT}/trilogy"
         "${S3_GAME_COMMON}"                      # sonic3_video.h (all modes)
+        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common"
+        "${NATIVE_GAME}"
     )
     if(GENESIS_Z80_RECOMP)
         list(APPEND INCLUDES_NATIVE
@@ -306,10 +331,17 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE}
         $<$<STREQUAL:${PREFIX},sonic3>:SONIC3_STANDALONE=1>
+        $<$<STREQUAL:${PREFIX},sonic3k>:S3_SOUND_COMBINED=1>
         $<$<BOOL:${GENESIS_Z80_RECOMP}>:GENESIS_Z80_RECOMP=1>
         $<$<BOOL:${GENESIS_Z80_RECOMP}>:SMS_RUNTIME_NO_CALL_BY_ADDRESS=1>
         $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>
         $<$<BOOL:${GEN_DEV_TRACE}>:GEN_DEV_TRACE>)
+    if(S3_CLONE_PROGRAM_DIR AND EXISTS "${NATIVE_GAME}/sonic3_clone_program.h")
+        target_compile_definitions(${TARGET} PRIVATE S3_CLONE_DRIVER=1)
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "${CMAKE_SOURCE_DIR}/docs/CLONE_DRIVER_NOTICES.txt" "$<TARGET_FILE_DIR:${TARGET}>/CLONE_DRIVER_NOTICES.txt")
+    endif()
 
     target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
     foreach(t ${TARGET})

@@ -14,6 +14,8 @@ static unsigned marker=17;
 void s3_video_state(S3StateIO *io) { S3_STATE(io,marker); }
 void s3_video_state_loaded(void) {}
 void s3_army_state(S3StateIO *io) { (void)io; }
+/* Audio serialization is exercised separately with the real driver. */
+void s3_sound_state(S3StateIO *io) { (void)io; }
 int s3_army_state_ready(void) { return actor_ready; }
 size_t audio_event_state_size(void) { return 0; }
 int audio_event_state_save(void *data,size_t size) { (void)data;return size==0; }

@@ -20,6 +20,7 @@
 #include "sonic3_kos.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
+#include "sonic3_sound_driver.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -46,8 +47,8 @@ extern void func_000802(void);  /* VInt         ($000802) */
 extern void func_000F9E(void);  /* JmpTo_HInt   ($000F9E) */
 extern void func_000FA2(void);  /* HInt         ($000FA2) */
 
-static void s3_call_entry_point(void) { recomp_call_addr(0x000206u); }
-static void s3_call_vblank(void)      { s3_video_vblank(); recomp_call_addr(0x000802u); }
+static void s3_call_entry_point(void) { s3_sound_post_reset(); recomp_call_addr(0x000206u); }
+static void s3_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); recomp_call_addr(0x000802u); }
 static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
 
 /* Native startup waits are resumable frame boundaries. Their instruction
@@ -270,6 +271,7 @@ static void s3_cmd_object_table(int id, const char *json) {
 
 static const GameDebugCommand s3_commands[] = {
     { "custom_video", s3_video_command },
+    { "custom_sound", s3_sound_command },
     { "sonic_state",  s3_cmd_state },
     { "object_table", s3_cmd_object_table },
 };
@@ -277,6 +279,7 @@ static const GameDebugCommand s3_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    if(s3_sound_owns(pc))return s3_sound_hook(pc);
     s3_startup_wait_hook(pc);
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
@@ -289,15 +292,19 @@ static int gameplay_instruction(uint32_t pc)
     }
     return s3_video_hook(pc);
 }
-static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); }
+static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); s3_sound_load(path,"sonic3"); }
+static const struct RecompLauncherCModProvider *sound_mods(const struct RecompLauncherCModProvider *base) { return s3_sound_mods(s3_gameplay_mods(base)); }
+static int sound_netplay(void) { return s3_sound_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
+    .rb_state_save          = s3_sound_rb_save,
+    .rb_state_load          = s3_sound_rb_load,
     .state_size             = s3_state_size,
     .state_save             = s3_state_save,
     .state_load             = s3_state_load,
     .load_settings          = gameplay_settings,
-    .mods                   = s3_gameplay_mods,
-    .netplay_allowed        = s3_gameplay_netplay_allowed,
+    .mods                   = sound_mods,
+    .netplay_allowed        = sound_netplay,
     .video                  = &sonic3_video,
     .video_default          = "fit",
     .instruction_hook       = gameplay_instruction,
@@ -325,14 +332,14 @@ const GameSpec g_game_spec = {
     .dispatch_main_loop_pc  = 0x000734u,   /* GameLoop */
     .call_periodic          = NULL,
 
-    .on_post_reset          = NULL,
+    .on_post_reset          = s3_sound_post_reset,
     .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 
     .handle_arg             = NULL,
     .arg_usage              = NULL,
-    .dispatch_override      = NULL,
+    .dispatch_override      = s3_sound_dispatch_miss,
 
     .fill_frame_record      = s3_fill_frame_record,
     .frame_record_version   = SONIC_GAME_DATA_VERSION,
