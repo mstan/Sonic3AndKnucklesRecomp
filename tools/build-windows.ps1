@@ -1,6 +1,6 @@
 # Adapted from RocketKnightAdventuresRecomp's validated release workflow.
 param(
-  [string]$Version = '0.7.6',
+  [string]$Version = '0.8.0',
   [string]$BuildDir = 'build-release',
   [string]$CMake = 'C:/Program Files (x86)/Microsoft Visual Studio/2022/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe',
   [string]$Python = 'python',
@@ -16,7 +16,8 @@ $ErrorActionPreference = 'Continue'
 & $CMake -S $root -B $build -G 'Visual Studio 17 2022' -A x64 `
   "-DGENESIS_RECOMP_ROOT=$root/segagenesisrecomp" "-DS3_BUILD_VERSION=$Version" `
   "-DPython3_EXECUTABLE=$Python" -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF `
-  -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
+  -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded `
+  -DS3_CLONE_DRIVER_SUPPORT=ON -DGENESIS_Z80_RECOMP=OFF
 if ($LASTEXITCODE) { throw 'Release configure failed' }
 & $CMake --build $build --config Release --parallel 8
 if ($LASTEXITCODE) { throw 'Release build failed' }

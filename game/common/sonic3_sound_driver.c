@@ -79,7 +79,7 @@ void s3_sound_post_reset(void)
     g_rom_ext=bank;g_rom_ext_size=(stats.bytes+1)&~1u;
     memset(sound_ram,0,sizeof sound_ram);
     if(!gbus_map_expansion_ram(S3_CLONE_RAM_ADDRESS,sound_ram,sizeof sound_ram)){fprintf(stderr,"[sound-driver] RAM mapping failed\n");exit(1);}
-    fprintf(stderr,"[sound-driver] Clone Driver + Mega PCM; %u songs, %u SFX; ROM-derived bank %u bytes\n",stats.music,stats.sfx,g_rom_ext_size);
+    fprintf(stderr,"[sound-driver] Clone Driver + Mega PCM; %u songs, %u SFX; ROM-derived bank %u bytes; program=%s\n",stats.music,stats.sfx,g_rom_ext_size,S3_CLONE_SHA256);
 #endif
 }
 int s3_sound_owns(uint32_t pc)
