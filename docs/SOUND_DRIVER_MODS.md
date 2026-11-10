@@ -14,6 +14,10 @@ standard Z80 backend. Imported campaigns and netplay require the original
 sound driver. A changed selection takes effect on the next application start;
 the running session keeps its driver and immutable sound bank.
 
+The existing **High refresh rate** mod provides visual interpolation at 120 Hz,
+144 Hz or display refresh rate. It works alongside Clone Driver while game
+and sound timing remain at their native rate.
+
 One adapter serves Sonic 3, S&K and their combined cartridge. Cartridge layouts,
 Z80 sequence conversion and queue translation stay in the game repository.
 The engine supplies its existing CPU/chip scheduler, native expansion-ROM

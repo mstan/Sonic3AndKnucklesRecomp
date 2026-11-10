@@ -13,3 +13,8 @@
 
 Enable the sound driver in Mods and restart the application. See
 [Sound driver mods](SOUND_DRIVER_MODS.md) for details and build options.
+
+Validation covers the three Windows ZIPs and Linux AppImages, current-build
+save/load, pause/resume, rewind, diagnostic replay and existing campaign imports.
+Stock and Clone audio captures match between Windows and Linux. Windows catalog
+smoke tests briefly play every available music and sound-effect entry.

@@ -35,9 +35,11 @@ runs the AppImage layout gate. Three AppImages land in `release-linux/`.
 
 The AppRun entry point refreshes release-owned launcher assets next to the
 AppImage and preserves settings, ROM selection, mod settings and saves.
-Adjacent ROM discovery checks the variant's size and product header. Mods
-remain off by default. Clone Driver software is required in production builds;
-its notices and ROM-derived audio documentation accompany each package. The directory must be writable. FUSE-free launch uses
+Adjacent ROM discovery checks the variant's size and product header. Optional
+gameplay, campaign and audio mods remain off by default; widescreen uses Fit
+to screen and replay diagnostics are enabled. Clone Driver software is required
+in production builds; its notices and ROM-derived audio documentation accompany
+each package. The directory must be writable. FUSE-free launch uses
 `--appimage-extract-and-run`. Ubuntu 24.04 determines the minimum glibc 2.39
 baseline; older distributions and Steam Deck require separate validation.
 
