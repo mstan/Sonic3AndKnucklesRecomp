@@ -55,24 +55,8 @@ extern void func_000584(void);  /* VInt         ($000584) */
 extern void func_000D0C(void);  /* JmpTo_HInt   ($000D0C) */
 extern void func_000D10(void);  /* HInt         ($000D10) */
 
-static int s3k_instruction(uint32_t pc)
-{
-    if(s3_sound_owns(pc))return s3_sound_hook(pc);
-    if (s3_state_menu_instruction(pc)) return 0;
-    if(s3_kos_owns(pc))return s3_kos_instruction(pc);
-    if(s3_gameplay_owns(pc)) {
-        s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
-        s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
-        s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
-        if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],!tri_character_active()))g_cpu.SR|=4u;
-        return 0; /* This private site must not reach the renderer default. */
-    }
-    if (trilogy_instruction(pc)) return 1;
-    /* New hook sites must never reach the renderer's object-range default,
-     * even with the pack disabled. Shared army sites retain their old chain. */
-    if (trilogy_owns(pc) && !s3_army_owns(pc)) return 0;
-    return s3_sk_instruction_hook(pc);
-}
+#include "sonic3k_instruction.h"
+
 extern void tri_obj_vblank(void);
 static void s3k_call_entry_point(void) { s3_sound_post_reset(); trilogy_init(); s3_army_init(); recomp_call_addr(0x000206u); }
 static void s3k_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); if (tri_bank_loaded()) tri_obj_vblank(); }

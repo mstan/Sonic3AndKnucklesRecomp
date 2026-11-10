@@ -247,6 +247,14 @@ add_executable(campaign_combined_test runtime/campaign_combined_test.c
 target_include_directories(campaign_combined_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME campaign_combined COMMAND campaign_combined_test)
 
+# Exercise audio/campaign hook composition without a cartridge fixture.
+add_executable(sonic3_sound_dispatch_test runtime/sonic3_sound_dispatch_test.c)
+target_include_directories(sonic3_sound_dispatch_test PRIVATE
+    "${S3_GAME_COMMON}" "${S3_GAME_ROOT}/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+    "${RUNNER_ROOT}/external/clowncommon" "${RUNNER_ROOT}/external/superzazu")
+target_compile_definitions(sonic3_sound_dispatch_test PRIVATE OWN_BACKEND=1)
+add_test(NAME sound_dispatch COMMAND sonic3_sound_dispatch_test)
 # Optional cartridge fixtures exercise the complete sound corpus without
 # storing any music, instruments or samples in the repository.
 foreach(_kind source sequence pcm)
