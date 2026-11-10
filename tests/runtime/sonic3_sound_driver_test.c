@@ -12,6 +12,13 @@ uint32_t g_rom_ext_size;
 int s3_stage_pack_enabled;
 static uint8_t *mapped;
 static uint32_t tail,last_queue,last_id;
+static int same_cpu(const M68KState *a,const M68KState *b)
+{
+    /* Struct assignment need not preserve the padding after SR. Check the
+     * guest registers rather than unspecified host padding bytes. */
+    return !memcmp(a->D,b->D,sizeof a->D) && !memcmp(a->A,b->A,sizeof a->A) &&
+           a->SR==b->SR && a->PC==b->PC && a->USP==b->USP;
+}
 int gbus_map_expansion_ram(uint32_t base,uint8_t *data,uint32_t size)
 {CHECK(base==0x900000 && size==0x800);mapped=data;return 1;}
 uint32_t m68k_read32(uint32_t a)
@@ -34,7 +41,7 @@ int main(int argc,char **argv)
     CHECK(!s3_sound_rb_load(disabled,n));
     int s3=!strcmp(argv[2],"sonic3");unsigned init=s3?0x1562:0x12CE,music=s3?0x15E2:0x1358,sfx=s3?0x160A:0x1380;
     memset(&g_cpu,0,sizeof g_cpu);g_cpu.A[7]=0xFFFE00;g_cpu.SR=0x271F;M68KState expected=g_cpu;expected.SR=0x2714;
-    CHECK(s3_sound_hook(init));CHECK(!memcmp(&g_cpu,&expected,sizeof g_cpu));
+    CHECK(s3_sound_hook(init));CHECK(same_cpu(&g_cpu,&expected));
     for(unsigned i=0;i<0x800;i++)mapped[i]=(uint8_t)(i*37);
     unsigned song=!strcmp(argv[2],"sandk")?0xF:1;
     g_cpu.D[0]=song;CHECK(s3_sound_hook(music));CHECK(s3_sound_rb_save(saved,n)==n);
@@ -45,8 +52,8 @@ int main(int argc,char **argv)
     /* Pending launcher selection is for a restart; current snapshots retain
      * the running driver identity. */
     CHECK(s3_sound_select(0));CHECK(s3_sound_rb_load(saved,n));CHECK(!s3_sound_netplay_allowed());
-    M68KState before=g_cpu;s3_sound_vblank();CHECK(!memcmp(&g_cpu,&before,sizeof g_cpu));CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==song);
-    g_cpu.D[0]=0x33;CHECK(s3_sound_hook(sfx));before=g_cpu;s3_sound_vblank();CHECK(!memcmp(&g_cpu,&before,sizeof g_cpu));CHECK(last_queue==S3_CLONE_QUEUE_SFX && last_id==0x40);
+    M68KState before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==song);
+    g_cpu.D[0]=0x33;CHECK(s3_sound_hook(sfx));before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_SFX && last_id==0x40);
     unsigned pause=s3_clone_pause_sites[0];uint8_t value=g_rom[pause+3];CHECK(s3_sound_hook(pause));CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==value && tail==pause+8);
 #ifdef S3_SOUND_COMBINED
     s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(!s3_sound_commit());
