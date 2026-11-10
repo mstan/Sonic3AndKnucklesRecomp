@@ -24,6 +24,7 @@
 #include "sonic3_gameplay.h"
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
+#include "sonic3_sound_driver.h"
 #include "sonic3_kos.h"
 
 #include <stddef.h>
@@ -48,12 +49,12 @@ extern void func_000584(void);  /* VInt         ($000584) */
 extern void func_000D0C(void);  /* JmpTo_HInt   ($000D0C) */
 extern void func_000D10(void);  /* HInt         ($000D10) */
 
-static void sandk_call_entry_point(void) { s3_army_init(); recomp_call_addr(0x000206u); }
-static void sandk_call_vblank(void)      { s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
-static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); s3_gameplay_load(path,"sandk"); }
+static void sandk_call_entry_point(void) { s3_sound_post_reset(); s3_army_init(); recomp_call_addr(0x000206u); }
+static void sandk_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
+static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); s3_gameplay_load(path,"sandk"); s3_sound_load(path,"sandk"); }
 static const struct RecompLauncherCModProvider *sandk_mods(const struct RecompLauncherCModProvider *base)
-{ return s3_gameplay_mods(s3_mods(base)); }
-static int sandk_netplay_allowed(void) { return s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
+{ return s3_sound_mods(s3_gameplay_mods(s3_mods(base))); }
+static int sandk_netplay_allowed(void) { return s3_sound_netplay_allowed() && s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void sandk_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* ---- 68K work-RAM accessors ---- */
@@ -215,6 +216,7 @@ static void sandk_cmd_object_table(int id, const char *json) {
 
 static const GameDebugCommand sandk_commands[] = {
     { "custom_video", s3_video_command },
+    { "custom_sound", s3_sound_command },
     { "sonic_state",  sandk_cmd_state },
     { "object_table", sandk_cmd_object_table },
     { "knuckles_army", s3_army_command },
@@ -223,6 +225,7 @@ static const GameDebugCommand sandk_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    if(s3_sound_owns(pc))return s3_sound_hook(pc);
     if (s3_state_menu_instruction(pc)) return 0;
     /* Startup uses the original queued program and VBlank's saved return PC.
      * Keep the incoming fade and overlapping title modules on that clock. */
@@ -241,6 +244,8 @@ static int gameplay_instruction(uint32_t pc)
 }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
+    .rb_state_save          = s3_sound_rb_save,
+    .rb_state_load          = s3_sound_rb_load,
     .state_size             = s3_state_size,
     .state_save             = s3_state_save,
     .state_load             = s3_state_load,
@@ -278,14 +283,14 @@ const GameSpec g_game_spec = {
     .dispatch_main_loop_pc  = 0x0004B6u,   /* GameLoop */
     .call_periodic          = NULL,
 
-    .on_post_reset          = NULL,
+    .on_post_reset          = s3_sound_post_reset,
     .on_frame_pre           = gameplay_frame,
     .on_frame_post          = NULL,
     .on_hblank              = NULL,
 
     .handle_arg             = NULL,
     .arg_usage              = NULL,
-    .dispatch_override      = NULL,
+    .dispatch_override      = s3_sound_dispatch_miss,
 
     .fill_frame_record      = sandk_fill_frame_record,
     .frame_record_version   = SONIC_GAME_DATA_VERSION,

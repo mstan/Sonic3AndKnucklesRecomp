@@ -2,10 +2,10 @@
 # Adapted from RocketKnightAdventuresRecomp's validated AppImage workflow.
 # Ubuntu 24.04: build-essential cmake pkg-config libsdl2-dev libgl1-mesa-dev
 # curl python3 patchelf imagemagick. Owner ROMs go under game/<mode>/.
-# Usage: bash tools/build-linux.sh --version 0.7.6 --jobs 8 [--no-package]
+# Usage: bash tools/build-linux.sh --version 0.8.0 --jobs 8 [--no-package]
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-VERSION=0.7.6
+VERSION=0.8.0
 JOBS=8
 OUT="$REPO/release-linux"
 BUILD="$REPO/build-linux-prod"
@@ -26,7 +26,8 @@ done
 test "$(uname -m)" = x86_64
 cmake -S "$REPO" -B "$BUILD" -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release \
     -DGENESIS_RECOMP_ROOT="$REPO/segagenesisrecomp" -DS3_BUILD_VERSION="$VERSION" \
-    -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF
+    -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF \
+    -DS3_CLONE_DRIVER_SUPPORT=ON -DGENESIS_Z80_RECOMP=OFF
 cmake --build "$BUILD" -j"$JOBS"
 [ "$PACKAGE" = 1 ] || exit 0
 python3 "$REPO/tools/make_campaign_builder.py" --out "$BUILD" \

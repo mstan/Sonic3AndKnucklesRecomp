@@ -246,3 +246,54 @@ add_executable(campaign_combined_test runtime/campaign_combined_test.c
     "${CMAKE_SOURCE_DIR}/game/trilogy/campaign_save.c")
 target_include_directories(campaign_combined_test PRIVATE "${CMAKE_SOURCE_DIR}/game/trilogy")
 add_test(NAME campaign_combined COMMAND campaign_combined_test)
+
+# Exercise audio/campaign hook composition without a cartridge fixture.
+add_executable(sonic3_sound_dispatch_test runtime/sonic3_sound_dispatch_test.c)
+target_include_directories(sonic3_sound_dispatch_test PRIVATE
+    "${S3_GAME_COMMON}" "${S3_GAME_ROOT}/trilogy"
+    "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+    "${RUNNER_ROOT}/external/clowncommon" "${RUNNER_ROOT}/external/superzazu")
+target_compile_definitions(sonic3_sound_dispatch_test PRIVATE OWN_BACKEND=1)
+add_test(NAME sound_dispatch COMMAND sonic3_sound_dispatch_test)
+# Optional cartridge fixtures exercise the complete sound corpus without
+# storing any music, instruments or samples in the repository.
+foreach(_kind source sequence pcm)
+    set(_sound_sources "${S3_GAME_COMMON}/sonic3_sound_assets.c"
+        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+    if(_kind STREQUAL "sequence")
+        list(APPEND _sound_sources "${S3_GAME_COMMON}/sonic3_sound_sequences.c")
+    elseif(_kind STREQUAL "pcm")
+        list(APPEND _sound_sources "${S3_GAME_COMMON}/sonic3_sound_pcm.c")
+    endif()
+    add_executable(sonic3_sound_${_kind}_test runtime/sonic3_sound_${_kind}_test.c ${_sound_sources})
+    target_include_directories(sonic3_sound_${_kind}_test PRIVATE
+        "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
+endforeach()
+foreach(_mode sonic3 sonic3k sandk)
+    set(_rom "${S3_GAME_ROOT}/${_mode}/${_mode}.bin")
+    if(EXISTS "${_rom}")
+        add_test(NAME sound_source_${_mode} COMMAND sonic3_sound_source_test "${_rom}")
+        if(S3_CLONE_PROGRAM_DIR)
+            add_executable(sound_driver_${_mode}_test runtime/sonic3_sound_driver_test.c
+                "${S3_GAME_COMMON}/sonic3_sound_driver.c" "${S3_GAME_COMMON}/sonic3_sound_assets.c"
+                "${S3_GAME_COMMON}/sonic3_sound_sequences.c" "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
+                "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+            target_include_directories(sound_driver_${_mode}_test PRIVATE
+                "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
+                "${CMAKE_SOURCE_DIR}/recomp-ui/src/common" "${CMAKE_BINARY_DIR}/clone-inputs/${_mode}")
+            target_compile_definitions(sound_driver_${_mode}_test PRIVATE S3_CLONE_DRIVER=1
+                $<$<STREQUAL:${_mode},sonic3k>:S3_SOUND_COMBINED=1>)
+            if(_mode STREQUAL "sonic3k")
+                target_include_directories(sound_driver_${_mode}_test PRIVATE "${S3_GAME_ROOT}/trilogy")
+            endif()
+            add_test(NAME sound_driver_${_mode} COMMAND sound_driver_${_mode}_test "${_rom}" "${_mode}")
+            set(_seq "${CMAKE_CURRENT_BINARY_DIR}/${_mode}-sequences.bin")
+            add_test(NAME sound_sequence_${_mode} COMMAND sonic3_sound_sequence_test
+                "${_rom}" "${S3_CLONE_PROGRAM_DIR}/clone-driver.bin" "${_seq}")
+            set_tests_properties(sound_sequence_${_mode} PROPERTIES FIXTURES_SETUP sound_${_mode})
+            add_test(NAME sound_pcm_${_mode} COMMAND sonic3_sound_pcm_test
+                "${_rom}" "${_seq}" "${CMAKE_CURRENT_BINARY_DIR}/${_mode}-sound-bank.bin")
+            set_tests_properties(sound_pcm_${_mode} PROPERTIES FIXTURES_REQUIRED sound_${_mode})
+        endif()
+    endif()
+endforeach()

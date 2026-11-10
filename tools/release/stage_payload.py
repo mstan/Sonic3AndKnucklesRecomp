@@ -71,6 +71,9 @@ def stage(build, dest, version, mode, engine_root=None):
     assert info["mode"] == mode and info["target"] == spec["target"], "Wrong build mode"
     for key in ("trace", "reverse_debug", "dev_trace", "cosim"):
         assert info[key] == "OFF", f"Development option enabled: {key}"
+    assert info["z80_recompiled"] == "OFF", "Release requires the standard Z80 backend"
+    sound_sha = info["clone_driver_sha256"]
+    assert len(sound_sha) == 64 and set(sound_sha) <= set("0123456789abcdef"), "Missing Clone Driver software"
     for key, repo, relative in (("source_commit", ROOT, None),
             ("engine_commit", engine, "segagenesisrecomp"),
             ("ui_commit", ROOT / "recomp-ui", "recomp-ui"),
@@ -90,6 +93,7 @@ def stage(build, dest, version, mode, engine_root=None):
     # Gameplay/launcher captions contain only the clean game name. Build
     # identity is emitted separately by the shared runner for logs/About.
     image = binary.read_bytes()
+    assert sound_sha.encode() + b"\0" in image, "Binary does not contain the declared sound driver"
     for label, stamp in (("game title", spec["title"]), ("version", version),
                          ("source commit", info["source_commit"][:10]),
                          ("engine commit", info["engine_commit"][:10])):
@@ -103,8 +107,10 @@ def stage(build, dest, version, mode, engine_root=None):
     shutil.copy2(license_path, dest / "LICENSE")
     shutil.copy2(ROOT / "PERMISSIONS.md", dest / "PERMISSIONS.md")
     shutil.copy2(engine / "THIRD-PARTY-LICENSES.md", dest)
+    shutil.copy2(ROOT / "docs/CLONE_DRIVER_NOTICES.txt", dest / "CLONE_DRIVER_NOTICES.txt")
     shutil.copy2(metadata, dest / "build-info.json")
     (dest / "docs").mkdir(exist_ok=True)
+    shutil.copy2(ROOT / "docs/SOUND_DRIVER_MODS.md", dest / "docs/SOUND_DRIVER_MODS.md")
     (dest / "tools").mkdir(exist_ok=True)
     shutil.copy2(engine / "docs/PLAYER_FEEDBACK.md", dest / "docs/PLAYER_FEEDBACK.md")
     shutil.copy2(engine / "tools/replay_diagnostic.py", dest / "tools/replay_diagnostic.py")

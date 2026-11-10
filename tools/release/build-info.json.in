@@ -10,6 +10,8 @@
   "reverse_debug": "@SONIC_REVERSE_DEBUG@",
   "dev_trace": "@GEN_DEV_TRACE@",
   "cosim": "@GENESIS_BUILD_COSIM@",
+  "z80_recompiled": "@GENESIS_Z80_RECOMP@",
+  "clone_driver_sha256": "@S3_CLONE_PROGRAM_SHA@",
   "system": "@CMAKE_SYSTEM_NAME@",
   "compiler": "@CMAKE_CXX_COMPILER_ID@ @CMAKE_CXX_COMPILER_VERSION@"
 }

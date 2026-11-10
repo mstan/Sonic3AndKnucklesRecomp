@@ -8,7 +8,7 @@ those ROMs, generated art, settings, saves or developer builds.
 ## Windows x64
 
 ```powershell
-./tools/build-windows.ps1 -Version 0.6.5 -Python C:/path/to/python.exe
+./tools/build-windows.ps1 -Version 0.8.0 -Python C:/path/to/python.exe
 ```
 
 Requires Visual Studio 2022 C++ tools, CMake and Python. `-CMake`, `-BuildDir`
@@ -24,7 +24,7 @@ On Ubuntu 24.04 install `build-essential cmake pkg-config libsdl2-dev
 libgl1-mesa-dev curl python3 patchelf imagemagick` and run:
 
 ```sh
-bash tools/build-linux.sh --version 0.6.5 --jobs 8
+bash tools/build-linux.sh --version 0.8.0 --jobs 8
 ```
 
 `--build DIR`, `--out DIR` and `--no-package` are available. An ext4 build
@@ -35,8 +35,11 @@ runs the AppImage layout gate. Three AppImages land in `release-linux/`.
 
 The AppRun entry point refreshes release-owned launcher assets next to the
 AppImage and preserves settings, ROM selection, mod settings and saves.
-Adjacent ROM discovery checks the variant's size and product header. Mods
-remain off by default. The directory must be writable. FUSE-free launch uses
+Adjacent ROM discovery checks the variant's size and product header. Optional
+gameplay, campaign and audio mods remain off by default; widescreen uses Fit
+to screen and replay diagnostics are enabled. Clone Driver software is required
+in production builds; its notices and ROM-derived audio documentation accompany
+each package. The directory must be writable. FUSE-free launch uses
 `--appimage-extract-and-run`. Ubuntu 24.04 determines the minimum glibc 2.39
 baseline; older distributions and Steam Deck require separate validation.
 
@@ -60,7 +63,7 @@ baseline; older distributions and Steam Deck require separate validation.
 3. Merge the release tooling/notes to `main`, then reconfigure and package from
    that exact clean commit. `build-info.json` must identify the tag target and
    the committed engine/UI/disassembly pins. Keep repository visibility as-is.
-4. Tag `v0.6.5`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
+4. Tag `v0.8.0`, publish the three ZIPs, three AppImages and `SHA256SUMS.txt`.
    Verify the remote tag, `origin/main`, asset names/sizes and uploaded SHA256s.
 
 Do not zip a build folder. All staging uses explicit native targets and
