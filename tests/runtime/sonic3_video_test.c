@@ -254,8 +254,15 @@ static void test_hcz_rush_extent(void)
             }
         }
     }
-    /* The higher opening gains margin-only brick fill, clipped by the
-     * foreground roof even when its native tiles have low priority. */
+    /* The closed current uses its authored two-row vertical extent. Its
+     * higher opening must remain dry before the water starts moving. */
+    memset(out,0,sizeof out);memset(s_priority,0,1603);
+    draw_scene_sprites(&v,16,out,1603,641,pal);
+    CHECK(!out[641+350]);
+    /* Moving water still fills the raised opening, clipped by real roof. */
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    s_build.camera_x=s_camera=0x680;s_camera_y=0;
+    extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,4,0x40,80,256);
     memset(out,0,sizeof out);memset(s_priority,0,1603);
     s_priority[641+400]=4;
     draw_scene_sprites(&v,16,out,1603,641,pal);

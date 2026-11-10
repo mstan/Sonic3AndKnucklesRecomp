@@ -761,10 +761,10 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
             q->x=sx;q->y=y+dy;q->attr=(uint16_t)(gfx+attr);
             q->size=0x6F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
         }
-        /* The corridor roof rises partway through the flow. Fill above the
-         * first row as well; the real foreground opacity clips its roof.
+        /* Only moving water fills the raised opening. The closed frames
+         * retain their authored upper edge rather than tinting the dry roof.
          * Bit4 marks this roof fill, bit5 the repeating texture, bit6 margins. */
-        if(top)for(int sy=y+dy-32;sy+32>0;sy-=32) {
+        if(top && frame<2)for(int sy=y+dy-32;sy+32>0;sy-=32) {
             int sx=x+first,margin=(s_requested_width-320)/2;
             while(sx+32<=-margin)sx+=32;
             for(;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
