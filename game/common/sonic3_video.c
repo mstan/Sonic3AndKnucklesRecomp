@@ -363,7 +363,13 @@ static uint16_t world_attr_blocks_mask(const uint8_t *ram,const uint8_t *blocks,
     return (uint16_t)(((blocks[address]<<8)|blocks[address+1])^((block&0xC00u)<<1));
 }
 static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int wx,int wy,int background)
-{ return world_attr_blocks_mask(ram,blocks,wx,wy,background,0x7Cu); }
+{
+    /* Get_ChunkRow follows the level's published layout mask. ICZ1 loops
+     * at 2048px; treating negative/bottom-edge Y as a 4096px world reads
+     * unrelated rows instead of the other side of that loop. */
+    unsigned mask=((unsigned)ram[0xEEAE]<<8)|ram[0xEEAF];
+    return world_attr_blocks_mask(ram,blocks,wx,wy,background,mask==0x3C?0x3Cu:0x7Cu);
+}
 static uint16_t world_attr(const uint8_t *ram,int wx,int wy,int background)
 { return world_attr_blocks(ram,ram+0x9000,wx,wy,background); }
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)

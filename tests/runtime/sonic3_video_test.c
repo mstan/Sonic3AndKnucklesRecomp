@@ -1827,6 +1827,30 @@ static int cnz_boss_background_cell(const uint8_t *ram,int x,int y,int backgroun
     (void)ram;(void)x;
     *cell=background?(y>=0x200 && y<0x300?1:2):0;return 1;
 }
+static void test_native_vertical_layout_wrap(void)
+{
+    memset(g_ram,0,sizeof g_ram);s3_video_set_world_cell(NULL);
+    word(g_ram,0x8000,16);word(g_ram,0x8002,16);
+    for(unsigned background=0;background<2;++background) {
+        unsigned table=0x8008+background*2;
+        word(g_ram,table,0x8100);word(g_ram,table+0x3C,0x8120);
+        word(g_ram,table+0x40,0x8140);word(g_ram,table+0x7C,0x8140);
+    }
+    g_ram[0x8100]=1;g_ram[0x8120]=2;g_ram[0x8140]=3;
+    for(unsigned chunk=1;chunk<=3;++chunk)for(unsigned cell=0;cell<64;++cell)
+        word(g_ram,chunk*128+cell*2,chunk+3);
+    for(unsigned block=4;block<=6;++block)for(unsigned cell=0;cell<4;++cell)
+        word(g_ram,0x9000+block*8+cell*2,(block-3)*0x111);
+    for(unsigned background=0;background<2;++background) {
+        word(g_ram,0xEEAE,0x3C);
+        CHECK(world_attr(g_ram,0,-8,(int)background)==0x222);
+        CHECK(world_attr(g_ram,0,0x800,(int)background)==0x111);
+        word(g_ram,0xEEAE,0x7C);
+        CHECK(world_attr(g_ram,0,-8,(int)background)==0x333);
+        CHECK(world_attr(g_ram,0,0x800,(int)background)==0x333);
+        CHECK(world_attr(g_ram,0,0x1000,(int)background)==0x111);
+    }
+}
 static void test_cnz_boss_background_band(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3254,7 +3278,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_cnz_boss_background_band();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_streamed_background_sources();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
