@@ -2169,6 +2169,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int by=bg_world?unwrap(presentation_bg_scroll(v->vsram[1]),s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    /* CNZ1BGE_Boss streams only the $200..$2FF background rows with
+     * Draw_TileColumn(d1=$200,d6=$10). Their 256px canvas scrolls while
+     * the room descends; the neighboring layout rows are other scenes. */
+    if(bg_world && s_frame_zone==3 && !s_frame_act && s_frame_bg_event==8)
+        by=0x200+(by&255);
     int bg_width=bg_world?((s_world_frame[0x8002]<<8)|s_world_frame[0x8003])*128:0;
     /* AIZ1's upper parallax bands are a fixed 512px canvas. Its layout
      * also stores the intro coastline and fire art farther right: those
