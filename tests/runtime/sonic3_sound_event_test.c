@@ -29,6 +29,42 @@ static int final_echo_restores(const uint8_t *bank,uint32_t song,uint32_t used)
 }
 static uint8_t *read_file(const char *path,size_t *size)
 {FILE *f=fopen(path,"rb");CHECK(f);CHECK(!fseek(f,0,SEEK_END));long n=ftell(f);CHECK(n>0);rewind(f);uint8_t *p=malloc((size_t)n);CHECK(p);CHECK(fread(p,1,(size_t)n,f)==(size_t)n);fclose(f);*size=(size_t)n;return p;}
+static void mixed_retail_envelopes(char **argv,const S3SoundLayout *seq,const S3SoundPCMLayout *pcm,
+                                   const uint8_t *program,const uint8_t *base,uint32_t base_size,uint8_t *bank)
+{
+    S3SoundSource source[2];uint8_t *rom[2];size_t size[2];unsigned ids[]={0x28,0x29};
+    char error[256]={0};
+    for(unsigned d=0;d<2;d++){
+        rom[d]=read_file(argv[8+d],&size[d]);
+        CHECK(s3_sound_read_source(rom[d],size[d],&source[d],error,sizeof error));
+    }
+    for(unsigned order=0;order<2;order++){
+        memcpy(bank,base,base_size);uint32_t used=base_size;unsigned next=97;
+        for(unsigned j=0;j<2;j++){
+            unsigned d=order?1-j:j;
+            CHECK(s3_sound_build_event(rom[d],size[d],S3_DONOR_S3+d,d?S3_THEME_CLEAR:S3_THEME_CONTINUE,
+                ids[d],seq,pcm,program,bank,0x400000,&used,&next,error,sizeof error));
+        }
+        /* Both cartridge tables must still match their own ROM after the
+         * other event is appended, regardless of configuration order. */
+        for(unsigned d=0;d<2;d++){
+            uint32_t input=s3_sound_music_source(&source[d],rom[d],ids[d]);
+            unsigned original=rom[d][input+6+rom[d][input+2]*4+5];CHECK(original);
+            uint32_t song=(be32(bank+seq->music_index-0x400000+4*(ids[d]-1))&0xFFFFFF)-0x400000;
+            unsigned table_base=bank[song+8+bank[song+2]*4+5]-original;
+            for(unsigned env=0;env<source[d].volume_count;env++){
+                unsigned p=source[d].volume_pointers+env*2;
+                p=source[d].z80[p]|((unsigned)source[d].z80[p+1]<<8);
+                unsigned n=0;while(n<254 && !(source[d].z80[p+n]>=0x80 && source[d].z80[p+n]<=0x83))++n;
+                CHECK(n<254);n+=1+(source[d].z80[p+n]==0x82);
+                uint32_t actual=be32(bank+seq->psg_index-0x400000+4*(table_base+env));
+                CHECK(actual>=0x400000 && actual+n<=0x400000+used);
+                CHECK(!memcmp(bank+actual-0x400000,source[d].z80+p,n));
+            }
+        }
+    }
+    free(rom[0]);free(rom[1]);
+}
 int main(int argc,char **argv)
 {
     CHECK(argc==10);size_t host_size,program_size;uint8_t *host=read_file(argv[1],&host_size),*program=read_file(argv[2],&program_size);
@@ -64,5 +100,6 @@ int main(int argc,char **argv)
         }
         recompui_sha256_compute(rom,size,after);CHECK(!memcmp(before,after,32));free(rom);
     }
-    CHECK(tested==27);free(host);free(program);free(base);free(bank);return 0;
+    CHECK(tested==27);mixed_retail_envelopes(argv,&seq,&pcm,program,base,stats.bytes,bank);
+    free(host);free(program);free(base);free(bank);return 0;
 }

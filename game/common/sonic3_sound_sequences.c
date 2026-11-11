@@ -324,7 +324,9 @@ int s3_sound_build_event(const uint8_t *rom,size_t size,unsigned donor,unsigned 
        theme>=S3_THEME_COUNT||!target||target>51||*used<l->program_size||*used>cap||cap>0x400000||
        l->psg_index<BASE||l->psg_index-BASE+256*4>l->program_size||pcm->sample_count<126)return 0;
     uint32_t dest=(*used+1)&~1u;if(dest>cap||cap-dest<0x8000)return 0;
-    static const unsigned bases[]={103,112,125,138,64,151,151};
+    /* Retail PSG envelope $26 differs between Sonic 3 and S&K. Keep their
+     * tables separate when several events use different cartridges. */
+    static const unsigned bases[]={103,112,125,138,64,151,202};
     unsigned psg_base=bases[donor];uint8_t drums[128]={0},map[128]={0};int bytes=0,ok=0;
     Convert *c=NULL;S3LegacySource *legacy=NULL;uint8_t *samples=NULL;
     if(donor<=S3_DONOR_WAI){
