@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum { BASE=0x400000, MAX_NODES=16384, KINDS=3 };
+enum { BASE=0x400000, MAX_NODES=16384, KINDS=4 };
 typedef struct Node {
     uint16_t pc,target,output;
     uint8_t kind,length,encoded;
@@ -76,6 +76,8 @@ static unsigned mod_id(Convert *c,unsigned id)
 static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
 {
     unsigned roots[10],kinds[10],headers[10],root_count=0,header;
+    int prototype_oneup=music && c->source.prototype &&
+        input==s3_sound_music_source(&c->source,c->rom,0x2A);
     c->input_bank=input&~0x7FFFu;c->count=0;c->voices=-1;memset(c->map,0xFF,sizeof c->map);
     unsigned fm=music?rb(c,input+2):0,psg=music?rb(c,input+3):0;
     if(music){
@@ -86,7 +88,11 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         c->bank[dest+6]=(uint8_t)rb(c,input+4);c->bank[dest+7]=(uint8_t)rb(c,input+5);
         for(unsigned i=0;i<fm+psg;i++){
             unsigned old=input+6+(i<fm?i*4:fm*4+(i-fm)*6),out=old-input+2;
-            unsigned kind=i==0?1:i>=fm?2:0;
+            /* The prototype stops every 1-UP channel without a restore
+             * command. FM5 echoes FM1 four ticks later and finishes last.
+             * Keep its graph separate so its final stop can restore the
+             * preceding music without cutting off that echo. */
+            unsigned kind=i==0?1:i>=fm?2:prototype_oneup && i==fm-1?3:0;
             roots[root_count]=rw(c,old);kinds[root_count]=kind;headers[root_count++]=out;
             unsigned n=i<fm?4:6;memcpy(c->bank+dest+out,c->rom+old,n);
             if(i>=fm){
@@ -156,6 +162,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         }
         if(op==0xE7){c->bank[out]=0xFE;continue;}
         c->bank[out]=0xFF;c->bank[out+1]=commands[op-0xE0];
+        if(op==0xF2 && n->kind==3)c->bank[out+1]=4;
         if(op==0xE2)continue;
         if(op==0xFF){c->bank[out+1]=0x0A;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;}
         if(op==0xE5){

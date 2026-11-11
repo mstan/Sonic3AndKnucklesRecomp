@@ -6,6 +6,27 @@
 #include <string.h>
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
+static unsigned be16(const uint8_t *p){return ((unsigned)p[0]<<8)|p[1];}
+static int final_echo_restores(const uint8_t *bank,uint32_t song,uint32_t used)
+{
+    unsigned pc=song+be16(bank+song+8+5*4);
+    /* Follow the prototype's last FM channel, including its jump into the
+     * first channel's phrase. It must restore, rather than merely stop. */
+    for(unsigned guard=0;guard<1024 && pc<used;guard++){
+        if(bank[pc]!=0xFF){++pc;continue;}
+        if(pc+1>=used)return 0;
+        unsigned op=bank[pc+1];
+        if(op==4)return 1;
+        if(op==0x10)return 0;
+        if(op==0x14){
+            if(pc+4>used)return 0;
+            pc=(unsigned)((int)pc+3+(int16_t)be16(bank+pc+2));
+        }else if(op==0x0D||op==1){pc+=3;}
+        else if(op==0x21){pc+=6;}
+        else return 0;
+    }
+    return 0;
+}
 static uint8_t *read_file(const char *path,size_t *size)
 {FILE *f=fopen(path,"rb");CHECK(f);CHECK(!fseek(f,0,SEEK_END));long n=ftell(f);CHECK(n>0);rewind(f);uint8_t *p=malloc((size_t)n);CHECK(p);CHECK(fread(p,1,(size_t)n,f)==(size_t)n);fclose(f);*size=(size_t)n;return p;}
 int main(int argc,char **argv)
@@ -30,6 +51,8 @@ int main(int argc,char **argv)
             CHECK(used>stats.bytes&&used<0x400000&&next>=97&&next<=126);
             uint32_t song=be32(bank+seq.music_index-0x400000+4*(target[t]-1))&0xFFFFFF;
             CHECK(song>=0x400000+stats.bytes&&song<0x400000+used);
+            if(d==S3_DONOR_PROTO && t==S3_THEME_LIFE)
+                CHECK(final_echo_restores(bank,song-0x400000,used));
             /* Only this song's entry, PSG/modulation resources and newly
              * assigned PCM descriptors may alter the original bank. */
             for(unsigned id=1;id<=51;id++)if(id!=target[t])CHECK(!memcmp(bank+seq.music_index-0x400000+4*(id-1),base+seq.music_index-0x400000+4*(id-1),4));
