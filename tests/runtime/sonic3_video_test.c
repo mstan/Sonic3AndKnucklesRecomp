@@ -2681,18 +2681,23 @@ static void test_blue_spheres(void)
     CHECK(ss_count==1 && ss_spheres[0].depth<ss_distance);
     ss_scanline(&v,160,contact_grace,796,contact_palette,contact_palette,0);
     CHECK(contact_grace[398]==contact_palette[19]);
-    /* A selected shadow texel hides later field sprites and shades the
-     * ground. Earlier character texels still win over that operator. */
+    /* A ground shadow stays beneath a contact sphere. The character keeps
+     * its native priority above both; uncovered ground is still shaded. */
     uint32_t contact_shadow[64];memcpy(contact_shadow,contact_palette,sizeof contact_shadow);
     contact_palette[56]=0xFF886644;contact_palette[60]=0xFFAA8844;
     contact_shadow[56]=0xFF443322;contact_shadow[60]=0xFF554422;
     contact_shadow[33]=0xFF224477;v.reg[12]=9;
+    ss_scanline(&v,160,contact_grace,796,contact_palette,contact_shadow,0);
+    uint32_t sphere_in_front=contact_grace[392];
     v.vram[0xF803]=1;word(v.vram,0xF808,128+160);
     word(v.vram,0xF80C,0xE781);word(v.vram,0xF80E,128+154);
     memset(v.vram+0x781*32,0xFF,32);
     ss_scanline(&v,160,contact_grace,796,contact_palette,contact_shadow,0);
-    CHECK(contact_grace[392]==contact_shadow[56] || contact_grace[392]==contact_shadow[60]);
+    CHECK(contact_grace[392]==sphere_in_front);
     CHECK(contact_grace[398]==contact_palette[19]);
+    g_ram[native_board]=0;ss_capture();ss_begin(&v,796);
+    ss_scanline(&v,160,contact_grace,796,contact_palette,contact_shadow,0);
+    CHECK(contact_grace[392]==contact_shadow[56] || contact_grace[392]==contact_shadow[60]);
     memset(v.vram+0xF808,0,8);memset(v.vram+0x781*32,0,32);v.reg[12]=0;
     memset(v.vram+0xF800,0,8);memset(v.vram+0x780*32,0,32);v.reg[5]=(uint8_t)saved_sat;
     /* Preserve the original mapping-center registration while moving,
@@ -2887,6 +2892,19 @@ int main(int argc,char **argv)
     write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(g_ram[0xEB02]&128);
     CHECK(scene_read32(0xFFB172)==S3_AIZ_MINIBOSS_CUTSCENE);
+    /* A placed capsule must survive an approach/backtrack before the boss
+     * locks the camera. Native deletion intentionally keeps its loaded bit. */
+    word(g_rom,0x100012,0x4560);word(g_rom,0x100014,0x8060);g_rom[0x100016]=4;
+    word(g_rom,0x100018,65535);
+    longword(g_rom,0x110010,S3_EGG_CAPSULE);longword(g_rom,0x5CCA6,S3_EGG_CAPSULE);
+    s_placement_count=0;
+    write16(0xEE78,16919);s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(!(g_ram[0xEB03]&128));
+    write16(0xEE78,16886);s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(!(g_ram[0xEB03]&128));
+    write16(0xEE78,0x4390);s3_video_hook(S3_LOAD_UPDATE);
+    CHECK(g_ram[0xEB03]&128);
+    CHECK(scene_read32(0xFFB1BC)==S3_EGG_CAPSULE);
     /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
      * the two earlier slots and verify a real placement goes past it. */
     write32(0xB172,0);write32(0xB1BC,0);

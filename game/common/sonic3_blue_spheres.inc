@@ -26,7 +26,6 @@ static const double ss_ground_lift=.49;
 typedef struct { float x,z,depth; } SSPoint;
 typedef struct { int x,y,w,h; float depth; unsigned kind,lod; } SSSphere;
 static SSPoint *ss_ground;
-static uint32_t *ss_background;
 static SSSphere *ss_spheres;
 static unsigned ss_count,ss_capacity,ss_margin_count;
 static int ss_width,ss_ready;
@@ -129,9 +128,7 @@ static void ss_begin(const GVDP *v,int width)
         SSPoint *points=(SSPoint *)realloc(ss_ground,(size_t)width*SS_HEIGHT*sizeof *points);
         if(!points)return;
         ss_ground=points;
-        uint32_t *background=(uint32_t *)realloc(ss_background,(size_t)width*sizeof *background);
-        if(!background)return;
-        ss_background=background;ss_width=width;ss_stretch=width/320.0;
+        ss_width=width;ss_stretch=width/320.0;
         for(int y=0;y<SS_HEIGHT;++y)for(int x=0;x<width;++x)
             ss_ground[(size_t)y*width+x]=ss_intersect(x-(width-1)*.5,y,ss_stretch);
     }
@@ -250,7 +247,7 @@ static void ss_native_sprites(const GVDP *v,int line,uint32_t *out,int width,
     for(unsigned n=count;n-->0;) {
         unsigned a=entries[n],attr=vram16(v,a+4),tile=attr&0x7FF;
         int is_text=tile<0x5A7 || (tile>=0x6F8 && tile<0x6FC);
-        if((is_text || tile>=0x77B) && is_text==text) {
+        if((is_text || tile>=0x77B) && is_text==(text==1)) {
             int sy=(vram16(v,a)&511)-128,sx=(vram16(v,a+6)&511)-128;
             if(ss_banner_x(attr,sx,sy,width,perfect,&sx)) { /* native-sized split text */ }
             else if(tile>=0x589 && tile<0x59B && sy<32)
@@ -272,12 +269,11 @@ static void ss_native_sprites(const GVDP *v,int line,uint32_t *out,int width,
                     if(!p)continue;
                     p|=(attr>>9)&48;
                     if(p==63 && (v->reg[12]&8)) {
-                        /* This SAT texel wins before sprite/plane merging:
-                         * it hides later field art and shades the ground.
-                         * Earlier character entries are painted afterward. */
-                        out[x]=ss_background[x];
+                        /* Ground shadows precede projected field objects.
+                         * The later character pass skips these operators. */
+                        if(text==0)continue;
                         for(unsigned k=0;k<64;++k)if(out[x]==palette[k]){out[x]=shadow[k];break;}
-                    } else if(p!=62 || !(v->reg[12]&8)) {
+                    } else if(text!=2 && (p!=62 || !(v->reg[12]&8))) {
                         int ext=presentation_sprite_line(flags,t,p>>4);
                         out[x]=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):palette[p];
                     }
@@ -312,8 +308,8 @@ static void ss_scanline(const GVDP *v,int line,uint32_t *out,int width,
             int dark=(v->reg[12]&8) && !((attr|front)&0x8000u);
             out[x]=dark?shadow[color]:palette[color];
         }
-        ss_background[x]=out[x];
     }
+    ss_native_sprites(v,line,out,width,palette,shadow,2);
     ss_draw_spheres(line,out,width,palette,0);
     ss_draw_spheres(line,out,width,palette,1);
     /* The original appends field sprites after Render_Sprites. Earlier SAT
