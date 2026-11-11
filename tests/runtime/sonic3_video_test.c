@@ -1542,6 +1542,10 @@ static void test_hcz_tunnel_palette_retirement(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static unsigned restored_hcz_palette(unsigned source)
+{
+    return source==S3_ART_BANK+0x8C594?0x3F0000:0x3F0040;
+}
 static void test_hcz_boss_foreground_palette(void)
 {
     static GVDP v;static uint8_t before[65536];uint32_t native[320],out[796];
@@ -1570,6 +1574,18 @@ static void test_hcz_boss_foreground_palette(void)
     uint32_t wet=genesis_dac_cram_to_argb(0xE00,GENESIS_DAC_NORMAL);
     for(int x=0;x<796;++x)CHECK(out[x]==(x<238?wet:live));
     CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+    /* A donor palette also owns the retained dry/wet bricks. The boss's
+     * native viewport and guest CRAM still keep their live colours. */
+    word(g_rom,0x3F0000+8,0xCE);word(g_rom,0x3F0040+32+8,0xEE);
+    s3_video_set_palette_source(restored_hcz_palette);
+    scanline(&v,0,native,320,out,796);
+    dry=genesis_dac_cram_to_argb(0xCE,GENESIS_DAC_NORMAL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<238?dry:live));
+    scanline(&v,104,native,320,out,796);
+    wet=genesis_dac_cram_to_argb(0xEE,GENESIS_DAC_NORMAL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<238?wet:live));
+    CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&unchanged,&v,sizeof v));
+    s3_video_set_palette_source(NULL);
     /* The incoming act and the boss's native viewport keep their palette. */
     g_ram[0xFE11]=1;s_build.world_tag=0x102;publish_sprites();
     scanline(&v,0,native,320,out,796);

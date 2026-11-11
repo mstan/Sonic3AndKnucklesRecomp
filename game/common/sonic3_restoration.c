@@ -39,7 +39,7 @@ void s3_restoration_load(void)
 {
     bound=names_active=0;selected=active=donor_address=0;name_art=name_map=level_names=0;*settings_file=*error=0;
     for(unsigned i=0;i<3;i++){free(backgrounds[i].pixels);memset(&backgrounds[i],0,sizeof backgrounds[i]);}
-    s3_video_set_title_card_name_map(0);s3_video_set_background_override(NULL);
+    s3_video_set_title_card_name_map(0);s3_video_set_background_override(NULL);s3_video_set_palette_source(NULL);
 }
 void s3_restoration_settings(const char *path,const char *mode)
 {
@@ -173,6 +173,22 @@ static size_t literals(uint8_t *dst,const uint8_t *src,size_t size)
 }
 static void piece(uint8_t *p,unsigned size,unsigned tile,int x)
 {p[0]=0;p[1]=(uint8_t)size;put16(p+2,0x8000u|tile);put16(p+4,(unsigned)x);}
+static unsigned palette_source(unsigned address)
+{
+    if(!(active&PROTO_PALETTES))return address;
+    static const unsigned retail_s3[]={0x8C594,0x8C5F4,0x8C654,0x8C6D4,0x8C9D4,0x8CA34,0x8CA94,0x8CB14};
+    static const unsigned retail_sk[]={0xA8D9C,0xA8DFC,0xA8E5C,0xA8EDC,0xA929C,0xA92FC,0xA935C,0xA93DC};
+    static const unsigned donor[]={0x1E9B54,0x1E9BB4,0x1E9C14,0x1E9C94,0x1E9EF4,0x1E9FD4,0x1EA034,0x1EA0B4};
+    /* The wide HCZ boss retains stage bricks from the locked-on cartridge's
+     * palette bank, while native palette loaders use the S&K copy. */
+    if(!standalone_s3){
+        if(address==0x28C594u)address=0xA8D9C;
+        if(address==0x28C654u)address=0xA8E5C;
+    }
+    for(unsigned n=0;n<8;n++)if(address==(standalone_s3?retail_s3[n]:retail_sk[n]))return donor_address+donor[n];
+    if(!standalone_s3 && (address==0xA909Cu || address==0xA90FCu))return donor_address+0x1E9DD4u;
+    return address;
+}
 void s3_restoration_post_reset(void)
 {
     if(bound)return;bound=1;names_active=s3_gameplay.early_zone_names;
@@ -194,6 +210,7 @@ void s3_restoration_post_reset(void)
         if(offset>g_rom_ext_size)memset(bank+g_rom_ext_size,0,offset-g_rom_ext_size);
         memcpy(bank+offset,donor,0x200000);free(donor);
         g_rom_ext=bank;g_rom_ext_size=offset+0x200000u;donor_address=0x400000u+offset;
+        if(active&PROTO_PALETTES)s3_video_set_palette_source(palette_source);
         fprintf(stderr,"[restoration] Verified November prototype graphics enabled (mask %u)\n",active);
     }
     if(!names_active)return;
@@ -253,13 +270,7 @@ int s3_restoration_instruction(unsigned pc)
     static const unsigned sk_pal[]={0x3DCA,0x3DE6,0x3DFE,0x3E1A};
     sites=standalone_s3?s3_pal:sk_pal;
     for(unsigned i=0;i<4;i++)if(pc==sites[i]){
-        if(active&PROTO_PALETTES){
-            static const unsigned retail_s3[]={0x8C594,0x8C5F4,0x8C654,0x8C6D4,0x8C9D4,0x8CA34,0x8CA94,0x8CB14};
-            static const unsigned retail_sk[]={0xA8D9C,0xA8DFC,0xA8E5C,0xA8EDC,0xA929C,0xA92FC,0xA935C,0xA93DC};
-            static const unsigned donor[]={0x1E9B54,0x1E9BB4,0x1E9C14,0x1E9C94,0x1E9EF4,0x1E9FD4,0x1EA034,0x1EA0B4};
-            for(unsigned n=0;n<8;n++)if(g_cpu.A[2]==(standalone_s3?retail_s3[n]:retail_sk[n]))g_cpu.A[2]=donor_address+donor[n];
-            if(!standalone_s3 && (g_cpu.A[2]==0xA909Cu || g_cpu.A[2]==0xA90FCu))g_cpu.A[2]=donor_address+0x1E9DD4u;
-        }
+        g_cpu.A[2]=palette_source(g_cpu.A[2]);
         return 1;
     }
     if(pc==(standalone_s3?0x1D5Cu:0x1AD2u)){

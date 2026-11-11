@@ -15,6 +15,8 @@ S3GameplayConfig s3_gameplay;
 static unsigned title_map;
 static S3VideoBackground background;
 void s3_video_set_background_override(S3VideoBackground fn){background=fn;}
+static S3VideoPaletteSource palette;
+void s3_video_set_palette_source(S3VideoPaletteSource fn){palette=fn;}
 static const char *donor_path;
 uint8_t *s3_sound_prototype_read(void)
 {
@@ -37,6 +39,9 @@ int main(int argc,char **argv)
         donor_path=argv[2];CHECK(s3_restoration_select(1,1));
         CHECK(s3_restoration_select(2,1)==!sk);CHECK(!s3_restoration_select(3,1));CHECK(s3_restoration_select(4,1));
         s3_restoration_post_reset();CHECK(g_rom_ext_size==0x200000 && !s3_restoration_netplay_allowed());
+        CHECK(palette);
+        CHECK(palette(s3?0x8C594u:0x28C594u)==0x5E9B54u);
+        CHECK(palette(s3?0x8C654u:0x28C654u)==0x5E9C14u);
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
@@ -66,7 +71,7 @@ int main(int argc,char **argv)
         puts("Prototype palette sources, Nemesis header and mappings preserve the retail cartridge PASS");
         free(original);free(g_rom_ext);return 0;
     }
-    s3_restoration_load();s3_restoration_post_reset();CHECK(!g_rom_ext_size && !title_map && s3_restoration_netplay_allowed());
+    s3_restoration_load();s3_restoration_post_reset();CHECK(!g_rom_ext_size && !title_map && !palette && s3_restoration_netplay_allowed());
     s3_restoration_load();s3_gameplay.early_zone_names=1;s3_restoration_post_reset();
     CHECK(title_map && g_rom_ext_size && !s3_restoration_netplay_allowed());
     g_cpu.A[1]=0x15C454;CHECK(s3_restoration_instruction(0x1AD2));

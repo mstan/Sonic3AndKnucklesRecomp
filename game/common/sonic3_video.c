@@ -86,6 +86,8 @@ static void ss_capture(void);
 static S3VideoObjectZoom s_object_zoom;
 static S3VideoBackground s_background_override;
 void s3_video_set_background_override(S3VideoBackground read){s_background_override=read;}
+static S3VideoPaletteSource s_palette_source;
+void s3_video_set_palette_source(S3VideoPaletteSource read){s_palette_source=read;}
 void s3_video_set_object_zoom(S3VideoObjectZoom fn) { s_object_zoom = fn; }
 static double s_ratio = 16.0 / 9.0;
 static int s_requested_width = 320;
@@ -2114,7 +2116,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     uint32_t hcz_boss_colors[16];
     if(hcz_boss) {
         unsigned water=((unsigned)s_world_frame[0xF646]<<8)|s_world_frame[0xF647];
-        unsigned source=S3_ART_BANK+(wy>=(int)water?0x8C654u+32u:0x8C594u);
+        int wet=wy>=(int)water;
+        unsigned source=S3_ART_BANK+(wet?0x8C654u:0x8C594u);
+        if(s_palette_source)source=s_palette_source(source);
+        if(wet)source+=32;
         for(unsigned i=0;i<16;++i)
             hcz_boss_colors[i]=genesis_dac_cram_to_argb(scene_art_color(scene_read16(source+i*2),v),GENESIS_DAC_NORMAL);
     }
