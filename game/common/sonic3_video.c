@@ -290,10 +290,12 @@ unsigned s3_video_main_cpu_divisor(void)
 {
     /* LevelLoop ($650C) still waits for the real V-int every tick.
      * Expanded activation must not inherit the 7.67 MHz object's lag budget.
+     * Four times the budget still delayed a wide bridge contact by one tick;
+     * eight completes that object pass before V-int, matching native contact.
      * Loading, recorded demos, special stages, native 2P and opt-out keep
      * original timing. Demo activation also remains native. */
     int mode=g_ram[0xF600];
-    return s_mode != VIDEO_OFF && !native_demo() && (mode==8 || mode==12) && gameplay() && g_ram[0xF711] ? 4 : 1;
+    return s_mode != VIDEO_OFF && !native_demo() && (mode==8 || mode==12) && gameplay() && g_ram[0xF711] ? 8 : 1;
 }
 static int width(int dw, int dh, int nw, int nh)
 {

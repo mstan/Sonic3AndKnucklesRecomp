@@ -606,7 +606,7 @@ static void test_native_demo_publication(void)
     v.vram[0xF806]^=2;select_scene(&v,1);
     CHECK(s_display && s_display->sprites[0].x==20);
     word(g_ram,S3_DEMO,0);g_ram[0xF600]=12;
-    CHECK(s3_video_main_cpu_divisor()==4);
+    CHECK(s3_video_main_cpu_divisor()==8);
     s_visible_count=1;s_visible_objects[0]=0xB000;publish_sprites();
     CHECK(g_ram[0xB004]==132); /* Ordinary gameplay retains wide visibility. */
     /* A margin-only waiting enemy must not upload over a returning card.
@@ -2969,7 +2969,7 @@ int main(int argc,char **argv)
     write32(0xB000,0x123456);g_ram[0xF600]=12;g_ram[0xF711]=1;
     word(g_ram,0x8000,16);word(g_ram,0x8002,4);
     CHECK(stage_width()==2048);CHECK(configure("fit"));CHECK(width(4000,500,320,224)==1792);
-    CHECK(s3_video_main_cpu_divisor()==4);
+    CHECK(s3_video_main_cpu_divisor()==8);
     g_ram[S3_COMPETITION+1]=1;CHECK(s3_video_main_cpu_divisor()==1);g_ram[S3_COMPETITION+1]=0;
     g_ram[0xF600]=0x8C;CHECK(s3_video_main_cpu_divisor()==1);g_ram[0xF600]=12;
     CHECK(configure("16:9"));CHECK(width(1,1,320,224)==398);
