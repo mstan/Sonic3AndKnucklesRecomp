@@ -419,6 +419,34 @@ addr = 0x4F3B0 # Correct history across seamless acts (Offset_ObjectsDuringTrans
 kind = "game_hook"
 
 [[widescreen_site]]
+addr = 0x6F90 # Apply native currents to extra players (HCZ_WaterTunnels)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x3077E # Apply native small-fan forces to extra players (loc_3077E)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x30A38 # Apply native large-fan forces to extra players (sub_30A38)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x6B9C8 # Apply native whirlpool approach forces to extras (sub_6B9C8)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x6BA06 # Capture extra players in the native whirlpool (sub_6BA06)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x6BB1E # Release extra players when the whirlpool retires (loc_6BB1E)
+kind = "game_hook"
+
+[[widescreen_site]]
+addr = 0x6BB5C # Apply native boss water-jet forces to extras (sub_6BB5C)
+kind = "game_hook"
+
+[[widescreen_site]]
 addr = 0x51A4 # Title gag: mirror the standing pose so Knuckles faces Knuckles (at lea (ArtKos_SKTitle_SonKnuxHand).l,a1)
 kind = "game_hook"
 
@@ -547,7 +575,6 @@ addr = 0x47A96 # Extras collide with sub_47A96
 kind = "game_hook"
 
 # END knuckles-army hooks
-
 # Opt-in Sonic shielded transformation; original elemental BEQ instructions.
 # Only CCR.Z is overridden; generated and interpreted paths execute native code.
 [[widescreen_site]]

@@ -40,7 +40,7 @@ enum {
     GAME_MODE = 0xF600, CTRL_1_LOGICAL = 0xF602, CTRL_1 = 0xF604, PAUSED = 0xF63A,
     WATER_ENTERED = 0xF64D, LEVEL_STARTED = 0xF711, GLIDE_FLAGS = 0xF74E,
     PHYSICS = 0xF760, PREV_FRAME = 0xF766, ANGLES = 0xF768, COLLISION_ADDR = 0xF796,
-    REVERSE_GRAVITY = 0xF7C6, CTRL_1_LOCKED = 0xF7CA, CHAIN = 0xF7D0,
+    REVERSE_GRAVITY = 0xF7C6, WIND = 0xF7C8, CTRL_1_LOCKED = 0xF7CA, CHAIN = 0xF7D0,
     LEVEL_FRAME = 0xFE04, DEBUG_PLACEMENT = 0xFE08, ZONE = 0xFE10,
     SUPER_FLAG = 0xFE19, HUD_TIMER = 0xFE1E, PLAYER_MODE = 0xFF08,
     DEMO = 0xFFD0, DEBUG_ART = 0xFFCE, COMPETITION = 0xFFE8,
@@ -81,6 +81,8 @@ typedef struct Actor {
     uint8_t mode, delay, phase, auto_jump, held, displayed, visible, driven;
     int8_t gap;
     uint8_t physics[6];
+    uint8_t wind, whirl;
+    uint16_t whirl_owner;
     uint8_t solid[OBJ_SLOTS];  /* this extra's p2 standing/pushing bits ($50) */
 } Actor;
 static Actor actors[S3_ARMY_MAX];
@@ -177,6 +179,7 @@ static void configure_actor(unsigned k)
 }
 static void park(Actor *a)
 {
+    a->wind = a->whirl = 0; a->whirl_owner = 0;
     unsigned o = a->slot;
     a->mode = MODE_PARKED; a->flight = 0; a->displayed = 0;
     g_ram[o + F_CONTROL] = 0x81; g_ram[o + F_STATUS] = ST_AIR;
@@ -234,6 +237,7 @@ static void settle(Actor *a)
 static void spawn(unsigned k, unsigned o, int fresh)
 {
     Actor *a = &actors[k];
+    a->wind = a->whirl = 0; a->whirl_owner = 0;
     a->slot = (uint16_t)o;
     memcpy(g_ram + o, g_ram + PLAYER_1, OBJ);
     wr32(o, CODE_IDLE);
@@ -408,6 +412,7 @@ static void glide_pose(unsigned o)
 /* Tails_Catch_Up_Flying ($13B26), with Knuckles gliding in instead. */
 static void enter_catchup(Actor *a)
 {
+    a->wind = a->whirl = 0; a->whirl_owner = 0;
     unsigned o = a->slot, p = PLAYER_1;
     int y = s16(p + F_Y) + (g_ram[REVERSE_GRAVITY] ? 0xC0 : -0xC0);
     wr16(o + F_X, (unsigned)(s16(p + F_X) + a->gap)); wr16(o + F_Y, (unsigned)y);
@@ -473,7 +478,7 @@ static void catchup_move(Actor *a)
 typedef struct {
     uint8_t ctrl[4], locked, physics[6], distance[2], dust[OBJ], bubbles[OBJ];
     uint8_t super, hud_timer, chain[2], glide, angles[4], collision[4], prev_frame;
-    uint8_t shake[2], water, scroll_lock, hscroll[2], debug_art[2];
+    uint8_t shake[2], water, scroll_lock, hscroll[2], debug_art[2], wind[2];
 } Globals;
 static void save_globals(Globals *g)
 {
@@ -486,6 +491,7 @@ static void save_globals(Globals *g)
     g->prev_frame = g_ram[PREV_FRAME]; memcpy(g->shake, g_ram + GLIDE_SHAKE, 2);
     g->water = g_ram[WATER_ENTERED]; g->scroll_lock = g_ram[SCROLL_LOCK_P2];
     memcpy(g->hscroll, g_ram + HSCROLL_P2, 2); memcpy(g->debug_art, g_ram + DEBUG_ART, 2);
+    memcpy(g->wind, g_ram + WIND, 2);
 }
 static void restore_globals(const Globals *g)
 {
@@ -498,6 +504,7 @@ static void restore_globals(const Globals *g)
     g_ram[PREV_FRAME] = g->prev_frame; memcpy(g_ram + GLIDE_SHAKE, g->shake, 2);
     g_ram[WATER_ENTERED] = g->water; g_ram[SCROLL_LOCK_P2] = g->scroll_lock;
     memcpy(g_ram + HSCROLL_P2, g->hscroll, 2); memcpy(g_ram + DEBUG_ART, g->debug_art, 2);
+    memcpy(g_ram + WIND, g->wind, 2);
 }
 static void tick_native(unsigned k, uint16_t input)
 {
@@ -505,6 +512,7 @@ static void tick_native(unsigned k, uint16_t input)
     Globals g; save_globals(&g);
     wr16(CTRL_1_LOGICAL, input); wr16(CTRL_1, 0); g_ram[CTRL_1_LOCKED] = 1;
     memcpy(g_ram + PHYSICS, a->physics, 6);
+    g_ram[WIND] = a->wind; g_ram[WIND + 1] = 0;
     /* Super/Hyper state and its ring drain belong to Player 1. Update_HUD_timer
      * is zero so Knux_Test_For_Glide can never start a transformation. */
     g_ram[SUPER_FLAG] = 0; g_ram[HUD_TIMER] = 0;
@@ -516,6 +524,7 @@ static void tick_native(unsigned k, uint16_t input)
     g_cpu = cpu;
     inside_actor = -1;
     memcpy(a->physics, g_ram + PHYSICS, 6);
+    a->wind = g_ram[WIND];
     restore_globals(&g);
 }
 static void tick(unsigned k)
@@ -566,6 +575,7 @@ static void adopt_restored(int keep)
         for (unsigned k = 0; keep && k < count && !a; ++k) if (!actors[k].slot) a = &actors[k];
         if (!a) { memset(g_ram + o, 0, OBJ); continue; }
         a->slot = (uint16_t)o; a->input = 0; a->held = 0; a->auto_jump = 0; a->flight = 0;
+        a->wind = a->whirl = 0; a->whirl_owner = 0;
         memset(a->solid, 0, sizeof a->solid);
         default_physics(a->physics);
         if (g_ram[o + F_CONTROL] & 0x80) {
@@ -655,6 +665,25 @@ static void react(const ArmySite *s, const M68KState *result, unsigned o)
     native(s->reaction);
     g_cpu = cpu;
 }
+/* Spikes inspect SolidObjectFull's combined P1/P2 result in their caller,
+ * outside the mirrored single-player primitive. Repeat only that contact's
+ * native damage helper after each extra's collision, with its virtual P2 bits.
+ * The object still moves once and the original players keep their own result. */
+static void spike_react(unsigned k, const M68KState *result)
+{
+    unsigned obj=result->A[0]&0xFFFF,code=rd32(obj);
+    unsigned contacts=result->D[6]>>16;
+    int hit=code==ARMY_CODE_SPIKES_UP?(g_ram[obj+F_STATUS]&0x10)!=0:
+        code==ARMY_CODE_SPIKES_SIDE?(contacts&2)!=0:
+        code==ARMY_CODE_SPIKES_DOWN?(contacts&8)!=0:0;
+    if(!hit)return;
+    Globals globals;save_globals(&globals);
+    M68KState cpu=g_cpu;int previous=inside_actor;inside_actor=(int)k;
+    g_cpu=*result;g_cpu.A[1]=0xFFFF0000u|actors[k].slot;
+    native(ARMY_CODE_SPIKE_HURT);
+    if(code==ARMY_CODE_SPIKES_SIDE)g_ram[obj+F_STATUS]&=(uint8_t)~0x40u;
+    inside_actor=previous;g_cpu=cpu;restore_globals(&globals);
+}
 static int solid_extras(uint32_t pc)
 {
     if (inside_solid || inside_actor >= 0 || !s3_army_active()) return 0;
@@ -675,11 +704,66 @@ static int solid_extras(uint32_t pc)
         M68KState extra = native(pc);
         ++solid_calls;
         if (site && site->kind != REACT_NONE) react(site, &extra, a->slot);
+        spike_react(k,&extra);
         solid_leave(a, &swap);
     }
     inside_solid = 0;
     /* Callers read Player 1's result registers; keep them exactly. */
     g_cpu = result;
+    return 1;
+}
+
+/* These native helpers accept one player, and their callers invoke them for
+ * P1 and P2. Repeat only that player operation; the object itself still steps
+ * once, preserving native timing, allocation, animation and sound requests. */
+static int environment_site(uint32_t pc)
+{
+    return pc == ARMY_PC_WATER || pc == ARMY_PC_FAN || pc == ARMY_PC_LARGE_FAN ||
+        pc == ARMY_PC_WHIRL_PUSH || pc == ARMY_PC_WHIRL ||
+        pc == ARMY_PC_WHIRL_EXIT || pc == ARMY_PC_WATER_JET;
+}
+static int environment_extras(uint32_t pc)
+{
+    if (inside_solid || inside_actor >= 0 || !s3_army_active()) return 0;
+    int exit = pc == ARMY_PC_WHIRL_EXIT;
+    unsigned reg = pc == ARMY_PC_WHIRL || pc == ARMY_PC_WATER_JET ? 2 : 1;
+    if (!exit && (g_cpu.A[reg] & 0xFFFF) != PLAYER_1) return 0;
+    M68KState input = g_cpu;
+    inside_solid = 1;
+    recomp_call_addr(pc);
+    M68KState result = g_cpu;
+    for (unsigned k = 0; k < count; ++k) {
+        Actor *a = &actors[k];
+        if (!a->slot) continue;
+        unsigned obj = input.A[0] & 0xFFFF;
+        if (exit) {
+            if (a->whirl_owner != obj) continue;
+            if (a->whirl && g_ram[a->slot + F_CONTROL] == 1) {
+                uint8_t flag = g_ram[obj + 0x42];
+                g_cpu = input; g_cpu.A[2] = 0xFFFF0000u | a->slot; g_cpu.D[4] = 0x42;
+                native(ARMY_CODE_WHIRL_RELEASE);
+                g_ram[obj + 0x42] = flag;
+            }
+            a->whirl = 0; a->whirl_owner = 0;
+            continue;
+        }
+        if ((a->mode != MODE_FOLLOW && a->mode != MODE_SPINDASH) ||
+            g_ram[a->slot + F_ROUTINE] >= 6) continue;
+        g_cpu = input; g_cpu.A[reg] = 0xFFFF0000u | a->slot;
+        if (pc == ARMY_PC_WATER) {
+            unsigned flag = input.A[3] & 0xFFFF;
+            uint8_t saved = g_ram[flag];
+            g_ram[flag] = a->wind; g_cpu.D[6] = a->input >> 8;
+            native(pc); a->wind = g_ram[flag]; g_ram[flag] = saved;
+        } else if (pc == ARMY_PC_WHIRL) {
+            unsigned flag = (obj + (input.D[4] & 0xFFFF)) & 0xFFFF;
+            uint8_t saved = g_ram[flag];
+            g_ram[flag] = a->whirl_owner == obj ? a->whirl : 0;
+            native(pc); a->whirl = g_ram[flag]; a->whirl_owner = a->whirl ? (uint16_t)obj : 0;
+            g_ram[flag] = saved;
+        } else native(pc);
+    }
+    inside_solid = 0; g_cpu = result;
     return 1;
 }
 
@@ -710,7 +794,7 @@ int s3_army_owns(uint32_t pc)
     case ARMY_PC_TITLE_LOAD: case ARMY_PC_TITLE_ITERATE: case ARMY_PC_TITLE_MAP:
         return 1;
     default:
-        return solid_callee(pc);
+        return solid_callee(pc) || environment_site(pc);
     }
 }
 int s3_army_hook(uint32_t pc)
@@ -761,7 +845,7 @@ int s3_army_hook(uint32_t pc)
         if (count) { shift_x = (int16_t)g_cpu.D[0]; shift_y = (int16_t)g_cpu.D[1]; shift_age = 0; }
         return 0;
     default:
-        return solid_callee(pc) ? solid_extras(pc) : 0;
+        return environment_site(pc) ? environment_extras(pc) : solid_callee(pc) ? solid_extras(pc) : 0;
     }
 }
 

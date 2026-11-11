@@ -9,6 +9,18 @@
 #define ARMY_PC_ALLOC_AFTER      0x01BAFAu /* AllocateObjectAfterCurrent */
 #define ARMY_PC_TRANSITION       0x04F3B0u /* Offset_ObjectsDuringTransition */
 #define ARMY_CODE_IDLE           0x013FC0u /* locret_13FC0 */
+#define ARMY_PC_WATER            0x006F90u /* HCZ_WaterTunnels */
+#define ARMY_PC_FAN              0x03077Eu /* loc_3077E */
+#define ARMY_PC_LARGE_FAN        0x030A38u /* sub_30A38 */
+#define ARMY_PC_WHIRL_PUSH       0x06B9C8u /* sub_6B9C8 */
+#define ARMY_PC_WHIRL            0x06BA06u /* sub_6BA06 */
+#define ARMY_PC_WHIRL_EXIT       0x06BB1Eu /* loc_6BB1E */
+#define ARMY_CODE_WHIRL_RELEASE  0x06BB02u /* sub_6BB02 */
+#define ARMY_PC_WATER_JET        0x06BB5Cu /* sub_6BB5C */
+#define ARMY_CODE_SPIKES_UP      0x024090u /* loc_24090 */
+#define ARMY_CODE_SPIKES_SIDE    0x0240E2u /* loc_240E2 */
+#define ARMY_CODE_SPIKES_DOWN    0x02413Eu /* loc_2413E */
+#define ARMY_CODE_SPIKE_HURT     0x024280u /* sub_24280 */
 #define ARMY_PC_SK_TITLE_FRAMES  0x0051A4u /* lea (ArtKos_SKTitle_SonKnuxHand).l,a1 */
 #define ARMY_MAP_SK_BANNER       0x0CB994u /* Map_SKTitle_Banner */
 #define ARMY_MAP_AND_KNUCKLES    0x0049AEu /* Map_TitleANDKnuckles */
