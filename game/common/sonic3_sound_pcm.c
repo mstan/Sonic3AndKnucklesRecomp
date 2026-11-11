@@ -67,6 +67,12 @@ int s3_sound_build_pcm(const uint8_t *rom,size_t size,const S3SoundPCMLayout *l,
     }
     uint8_t *sega=bank+l->sample_table-BASE+(l->sega_id-0x81)*10;
     memcpy(sega,descriptors+(l->sega_id-0x81)*10,2);
+    /* The retail SEGA loop has a 12-iteration delay: 245 Z80 cycles per
+     * sample in the supported machine. Its effective rate is about 14.6 kHz,
+     * while the generic Clone table assumes 16 kHz. MegaPCM's PCM rate byte
+     * is a fraction of its 25.1 kHz base clock. */
+    unsigned sega_rate=3579545u/(102u+13u*11u);
+    sega[1]=(uint8_t)((sega_rate*256u+12550u)/25100u);
     put32(sega+2,BASE+cursor);memcpy(bank+cursor,rom+SEGA_START,SEGA_BYTES);cursor+=SEGA_BYTES;put32(sega+6,BASE+cursor);
     *used=cursor;if(e && en)*e=0;return 1;
 }

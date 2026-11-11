@@ -22,6 +22,7 @@ int main(int argc,char **argv)
     recompui_sha256_compute(rom,size,after);CHECK(!memcmp(before,after,32));
     for(size_t i=0;i<input_size;i++)if(i<l.sample_table-0x400000 || i>=l.sample_table-0x400000+l.sample_count*10)CHECK(bank[i]==input[i]);
     CHECK(used>input_size && used<=0x400000);
+    CHECK(bank[l.sample_table-0x400000+(l.sega_id-0x81)*10+1]==149);
     FILE *f=fopen(argv[3],"wb");CHECK(f);CHECK(fwrite(bank,1,used,f)==used);fclose(f);
     printf("PASS ROM-derived available DAC samples + SEGA; immutable ROM/software, bounds/alias rejection; %u bank bytes\n",used);
     free(bank);free(input);free(rom);return 0;
