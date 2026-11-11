@@ -2259,6 +2259,22 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int background_x=-bg_origin-hs_b;
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
     GenesisTileRow fg={0},bg={0};
+    /* The snowboard hill begins partway across each wrapped layout row.
+     * Its unused leading chunks are empty on the cartridge. Extend the
+     * solid snow at that boundary into the extra left view; do not expose
+     * rectangular holes behind the hill, or change its native geometry. */
+    int icz_snow_edge=0;
+    uint16_t icz_snow_attr=0;
+    if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event) {
+        unsigned p=0x8008u+(((unsigned)wy>>5)&0x3Cu);
+        unsigned row=((unsigned)s_world_frame[p]<<8)|s_world_frame[p+1];
+        if(row>=0x8088 && row+16<=0x9000)for(unsigned i=0;i<16;++i) {
+            if(!s_world_frame[row+i])continue;
+            uint16_t attr=world_attr(s_world_frame,(int)i*128,wy,0);
+            if(attr==0x4002){icz_snow_edge=(int)i*128;icz_snow_attr=attr;}
+            break;
+        }
+    }
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -2293,6 +2309,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        if(nx<0 && wx>=0 && wx<icz_snow_edge && !ap) {
+            a=icz_snow_attr;ap=pattern_pixel(v,a,wx,wy);
+        }
         if(file_select) {
             /* Keep one portrait, extending only its edge colours. Mirroring
              * the whole image repeats Sonic's face and DATA SELECT text.
