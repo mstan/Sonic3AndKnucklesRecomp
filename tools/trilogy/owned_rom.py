@@ -11,6 +11,11 @@ MAX_ENTRIES=256
 def normalize(data,kind):
     size,crc=ROMS[kind]
     if len(data)==size+512:data=data[512:]
+    # The qualified Steam release changes only the locked-on S3 region byte.
+    # Converters consume a canonical private buffer; the owner's file stays
+    # byte-identical and the running game retains its original ROM identity.
+    if kind=='s3k' and len(data)==size and zlib.crc32(data)==0x0C06AA82:
+        data=data[:0x2001F0]+b'U'+data[0x2001F1:]
     if len(data)!=size or zlib.crc32(data)!=crc:
         raise ValueError(f'{kind}: expected {size} bytes, CRC32 {crc:08X}')
     return data

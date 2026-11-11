@@ -78,11 +78,9 @@ def import_campaign(kind,source,s3k,output):
     if stage.parent!=output:raise ValueError('Import staging escaped its cache')
     try:
         source_copy=stage/(donor+'.bin');source_copy.write_bytes(raw)
-        # The active S3K image is already a verified raw cartridge; a ZIP is
-        # normalized only for direct use of this developer-facing CLI.
-        host_path=Path(s3k).resolve()
-        if host_path.suffix.lower()=='.zip' or host_path.stat().st_size!=len(host):
-            host_path=stage/'s3k.bin';host_path.write_bytes(host)
+        # Conversion consumes the verified, normalized buffer even when its
+        # length matches the original file (as with the Steam region alias).
+        host_path=stage/'s3k.bin';host_path.write_bytes(host)
         bank=stage/'converted.bin'
         progress(.1,'Converting the complete campaign from your cartridge...')
         if kind=='megamix':

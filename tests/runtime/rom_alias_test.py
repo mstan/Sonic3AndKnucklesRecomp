@@ -9,6 +9,7 @@ import hashlib
 import os
 from pathlib import Path
 import subprocess
+import sys
 
 
 def main():
@@ -23,6 +24,11 @@ def main():
     original = alias.read_bytes()
     assert len(original) > 0x400 and original != supported.read_bytes()
     source_hash = hashlib.sha256(original).digest()
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'tools'))
+    from trilogy.owned_rom import read_rom
+    # Exercise the same host-ROM reader used by the launcher campaign importer.
+    # Both accepted cartridge identities must produce the same converter input.
+    assert read_rom(alias, 's3k') == read_rom(supported, 's3k')
     unknown = out / 'unknown.bin'
     changed = bytearray(original)
     changed[0x400] ^= 1

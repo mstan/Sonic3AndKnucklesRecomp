@@ -76,6 +76,21 @@ class CampaignTransactions(unittest.TestCase):
         self.assertNotEqual(a,b);self.assertEqual((a/'sonic1-stages.pak').read_bytes(),previous)
         self.assertIn(str(a/'sonic1-stages.pak').encode(),self.receipt.read_bytes())
 
+    def test_same_length_normalized_host_reaches_converter(self):
+        original=self.host.read_bytes()
+        normalized=b'fixed host'
+        self.assertEqual(len(normalized),len(original))
+        def read(path,kind):
+            return normalized if kind=='s3k' else Path(path).read_bytes()
+        def build(args):
+            host=Path(args[args.index('--s3k')+1])
+            self.assertNotEqual(host,self.host)
+            self.assertEqual(host.read_bytes(),normalized)
+            return self.fake_build(args)
+        with patch.object(importer,'read_rom',side_effect=read),patch('build_stage_pack.main',side_effect=build):
+            importer.import_campaign('sonic1',self.source,self.host,self.cache)
+        self.assertEqual(self.host.read_bytes(),original)
+
     def test_failed_conversion_and_bad_cache_preserve_settings_progress_receipt(self):
         prior={p:p.read_bytes() for p in (self.source,self.host,self.settings,self.save,self.journal,self.receipt)}
         def fail(args):Path(args[args.index('--out')+1]).write_bytes(b'incomplete');return 1
