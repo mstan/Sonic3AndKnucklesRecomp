@@ -280,6 +280,7 @@ static const GameDebugCommand s3_commands[] = {
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
 static int gameplay_instruction(uint32_t pc)
 {
+    if(s3_restoration_instruction(pc))return 0;
     if(s3_sound_owns(pc))return s3_sound_hook(pc);
     s3_startup_wait_hook(pc);
     if (s3_state_menu_instruction(pc)) return 0;
@@ -297,8 +298,8 @@ static int gameplay_instruction(uint32_t pc)
     }
     return s3_video_hook(pc);
 }
-static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); s3_sound_load(path,"sonic3"); s3_restoration_load(); }
-static const struct RecompLauncherCModProvider *sound_mods(const struct RecompLauncherCModProvider *base) { return s3_sound_mods(s3_gameplay_mods(base)); }
+static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); s3_sound_load(path,"sonic3"); s3_restoration_settings(path,"sonic3"); }
+static const struct RecompLauncherCModProvider *sound_mods(const struct RecompLauncherCModProvider *base) { return s3_sound_mods(s3_restoration_mods(s3_gameplay_mods(base))); }
 static int sound_netplay(void) { return s3_sound_netplay_allowed() && s3_restoration_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,

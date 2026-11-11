@@ -13,6 +13,8 @@ int s3_sound_prototype_selected(void);
 int s3_sound_prototype_active(void);
 int s3_sound_prototype_set_path(const char *path);
 const char *s3_sound_prototype_path(void);
+/* Caller owns the verified 2 MiB donor buffer. NULL retains the error text. */
+uint8_t *s3_sound_prototype_read(void);
 int s3_sound_prototype_verified(void);
 const char *s3_sound_error(void);
 int s3_sound_commit(void);

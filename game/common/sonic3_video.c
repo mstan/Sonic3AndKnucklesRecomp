@@ -82,6 +82,8 @@ enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
 static int s_mode;
 static void ss_capture(void);
 static S3VideoObjectZoom s_object_zoom;
+static S3VideoBackground s_background_override;
+void s3_video_set_background_override(S3VideoBackground read){s_background_override=read;}
 void s3_video_set_object_zoom(S3VideoObjectZoom fn) { s_object_zoom = fn; }
 static double s_ratio = 16.0 / 9.0;
 static int s_requested_width = 320;
@@ -280,7 +282,8 @@ static int configure(const char *mode)
     scene_mode_changed(was_enabled);
     return 1;
 }
-static int enabled(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
+static int enabled(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)) ||
+    (s_background_override && s_background_override(g_ram,0,0,0,0,NULL,NULL,NULL)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
     /* LevelLoop ($650C) still waits for the real V-int every tick.
@@ -1636,6 +1639,33 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
     }
     return (uint16_t)faded;
 }
+static uint16_t restored_art_color(unsigned color,const GVDP *v)
+{
+    /* The donor's first stage color can be nonblack (FBZ is $0462).
+     * Use the character palette's black/white as the native fade clock,
+     * rather than tinting every restored color toward stage entry 16. */
+    unsigned white=v->cram[1],black=v->cram[0],faded=0;
+    unsigned sum=(white&14)+((white>>4)&14)+((white>>8)&14);
+    if((int16_t)((s_world_frame[0xEE50]<<8)|s_world_frame[0xEE51])>0){
+        unsigned steps=sum/2;
+        for(int shift=8;shift>=0;shift-=4){
+            unsigned target=(color>>(unsigned)shift)&14,part=steps*2;
+            if(part>target)part=target;
+            faded|=part<<(unsigned)shift;steps-=part/2;
+        }
+    } else if(sum<42 && !black){
+        unsigned steps=(42-sum)/2;
+        for(unsigned shift=0;shift<12;shift+=4){
+            unsigned target=(color>>shift)&14,remove=steps*2;
+            if(remove>target)remove=target;
+            faded|=(target-remove)<<shift;steps-=remove/2;
+        }
+    } else for(unsigned shift=0;shift<12;shift+=4){
+        int lo=(black>>shift)&14,hi=(white>>shift)&14;
+        faded|=(unsigned)(lo+(int)((color>>shift)&14)*(hi-lo)/14)<<shift;
+    }
+    return (uint16_t)faded;
+}
 static int aiz_tree_color(int wx,int wy,int nx,int nw,uint8_t pixel)
 {
     /* Native AIZ1_Resize changes this entry from $0004 to sky $0C02 at
@@ -2315,6 +2345,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
+        uint16_t restored_color=0xFFFF;
+        int restored_background=level && s_background_override &&
+            s_background_override(s_world_frame,reference_bx,by,nx,line,&b,&bp,&restored_color);
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
         if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
            wx>=0x360 && wx<0x980) {
@@ -2337,7 +2370,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ac=hcz_tunnel_colors[ap-56];
         if(hcz_boss && nx<0 && wx<0x3680 && ap>=16 && ap<32)
             ac=hcz_boss_colors[ap-16];
-        uint32_t bc=bp?plane_color(line,b,bp,bpalette):backdrop;
+        uint32_t bc=bp?(restored_background && restored_color!=0xFFFF?
+            genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color(line,b,bp,bpalette)):backdrop;
         out[x]=foreground?ac:bc;
         if(tree_arrival && nx>=nw) {
             uint16_t tree_attr;uint8_t tree_pixel;
@@ -2369,7 +2403,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 if(bad && s_bad_y<0){s_bad_x=wx;s_bad_y=line;s_bad_attr=a;s_bad_expected=expected;s_bad_world_y=wy;s_bad_hscroll=hs_a;}
                 s_terrain_errors+=bad;
             }
-            if(centered_background && bg_origin!=origin) {
+            if(restored_background) {
+                /* Optional replacement artwork is compared with its donor,
+                 * rather than the unchanged native name table. */
+                ++s_bg_unstreamed;
+            } else if(centered_background && bg_origin!=origin) {
                 /* This edge presentation intentionally moves B relative to
                  * the native foreground window. Its same-column pixels are
                  * not a presentation oracle until the view is centered. */

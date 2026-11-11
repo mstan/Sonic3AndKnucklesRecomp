@@ -48,6 +48,7 @@ int s3_sound_prototype_set_path(const char *path)
     snprintf(prototype_path,sizeof prototype_path,"%s",path);
     prototype_verified=*path!=0;*error=0;return 1;
 }
+uint8_t *s3_sound_prototype_read(void){return prototype_rom(prototype_path);}
 int s3_sound_prototype_select(int on)
 {
     if(on && !selected){snprintf(error,sizeof error,"Enable Clone Driver before selecting the prototype soundtrack.");return 0;}

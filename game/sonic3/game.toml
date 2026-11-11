@@ -583,3 +583,28 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x3188
 kind = "game_hook"
+
+# Optional prototype palette sources; native fades and copies remain intact.
+[[widescreen_site]]
+addr = 0x3500
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x351C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x3534
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x3550
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1D5C
+kind = "game_hook"
+
+# Optional prototype Bugernaut art and mappings.
+[[widescreen_site]]
+addr = 0x1932
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x529AC
+kind = "game_hook"
