@@ -29,6 +29,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
        S3_MENU_BG_MAP=0x19D2A2,
        S3_TITLE_PLANE_SIZE=0x11,
        S3_AIZ_MINIBOSS_CUTSCENE=0x46442, S3_EGG_CAPSULE=0x544E0,
+       S3_HCZ_LARGE_FAN=0x2F2D8, S3_HCZ_WATER_RUSH=0x2E4BA,
        S3_RING_RANGE=0xF6D8, S3_RING_STATUS=0xF6E2,
        S3_ART_BANK=0, S3_PAL_INTRO=0x8C314, S3_PAL_FOREST=0x8C374,
        S3_MOVING_PLATFORM_CULL=0x23E1E, S3_FLOATING_PLATFORM_CULL=0x2452A,
@@ -49,6 +50,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_MENU_BG_MAP=0x39D2A2,
        S3_TITLE_PLANE_SIZE=1,
        S3_AIZ_MINIBOSS_CUTSCENE=0x684EC, S3_EGG_CAPSULE=0x86540,
+       S3_HCZ_LARGE_FAN=0x308FA, S3_HCZ_WATER_RUSH=0x2FDA4,
        S3_RING_RANGE=0xEA32, S3_RING_STATUS=0xEA3C,
        S3_ART_BANK=0x200000, S3_PAL_INTRO=0xA8B1C, S3_PAL_FOREST=0xA8B7C,
        S3_MOVING_PLATFORM_CULL=0x24F28, S3_FLOATING_PLATFORM_CULL=0x25634,
@@ -790,9 +792,12 @@ static void spawn_scene(void)
             /* Capsules permanently retain their loaded bit when culled.
              * Early wide activation followed by a short camera backtrack
              * can delete one before the native boss approach locks scrolling,
-             * leaving no capsule after victory. Respect native activation. */
+             * leaving no capsule after victory. HCZ's gate and large fan
+             * also change the global current inhibit/palette on activation.
+             * Preserve the native timing of these scripted operations. */
             if(((int)p->x<((camera-128)&~127) || (int)p->x>=(camera&~127)+640) &&
-                (code==S3_AIZ_MINIBOSS_CUTSCENE || code==S3_EGG_CAPSULE))continue;
+                (code==S3_AIZ_MINIBOSS_CUTSCENE || code==S3_EGG_CAPSULE ||
+                 code==S3_HCZ_LARGE_FAN || code==S3_HCZ_WATER_RUSH))continue;
             int y=p->y&4095;
             if(!(p->y&0x8000)) {
                 if((int16_t)ram16(0xEE18)<0) {

@@ -3014,6 +3014,20 @@ int main(int argc,char **argv)
      * activation margin: its VRAM bank still belongs to a stage PLC. */
     word(g_rom,0x10000C,0x3020);word(g_rom,0x10000E,0x8060);g_rom[0x100010]=3;
     word(g_rom,0x100012,65535);
+    /* HCZ fan/gate initialization changes global tunnel/palette state.
+     * Loading either in a margin can disable a current before its approach. */
+    const unsigned hcz_scripted[]={S3_HCZ_LARGE_FAN,S3_HCZ_WATER_RUSH};
+    for(unsigned i=0;i<2;++i) {
+        longword(g_rom,0x11000C,hcz_scripted[i]);
+        longword(g_rom,0x5CCA2,hcz_scripted[i]);
+        word(g_ram,0x8000,256);s_placement_count=0;g_ram[0xEB02]=0;
+        write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
+        CHECK(!(g_ram[0xEB02]&128));
+        write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
+        CHECK(g_ram[0xEB02]&128);
+        CHECK(scene_read32(0xFFB172)==hcz_scripted[i]);write32(0xB172,0);
+    }
+    g_ram[0xEB02]=0;
     longword(g_rom,0x11000C,S3_AIZ_MINIBOSS_CUTSCENE);
     longword(g_rom,0x5CCA2,S3_AIZ_MINIBOSS_CUTSCENE);
     word(g_ram,0x8000,256);
