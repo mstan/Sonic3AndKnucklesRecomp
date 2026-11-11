@@ -609,6 +609,15 @@ static void test_native_demo_publication(void)
     CHECK(s3_video_main_cpu_divisor()==4);
     s_visible_count=1;s_visible_objects[0]=0xB000;publish_sprites();
     CHECK(g_ram[0xB004]==132); /* Ordinary gameplay retains wide visibility. */
+    /* A margin-only waiting enemy must not upload over a returning card.
+     * Native SAT visibility still starts it; wide visibility resumes when
+     * the card has retired. */
+    write32(0xB000,S3_WAIT_ONSCREEN);g_ram[0xB004]=4;
+    write32(0xB0DE,1);write32(0xB0EA,S3_TITLE_CARD_MAP);
+    publish_sprites();CHECK(g_ram[0xB004]==4);
+    g_ram[0xB004]=132;publish_sprites();CHECK(g_ram[0xB004]==132);
+    write32(0xB0DE,0);g_ram[0xB004]=4;
+    publish_sprites();CHECK(g_ram[0xB004]==132);
     CHECK(configure("off"));
 }
 static void test_title_card_edges(void)

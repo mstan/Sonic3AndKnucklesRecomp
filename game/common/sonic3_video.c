@@ -38,7 +38,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
        S3_AIZ_PLANE_EXHAUST=0x45C64, S3_AIZ_PLANE_MAP=0x164470,
        S3_AIZ_PLANE_PROP_ANIM=0x45E6B, S3_AIZ_PLANE_EXHAUST_ANIM=0x45E73,
        S3_AIZ_PLANE_INTRO=0x4584E, S3_SUPER_MAP=0x141194, S3_SUPER_PLC=0x142A60,
-       S3_MGZ_END_BOSS=0x4A0F8 };
+       S3_MGZ_END_BOSS=0x4A0F8, S3_WAIT_ONSCREEN=0x53FFC };
 #else
 enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
@@ -58,7 +58,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_AIZ_PLANE_EXHAUST=0x67888, S3_AIZ_PLANE_MAP=0x364470,
        S3_AIZ_PLANE_PROP_ANIM=0x67A8F, S3_AIZ_PLANE_EXHAUST_ANIM=0x67A97,
        S3_AIZ_PLANE_INTRO=0x67472, S3_SUPER_MAP=0x146816, S3_SUPER_PLC=0x148378,
-       S3_MGZ_END_BOSS=0x6C31A };
+       S3_MGZ_END_BOSS=0x6C31A, S3_WAIT_ONSCREEN=0x85AD2 };
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
@@ -1147,10 +1147,21 @@ static void capture_objects(void)
 
 static void publish_sprites(void)
 {
+    int card=0;
+    if((g_ram[0xF600]&127)==12 && !bonus_stage())
+        for(unsigned o=0xB0DE;o<0xCAE2;o+=0x4A)
+            if(scene_read32(0xFF0000u+o) && scene_read32(0xFF000Cu+o)==S3_TITLE_CARD_MAP) {
+                card=1;break;
+            }
     /* Demo inputs were authored for native object activation/visibility.
      * Showing an actor in a margin must not change its next simulated tick. */
     for(unsigned n=0;!native_demo() && n<s_visible_count;++n) {
-        unsigned o=s_visible_objects[n]; if(scene_read32(0xFF0000u+o))write8(o+4,g_ram[o+4]|128);
+        unsigned o=s_visible_objects[n],code=scene_read32(0xFF0000u+o);
+        /* Waiting enemies load their DPLC only after the native SAT sees
+         * them. During a returning title card those tiles still hold its
+         * banner. Keep native visibility until the card retires, then let
+         * the expanded view start the enemy normally. */
+        if(code && !(card && code==S3_WAIT_ONSCREEN))write8(o+4,g_ram[o+4]|128);
     }
     s_build.serial=++s_serial;
     unsigned sat=s_build.scene==4 && s_build.competition_page?0x7880:0xF800;
