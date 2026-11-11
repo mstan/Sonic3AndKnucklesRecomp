@@ -1804,6 +1804,7 @@ static void test_streamed_background_sources(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
     const struct { unsigned zone,event,bank,source; } cases[]={
+        {0x001,12,0,2},{0x001,16,0,1},{0x001,20,0,2},
         {0x101,4,0,0},{0x101,8,0,1},{0x101,12,0,1},{0x101,16,0,2},
         {0x201,4,0,2},{0x201,4,12,2},{0x201,4,4,0},{0x201,4,8,0},
         {0x201,8,0,1},{0x201,8,8,0},

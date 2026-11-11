@@ -2184,8 +2184,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * normal panorama is installed. Preserve those mixed uploaded rows. */
     int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
         (s_frame_bg_event==8 || s_frame_bg_event==12);
+    /* The AIZ2 grove/ship backdrop is also replaced bottom-up. During that
+     * pass the uploaded rows retain the outgoing composition. */
+    int aiz2_canvas=bg_world && !s_frame_zone && s_frame_act==1 && s_frame_bg_event==16;
     int mgz2_canvas=mgz2_panorama && s_frame_bg_event==8;
-    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || mgz2_canvas;
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
