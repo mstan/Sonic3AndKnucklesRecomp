@@ -832,10 +832,15 @@ int s3_army_hook(uint32_t pc)
     }
     case PC_ALLOC:
     case PC_ALLOC_AFTER:
-        /* Immediate relief if the reserve was exhausted within one frame. */
-        if (count && !free_slots()) {
-            for (int k = (int)count - 1; k >= 0; --k)
-                if (actors[k].slot && actors[k].slot > (g_cpu.A[0] & 0xFFFF)) { release(&actors[k]); break; }
+        /* Child allocation searches only above its parent. Free slots below
+         * it do not help: missing act-transition children can leave the
+         * camera locked. Yield an extra inside this allocator's search. */
+        if (count) {
+            unsigned first=pc==PC_ALLOC_AFTER?(g_cpu.A[0]&65535u)+OBJ:DYN_FIRST;
+            int room=0;
+            for(unsigned o=first;o<DYN_END;o+=OBJ)if(!rd32(o)){room=1;break;}
+            if(!room)for(int k=(int)count-1;k>=0;--k)
+                if(actors[k].slot>=first){release(&actors[k]);break;}
         }
         return 0;
     case ARMY_PC_SK_TITLE_FRAMES:
