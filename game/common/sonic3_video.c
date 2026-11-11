@@ -2590,12 +2590,55 @@ void s3_video_state(S3StateIO *io)
 }
 static S3VideoFrameOverlay s_frame_overlay;
 void s3_video_set_frame_overlay(S3VideoFrameOverlay draw) { s_frame_overlay = draw; }
+/* Competition fills the hardware card banks with its two playfields and HUD.
+ * Draw its unused native name-card layout from the cartridge instead. The
+ * actual native child owns position/lifetime; no art or result flag is written. */
+static void competition_card_scanline(const GVDP *v,int line,uint32_t *out,int width)
+{
+    unsigned zone=g_ram[0xFE10];
+    if((g_ram[0xF600]&127)!=12 || zone<14 || zone>18 || !(v->reg[1]&64))return;
+    static uint8_t art[5][2048],ready[5];
+    unsigned course=zone-14,table=S3_ART_BANK?0x2DA16u:0x2CD22u;
+    unsigned source=scene_read32(table+zone*4);
+    if(!ready[course]) {
+        if(art_kosm(source,0x800,art[course],sizeof art[course])!=sizeof art[course])return;
+        ready[course]=1;
+    }
+    /* S&K inserted more story frames without updating its unused course
+     * object. The locked-on S3 half retains the matching nine-piece layout. */
+    unsigned map=S3_TITLE_CARD_MAP,layout=S3_ART_BANK+0x2D90Cu;
+    unsigned entry=layout+scene_read16(layout+18*2);
+    unsigned pieces=scene_read16(entry);if(pieces>16)return;
+    for(unsigned o=0xB000;o<0xCAE2;o+=0x4A) {
+        if(scene_read32(0xFF0000u+o+12)!=map || g_ram[o+0x22]!=18 ||
+           scene_read32(0xFF0000u+o)!=(S3_ART_BANK?0x2D9CCu:0x2CCD8u))continue;
+        int ox=(int16_t)ram16(o+16)-128+(width-320)/2,oy=(int16_t)ram16(o+20)-128;
+        for(unsigned n=0;n<pieces;++n) {
+            unsigned p=entry+2+n*6,shape=g_rom[p+1],tile=scene_read16(p+2);
+            int x=ox+(int16_t)scene_read16(p+4),y=oy+(int8_t)g_rom[p];
+            int cw=(shape>>2)+1,ch=(shape&3)+1,iy=line-y;
+            if(iy<0 || iy>=ch*8)continue;
+            if(tile&0x1000)iy=ch*8-1-iy;
+            for(int dx=0;dx<cw*8;++dx) {
+                if(x+dx<0 || x+dx>=width)continue;
+                int ix=tile&0x800?cw*8-1-dx:dx;
+                unsigned pattern=(tile&2047u)+(unsigned)(ix/8*ch+iy/8);
+                if(pattern<0x500 || pattern>=0x540)continue;
+                unsigned byte=art[course][(pattern-0x500)*32+(iy&7)*4+(ix&7)/2];
+                unsigned color=(ix&1)?byte&15:byte>>4;if(!color)continue;
+                color|=(tile>>9)&48;
+                out[x+dx]=genesis_dac_cram_to_argb(v->cram[color],GENESIS_DAC_NORMAL);
+            }
+        }
+    }
+}
 static void overlay_scanline(const struct GVDP *v, int line, uint32_t *out, int width)
 {
     if(!enabled()) {
         life_ones_scanline(v,g_ram,line,out,width,(width-320)/2);
         time_tens_scanline(v,g_ram,line,out,width,(width-320)/2);
     }
+    competition_card_scanline(v,line,out,width);
     if (s_frame_overlay) s_frame_overlay(line, out, width);
 }
 

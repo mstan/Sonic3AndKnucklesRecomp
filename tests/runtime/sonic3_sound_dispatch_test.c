@@ -6,7 +6,11 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 M68KState g_cpu;
 uint8_t g_ram[65536];
-static int clone,cd,audio_calls,cd_calls,renderer_calls;
+static int clone,cd,audio_calls,cd_calls,renderer_calls,restoration;
+static uint32_t card_tail;
+int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t *ram,uint32_t actor)
+{(void)pc;(void)ram;(void)actor;return 0;}
+void recomp_tail_call(uint32_t pc){card_tail=pc;}
 int s3_sound_active(void){return clone;}
 int s3_sound_owns(uint32_t pc){return pc==0x12CE || pc==0x1358 || pc==0x13C2;}
 int s3_sound_hook(uint32_t pc){(void)pc;++audio_calls;return clone;}
@@ -16,7 +20,9 @@ int trilogy_instruction(uint32_t pc)
 int s3_state_menu_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_kos_owns(uint32_t pc){(void)pc;return 0;}
 int s3_kos_instruction(uint32_t pc){(void)pc;return 0;}
-int s3_gameplay_owns(uint32_t pc){(void)pc;return 0;}
+int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6;}
+uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
+{(void)ram;(void)actor;return restoration && pc==0x2D6A6?0x2D756:0;}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t *ram,uint32_t p,uint16_t *sr){(void)pc;(void)ram;(void)p;(void)sr;}
 void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t *ram,uint16_t *sr){(void)pc;(void)ram;(void)sr;}
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t *ram,uint32_t *d,uint16_t *sr){(void)pc;(void)ram;(void)d;(void)sr;}
@@ -37,5 +43,8 @@ int main(void)
     }
     clone=cd=0;renderer_calls=0;g_cpu.D[0]=0x1234;
     CHECK(!s3k_instruction(0x12CE));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
+    CHECK(!s3k_instruction(0x2D6A6));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
+    restoration=1;CHECK(s3k_instruction(0x2D6A6));
+    CHECK(card_tail==0x2D756 && !renderer_calls && g_cpu.D[0]==0x1234);
     puts("PASS actual hook composition: original/CD music and tempo, active Clone priority, renderer isolation");return 0;
 }

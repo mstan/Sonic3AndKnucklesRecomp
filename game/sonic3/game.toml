@@ -28,6 +28,7 @@ code_addrs_file = "sonic3.code_addrs.txt"
 discovery_files = [
     "sonic3.return_handlers.toml", # source-backed object-handler call continuations
     "sonic3.palette_commands.toml",
+    "sonic3.restoration.toml", # source-backed unused-card continuation
     "sonic3.menu_state.toml", # exact menu state continuations
     # Padded SpecialVInt branch table: tools/gen_special_vint_sites.py
     "sonic3.special_vint_s3.toml",
@@ -564,6 +565,13 @@ addr = 0x009C68
 kind = "game_hook"
 
 # Grand Prix uses its own player-selection loop.
+[[widescreen_site]]
+addr = 0x02CA7C # Optional original Competition title cards
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x019240 # Present restored course cards without changing shared VRAM
+kind = "game_hook"
+
 [[widescreen_site]]
 addr = 0x00A344
 kind = "game_hook"

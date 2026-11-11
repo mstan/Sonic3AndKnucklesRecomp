@@ -7,6 +7,7 @@ typedef struct {
     int checkpoint_bonus;
     int shield_transform;
     int tails_ring_follow;
+    int competition_title_cards;
 } S3GameplayConfig;
 extern S3GameplayConfig s3_gameplay;
 void s3_gameplay_load(const char *settings_path,const char *mode);
@@ -15,6 +16,9 @@ int s3_gameplay_netplay_allowed(void);
 void s3_gameplay_apply(uint8_t ram[65536]);
 /* All private gameplay hook sites; the renderer must not consume them. */
 int s3_gameplay_owns(uint32_t pc);
+/* Opt-in unused Competition card; return its original loader continuation. */
+uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t ram[65536],uint32_t actor);
+int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t actor);
 /* Keep the HCZ1 fixed splash slot out of ordinary native allocation. */
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr);

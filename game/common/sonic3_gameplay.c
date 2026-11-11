@@ -28,6 +28,7 @@ void s3_gameplay_load(const char *settings_path,const char *mode)
         if(combined_mode&&!strcmp(line,"checkpoint_bonus=1"))s3_gameplay.checkpoint_bonus=1;
         if(!strcmp(line,"shield_transform=1"))s3_gameplay.shield_transform=1;
         if(combined_mode&&!strcmp(line,"tails_ring_follow=1"))s3_gameplay.tails_ring_follow=1;
+        if(!standalone_sk&&!strcmp(line,"competition_title_cards=1"))s3_gameplay.competition_title_cards=1;
     }
     fclose(f);
 }
@@ -36,9 +37,9 @@ int s3_gameplay_save(void)
     error[0]=0;
     char temp[1040];snprintf(temp,sizeof temp,"%s.tmp",path);
     FILE *f=fopen(temp,"wb");if(!f)goto failed;
-    fprintf(f,"infinite_lives=%d\ninfinite_time=%d\neasy_level_select=%d\ndebug_mode=%d\ncheckpoint_bonus=%d\nshield_transform=%d\ntails_ring_follow=%d\n",
+    fprintf(f,"infinite_lives=%d\ninfinite_time=%d\neasy_level_select=%d\ndebug_mode=%d\ncheckpoint_bonus=%d\nshield_transform=%d\ntails_ring_follow=%d\ncompetition_title_cards=%d\n",
         s3_gameplay.infinite_lives,s3_gameplay.infinite_time,
-        s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform,s3_gameplay.tails_ring_follow);
+        s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform,s3_gameplay.tails_ring_follow,s3_gameplay.competition_title_cards);
     int ok=!ferror(f);if(fclose(f))ok=0;
     if(!ok)goto failed;
 #ifdef _WIN32
@@ -53,7 +54,7 @@ failed:
 int s3_gameplay_netplay_allowed(void)
 { return !s3_gameplay.infinite_lives && !s3_gameplay.infinite_time &&
     !s3_gameplay.easy_level_select && !s3_gameplay.debug_mode &&
-    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow; }
+    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
 static int shield_site(uint32_t pc)
@@ -67,9 +68,36 @@ static int nemesis_pop_site(uint32_t pc)
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
         combined_mode && (pc==0x1BB10u || pc==0x1BAECu);}
+static int title_card_site(uint32_t pc)
+{return (standalone_s3 || combined_mode) &&
+    pc==(standalone_s3?0x2CA7Cu:0x2D6A6u);}
+uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t ram[65536],uint32_t actor)
+{
+    actor&=0xFFFFFFu;
+    if(!s3_gameplay.competition_title_cards || !title_card_site(pc) ||
+       pc!=(standalone_s3?0x2CA7Cu:0x2D6A6u) || !ram ||
+       (ram[0xF600]&0x7F)!=12 || ram[0xFE10]<0xE || ram[0xFE10]>0x12 ||
+       actor<0xFFB000u || actor>=0xFFCAE2u)return 0;
+    /* The unused controller/layout is complete. Competition's planes and
+     * HUD occupy the story-card pattern banks, so keep its controller timing
+     * but render ROM-derived course art without queuing the story PLCs. */
+    ram[(actor&65535u)+0x44]=255;
+    return standalone_s3?0x2CADCu:0x2D756u;
+}
+int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t actor)
+{
+    actor&=0xFFFFFFu;
+    if(!s3_gameplay.competition_title_cards || !(standalone_s3 || combined_mode) ||
+       pc!=(standalone_s3?0x19240u:0x1ABC6u) || !ram ||
+       (ram[0xF600]&0x7F)!=12 || ram[0xFE10]<0xE || ram[0xFE10]>0x12 ||
+       actor<0xFFB000u || actor>=0xFFCAE2u)return 0;
+    unsigned o=actor&65535u;
+    uint32_t map=(uint32_t)word(ram,o+12)<<16|word(ram,o+14);
+    return map==(standalone_s3?0x2D90Cu:0x2EE10u) && ram[o+0x22]==0x12;
+}
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) ||
-        allocation_site(pc);}
+        allocation_site(pc) || title_card_site(pc) || (standalone_s3 && pc==0x19240u);}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
 {
@@ -178,17 +206,18 @@ void s3_gameplay_apply(uint8_t ram[65536])
 #include "recomp_launcher.h"
 static const RecompLauncherCModProvider *base;
 static const char package[]="sonic3.gameplay";
-static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","s1-checkpoint-bonus","tails-ring-follow"};
-static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Sonic 1 checkpoint bonus stages","Tails giant-ring follow"};
+static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","competition-title-cards","s1-checkpoint-bonus","tails-ring-follow"};
+static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Competition title cards","Sonic 1 checkpoint bonus stages","Tails giant-ring follow"};
 static const char *descriptions[]={
     "Keep at least three lives, including after death and retry. Local play only.",
     "Disable the stage time limit. The clock counts to 99:59, then stays there. The 100,000-point time bonus applies only at 9:59. Local play only.",
     "Unlock Sound Test on the title menu. Press Up to select it, then Start; use the native stage list. Local play only.",
     "Enable native debug in original stages. B enters/exits placement, A cycles objects, C places one. Imported rounds are excluded. Local play only.",
     "Native Sonic: hold Up and press jump again in the air to transform with an elemental shield. Requires native emeralds and 50 rings. Without Up, shield actions stay normal. Shadow/Mighty keep their own controls. Local play only.",
+    "Restore the five unused Competition course name cards using the cartridge's original art, animation and timing. Local play only.",
     "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
     "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only."};
-static int own_features(void){return combined_mode?7:5;}
+static int own_features(void){return combined_mode?8:standalone_s3?6:5;}
 #define COPY(d,s) snprintf(d,sizeof(d),"%s",s)
 static int own(const char *p){return p&&!strcmp(p,package);}
 static int index_of(const char *f){for(int i=0;i<own_features();++i)if(f&&!strcmp(f,ids[i]))return i;return -1;}
@@ -198,7 +227,8 @@ static int *value(int i){switch(i) {
     case 2:return &s3_gameplay.easy_level_select;
     case 3:return &s3_gameplay.debug_mode;
     case 4:return &s3_gameplay.shield_transform;
-    case 5:return &s3_gameplay.checkpoint_bonus;
+    case 5:return &s3_gameplay.competition_title_cards;
+    case 6:return &s3_gameplay.checkpoint_bonus;
     default:return &s3_gameplay.tails_ring_follow;
 }}
 static int packages(void *c){(void)c;return 1+(base&&base->package_count?base->package_count(base->ctx):0);}
@@ -220,6 +250,10 @@ static int get_feature(void *c,int i,RecompLauncherCModFeature *o)
     memset(o,0,sizeof *o);
     COPY(o->id,ids[i]);COPY(o->package_id,package);COPY(o->package_name,"Gameplay options");
     COPY(o->package_version,"0.1.0");COPY(o->name,names[i]);COPY(o->group,"Gameplay");
+    if(i==5){
+        COPY(o->group,"Restoration");COPY(o->source_name,"Sonic Retro disassembly");
+        COPY(o->source_url,"https://github.com/sonicretro/skdisasm");
+    }
     COPY(o->description,descriptions[i]);COPY(o->status,*value(i)?"Enabled â€” local play":"Disabled");
     if(i==2 && standalone_sk)
         COPY(o->description,"Hold A and press Start on the title screen to open native level select. Keep A held through the fade. Local play only.");

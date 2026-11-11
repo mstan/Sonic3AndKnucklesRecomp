@@ -1,0 +1,3 @@
+# Native title-card timer initialization, immediately after its story PLCs.
+[functions]
+extra = [0x02D756]

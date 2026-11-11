@@ -223,7 +223,7 @@ static void test_checkpoint_option(void)
         char path[128];snprintf(path,sizeof path,"%s/%s-gameplay.ini",dir,modes[i]);
         s3_gameplay_load("test-gameplay-modes/settings.ini",modes[i]);
         const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
-        CHECK(p->feature_count(p->ctx)==(i==2?7:5));
+        CHECK(p->feature_count(p->ctx)==(i==2?8:i==0?6:5));
         CHECK(!s3_gameplay.checkpoint_bonus && !s3_gameplay.tails_ring_follow && s3_gameplay_netplay_allowed());
         if(i==2) {
             CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
@@ -306,6 +306,46 @@ static void test_shield_transform(void)
         CHECK(!s3_gameplay_skip_shield(m?0xDD76:0xEAF2,ram,0xFFFFB000u,1));
     }
 }
+static void test_competition_title_cards(void)
+{
+    static uint8_t ram[65536],before[65536];
+    CHECK(MAKE_DIR("test-restoration")==0);
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;++m) {
+        s3_gameplay_load("test-restoration/settings.ini",modes[m]);
+        CHECK(!s3_gameplay.competition_title_cards && s3_gameplay_netplay_allowed());
+        const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
+        CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","competition-title-cards",1)==(m<2));
+        CHECK(s3_gameplay.competition_title_cards==(m<2));
+        unsigned pc=m?0x2D6A6:0x2CA7C,entry=m?0x2D756:0x2CADC;
+        for(unsigned zone=0;zone<0x18;++zone) {
+            memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=(uint8_t)zone;
+            memcpy(before,ram,sizeof ram);
+            uint32_t result=s3_gameplay_title_card(pc,ram,0xFFFFB0DEu);
+            if(m<2 && zone>=0xE && zone<=0x12) {
+                CHECK(result==entry && ram[0xB122]==255);
+                ram[0xB122]=0;
+            } else CHECK(!result);
+            CHECK(!memcmp(ram,before,sizeof ram));
+        }
+        CHECK(!s3_gameplay_title_card(pc,NULL,0xFFB0DE));
+        CHECK(!s3_gameplay_title_card(pc+2,ram,0xFFB0DE));
+        CHECK(!s3_gameplay_title_card(pc,ram,0xFF0000));
+        memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=14;
+        unsigned map=m?0x2EE10u:0x2D90Cu;
+        ram[0xB0EA]=(uint8_t)(map>>24);ram[0xB0EB]=(uint8_t)(map>>16);
+        ram[0xB0EC]=(uint8_t)(map>>8);ram[0xB0ED]=(uint8_t)map;
+        ram[0xB100]=18;memcpy(before,ram,sizeof ram);
+        CHECK(s3_gameplay_title_card_sprite(m?0x1ABC6:0x19240,ram,0xFFFFB0DEu)==(m<2));
+        CHECK(!memcmp(ram,before,sizeof ram));
+        CHECK(p->commit(p->ctx,NULL));s3_gameplay_load("test-restoration/settings.ini",modes[m]);
+        CHECK(s3_gameplay.competition_title_cards==(m<2));
+        CHECK(s3_gameplay_netplay_allowed()==(m==2));
+        char path[128];snprintf(path,sizeof path,"test-restoration/%s-gameplay.ini",modes[m]);
+        CHECK(!remove(path));
+    }
+    CHECK(!REMOVE_DIR("test-restoration"));
+}
 int main(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -368,6 +408,7 @@ int main(void)
         ram[competition+1]=0;flags=0xA714;
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
+    test_competition_title_cards();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

@@ -1,6 +1,7 @@
 #pragma once
 /* The game-owned hook chain is shared with its composition regression test. */
 #include "genesis_runtime.h"
+#include "genesis_bus.h"
 #include "sonic3_sound_driver.h"
 #include "sonic3_state.h"
 #include "sonic3_kos.h"
@@ -14,7 +15,10 @@ static int s3k_instruction(uint32_t pc)
     if(s3_sound_active() && s3_sound_owns(pc))return s3_sound_hook(pc);
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
+    if(s3_gameplay_title_card_sprite(pc,g_ram,g_cpu.A[0]))return 1;
     if(s3_gameplay_owns(pc)) {
+        uint32_t card=s3_gameplay_title_card(pc,g_ram,g_cpu.A[0]);
+        if(card){recomp_tail_call(card);return 1;}
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
