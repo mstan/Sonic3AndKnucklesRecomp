@@ -65,6 +65,15 @@ static int timer_site(uint32_t pc)
                      (pc==0xDD76u || pc==0xDD98u || pc==0xDDAAu);}
 static int nemesis_pop_site(uint32_t pc)
 {return pc==(standalone_s3?0x1B0Au:0x1880u);}
+static int palette_reset_site(uint32_t pc)
+{return pc==(standalone_s3?0x3188u:0x3812u);}
+void s3_gameplay_palette_reset(uint32_t pc,uint8_t ram[65536])
+{
+    /* Revert underflows to FFFA. Retail clears only the high byte, leaving
+     * 00FA for the next fade-in, which then reads code past the color table.
+     * Clear the low byte too; the original instruction retains its own CCR. */
+    if(ram && palette_reset_site(pc))ram[0xF65D]=0;
+}
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
         combined_mode && (pc==0x1BB10u || pc==0x1BAECu);}
@@ -96,7 +105,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
     return map==(standalone_s3?0x2D90Cu:0x2EE10u) && ram[o+0x22]==0x12;
 }
 int s3_gameplay_owns(uint32_t pc)
-{return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) ||
+{return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && pc==0x19240u);}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)

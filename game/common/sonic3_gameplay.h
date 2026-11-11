@@ -24,6 +24,8 @@ void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr);
 /* Unconditional native Nemesis FIFO correctness repair at its audited RTS. */
 void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t ram[65536],uint16_t *sr);
+/* Complete retail's byte-sized palette-index reset after depowering. */
+void s3_gameplay_palette_reset(uint32_t pc,uint8_t ram[65536]);
 /* Audited timer branch/formatter sites; only their consumed CCR bits or
  * display argument change. Native timer/result/death routines still execute. */
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],

@@ -25,6 +25,7 @@ uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)ram;(void)actor;return restoration && pc==0x2D6A6?0x2D756:0;}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t *ram,uint32_t p,uint16_t *sr){(void)pc;(void)ram;(void)p;(void)sr;}
 void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t *ram,uint16_t *sr){(void)pc;(void)ram;(void)sr;}
+void s3_gameplay_palette_reset(uint32_t pc,uint8_t *ram){(void)pc;(void)ram;}
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t *ram,uint32_t *d,uint16_t *sr){(void)pc;(void)ram;(void)d;(void)sr;}
 int s3_gameplay_skip_shield(uint32_t pc,const uint8_t *ram,uint32_t p,int native){(void)pc;(void)ram;(void)p;(void)native;return 0;}
 int tri_character_active(void){return 0;}

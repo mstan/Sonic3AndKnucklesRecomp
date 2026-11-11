@@ -652,3 +652,8 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x00B4B4
 kind = "game_hook"
+
+# Complete the palette-frame word reset after Super reverts.
+[[widescreen_site]]
+addr = 0x3812
+kind = "game_hook"
