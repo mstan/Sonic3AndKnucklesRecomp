@@ -1,6 +1,9 @@
 #include "sonic3_gameplay.h"
 #include <stdio.h>
 #include <string.h>
+#ifdef S3_SOUND_COMBINED
+#include "stage_pack.h"
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -29,6 +32,8 @@ void s3_gameplay_load(const char *settings_path,const char *mode)
         if(!strcmp(line,"shield_transform=1"))s3_gameplay.shield_transform=1;
         if(combined_mode&&!strcmp(line,"tails_ring_follow=1"))s3_gameplay.tails_ring_follow=1;
         if(!standalone_sk&&!strcmp(line,"competition_title_cards=1"))s3_gameplay.competition_title_cards=1;
+        if(combined_mode&&!strcmp(line,"original_zone_order=1"))s3_gameplay.original_zone_order=1;
+        if(!standalone_s3&&!strcmp(line,"early_zone_names=1"))s3_gameplay.early_zone_names=1;
     }
     fclose(f);
 }
@@ -40,6 +45,8 @@ int s3_gameplay_save(void)
     fprintf(f,"infinite_lives=%d\ninfinite_time=%d\neasy_level_select=%d\ndebug_mode=%d\ncheckpoint_bonus=%d\nshield_transform=%d\ntails_ring_follow=%d\ncompetition_title_cards=%d\n",
         s3_gameplay.infinite_lives,s3_gameplay.infinite_time,
         s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform,s3_gameplay.tails_ring_follow,s3_gameplay.competition_title_cards);
+    fprintf(f,"original_zone_order=%d\n",s3_gameplay.original_zone_order);
+    fprintf(f,"early_zone_names=%d\n",s3_gameplay.early_zone_names);
     int ok=!ferror(f);if(fclose(f))ok=0;
     if(!ok)goto failed;
 #ifdef _WIN32
@@ -54,7 +61,7 @@ failed:
 int s3_gameplay_netplay_allowed(void)
 { return !s3_gameplay.infinite_lives && !s3_gameplay.infinite_time &&
     !s3_gameplay.easy_level_select && !s3_gameplay.debug_mode &&
-    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards; }
+    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards && !s3_gameplay.original_zone_order && !s3_gameplay.early_zone_names; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
 static int shield_site(uint32_t pc)
@@ -73,6 +80,28 @@ void s3_gameplay_palette_reset(uint32_t pc,uint8_t ram[65536])
      * 00FA for the next fade-in, which then reads code past the color table.
      * Clear the low byte too; the original instruction retains its own CCR. */
     if(ram && palette_reset_site(pc))ram[0xF65D]=0;
+}
+void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0)
+{
+    if(!combined_mode || !s3_gameplay.original_zone_order || !ram || !d0 ||
+       word(ram,0xFFD0) || word(ram,0xFFE8))return;
+    unsigned zone=word(ram,0xFE10),next=*d0&65535u;
+    if(pc==0x85E3Au) {
+        /* StartNewLevel: retain each native exit and incoming initialization. */
+        if(zone==0x301 && next==0x500)next=0x400;
+        else if(zone==0x401 && next==0x800)next=0x500;
+        else if(zone==0x701 && next==0x400)next=0x800;
+        *d0=(*d0&0xFFFF0000u)|next;
+    } else if(pc==0xC452u) {
+        /* SaveGame's already-decoded next-zone byte. These are the retail
+         * save codes for FBZ, ICZ and SOZ, so disabling the mod or importing
+         * the SRAM still resumes the actual saved zone. */
+        if(zone==0x300 || zone==0x301)next=7;
+        else if(zone==0x400 || zone==0x401)next=4;
+        else if(zone==0x700 || zone==0x701)next=8;
+        else return;
+        *d0=(*d0&0xFFFFFF00u)|next;
+    }
 }
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
@@ -106,6 +135,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 }
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
+        (combined_mode && (pc==0x85E3Au || pc==0xC452u)) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && pc==0x19240u);}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
@@ -215,8 +245,8 @@ void s3_gameplay_apply(uint8_t ram[65536])
 #include "recomp_launcher.h"
 static const RecompLauncherCModProvider *base;
 static const char package[]="sonic3.gameplay";
-static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","competition-title-cards","s1-checkpoint-bonus","tails-ring-follow"};
-static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Competition title cards","Sonic 1 checkpoint bonus stages","Tails giant-ring follow"};
+static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","competition-title-cards","s1-checkpoint-bonus","tails-ring-follow","original-zone-order","early-zone-names"};
+static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Competition title cards","Sonic 1 checkpoint bonus stages","Tails giant-ring follow","Original zone order","Mushroom Valley name"};
 static const char *descriptions[]={
     "Keep at least three lives, including after death and retry. Local play only.",
     "Disable the stage time limit. The clock counts to 99:59, then stays there. The 100,000-point time bonus applies only at 9:59. Local play only.",
@@ -225,11 +255,14 @@ static const char *descriptions[]={
     "Native Sonic: hold Up and press jump again in the air to transform with an elemental shield. Requires native emeralds and 50 rings. Without Up, shield actions stay normal. Shadow/Mighty keep their own controls. Local play only.",
     "Restore the five unused Competition course name cards using the cartridge's original art, animation and timing. Local play only.",
     "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
-    "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only."};
-static int own_features(void){return combined_mode?8:standalone_s3?6:5;}
+    "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only.",
+    "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Uses the complete retail stages and their normal exits. Native saves retain their original zone codes. Default off; local play only.",
+    "Use Mushroom Valley, the November 1993 level name, on native title cards and level select. The title lettering is reconstructed from your retail cartridge's font; the prototype's missing card is not claimed as recovered artwork. Default off; restart to apply. Local play only."};
+static int own_features(void){return combined_mode?10:6;}
+static int feature_index(int i){return standalone_sk && i==5?9:i;}
 #define COPY(d,s) snprintf(d,sizeof(d),"%s",s)
 static int own(const char *p){return p&&!strcmp(p,package);}
-static int index_of(const char *f){for(int i=0;i<own_features();++i)if(f&&!strcmp(f,ids[i]))return i;return -1;}
+static int index_of(const char *f){for(int i=0;i<own_features();++i)if(f&&!strcmp(f,ids[feature_index(i)]))return feature_index(i);return -1;}
 static int *value(int i){switch(i) {
     case 0:return &s3_gameplay.infinite_lives;
     case 1:return &s3_gameplay.infinite_time;
@@ -238,6 +271,8 @@ static int *value(int i){switch(i) {
     case 4:return &s3_gameplay.shield_transform;
     case 5:return &s3_gameplay.competition_title_cards;
     case 6:return &s3_gameplay.checkpoint_bonus;
+    case 8:return &s3_gameplay.original_zone_order;
+    case 9:return &s3_gameplay.early_zone_names;
     default:return &s3_gameplay.tails_ring_follow;
 }}
 static int packages(void *c){(void)c;return 1+(base&&base->package_count?base->package_count(base->ctx):0);}
@@ -256,12 +291,17 @@ static int get_feature(void *c,int i,RecompLauncherCModFeature *o)
 {
     (void)c;if(i>=own_features())return base&&base->feature_get&&base->feature_get(base->ctx,i-own_features(),o);
     if(i<0||!o)return 0;
+    i=feature_index(i);
     memset(o,0,sizeof *o);
     COPY(o->id,ids[i]);COPY(o->package_id,package);COPY(o->package_name,"Gameplay options");
     COPY(o->package_version,"0.1.0");COPY(o->name,names[i]);COPY(o->group,"Gameplay");
     if(i==5){
         COPY(o->group,"Restoration");COPY(o->source_name,"Sonic Retro disassembly");
         COPY(o->source_url,"https://github.com/sonicretro/skdisasm");
+    }
+    if(i==8 || i==9){
+        COPY(o->group,"Restoration");COPY(o->source_name,"Hidden Palace prototype documentation");
+        COPY(o->source_url,"https://hiddenpalace.org/Sonic_the_Hedgehog_3_(Nov_3,_1993_prototype)");
     }
     COPY(o->description,descriptions[i]);COPY(o->status,*value(i)?"Enabled â€” local play":"Disabled");
     if(i==2 && standalone_sk)
@@ -272,17 +312,24 @@ static int enable(void *c,const char *p,const char *f,int on)
 {
     (void)c;error[0]=0;
     if(!own(p))return base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on);
-    int i=index_of(f);if(i<0)return 0;*value(i)=on!=0;return 1;
+    int i=index_of(f);if(i<0)return 0;
+#ifdef S3_SOUND_COMBINED
+    if(i==9 && on && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+#endif
+    *value(i)=on!=0;return 1;
 }
 static int enable_package(void *c,const char *p,int on)
 {
     if(!own(p))return base&&base->set_enabled&&base->set_enabled(base->ctx,p,on);
-    for(int i=0;i<own_features();++i)if(!enable(c,p,ids[i],on))return 0;
+    for(int i=0;i<own_features();++i)if(!enable(c,p,ids[feature_index(i)],on))return 0;
     return 1;
 }
 static int commit(void *c,const char *image)
 {
     (void)c;error[0]=0;
+#ifdef S3_SOUND_COMBINED
+    if(s3_gameplay.early_zone_names && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+#endif
     if(base&&base->commit&&!base->commit(base->ctx,image))return 0;
     return s3_gameplay_save();
 }

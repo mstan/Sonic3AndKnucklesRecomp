@@ -58,12 +58,12 @@ extern void func_000D10(void);  /* HInt         ($000D10) */
 #include "sonic3k_instruction.h"
 
 extern void tri_obj_vblank(void);
-static void s3k_call_entry_point(void) { s3_sound_post_reset(); trilogy_init(); s3_army_init(); recomp_call_addr(0x000206u); }
+static void s3k_call_entry_point(void) { s3_sound_post_reset(); s3_restoration_post_reset(); trilogy_init(); s3_army_init(); recomp_call_addr(0x000206u); }
 static void s3k_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); if (tri_bank_loaded()) tri_obj_vblank(); }
-static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); s3_gameplay_load(path,"sonic3k"); s3_sound_load(path,"sonic3k"); s3_stage_pack_load(path); }
+static void s3k_load_settings(const char *path) { s3_mods_load(path, "sonic3k"); s3_gameplay_load(path,"sonic3k"); s3_sound_load(path,"sonic3k"); s3_restoration_load(); s3_stage_pack_load(path); }
 static const struct RecompLauncherCModProvider *s3k_mods(const struct RecompLauncherCModProvider *base)
 { return s3_sound_mods(s3_stage_pack_mods(s3_gameplay_mods(s3_mods(base)))); }
-static int s3k_netplay_allowed(void) { return s3_sound_netplay_allowed() && !s3_stage_pack_enabled && s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
+static int s3k_netplay_allowed(void) { return s3_sound_netplay_allowed() && s3_restoration_netplay_allowed() && !s3_stage_pack_enabled && s3_mods_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 static void s3k_call_hblank(void)      { recomp_call_addr(0x000D0Cu); }
 
 /* ---- 68K work-RAM accessors ---- */

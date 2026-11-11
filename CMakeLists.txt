@@ -244,6 +244,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     )
     list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_video.c"
         "${S3_GAME_COMMON}/sonic3_gameplay.c"
+        "${S3_GAME_COMMON}/sonic3_restoration.c"
         "${S3_GAME_COMMON}/sonic3_state.c")
     list(APPEND SHARED_SRC
         "${S3_GAME_COMMON}/sonic3_sound_driver.c"

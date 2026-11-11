@@ -146,6 +146,8 @@ add_executable(sonic3_gameplay_test runtime/sonic3_gameplay_test.c "${S3_GAME_CO
 target_include_directories(sonic3_gameplay_test PRIVATE "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src")
 target_compile_definitions(sonic3_gameplay_test PRIVATE RECOMP_LAUNCHER=1)
 add_test(NAME sonic3_gameplay COMMAND sonic3_gameplay_test)
+add_executable(sonic3_restoration_test runtime/sonic3_restoration_test.c "${S3_GAME_COMMON}/sonic3_restoration.c")
+target_include_directories(sonic3_restoration_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include")
 
 # The renderer test #includes game/common/sonic3_video.c directly and supplies
 # its own guest-memory/TCP stubs; it compiles once per cartridge address profile.
@@ -270,6 +272,9 @@ endforeach()
 foreach(_mode sonic3 sonic3k sandk)
     set(_rom "${S3_GAME_ROOT}/${_mode}/${_mode}.bin")
     if(EXISTS "${_rom}")
+        if(NOT _mode STREQUAL "sonic3")
+            add_test(NAME restoration_${_mode} COMMAND sonic3_restoration_test "${_rom}")
+        endif()
         add_test(NAME sound_source_${_mode} COMMAND sonic3_sound_source_test "${_rom}")
         if(S3_CLONE_PROGRAM_DIR)
             add_executable(sound_driver_${_mode}_test runtime/sonic3_sound_driver_test.c

@@ -3,6 +3,7 @@
 #include "genesis_runtime.h"
 #include "genesis_bus.h"
 #include "sonic3_sound_driver.h"
+#include "sonic3_restoration.h"
 #include "sonic3_state.h"
 #include "sonic3_kos.h"
 #include "sonic3_gameplay.h"
@@ -13,6 +14,7 @@
 static int s3k_instruction(uint32_t pc)
 {
     if(s3_sound_active() && s3_sound_owns(pc))return s3_sound_hook(pc);
+    if(s3_restoration_instruction(pc))return 0;
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_title_card_sprite(pc,g_ram,g_cpu.A[0]))return 1;
@@ -22,6 +24,7 @@ static int s3k_instruction(uint32_t pc)
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);
+        s3_gameplay_zone_order(pc,g_ram,&g_cpu.D[0]);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],!tri_character_active()))g_cpu.SR|=4u;
         return 0; /* This private site must not reach the renderer default. */

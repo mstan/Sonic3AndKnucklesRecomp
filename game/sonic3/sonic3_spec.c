@@ -21,6 +21,7 @@
 #include "sonic3_state.h"
 #include "sonic3_state_build.h"
 #include "sonic3_sound_driver.h"
+#include "sonic3_restoration.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -47,7 +48,7 @@ extern void func_000802(void);  /* VInt         ($000802) */
 extern void func_000F9E(void);  /* JmpTo_HInt   ($000F9E) */
 extern void func_000FA2(void);  /* HInt         ($000FA2) */
 
-static void s3_call_entry_point(void) { s3_sound_post_reset(); recomp_call_addr(0x000206u); }
+static void s3_call_entry_point(void) { s3_sound_post_reset(); s3_restoration_post_reset(); recomp_call_addr(0x000206u); }
 static void s3_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); recomp_call_addr(0x000802u); }
 static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
 
@@ -296,9 +297,9 @@ static int gameplay_instruction(uint32_t pc)
     }
     return s3_video_hook(pc);
 }
-static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); s3_sound_load(path,"sonic3"); }
+static void gameplay_settings(const char *path) { s3_gameplay_load(path,"sonic3"); s3_sound_load(path,"sonic3"); s3_restoration_load(); }
 static const struct RecompLauncherCModProvider *sound_mods(const struct RecompLauncherCModProvider *base) { return s3_sound_mods(s3_gameplay_mods(base)); }
-static int sound_netplay(void) { return s3_sound_netplay_allowed() && s3_gameplay_netplay_allowed(); }
+static int sound_netplay(void) { return s3_sound_netplay_allowed() && s3_restoration_netplay_allowed() && s3_gameplay_netplay_allowed(); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
     .rb_state_save          = s3_rb_state_save,

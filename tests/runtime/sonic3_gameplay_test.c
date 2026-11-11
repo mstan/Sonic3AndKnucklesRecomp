@@ -196,10 +196,10 @@ static void test_provider_composition(void)
     b.feature_get=base_feature;b.feature_enable=base_enable;
     b.feature_option_get=base_option;b.commit_netplay=base_commit;
     const RecompLauncherCModProvider *p=s3_gameplay_mods(&b);
-    CHECK(p->ctx==&base_context && p->package_count(p->ctx)==2 && p->feature_count(p->ctx)==6);
+    CHECK(p->ctx==&base_context && p->package_count(p->ctx)==2 && p->feature_count(p->ctx)==7);
     RecompLauncherCModPackage package;RecompLauncherCModFeature feature;
     CHECK(p->package_get(p->ctx,1,&package)&&!strcmp(package.id,"fixture"));
-    CHECK(p->feature_get(p->ctx,5,&feature)&&!strcmp(feature.id,"base-feature"));
+    CHECK(p->feature_get(p->ctx,6,&feature)&&!strcmp(feature.id,"base-feature"));
     CHECK(p->feature_enable(p->ctx,"fixture","base-feature",1));
     CHECK(p->feature_option_get(p->ctx,"fixture","base-feature",3,NULL));
     CHECK(p->commit_netplay(p->ctx,"owned.bin"));
@@ -223,7 +223,7 @@ static void test_checkpoint_option(void)
         char path[128];snprintf(path,sizeof path,"%s/%s-gameplay.ini",dir,modes[i]);
         s3_gameplay_load("test-gameplay-modes/settings.ini",modes[i]);
         const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
-        CHECK(p->feature_count(p->ctx)==(i==2?8:i==0?6:5));
+        CHECK(p->feature_count(p->ctx)==(i==2?10:6));
         CHECK(!s3_gameplay.checkpoint_bonus && !s3_gameplay.tails_ring_follow && s3_gameplay_netplay_allowed());
         if(i==2) {
             CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
@@ -346,6 +346,39 @@ static void test_competition_title_cards(void)
     }
     CHECK(!REMOVE_DIR("test-restoration"));
 }
+static void test_original_order(void)
+{
+    static uint8_t ram[65536],before[65536];
+    CHECK(!MAKE_DIR("test-original-order"));
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;++m) {
+        s3_gameplay_load("test-original-order/settings.ini",modes[m]);
+        const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
+        CHECK(!s3_gameplay.original_zone_order && s3_gameplay_netplay_allowed());
+        CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","original-zone-order",1)==(m==1));
+        CHECK(s3_gameplay.original_zone_order==(m==1));
+        const unsigned exits[][4]={{0x301,0x500,0x400,7},{0x401,0x800,0x500,4},{0x701,0x400,0x800,8}};
+        for(unsigned i=0;i<3;++i) {
+            memset(ram,0,sizeof ram);ram[0xF600]=12;
+            ram[0xFE10]=(uint8_t)(exits[i][0]>>8);ram[0xFE11]=1;
+            memcpy(before,ram,sizeof ram);
+            uint32_t next=0xABCD0000u|exits[i][1];
+            s3_gameplay_zone_order(0x85E3A,ram,&next);
+            CHECK(next==(0xABCD0000u|(m==1?exits[i][2]:exits[i][1])));
+            uint32_t save=0x12345600u;
+            s3_gameplay_zone_order(0xC452,ram,&save);
+            CHECK(save==(0x12345600u|(m==1?exits[i][3]:0)));
+            CHECK(!memcmp(before,ram,sizeof ram));
+            ram[0xFFD1]=1;next=exits[i][1];s3_gameplay_zone_order(0x85E3A,ram,&next);CHECK(next==exits[i][1]);
+            ram[0xFFD1]=0;ram[0xFFE9]=1;next=exits[i][1];s3_gameplay_zone_order(0x85E3A,ram,&next);CHECK(next==exits[i][1]);
+        }
+        CHECK(p->commit(p->ctx,NULL));s3_gameplay_load("test-original-order/settings.ini",modes[m]);
+        CHECK(s3_gameplay.original_zone_order==(m==1));
+        CHECK(s3_gameplay_netplay_allowed()==(m!=1));
+        char path[128];snprintf(path,sizeof path,"test-original-order/%s-gameplay.ini",modes[m]);CHECK(!remove(path));
+    }
+    CHECK(!REMOVE_DIR("test-original-order"));
+}
 int main(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -409,6 +442,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
+    test_original_order();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

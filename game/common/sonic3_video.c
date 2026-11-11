@@ -164,50 +164,7 @@ static void scene_mode_changed(int was_enabled);
 typedef struct { uint8_t blocks[0x1800]; GVDP video; uint16_t colors[48]; } AizArt;
 static AizArt s_aiz_intro,s_aiz_main;
 static int s_aiz_art_ready,s_aiz_art_attempted;
-typedef struct { const uint8_t *p,*end; unsigned desc,bits; int error; } KosReader;
-static unsigned kos_byte(KosReader *r)
-{
-    if(r->p==r->end){r->error=1;return 0;}
-    return *r->p++;
-}
-static unsigned kos_bit(KosReader *r)
-{
-    unsigned bit=r->desc&1u;r->desc>>=1;
-    if(!--r->bits) {
-        unsigned low=kos_byte(r);r->desc=low|(kos_byte(r)<<8);r->bits=16;
-    }
-    return bit;
-}
-static size_t art_kos(const uint8_t *src,size_t size,uint8_t *out,size_t capacity,size_t *used)
-{
-    KosReader r={src,src+size,0,16,0};size_t n=0;
-    unsigned low=kos_byte(&r);r.desc=low|(kos_byte(&r)<<8);
-    while(!r.error) {
-        if(kos_bit(&r)) {
-            unsigned value=kos_byte(&r);
-            if(r.error || n==capacity)return 0;
-            out[n++]=(uint8_t)value;continue;
-        }
-        unsigned count;int offset;
-        if(kos_bit(&r)) {
-            unsigned lo=kos_byte(&r),hi=kos_byte(&r);
-            offset=(int)(((hi&248u)<<5)|lo)-8192;count=hi&7u;
-            if(!count) {
-                count=kos_byte(&r);
-                if(r.error)return 0;
-                if(!count){*used=(size_t)(r.p-src);return n;}
-                if(count==1)continue;
-                ++count;
-            } else count+=2;
-        } else {
-            count=kos_bit(&r)<<1;count=(count|kos_bit(&r))+2;
-            offset=(int)kos_byte(&r)-256;
-        }
-        if(r.error || (size_t)-offset>n || count>capacity-n)return 0;
-        while(count--){out[n]=out[n-(size_t)-offset];++n;}
-    }
-    return 0;
-}
+#include "sonic3_art.h"
 static size_t art_kosm(unsigned address,size_t compressed,uint8_t *out,size_t capacity)
 {
     if(compressed<2 || address>0x400000u-compressed)return 0;
@@ -867,6 +824,8 @@ static S3VideoHudMapping s_hud_mapping;
 void s3_video_set_hud_mapping(S3VideoHudMapping fn) { s_hud_mapping = fn; }
 static S3VideoHudObject s_hud_object;
 void s3_video_set_hud_object(S3VideoHudObject fn) { s_hud_object = fn; }
+static unsigned s_title_name_map;
+void s3_video_set_title_card_name_map(unsigned map) { s_title_name_map=map; }
 static unsigned rings_base(void)
 {
     unsigned own=s_ring_layout?s_ring_layout():0;
@@ -1086,7 +1045,7 @@ static void capture_objects(void)
             if(mgz2_parked_body(o,map))continue;
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
-            if(map==S3_TITLE_CARD_MAP && !(flags&4)) {
+            if((map==S3_TITLE_CARD_MAP || (s_title_name_map && map==s_title_name_map)) && !(flags&4)) {
                 unsigned target=ram16(o+0x46),frame=g_ram[o+0x22];
                 if(frame>=4 && target==0x120)anchor=6;
                 else if(frame==3 && target==0x17C)anchor=7;

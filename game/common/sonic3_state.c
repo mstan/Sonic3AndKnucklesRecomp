@@ -3,6 +3,7 @@
 #include "sonic3_state.h"
 #include "sonic3_state_io.h"
 #include "sonic3_sound_driver.h"
+#include "sonic3_restoration.h"
 #include "genesis_runtime.h"
 #include "audio/event_queue.h"
 
@@ -77,6 +78,7 @@ static void state(S3StateIO *io)
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
     s3_sound_state(io);
+    s3_restoration_state(io);
 #ifndef SONIC3_STANDALONE
     s3_army_state(io);
 #endif
@@ -96,6 +98,7 @@ static void state(S3StateIO *io)
 static void rollback_state(S3StateIO *io)
 {
     s3_sound_state(io);
+    s3_restoration_state(io);
 #ifndef SONIC3_STANDALONE
     s3_army_state(io);
 #endif

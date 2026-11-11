@@ -33,6 +33,8 @@ void s3_video_set_hud_mapping(S3VideoHudMapping fn);
  * rather than the centered anchor used by cutscenes and results panels. */
 typedef int (*S3VideoHudObject)(unsigned object);
 void s3_video_set_hud_object(S3VideoHudObject fn);
+/* Native title-name mappings supplied by a game-owned optional restoration. */
+void s3_video_set_title_card_name_map(unsigned map);
 /* Optional object size in 256ths (zero = unchanged). Object zero asks whether
  * the game needs this presentation at native width even with widescreen off.
  * Sampled during scene publication; the callback must not change guest state. */
