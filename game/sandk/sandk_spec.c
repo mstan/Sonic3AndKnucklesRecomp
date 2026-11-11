@@ -244,8 +244,8 @@ static int gameplay_instruction(uint32_t pc)
 }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
-    .rb_state_save          = s3_sound_rb_save,
-    .rb_state_load          = s3_sound_rb_load,
+    .rb_state_save          = s3_rb_state_save,
+    .rb_state_load          = s3_rb_state_load,
     .state_size             = s3_state_size,
     .state_save             = s3_state_save,
     .state_load             = s3_state_load,

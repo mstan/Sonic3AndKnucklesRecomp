@@ -73,7 +73,7 @@ void s3_state_call_resume(uint32_t pc)
 
 static void state(S3StateIO *io)
 {
-    unsigned version = 4;
+    unsigned version = 5;
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
     s3_sound_state(io);
@@ -89,6 +89,37 @@ static void state(S3StateIO *io)
         if (!ok) io->ok = 0;
     }
     io->pos += audio_size;
+}
+/* Rewind restores an execution snapshot, including any suspended native actor
+ * call. Its simulation statics must follow the restored guest object RAM.
+ * Presentation is restored separately by the local rewind renderer. */
+static void rollback_state(S3StateIO *io)
+{
+    s3_sound_state(io);
+#ifndef SONIC3_STANDALONE
+    s3_army_state(io);
+#endif
+}
+size_t s3_rb_state_save(void *data, size_t capacity)
+{
+    S3StateIO measure = {0};
+    rollback_state(&measure);
+    if (!data) return measure.pos;
+    if (capacity < measure.pos) return 0;
+    S3StateIO io = {data, capacity, 0, 0, 1};
+    rollback_state(&io);
+    return io.ok ? io.pos : 0;
+}
+int s3_rb_state_load(const void *data, size_t size)
+{
+    if (!data || size != s3_rb_state_save(NULL, 0)) return 0;
+    S3StateIO io = {(uint8_t *)data, size, 0, 1, 1};
+    rollback_state(&io);
+    if (!io.ok || io.pos != size) return 0;
+    io.pos = 0;
+    io.mode = 2;
+    rollback_state(&io);
+    return io.ok && io.pos == size;
 }
 size_t s3_state_size(void) { S3StateIO io = {0}; state(&io); return io.pos; }
 static int ready(void)

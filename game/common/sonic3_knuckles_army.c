@@ -817,7 +817,12 @@ void s3_army_state(S3StateIO *io)
     S3_STATE(io, shown);
     S3_STATE(io, lag_ticks); S3_STATE(io, vblank_ticks);
     S3_STATE(io, last_tick); S3_STATE(io, was_active);
-    if (io->mode == 2) { inside_actor = -1; inside_solid = 0; s3_video_set_actor_interpolation_blocked(shown.count!=0); }
+    int actor=inside_actor,solid=inside_solid;
+    s3_state_peek(io,0,&actor,sizeof actor);
+    s3_state_peek(io,sizeof actor,&solid,sizeof solid);
+    if (actor < -1 || actor >= (int)saved_count || solid < 0 || solid > 1) io->ok=0;
+    S3_STATE(io,inside_actor); S3_STATE(io,inside_solid);
+    if (io->mode == 2) s3_video_set_actor_interpolation_blocked(shown.count!=0);
 }
 /* Each extra is a full native Knuckles tick charged at 68K speed; a crowd
  * would otherwise turn every frame into a lag frame. LevelLoop still waits

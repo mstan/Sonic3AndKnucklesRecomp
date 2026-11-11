@@ -11,11 +11,12 @@ static int actor_ready=1;
 static unsigned called_pc,called_sp;
 void recomp_call_addr(uint32_t pc) { called_pc=pc;called_sp=g_cpu.A[7]; }
 static unsigned marker=17;
+static unsigned sound_marker=23,army_marker=29;
 void s3_video_state(S3StateIO *io) { S3_STATE(io,marker); }
 void s3_video_state_loaded(void) {}
-void s3_army_state(S3StateIO *io) { (void)io; }
+void s3_army_state(S3StateIO *io) { S3_STATE(io,army_marker); }
 /* Audio serialization is exercised separately with the real driver. */
-void s3_sound_state(S3StateIO *io) { (void)io; }
+void s3_sound_state(S3StateIO *io) { S3_STATE(io,sound_marker); }
 int s3_army_state_ready(void) { return actor_ready; }
 size_t audio_event_state_size(void) { return 0; }
 int audio_event_state_save(void *data,size_t size) { (void)data;return size==0; }
@@ -29,6 +30,18 @@ static void caller(unsigned pc)
 }
 int main(void)
 {
+    unsigned char snapshot[32];
+    size_t rollback_size=s3_rb_state_save(NULL,0);
+    CHECK(rollback_size && rollback_size<=sizeof snapshot);
+    CHECK(s3_rb_state_save(snapshot,sizeof snapshot)==rollback_size);
+    sound_marker=31;army_marker=37;
+    CHECK(s3_rb_state_load(snapshot,rollback_size));
+    CHECK(sound_marker==23);
+#ifndef SONIC3_STANDALONE
+    CHECK(army_marker==29);
+#endif
+    CHECK(!s3_rb_state_load(snapshot,rollback_size-1));
+    CHECK(!s3_rb_state_save(snapshot,rollback_size-1));
 #ifdef SONIC3_STANDALONE
     const unsigned level=0x4B20,special=0x77E6,pause=0x16C0,loop=0x77D2;
 #else

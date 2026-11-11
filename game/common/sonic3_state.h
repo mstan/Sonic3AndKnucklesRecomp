@@ -4,6 +4,8 @@
 size_t s3_state_size(void);
 int s3_state_save(void *data, size_t size);
 int s3_state_load(const void *data, size_t size, int apply);
+size_t s3_rb_state_save(void *data, size_t capacity);
+int s3_rb_state_load(const void *data, size_t size);
 int s3_state_at_boundary(void);
 uint32_t s3_state_resume_pc(uint8_t mode);
 int s3_state_menu_instruction(uint32_t pc);
