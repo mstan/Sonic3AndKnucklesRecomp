@@ -50,6 +50,33 @@ def assemble(source, assembler, p2bin, out):
             rows.append(line)
         text = '\n'.join(rows) + '\n'
         if name == 'Sound/Engine/Sonic 2 Clone Driver v2.asm':
+            # A new song resets its DAC track pan to stereo. MegaPCM keeps a
+            # separate pan shadow for sample/SFX restoration; reset that too,
+            # or a song without a pan command inherits the preceding song's
+            # left/right-only DAC setting.
+            marker = '.bgm_loadMusic:\n'
+            assert text.count(marker) == 1, 'Upstream music loader changed'
+            text = text.replace(marker, marker + '\tMPCM_setPan #$C0\n', 1)
+            # Retail SMPS Z80 keeps the full unsigned transposed note. Low
+            # bass notes deliberately wrap into octaves beyond seven. Clone's
+            # 7-bit mask instead turns them into high audible notes, and its
+            # 96-entry table also permits reads into following instructions.
+            # Encode the retail first-octave frequencies and octave OR for all
+            # 256 byte indices (Clone indexes C as 1 rather than 0).
+            start = text.index('FMSetFreq:\n')
+            end = text.index('; End of function FMSetFreq', start)
+            segment = text[start:end]
+            assert segment.count('andi.w\t#$7F,d5') == 1, 'Upstream FM note lookup changed'
+            text = text[:start] + segment.replace('andi.w\t#$7F,d5', 'andi.w\t#$FF,d5') + text[end:]
+            octave = (0x284, 0x2AB, 0x2D3, 0x2FE, 0x32D, 0x35C,
+                      0x38F, 0x3C5, 0x3FF, 0x43C, 0x47C, 0x4C0)
+            frequencies = [octave[((i-1)&255)%12] | ((((i-1)&255)//12)<<11) for i in range(256)]
+            start = text.index('FMFrequencies:\n') + len('FMFrequencies:\n')
+            end = start
+            while text[end:].startswith('\tdc.w '):
+                end = text.index('\n', end) + 1
+            assert end > start, 'Upstream FM frequency table changed'
+            text = text[:start] + ''.join('\tdc.w ' + ','.join(f'${n:04X}' for n in frequencies[i:i+12]) + '\n' for i in range(0,256,12)) + text[end:]
             # Two channel maps stored sign-extended 16-bit work-RAM pointers.
             # Widen their entries, then scale the original byte index using
             # LEA rather than arithmetic that would change condition flags.

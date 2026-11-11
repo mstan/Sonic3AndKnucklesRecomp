@@ -184,9 +184,11 @@ void s3_sound_command(int id,const char *json)
     static const char *keys[]={"\"music\"","\"sfx\"","\"tempo\""};
     for(unsigned i=0;i<3;i++){
         const char *p=strstr(json,keys[i]);if(!p)continue;p=strchr(p,':');if(!p)continue;
-        char *end;long v=strtol(p+1,&end,10);if(end==p+1 || v<0 || v>255 || !active || !initialised)continue;
+        char *end;long v=strtol(p+1,&end,10);if(end==p+1 || v<0 || v>255 || (active && !initialised))continue;
         uint32_t pc=i==0?(standalone?0x15E2:0x1358):i==1?(standalone?0x160A:0x1380):(standalone?0x164C:0x13C2);
-        M68KState saved=g_cpu;g_cpu.D[0]=(uint32_t)v;s3_sound_hook(pc);g_cpu=saved;
+        M68KState saved=g_cpu;g_cpu.D[0]=(uint32_t)v;
+        if(active)s3_sound_hook(pc);else recomp_call_addr(pc);
+        g_cpu=saved;
     }
 #else
     (void)json;
