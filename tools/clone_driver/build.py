@@ -57,6 +57,12 @@ def assemble(source, assembler, p2bin, out):
             marker = '.bgm_loadMusic:\n'
             assert text.count(marker) == 1, 'Upstream music loader changed'
             text = text.replace(marker, marker + '\tMPCM_setPan #$C0\n', 1)
+            # The logo sample is not a music track: it bypasses the song
+            # loader that restores PCM volume after a demo fade. Restore its
+            # own full-volume stereo output before requesting the sample.
+            marker = 'PlaySegaSound:\n'
+            assert text.count(marker) == 1, 'Upstream logo playback changed'
+            text = text.replace(marker, marker + '\tMPCM_setVol #0\n\tMPCM_setPan #$C0\n', 1)
             # Retail SMPS Z80 keeps the full unsigned transposed note. Low
             # bass notes deliberately wrap into octaves beyond seven. Clone's
             # 7-bit mask instead turns them into high audible notes, and its

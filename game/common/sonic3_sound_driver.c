@@ -103,7 +103,12 @@ static void queue(unsigned native,unsigned slot)
     else if(native>=0x33 && native<=0xDB)id=native+0xD;
     else if(native==0xE1 || native==0xE5)id=0xFB;
     else if(native==0xE4)id=0xFA;
-    else if(native==0xFF)id=0xFC;
+    else if(native==0xFF){
+        /* The logo supersedes a demo's active fade. StopAllSound is an
+         * internal entry with A6 pointing at the driver's private RAM. */
+        g_cpu.A[6]=S3_CLONE_RAM_ADDRESS;
+        recomp_call_addr(S3_CLONE_STOP_ALL);id=0xFC;
+    }
     else if(native>=0xE0 || (native>=0xDD && native<=0xDF))id=0xFF;
     if(native==0xE3){ /* original command silences PSG only */
         for(unsigned v=0x9F;v<=0xFF;v+=0x20)m68k_write8(0xC00011,(uint8_t)v);

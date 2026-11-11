@@ -11,7 +11,7 @@ uint8_t g_rom[0x400000],g_ram[0x10000],*g_rom_ext;
 uint32_t g_rom_ext_size;
 int s3_stage_pack_enabled;
 static uint8_t *mapped;
-static uint32_t tail,last_queue,last_id;
+static uint32_t tail,last_queue,last_id,stop_calls;
 static int same_cpu(const M68KState *a,const M68KState *b)
 {
     /* Struct assignment need not preserve the padding after SR. Check the
@@ -26,6 +26,7 @@ uint32_t m68k_read32(uint32_t a)
 void m68k_write8(uint32_t a,uint8_t v){CHECK(a==0xC00011 && (v&0x9F)==0x9F);}
 void recomp_call_addr(uint32_t pc)
 {
+    if(pc==S3_CLONE_STOP_ALL){CHECK(g_cpu.A[6]==S3_CLONE_RAM_ADDRESS);++stop_calls;}
     if(pc==S3_CLONE_QUEUE_MUSIC || pc==S3_CLONE_QUEUE_SFX || pc==S3_CLONE_QUEUE_EXTRA){last_queue=pc;last_id=g_cpu.D[0];}
     memset(&g_cpu,0xAD,sizeof g_cpu); /* driver calls may clobber any register */
 }
@@ -54,6 +55,11 @@ int main(int argc,char **argv)
     CHECK(s3_sound_select(0));CHECK(s3_sound_rb_load(saved,n));CHECK(!s3_sound_netplay_allowed());
     M68KState before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==song);
     g_cpu.D[0]=0x33;CHECK(s3_sound_hook(sfx));before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_SFX && last_id==0x40);
+    /* The logo cancels a demo fade using the internal driver's A6 contract,
+     * while its external bridge preserves every guest CPU register. */
+    CHECK(!stop_calls);g_cpu.A[6]=0xFFB000;g_cpu.D[0]=0xFF;
+    CHECK(s3_sound_hook(music));before=g_cpu;s3_sound_vblank();
+    CHECK(stop_calls==1 && last_id==0xFC && same_cpu(&g_cpu,&before));
     unsigned pause=s3_clone_pause_sites[0];uint8_t value=g_rom[pause+3];CHECK(s3_sound_hook(pause));CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==value && tail==pause+8);
 #ifdef S3_SOUND_COMBINED
     s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(!s3_sound_commit());
