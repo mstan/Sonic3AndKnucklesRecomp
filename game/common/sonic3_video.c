@@ -1656,10 +1656,10 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
 }
 static uint16_t restored_art_color(unsigned color,const GVDP *v)
 {
-    /* The donor's first stage color can be nonblack (FBZ is $0462).
-     * Use the character palette's black/white as the native fade clock,
-     * rather than tinting every restored color toward stage entry 16. */
-    unsigned white=v->cram[1],black=v->cram[0],faded=0;
+    /* The donor's stage entry 16 can be nonblack (FBZ is $0462), so use
+     * character black with stage white. The character palette reloads
+     * before the stage after death and must not reveal the donor early. */
+    unsigned white=v->cram[17],black=v->cram[0],faded=0;
     unsigned sum=(white&14)+((white>>4)&14)+((white>>8)&14);
     if((int16_t)((s_world_frame[0xEE50]<<8)|s_world_frame[0xEE51])>0){
         unsigned steps=sum/2;
@@ -1811,9 +1811,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * palette or disabled display retires it before the next screen. */
         int same_planes=v->reg[2]==s_video_frame.reg[2] && v->reg[4]==s_video_frame.reg[4] &&
             v->reg[16]==s_video_frame.reg[16];
+        int previous_flat=1;
+        for(unsigned i=1;i<64;i++)if((s_video_frame.cram[i]&0xEEE)!=(s_video_frame.cram[0]&0xEEE))
+            previous_flat=0;
         int retain_bonus=s_frame_bonus && !bonus_stage() && !uniform_palette &&
             (v->reg[1]&64) && same_planes;
-        int retain_level=s_frame_level && !level_ready() && !uniform_palette &&
+        int retain_level=s_frame_level && !level_ready() && !uniform_palette && !previous_flat &&
             (v->reg[1]&64) &&
             (!((g_ram[0xF600]&127)==0x34 || (g_ram[0xF600]&127)==0x48) || !(v->reg[12]&8)) &&
             same_planes;
@@ -1850,7 +1853,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* The title entry clears Current_zone before fading the old level.
          * Keep its published world/camera as well as its composition until
          * the native SAT is replaced. CRAM continues to follow every fade. */
-        int hold_level=!ready && !uniform_palette && s_frame_level && s_display && s_display->scene==1 &&
+        /* A completed fade ends retention even if its last HUD/list still
+         * qualifies as ready. New character colors must not revive that
+         * world on the next tick while level RAM is being cleared. */
+        int hold_level=!ready && !uniform_palette && !previous_flat && s_frame_level && s_display && s_display->scene==1 &&
             (v->reg[1]&64) && !s_frame_special && !s_frame_bonus &&
             !file_select_layout(v) && !competition_layout(v);
         s_frame_level=!s_frame_bonus && (ready || hold_level);
@@ -2084,9 +2090,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         (mgz2_bank==0 || mgz2_bank==12);
     int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
     int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
+    int restored_canvas=level && s_background_override &&
+        s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background ||
-        mgz_background || cnz_background);
+        mgz_background || cnz_background || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
@@ -2414,7 +2422,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         uint16_t restored_color=0xFFFF;
         int restored_background=level && s_background_override &&
-            s_background_override(s_world_frame,reference_bx,by,nx,line,&b,&bp,&restored_color);
+            s_background_override(s_world_frame,bx,by,x-bg_origin,line,&b,&bp,&restored_color);
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
         if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
            wx>=0x360 && wx<0x980) {

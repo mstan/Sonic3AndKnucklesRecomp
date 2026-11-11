@@ -22,6 +22,10 @@ campaigns and netplay retain their supported original content and audio paths.
 Restored backgrounds retain retail foreground collision and scripted boss
 scenes. Native palette animation remains active. Selected prototype water
 colors also apply to retained Hydrocity scenery outside the native viewport.
+Flying Battery's restored panorama repeats its authored canvas and keeps a
+stable background anchor while the foreground camera leaves the level edge.
+Restored scenery follows the stage palette through death and restart, and a
+completed fade retires the outgoing world before the next level is loaded.
 
 ## Audio
 

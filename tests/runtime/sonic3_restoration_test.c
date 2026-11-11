@@ -45,6 +45,18 @@ int main(int argc,char **argv)
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
+        if(!s3)for(unsigned act=0;act<2;act++) {
+            g_ram[0xFE10]=4;g_ram[0xFE11]=(uint8_t)act;
+            /* Repeat the authored panorama, including negative expanded
+             * columns, without selecting Act 2's blank layout banks. */
+            for(int y=0;y<512;y+=17)for(int x=0;x<512;x+=13) {
+                uint16_t a0,c0,a1,c1;uint8_t p0,p1;
+                CHECK(background(g_ram,0,0,x,y,&a0,&p0,&c0));
+                CHECK(background(g_ram,0,0,x-512,y+512,&a1,&p1,&c1));
+                CHECK(a0==a1 && p0==p1 && c0==c1);
+            }
+            g_ram[0xFE11]=0;
+        }
         g_ram[0xF664]=1;CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));g_ram[0xF664]=0;
         const unsigned hooks[]={s3?0x3500u:0x3DCAu,s3?0x351Cu:0x3DE6u,s3?0x3534u:0x3DFEu,s3?0x3550u:0x3E1Au};
         for(unsigned i=0;i<4;i++){

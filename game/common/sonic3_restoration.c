@@ -104,6 +104,10 @@ static int prepare_backgrounds(const uint8_t *rom)
         const uint8_t *layout=rom+s[0];unsigned wide=bg_word(layout+2),high=bg_word(layout+6);
         if(!wide || wide>32 || !high || high>32)goto done;
         Background *bg=&backgrounds[which];bg->width=wide*128;bg->height=high*128;
+        /* FBZ's repeating panorama occupies the first four chunks per axis.
+         * Act 2's larger layout also contains blank columns and other banks;
+         * wrapping into those exposes the backdrop at the expanded edge. */
+        if(which)bg->width=bg->height=512;
         unsigned pal=which?0x1E9DD4u:0x1E9B54u;
         for(unsigned i=16;i<64;i++)bg->colors[i]=(uint16_t)bg_word(rom+pal+(i-16)*2);
         for(unsigned i=0;i<64;i++)bg->water[i]=(uint16_t)bg_word(rom+0x1E9C14u+i*2);

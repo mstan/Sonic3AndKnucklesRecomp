@@ -1823,6 +1823,51 @@ static void test_campaign_background_edges(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static int restored_test_x,restored_test_pixels;
+static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,
+                                    uint16_t *attr,uint8_t *pixel,uint16_t *color)
+{
+    (void)ram;(void)y;(void)sy;
+    if(!attr || !pixel)return 1;
+    CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx);
+    *attr=0;*pixel=1;*color=0xFFFF;return 1;
+}
+static void test_restored_background_edges_and_reload(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];
+    CHECK(configure("off"));CHECK(configure("fit"));
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=v.cram[17]=0xEEE;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(cd_edge_cell);
+    s3_video_set_background_override(restored_test_background);
+    const unsigned zones[]={0x100,0x400,0x401};
+    const int widths[]={320,398,523,796},cameras[]={0,8,31,39,56,160};
+    for(unsigned z=0;z<3;z++)for(unsigned w=0;w<4;w++)for(unsigned c=0;c<6;c++) {
+        int canvas=widths[w],camera=cameras[c];
+        word(g_ram,0xFE10,zones[z]);word(g_ram,0xEE80,camera);
+        word(v.vram,0xF000,(unsigned)-camera);
+        restored_test_x=-(canvas-320)/2;restored_test_pixels=0;
+        scanline(&v,0,native,320,out,canvas);
+        CHECK(restored_test_pixels==canvas && s_native_x==camera-view_left(camera,canvas));
+    }
+    s3_video_set_background_override(NULL);
+    /* The completed black fade still has a ready outgoing HUD. Character
+     * colors then reload while stage RAM/palettes remain uninitialized. */
+    g_ram[0xF600]=0x8C;memset(v.cram,0,sizeof v.cram);
+    scanline(&v,0,native,320,out,398);
+    g_ram[0xF711]=0;v.cram[1]=0xEEE;
+    scanline(&v,0,native,320,out,398);CHECK(!s_frame_level && !s_world_frame[0xF711]);
+    CHECK(restored_art_color(0xECA,&v)==0);
+    g_ram[0xF711]=1;v.cram[17]=0xEEE;
+    scanline(&v,0,native,320,out,398);CHECK(s_frame_level);
+    CHECK(restored_art_color(0xECA,&v)==0xECA);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
 static int panorama_source_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {
     (void)ram;(void)y;
@@ -3421,6 +3466,7 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
+    test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();
     test_aiz_join();
