@@ -14,8 +14,25 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The v0.7.3 release
+the separate versions need their corresponding ROMs. The v0.8.1 release
 provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+
+## Optional restoration in v0.8.1
+
+Mods offers separate, off-by-default options for unused Competition course
+cards, the Mushroom Valley name, original zone order, prototype music,
+prototype palettes, early badnik art and prototype backgrounds. Original zone
+order places Flying Battery before IceCap. These options apply to supported
+original campaigns; imported campaigns retain their own content.
+
+The music and graphics options require your own **Sonic the Hedgehog 3
+(Nov 3, 1993 prototype)** ROM. Each relevant mod links to the
+[Hidden Palace source documentation](https://hiddenpalace.org/Sonic_the_Hedgehog_3_(Nov_3,_1993_prototype)).
+Select the donor ROM in Mods and restart after changing these options. No
+prototype ROM or extracted game assets are included in the release.
+
+See [v0.8.1 changes](docs/RELEASE_NOTES_0.8.1.md) for audio, widescreen and
+Knuckles Army fixes.
 
 **The extra campaigns, Mighty and Shadow shown below were introduced in v0.6.0**
 as experimental, off-by-default options in **Sonic3KRecomp**.
