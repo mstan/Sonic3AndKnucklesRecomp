@@ -99,7 +99,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             if(op==0xE7)encoded=1;
             else if(op==0xE9)encoded=0; /* Clone queues own spindash pitch */
             else if(op==0xE2)encoded=rb(c,pc+1)==0xFF?2:0;
-            else if(op==0xE5)encoded=3;
+            else if(op==0xE5)encoded=n->kind==2?0:3;
             else if(op==0xFF){
                 unsigned sub=rb(c,pc+1);
                 if(sub==0){length=3;encoded=3;}
@@ -132,9 +132,9 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(op==0xE2)continue;
         if(op==0xFF){c->bank[out+1]=0x0A;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;}
         if(op==0xE5){
-            unsigned v=rb(c,pc+(n->kind==2?2:1));
-            c->bank[out+1]=(uint8_t)(n->kind==2?0x0C:6);
-            c->bank[out+2]=(uint8_t)(n->kind==2?((v<<3)&0x7F)|(v&0x80):v);continue;
+            /* Retail discards the first parameter, then changes FM volume
+             * using the second. PSG ignores both parameters entirely. */
+            c->bank[out+1]=6;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;
         }
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);
         if(op==0xEC){unsigned v=rb(c,pc+1);c->bank[out+2]=(uint8_t)(((v<<3)&0x7F)|(v&0x80));}
