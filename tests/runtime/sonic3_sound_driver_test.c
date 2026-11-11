@@ -35,7 +35,7 @@ int genesis_atomic_file_store(const char *p,const void *d,size_t n){(void)p;(voi
 void cmd_send_response(const char *s){(void)s;}
 int main(int argc,char **argv)
 {
-    CHECK(argc==3);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);
+    CHECK(argc==3 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);
     s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(!s3_sound_selected());CHECK(s3_sound_netplay_allowed());
     size_t n=s3_sound_rb_save(NULL,0);uint8_t *disabled=malloc(n),*saved=malloc(n),*after=malloc(n);CHECK(disabled&&saved&&after);
     CHECK(s3_sound_rb_save(disabled,n)==n);CHECK(s3_sound_select(1));s3_sound_post_reset();CHECK(mapped && s3_sound_active() && !s3_sound_netplay_allowed());
@@ -64,6 +64,24 @@ int main(int argc,char **argv)
 #ifdef S3_SOUND_COMBINED
     s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(!s3_sound_commit());
 #endif
+    if(argc==4){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);
+        CHECK(!s3_sound_prototype_selected() && !s3_sound_prototype_active());
+        CHECK(!s3_sound_prototype_select(1));CHECK(s3_sound_select(1));
+        CHECK(!s3_sound_prototype_set_path(argv[1])); /* Retail is not the donor. */
+        CHECK(!*s3_sound_prototype_path());CHECK(s3_sound_prototype_set_path(argv[3]));
+        CHECK(s3_sound_prototype_verified());CHECK(s3_sound_prototype_select(1));
+        CHECK(!s3_sound_select(0));
+        CHECK(!s3_sound_prototype_set_path("missing-prototype.bin"));
+        CHECK(!strcmp(s3_sound_prototype_path(),argv[3])); /* Keep valid selection. */
+        s3_sound_post_reset();CHECK(s3_sound_prototype_active());
+        CHECK(!s3_sound_rb_load(saved,n)); /* Different soundtrack identity. */
+        CHECK(s3_sound_rb_save(after,n)==n);after[6]^=1;CHECK(!s3_sound_rb_load(after,n));
+        CHECK(s3_sound_prototype_select(0));CHECK(s3_sound_prototype_active());
+        CHECK(s3_sound_rb_save(after,n)==n && s3_sound_rb_load(after,n));
+        CHECK(s3_sound_select(0));
+    }
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;
 }

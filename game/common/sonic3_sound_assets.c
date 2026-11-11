@@ -86,6 +86,7 @@ int s3_sound_read_source(const uint8_t *rom,size_t size,S3SoundSource *out,char 
     else if(!kos(rom,size,0xF6960,source.z80,0x1300) ||
             !kos(rom,size,0xF7760,source.z80+0x1300,0xD00))
         return fail(error,error_size,"Invalid original sound-driver compression");
+    source.modulation_count=8;
     source.music_banks=(uint16_t)(s3?0xB48:0xB65);
     source.music_pointers=(uint16_t)le16(source.z80+0x1304);
     source.sfx_pointers=(uint16_t)le16(source.z80+0x1306);
@@ -105,6 +106,25 @@ int s3_sound_read_source(const uint8_t *rom,size_t size,S3SoundSource *out,char 
        source.music_count!=(s3?50:51) || source.volume_count>64 ||
        source.voice_bank>=0x1C00 || source.volume_pointers+2u*source.volume_count>0x1C00)
         return fail(error,error_size,"Original sound tables are out of bounds");
+    memcpy(out,&source,sizeof source);if(error && error_size)*error=0;return 1;
+}
+int s3_sound_read_prototype(const uint8_t *rom,size_t size,S3SoundSource *out,char *error,size_t error_size)
+{
+    if(!rom || !out || size!=0x200000)
+        return fail(error,error_size,"Expected the Sonic 3 November 3, 1993 prototype ROM (2 MiB)");
+    uintptr_t a=(uintptr_t)rom,b=(uintptr_t)out;
+    if((b>=a && b-a<size) || (a>=b && a-b<sizeof *out))
+        return fail(error,error_size,"Sound-source output aliases the ROM");
+    char hash[65];hex_digest(rom,size,hash);
+    if(strcmp(hash,"ace6af3187c1c2da4e71a1c24fb81f2529cb25057f093f5cb5389842a90d4abf"))
+        return fail(error,error_size,"Expected the unmodified Sonic 3 November 3, 1993 prototype ROM");
+    S3SoundSource source;memset(&source,0,sizeof source);
+    source.rom_size=(uint32_t)size;source.standalone_sonic3=1;source.prototype=1;
+    memcpy(source.z80,rom+0xE0000,0x1852);
+    source.music_banks=0x8DD;source.music_pointers=0x16A0;
+    source.sfx_pointers=0x1702;source.modulation_pointers=0x120E;
+    source.volume_pointers=0x134B;source.music_count=49;
+    source.volume_count=39;source.modulation_count=10;
     memcpy(out,&source,sizeof source);if(error && error_size)*error=0;return 1;
 }
 uint32_t s3_sound_music_source(const S3SoundSource *s,const uint8_t *rom,unsigned id)

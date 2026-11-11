@@ -10,12 +10,14 @@ typedef struct S3SoundSource {
     uint32_t rom_size;
     uint16_t music_banks, music_pointers, sfx_pointers;
     uint16_t voice_bank, modulation_pointers, volume_pointers;
-    uint16_t music_count, volume_count;
-    uint8_t standalone_sonic3;
+    uint16_t music_count, volume_count, modulation_count;
+    uint8_t standalone_sonic3, prototype;
 } S3SoundSource;
 
 int s3_sound_read_source(const uint8_t *rom, size_t rom_size,
                          S3SoundSource *out, char *error, size_t error_size);
+int s3_sound_read_prototype(const uint8_t *rom, size_t rom_size,
+                            S3SoundSource *out, char *error, size_t error_size);
 /* Zero means unavailable in this cartridge (notably locked-on S3 songs when
  * running the standalone S&K ROM). IDs retain their original queue domains. */
 uint32_t s3_sound_music_source(const S3SoundSource *source,
@@ -44,4 +46,14 @@ int s3_sound_build_pcm(const uint8_t *rom,size_t rom_size,
 int s3_sound_build_sequences(const uint8_t *rom,size_t rom_size,
                              const S3SoundLayout *layout,uint8_t *bank,size_t capacity,
                              S3SoundAssetStats *stats,char *error,size_t error_size);
+/* Append prototype music without replacing the host cartridge's SFX or
+ * envelopes. The software program reserves PSG slots 65..103 and modulation
+ * slots 9..18 for this donor. Existing PCM remains the retail cartridge's. */
+int s3_sound_build_prototype_music(const uint8_t *rom,size_t rom_size,
+                                   const S3SoundLayout *layout,uint8_t *bank,size_t capacity,
+                                   uint32_t *used,int standalone_s3,
+                                   char *error,size_t error_size);
+int s3_sound_build_prototype_pcm(const uint8_t *rom,size_t rom_size,
+                                 const S3SoundPCMLayout *layout,uint8_t *bank,size_t capacity,
+                                 uint32_t *used,char *error,size_t error_size);
 #endif

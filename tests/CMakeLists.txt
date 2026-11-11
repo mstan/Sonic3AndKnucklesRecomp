@@ -275,6 +275,7 @@ foreach(_mode sonic3 sonic3k sandk)
             add_executable(sound_driver_${_mode}_test runtime/sonic3_sound_driver_test.c
                 "${S3_GAME_COMMON}/sonic3_sound_driver.c" "${S3_GAME_COMMON}/sonic3_sound_assets.c"
                 "${S3_GAME_COMMON}/sonic3_sound_sequences.c" "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
+                "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"
                 "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
             target_include_directories(sound_driver_${_mode}_test PRIVATE
                 "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
@@ -285,6 +286,9 @@ foreach(_mode sonic3 sonic3k sandk)
                 target_include_directories(sound_driver_${_mode}_test PRIVATE "${S3_GAME_ROOT}/trilogy")
             endif()
             add_test(NAME sound_driver_${_mode} COMMAND sound_driver_${_mode}_test "${_rom}" "${_mode}")
+            if(S3_PROTOTYPE_DONOR AND EXISTS "${S3_PROTOTYPE_DONOR}")
+                add_test(NAME sound_prototype_${_mode} COMMAND sound_driver_${_mode}_test "${_rom}" "${_mode}" "${S3_PROTOTYPE_DONOR}")
+            endif()
             set(_seq "${CMAKE_CURRENT_BINARY_DIR}/${_mode}-sequences.bin")
             add_test(NAME sound_sequence_${_mode} COMMAND sonic3_sound_sequence_test
                 "${_rom}" "${S3_CLONE_PROGRAM_DIR}/clone-driver.bin" "${_seq}")

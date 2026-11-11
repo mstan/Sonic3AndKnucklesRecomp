@@ -26,6 +26,21 @@ VBlank interrupts, including pauses and lag, independently of presentation
 refresh rate. File saves and local rewind include the private sound RAM and
 pending queues; states from a different driver identity are rejected.
 
+The separate **November 1993 prototype soundtrack** restoration option is
+disabled by default in all three games. Enable Clone Driver, select your raw
+donor ROM in the soundtrack's resource picker, enable the soundtrack and
+restart. The supported donor is
+[Sonic the Hedgehog 3 (Nov 3, 1993 prototype)](https://hiddenpalace.org/Sonic_the_Hedgehog_3_(Nov_3,_1993_prototype)),
+2,097,152 bytes, SHA-1 `fc87a7b411302a576028b7ccd5911b1f266b59b3`.
+Extract archives before selecting the ROM. The game verifies the exact donor
+at selection and startup; releases include no donor ROM or extracted music.
+
+This option uses the donor's sequences, instruments, envelopes and percussion,
+including its unused Super theme. Retail sound effects keep their own data and
+envelopes. Donor music and the normal soundtrack have separate save-state
+identities. Native battery saves are preserved. Disable the soundtrack before
+disabling Clone Driver; both selections take effect on application restart.
+
 Normal builds automatically prepare pinned driver software when supported.
 `S3_CLONE_DRIVER_SUPPORT=ON` requires preparation to succeed; `OFF` omits it;
 the default `AUTO` allows builds without the enhancement when preparation is

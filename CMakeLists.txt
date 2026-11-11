@@ -251,6 +251,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${S3_GAME_COMMON}/sonic3_sound_assets.c"
         "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
         "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
+        "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"
         "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
     # The source's queued decompressor changes its IRQ return PC. Compile this
     # small program with the existing explicit-PC native backend so its RTE

@@ -98,9 +98,17 @@ def assemble(source, assembler, p2bin, out):
             # These eight musical modulation envelopes are game data. Keep
             # only the pointer layout; derive their bytes from the player's
             # ROM alongside PSG envelopes, instruments and sequences.
+            table = text.index('ModEnvPointers:\n')
+            start = text.index('; These have been converted to SMPS 68k format:')
+            text = text[:table] + 'ModEnvPointers:\n' + ''.join(f'\tdc.l ModEnv_{i:02X}\n' for i in range(32)) + text[start:]
             start = text.index('; These have been converted to SMPS 68k format:')
             end = text.index('    endif', start)
-            text = text[:start] + ''.join(f'ModEnv_{i:02X}: dc.b [128]0\n' for i in range(8)) + text[end:]
+            text = text[:start] + ''.join(f'ModEnv_{i:02X}: dc.b [128]0\n' for i in range(32)) + text[end:]
+        if name == 'Sound/MegaPCM - DAC Table.asm':
+            marker = '\t\t\tdc.w -1'
+            assert text.count(marker) == 1, 'Upstream PCM table terminator changed'
+            extra = ''.join(f'proto_dac{i:02X}: dcSample TYPE_PCM, PrototypeSample, 16000\n' for i in range(27))
+            text = text.replace(marker, extra + marker)
         write(inputs / name, text)
     write(inputs / 'Sound/Music.asm', 'MusicIndex:\n' + ''.join(f'ptr_mus{i:02X}: dc.l 0\n' for i in range(1, 0x34)) + 'ptr_musend:\n')
     sound_ids = source['Sound/Sound IDs.asm'].read_text()
@@ -113,12 +121,12 @@ def assemble(source, assembler, p2bin, out):
     # Runtime conversion preserves retail PSG envelope IDs. Equate labels are
     # aliases of those slots; their upstream include order is not an asset ID.
     psg = 'PSG_Index:\n'
-    for number in range(1, 52):
+    for number in range(1, 129):
         psg += ''.join(name + ':\n' for name in envs if int(name[-2:], 16) == number)
         psg += '    dc.l 0\n'
     write(inputs / 'Sound/PSG Volume Envelopes.asm', psg)
     descriptors = source['Sound/MegaPCM - DAC Table.asm'].read_text()
-    samples = sorted(set(re.findall(r'dcSample\s+\w+\s*,\s*(\w+)', descriptors)))
+    samples = ['PrototypeSample'] + sorted(set(re.findall(r'dcSample\s+\w+\s*,\s*(\w+)', descriptors)))
     write(inputs / 'Sound/SamplePlaceholders.asm', ''.join(f'{name} = $600000\n{name}_End = {name}+16\n' for name in samples))
     write(inputs / 'NativeDACMaps.asm', Path(__file__).with_name('native_dac_order.asm').read_text())
     wrapper = Path(__file__).with_name('driver.asm')
@@ -133,6 +141,8 @@ def assemble(source, assembler, p2bin, out):
     info = dict(zip(FIELDS, values))
     assert magic == b'S3CR' and info['payload_size'] == len(payload)
     assert info['ram_address'] == 0x900000 and 0 < info['ram_size'] <= 0x800
+    end = info['sample_table'] + info['sample_count'] * 10
+    assert raw[end:end+2] == b'\xff\xff', 'PCM descriptors must precede their terminator'
     for key in ('initialise', 'update', 'queue_music', 'queue_sfx', 'queue_extra', 'guarded_update', 'pcm_idle', 'stop_all'):
         assert LOAD_ADDRESS + HEADER.size <= info[key] < len(raw) and not info[key] & 1, key
     (out/'clone-driver.bin').write_bytes(payload)

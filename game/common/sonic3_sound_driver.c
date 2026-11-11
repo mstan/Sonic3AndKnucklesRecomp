@@ -18,6 +18,42 @@
 static int selected,active,bound,standalone;
 static uint8_t sound_ram[0x800],pending[3],initialised,tempo,tempo_dirty;
 static char settings_file[1200],error[256];
+static char prototype_path[1024];
+static int prototype_selected,prototype_active,prototype_verified;
+int s3_sound_prototype_selected(void){return prototype_selected;}
+int s3_sound_prototype_active(void){return prototype_active;}
+int s3_sound_prototype_verified(void){return prototype_verified;}
+const char *s3_sound_prototype_path(void){return prototype_path;}
+static uint8_t *prototype_rom(const char *path)
+{
+    FILE *f=path && *path?fopen(path,"rb"):NULL;
+    if(!f){snprintf(error,sizeof error,"Select your Sonic 3 November 3, 1993 prototype ROM.");return NULL;}
+    uint8_t *rom=NULL;
+    if(!fseek(f,0,SEEK_END) && ftell(f)==0x200000){
+        rewind(f);rom=(uint8_t*)malloc(0x200000);
+        if(rom && fread(rom,1,0x200000,f)!=0x200000){free(rom);rom=NULL;}
+    }
+    fclose(f);
+    if(!rom){snprintf(error,sizeof error,"Expected an unmodified 2 MiB Sonic 3 November 3, 1993 prototype ROM.");return NULL;}
+    S3SoundSource source;
+    if(!s3_sound_read_prototype(rom,0x200000,&source,error,sizeof error)){free(rom);return NULL;}
+    return rom;
+}
+int s3_sound_prototype_set_path(const char *path)
+{
+    if(!path || strlen(path)>=sizeof prototype_path || strpbrk(path,"\r\n")){
+        snprintf(error,sizeof error,"Invalid prototype ROM path.");return 0;
+    }
+    if(*path){uint8_t *rom=prototype_rom(path);if(!rom)return 0;free(rom);}
+    snprintf(prototype_path,sizeof prototype_path,"%s",path);
+    prototype_verified=*path!=0;*error=0;return 1;
+}
+int s3_sound_prototype_select(int on)
+{
+    if(on && !selected){snprintf(error,sizeof error,"Enable Clone Driver before selecting the prototype soundtrack.");return 0;}
+    if(on){uint8_t *rom=prototype_rom(prototype_path);prototype_verified=rom!=NULL;if(!rom)return 0;free(rom);}
+    prototype_selected=on!=0;*error=0;return 1;
+}
 int s3_sound_selected(void){return selected;}
 int s3_sound_active(void){return active;}
 const char *s3_sound_error(void){return error;}
@@ -30,6 +66,7 @@ int s3_sound_available(void){
 }
 int s3_sound_select(int on)
 {
+    if(!on && prototype_selected){snprintf(error,sizeof error,"Disable the prototype soundtrack before disabling Clone Driver.");return 0;}
     if(on && !s3_sound_available()){snprintf(error,sizeof error,"Clone Driver requires the standard Z80 backend in this build.");return 0;}
 #ifdef S3_SOUND_COMBINED
     if((on || active) && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns before enabling Clone Driver; restart after changing drivers.");return 0;}
@@ -39,6 +76,7 @@ int s3_sound_select(int on)
 void s3_sound_load(const char *path,const char *mode)
 {
     selected=active=bound=0;initialised=tempo=tempo_dirty=0;memset(pending,0,sizeof pending);*error=0;
+    prototype_selected=prototype_active=prototype_verified=0;*prototype_path=0;
     standalone=!strcmp(mode,"sonic3");
     snprintf(settings_file,sizeof settings_file,"%s",path?path:"settings.ini");
     char *s=strrchr(settings_file,'/'),*b=strrchr(settings_file,'\\');if(!s || (b && b>s))s=b;
@@ -46,12 +84,20 @@ void s3_sound_load(const char *path,const char *mode)
     if(prefix+strlen(mode)+12>=sizeof settings_file){snprintf(error,sizeof error,"Sound settings path too long");return;}
     snprintf(settings_file+prefix,sizeof settings_file-prefix,"%s-sound.ini",mode);
     FILE *f=fopen(settings_file,"rb");if(!f)return;
-    char line[128];while(fgets(line,sizeof line,f)){line[strcspn(line,"\r\n")]=0;if(!strcmp(line,"enabled=1"))selected=1;}fclose(f);
+    char line[1152];while(fgets(line,sizeof line,f)){
+        line[strcspn(line,"\r\n")]=0;
+        if(!strcmp(line,"enabled=1"))selected=1;
+        if(!strcmp(line,"prototype_music=1"))prototype_selected=1;
+        if(!strncmp(line,"prototype_rom=",14) && strlen(line+14)<sizeof prototype_path)
+            snprintf(prototype_path,sizeof prototype_path,"%s",line+14);
+    }fclose(f);
+    if(*prototype_path){uint8_t *rom=prototype_rom(prototype_path);prototype_verified=rom!=NULL;free(rom);if(!prototype_selected)*error=0;}
 }
 int s3_sound_commit(void)
 {
     if(!s3_sound_select(selected))return 0;
-    char text[64];int n=snprintf(text,sizeof text,"[sound_driver]\nenabled=%d\n",selected);
+    if(!s3_sound_prototype_select(prototype_selected))return 0;
+    char text[1200];int n=snprintf(text,sizeof text,"[sound_driver]\nenabled=%d\nprototype_music=%d\nprototype_rom=%s\n",selected,prototype_selected,prototype_path);
     if(!genesis_atomic_file_store(settings_file,text,(size_t)n)){snprintf(error,sizeof error,"Unable to save sound settings");return 0;}return 1;
 }
 int s3_sound_netplay_allowed(void){return !(selected || active);}
@@ -59,7 +105,8 @@ void s3_sound_post_reset(void)
 {
     if(bound)return;
     if(selected && !s3_sound_select(1)){fprintf(stderr,"[sound-driver] %s\n",error);exit(1);}
-    active=selected;bound=1;if(!active)return;
+    if(prototype_selected && !selected){fprintf(stderr,"[sound-driver] Prototype soundtrack requires Clone Driver\n");exit(1);}
+    active=selected;prototype_active=prototype_selected;bound=1;if(!active)return;
 #ifdef S3_CLONE_DRIVER
     if(g_rom_ext){fprintf(stderr,"[sound-driver] Expansion ROM already in use\n");exit(1);}
     uint8_t *bank=calloc(1,0x400000);if(!bank){fprintf(stderr,"[sound-driver] Allocation failed\n");exit(1);}
@@ -75,6 +122,14 @@ void s3_sound_post_reset(void)
     if(!s3_sound_build_sequences(g_rom,rom_size,&seq,bank,0x400000,&stats,error,sizeof error) ||
        !s3_sound_build_pcm(g_rom,rom_size,&pcm,bank,0x400000,&stats.bytes,error,sizeof error)){
         fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);
+    }
+    if(prototype_active){
+        uint8_t *donor=prototype_rom(prototype_path);
+        int ok=donor && s3_sound_build_prototype_music(donor,0x200000,&seq,bank,0x400000,&stats.bytes,standalone,error,sizeof error) &&
+            s3_sound_build_prototype_pcm(donor,0x200000,&pcm,bank,0x400000,&stats.bytes,error,sizeof error);
+        free(donor);
+        if(!ok){fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);}
+        fprintf(stderr,"[sound-driver] Verified November 3, 1993 prototype soundtrack; retail SFX retained\n");
     }
     g_rom_ext=bank;g_rom_ext_size=(stats.bytes+1)&~1u;
     memset(sound_ram,0,sizeof sound_ram);
@@ -115,6 +170,9 @@ static void queue(unsigned native,unsigned slot)
         return;
     }
     if(!id)return;
+    /* Retail Sonic 3 shares Invincibility with Super. The donor has a
+     * dedicated Super theme, also used by the S&K hosts' native $32 queue. */
+    if(prototype_active && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
     if(id<=0x33 && !m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))return;
     g_cpu.D[0]=id;recomp_call_addr(slot?S3_CLONE_QUEUE_SFX:S3_CLONE_QUEUE_MUSIC);
 }
@@ -158,6 +216,7 @@ int s3_sound_dispatch_miss(uint32_t pc)
 void s3_sound_state(struct S3StateIO *io)
 {
     uint8_t identity[40]={'S','3','S','D',1,0,0,0},incoming[40];identity[5]=(uint8_t)(bound?active:selected);
+    identity[6]=(uint8_t)(bound?prototype_active:prototype_selected);
 #ifdef S3_CLONE_DRIVER
     if(identity[5])for(unsigned i=0;i<32;i++){
         unsigned a=S3_CLONE_SHA256[i*2],b=S3_CLONE_SHA256[i*2+1];

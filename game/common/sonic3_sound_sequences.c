@@ -15,6 +15,7 @@ typedef struct Convert {
     size_t capacity,cursor;
     uint32_t input_bank;
     int bad,count,voices;
+    unsigned psg_base,mod_base;
     uint32_t last_pc,last_op;
     int map[0x8000*KINDS];
     Node nodes[MAX_NODES];
@@ -54,6 +55,20 @@ static unsigned parameter_length(unsigned op)
     static const uint8_t lengths[32]={1,1,1,0,1,2,1,0,1,0,1,3,1,1,2,1,4,2,0,1,1,1,2,4,2,0,0,1,2,1,4,0};
     return lengths[op-0xE0];
 }
+static unsigned psg_id(Convert *c,unsigned id)
+{
+    if(id>c->source.volume_count){c->bad=1;return 0;}
+    return id?id+c->psg_base:0;
+}
+static unsigned mod_id(Convert *c,unsigned id)
+{
+    unsigned env=id&63u;
+    if(!(id&0xC0) && env){
+        if(env>c->source.modulation_count){c->bad=1;return 0;}
+        return env+c->mod_base;
+    }
+    return id;
+}
 static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
 {
     unsigned roots[10],kinds[10],headers[10],root_count=0,header;
@@ -70,7 +85,11 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             unsigned kind=i==0?1:i>=fm?2:0;
             roots[root_count]=rw(c,old);kinds[root_count]=kind;headers[root_count++]=out;
             unsigned n=i<fm?4:6;memcpy(c->bank+dest+out,c->rom+old,n);
-            if(i>=fm)c->bank[dest+out+3]<<=3;
+            if(i>=fm){
+                c->bank[dest+out+3]<<=3;
+                c->bank[dest+out+4]=(uint8_t)mod_id(c,rb(c,old+4));
+                c->bank[dest+out+5]=(uint8_t)psg_id(c,rb(c,old+5));
+            }
         }
         if(fm>1)c->voices=0;
     }else{
@@ -92,7 +111,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         c->last_pc=pc;c->last_op=op;
         if(n->kind==1 && op>=0x81 && op<0xE0){
             unsigned banks=c->source.standalone_sonic3?0xDC:0xD6;
-            if(op>0xC4 || ((uint32_t)c->source.z80[banks+(op&0x7F)]<<15)>=c->source.rom_size){c->bad=1;break;}
+            if(c->source.prototype ? op>0x9B : op>0xC4 || ((uint32_t)c->source.z80[banks+(op&0x7F)]<<15)>=c->source.rom_size){c->bad=1;break;}
         }
         if(op>=0xE0){
             length=1+parameter_length(op);encoded=length+1;
@@ -126,7 +145,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
     for(int i=0;i<c->count && !c->bad;i++){
         Node *n=&c->nodes[i];uint32_t pc=c->input_bank+(n->pc&0x7FFFu);size_t out=dest+n->output;unsigned op=rb(c,pc);
         if(!n->encoded)continue;
-        if(op<0xE0){c->bank[out]=(uint8_t)op;continue;}
+        if(op<0xE0){
+            c->bank[out]=(uint8_t)(op+(c->source.prototype && n->kind==1 && op>=0x81?70:0));
+            continue;
+        }
         if(op==0xE7){c->bank[out]=0xFE;continue;}
         c->bank[out]=0xFF;c->bank[out+1]=commands[op-0xE0];
         if(op==0xE2)continue;
@@ -137,6 +159,8 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             c->bank[out+1]=6;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;
         }
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);
+        if(op==0xF5)c->bank[out+2]=(uint8_t)psg_id(c,rb(c,pc+1));
+        if(op==0xF4)c->bank[out+2]=(uint8_t)mod_id(c,rb(c,pc+1));
         if(op==0xEC){unsigned v=rb(c,pc+1);c->bank[out+2]=(uint8_t)(((v<<3)&0x7F)|(v&0x80));}
         if(n->target){
             int target=c->nodes[find_node(c,n->target,n->kind)].output;
@@ -173,10 +197,10 @@ static int envelopes(Convert *c,const S3SoundLayout *l)
     memcpy(c->bank+c->cursor,c->source.z80+first,end-first);
     for(unsigned i=0;i<c->source.volume_count;i++){
         unsigned ptr=zw(c,c->source.volume_pointers+i*2);if(ptr<first || ptr>=end)return 0;
-        wl(c,l->psg_index-BASE+i*4,BASE+(uint32_t)c->cursor+ptr-first);
+        wl(c,l->psg_index-BASE+(i+c->psg_base)*4,BASE+(uint32_t)c->cursor+ptr-first);
     }
     c->cursor+=end-first;
-    for(unsigned i=0;i<8;i++){
+    for(unsigned i=0;i<c->source.modulation_count;i++){
         unsigned src=zw(c,c->source.modulation_pointers+i*2);
         uint8_t out[128];unsigned n=2;out[0]=0x84;out[1]=1;int complete=0;
         for(unsigned j=0;j<120;j++){
@@ -186,7 +210,7 @@ static int envelopes(Convert *c,const S3SoundLayout *l)
             if(value==0x82){unsigned target=zb(c,src+(++j));if(target>=j)return 0;out[n++]=(uint8_t)(target+2);complete=1;break;}
         }
         if(!complete || n>c->capacity-c->cursor)return 0;
-        memcpy(c->bank+c->cursor,out,n);wl(c,l->modulation_index-BASE+i*4,BASE+(uint32_t)c->cursor);c->cursor+=n;
+        memcpy(c->bank+c->cursor,out,n);wl(c,l->modulation_index-BASE+(i+c->mod_base)*4,BASE+(uint32_t)c->cursor);c->cursor+=n;
     }
     return !c->bad;
 }
@@ -219,5 +243,41 @@ int s3_sound_build_sequences(const uint8_t *rom,size_t size,const S3SoundLayout 
     if(c->bad)ok=0;
     if(ok){c->stats.bytes=(uint32_t)c->cursor;if(stats)*stats=c->stats;if(error && error_size)*error=0;}
     else if(error && error_size)snprintf(error,error_size,"Unable to convert %s $%02X at $%06X, command $%02X",music?"music":"SFX",failed_id,c->last_pc,c->last_op);
+    free(c);return ok;
+}
+int s3_sound_build_prototype_music(const uint8_t *rom,size_t size,const S3SoundLayout *l,
+                                   uint8_t *bank,size_t capacity,uint32_t *used,int standalone_s3,
+                                   char *error,size_t error_size)
+{
+    if(!l || !bank || !used || capacity>0x400000 || *used>capacity ||
+       *used<l->program_size || l->program_size<84)return 0;
+    uintptr_t a=(uintptr_t)rom,b=(uintptr_t)bank;
+    if((b>=a && b-a<size) || (a>=b && a-b<capacity))return 0;
+    Convert *c=(Convert*)calloc(1,sizeof *c);if(!c)return 0;
+    c->rom=rom;c->bank=bank;c->capacity=capacity;c->cursor=*used;
+    c->psg_base=64;c->mod_base=8;
+    int ok=s3_sound_read_prototype(rom,size,&c->source,error,error_size);
+    if(ok)ok=table(c,l->music_index,51*4) && table(c,l->psg_index,103*4) && table(c,l->modulation_index,18*4);
+    unsigned failed_id=0;
+    for(unsigned i=1;ok && i<=51;i++){
+        /* The prototype's $2E is its unique Super theme. Retail S3 uses
+         * that ID for minibosses; S&K uses $32 for Super and $33 for its
+         * second miniboss. Preserve their queue meanings in each host. */
+        unsigned donor=i==0x32?0x2E:i==0x33?0x18:i==0x2E?0x18:i;
+        if(standalone_s3 && i>0x32)continue;
+        uint32_t source=s3_sound_music_source(&c->source,rom,donor);
+        if(!source)continue;
+        failed_id=i;
+        c->cursor=(c->cursor+1)&~(size_t)1;
+        int bytes=convert_song(c,source,c->cursor,1);
+        if(bytes<=0){ok=0;break;}
+        wl(c,l->music_index-BASE+(i-1)*4,0x01000000u|BASE|(uint32_t)c->cursor|(i==0x31?1u:0u));
+        c->cursor+=bytes;
+    }
+    if(ok)ok=envelopes(c,l);
+    if(c->bad)ok=0;
+    if(ok){*used=(uint32_t)((c->cursor+1)&~(size_t)1);if(error && error_size)*error=0;}
+    else if(error && error_size && (!*error || failed_id))
+        snprintf(error,error_size,"Unable to convert prototype music $%02X at $%06X, command $%02X",failed_id,c->last_pc,c->last_op);
     free(c);return ok;
 }
