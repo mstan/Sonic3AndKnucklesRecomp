@@ -2159,7 +2159,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * and outdoor canvases. Keep those uploaded compositions through each
      * redraw rather than treating their source banks as adjacent scenery. */
     int icz_canvas=bg_world && s_frame_zone==5 &&
-        (s_frame_act==1 || s_frame_bg_event<0x10);
+        (s_frame_act==1 || (s_frame_bg_event<0x10 && s_frame_bg_event!=4));
+    /* BigSnowFall is a finite spatial snow bank streamed normally by
+     * DrawBGAsYouMove, not a repeating 512px canvas. Keep its real extent;
+     * the subsequent partial redraws still use the uploaded composition. */
     /* SSZ1's cloud band is a separate 512px bank at X=$1C00; entry and
      * exit replace it progressively. DEZ3's auto-scrolling runway is a
      * live Plane B canvas edited by the boss, independent of its layout. */

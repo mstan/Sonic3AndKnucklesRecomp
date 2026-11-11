@@ -1790,7 +1790,9 @@ static void test_streamed_background_sources(void)
     const struct { unsigned zone,event,bank,source; } cases[]={
         {0x101,4,0,0},{0x101,8,0,1},{0x101,12,0,1},{0x101,16,0,2},
         {0x201,4,0,2},{0x201,4,12,2},{0x201,4,4,0},{0x201,4,8,0},
-        {0x201,8,0,1},{0x201,8,8,0}
+        {0x201,8,0,1},{0x201,8,8,0},
+        {0x500,0,0,1},{0x500,4,0,0},{0x500,8,0,1},
+        {0x500,12,0,1},{0x500,16,0,0},{0x501,4,0,1}
     };
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));
