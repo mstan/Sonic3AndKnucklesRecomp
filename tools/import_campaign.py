@@ -132,11 +132,15 @@ def write_receipt(path,bundle,kind):
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--campaign',required=True,choices=tuple(KINDS)+('sonic_cd',))
+    p.add_argument('--campaign',required=True,choices=tuple(KINDS)+('sonic_cd','sound'))
     for n in ('source','s3k','out'):p.add_argument('--'+n,required=True,type=Path)
     p.add_argument('--receipt',type=Path);p.add_argument('--validator',type=Path)
     a=p.parse_args(argv)
     try:
+        if a.campaign=='sound':
+            from import_sound_donor import import_donor
+            import_donor(a.source,a.out,a.receipt,str(a.s3k).split(','))
+            return 0
         if a.campaign=='sonic_cd':
             from import_sonic_cd import main as cd
             args=['--disc',str(a.source),'--s3k',str(a.s3k),'--out',str(a.out)]

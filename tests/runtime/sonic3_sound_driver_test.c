@@ -33,6 +33,7 @@ void recomp_call_addr(uint32_t pc)
 void recomp_tail_call(uint32_t pc){tail=pc;}
 int genesis_atomic_file_store(const char *p,const void *d,size_t n){(void)p;(void)d;(void)n;return 1;}
 void cmd_send_response(const char *s){(void)s;}
+void audio_set_extra_source(void (*source)(int16_t *,size_t,double)){(void)source;}
 int main(int argc,char **argv)
 {
     CHECK(argc==3 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);

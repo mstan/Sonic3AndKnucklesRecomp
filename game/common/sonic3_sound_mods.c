@@ -1,4 +1,5 @@
 #include "sonic3_sound_driver.h"
+const struct RecompLauncherCModProvider *s3_theme_mods(const struct RecompLauncherCModProvider *base);
 #if RECOMP_LAUNCHER
 #include "recomp_launcher.h"
 #include <stdio.h>
@@ -27,7 +28,7 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     if(i>1)return base&&base->feature_get&&base->feature_get(base->ctx,i-2,o);
     RecompLauncherCModPackage p;if(i<0||!o||!package_get(c,0,&p))return 0;memset(o,0,sizeof *o);
     COPY(o->id,feature);COPY(o->package_id,package);COPY(o->package_name,p.name);COPY(o->package_version,p.version);
-    COPY(o->name,p.name);COPY(o->author,p.author);COPY(o->description,p.description);COPY(o->group,"Audio");
+    COPY(o->name,p.name);COPY(o->author,p.author);COPY(o->description,p.description);COPY(o->group,"Sound");
     COPY(o->source_name,p.source_name);COPY(o->source_url,p.source_url);COPY(o->status,p.status);o->enabled=p.enabled;
     if(i==1){
         COPY(o->id,prototype);COPY(o->name,"November 1993 prototype soundtrack");COPY(o->group,"Restoration");
@@ -82,7 +83,7 @@ const RecompLauncherCModProvider *s3_sound_mods(const RecompLauncherCModProvider
     static RecompLauncherCModProvider p;base=common;if(base)p=*base;else memset(&p,0,sizeof p);
     p.package_count=packages;p.package_get=package_get;p.set_enabled=enable_package;p.feature_count=features;p.feature_get=feature_get;p.feature_enable=enable;
     p.feature_resource_count=resource_count;p.feature_resource_get=resource_get;p.feature_resource_set_path=resource_path;
-    p.commit=commit;p.commit_netplay=netplay;p.last_error=last_error;return &p;
+    p.commit=commit;p.commit_netplay=netplay;p.last_error=last_error;return s3_theme_mods(&p);
 }
 #else
 const struct RecompLauncherCModProvider *s3_sound_mods(const struct RecompLauncherCModProvider *base){return base;}

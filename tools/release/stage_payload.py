@@ -10,18 +10,23 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def stage_campaign_tools(dest, build, system, engine):
-    """Copy the complete public converter, including shared upstream media IO."""
+def stage_sound_tools(dest, build, system):
+    """All three cartridges can import owned sound donors without Python."""
     builder=build/('S3KCampaignBuilder.exe' if system=='Windows' else 'S3KCampaignBuilder')
     assert builder.is_file(), 'Build the bundled S3KCampaignBuilder before packaging'
     shutil.copy2(builder,dest/builder.name)
     builder_licenses=build/'campaign-builder-licenses'
     assert (builder_licenses/'Python.txt').is_file() and (builder_licenses/'versions.json').is_file(), 'Missing converter runtime licenses'
     shutil.copytree(builder_licenses,dest/'licenses/campaign-builder',dirs_exist_ok=True)
+
+
+def stage_campaign_tools(dest, build, system, engine):
+    """Copy the complete public converter, including shared upstream media IO."""
+    stage_sound_tools(dest,build,system)
     tools = dest / "tools"
     tools.mkdir(exist_ok=True)
     for name in ("build_stage_pack.py", "build_megamix_pack.py",
-                 "split_campaign_packs.py", "build_sonic_cd_pack.py", "import_sonic_cd.py", "import_campaign.py"):
+                 "split_campaign_packs.py", "build_sonic_cd_pack.py", "import_sonic_cd.py", "import_campaign.py", "import_sound_donor.py", "import_cd_sound_donor.py"):
         shutil.copy2(ROOT / "tools" / name, tools / name)
     for directory in ("trilogy", "megamix"):
         tracked = subprocess.check_output(["git", "-C", str(ROOT), "ls-files", "--",
@@ -121,6 +126,8 @@ def stage(build, dest, version, mode, engine_root=None):
                      "SONIC_CD.md", "SONIC_CD_VALIDATION.md"):
             shutil.copy2(ROOT / "docs" / name, docs / name)
         stage_campaign_tools(dest, build, info["system"], engine)
+    else:
+        stage_sound_tools(dest, build, info["system"])
     assets = build / "assets"
     assert (assets / "fonts/LatoLatin-Regular.ttf").is_file(), "Missing launcher font"
     assert (assets / "img" / spec["boxart"]).is_file(), "Missing mode box art"

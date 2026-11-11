@@ -4,6 +4,12 @@ Play **Sonic 3 & Knuckles** on your PC, with Sonic, Tails and Knuckles.
 Optional mods bring in more adventures and let Mighty and Shadow join the fun.
 Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 
+The **Sound** section of Mods has optional dropdowns for 1-UP, Game Over,
+Continue, Act Clear and Invincibility themes. Choose individual cartridge or
+US Sonic CD variants using your own media; matching ROMs are verified and
+shared automatically. See [Event music](docs/EVENT_MUSIC.md) for the choices
+and supported donor inputs.
+
 ## Download and play
 
 1. Download your game's package from [Releases](https://github.com/mstan/Sonic3AndKnucklesRecomp/releases).
@@ -14,8 +20,8 @@ Separate versions of **Sonic 3** and **Sonic & Knuckles** are also available.
 4. Check your controls, then select **PLAY**.
 
 Game files are not included. The combined game needs a Sonic 3 & Knuckles ROM;
-the separate versions need their corresponding ROMs. The v0.8.1 release
-provides Windows x64 ZIPs and Linux x86_64 AppImages for all three games.
+the separate versions need their corresponding ROMs. Packages provide Windows
+x64 ZIPs and Linux x86_64 AppImages for all three games.
 
 ## Optional restoration in v0.8.1
 

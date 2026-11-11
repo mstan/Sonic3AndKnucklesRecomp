@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.8.1 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.8.2 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -251,8 +251,12 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${S3_GAME_COMMON}/sonic3_sound_mods.c"
         "${S3_GAME_COMMON}/sonic3_sound_assets.c"
         "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
+        "${S3_GAME_COMMON}/sonic3_sound_legacy.c"
         "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
         "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"
+        "${S3_GAME_COMMON}/sonic3_sound_themes.c"
+        "${S3_GAME_COMMON}/sonic3_theme_mods.c"
+        "${S3_GAME_COMMON}/sonic3_cd_themes.c"
         "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
     # The source's queued decompressor changes its IRQ return PC. Compile this
     # small program with the existing explicit-PC native backend so its RTE
@@ -295,6 +299,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         set_source_files_properties("${S3_GAME_ROOT}/trilogy/scd_background.c"
             PROPERTIES COMPILE_OPTIONS "$<$<C_COMPILER_ID:GNU,Clang,AppleClang>:-fwrapv>")
         list(APPEND SHARED_SRC ${STAGE_PACK_SOURCES})
+    else()
+        list(APPEND SHARED_SRC "${S3_GAME_ROOT}/trilogy/scd_import.c")
     endif()
     # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
     # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)

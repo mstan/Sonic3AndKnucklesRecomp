@@ -28,7 +28,7 @@ def main():
         '--specpath',str(work),'--hidden-import','PIL.Image','--hidden-import','PIL.PngImagePlugin',
         '--exclude-module','tkinter','--exclude-module','numpy','--exclude-module','matplotlib']
     sources=[]
-    for name in ('import_campaign.py','build_stage_pack.py','split_campaign_packs.py',
+    for name in ('import_campaign.py','import_sound_donor.py','import_cd_sound_donor.py','build_stage_pack.py','split_campaign_packs.py',
                  'build_megamix_pack.py','import_sonic_cd.py','build_sonic_cd_pack.py'):
         sources.append(ROOT/'tools'/name)
         command+=['--add-data',str(ROOT/'tools'/name)+sep+'tools']
