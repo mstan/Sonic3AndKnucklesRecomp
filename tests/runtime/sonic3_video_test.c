@@ -1667,6 +1667,34 @@ static void test_private_plane_colors(void)
     }
     test_private_planes=0;s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static void test_aiz2_retired_grove(void)
+{
+    static GVDP v;static AizArt saved;uint32_t native[320],out[796];uint8_t before[65536];
+    saved=s_aiz_ship_art;int attempted=s_aiz_ship_art_attempted,ready=s_aiz_ship_art_ready;
+    memset(&s_aiz_ship_art,0,sizeof s_aiz_ship_art);s_aiz_ship_art_attempted=s_aiz_ship_art_ready=1;
+    memset(s_aiz_ship_art.video.vram+32,0x33,32);
+    for(unsigned i=0;i<4;i++)word(s_aiz_ship_art.blocks,8+i*2,1);
+    const struct { unsigned character,camera,retired; } cases[]={{0,0x4880,1},{2,0x4100,1},{2,0x40F0,0}};
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;n++) {
+        CHECK(configure("off"));CHECK(configure("32:9"));
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        g_ram[0xF600]=12;g_ram[0xFE11]=1;g_ram[0xB038]=(uint8_t)cases[n].character;
+        write32(0xB000,0x1234);word(g_ram,0x8000,160);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0xEE80,cases[n].camera);word(g_ram,0xEEC2,20);
+        for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[1]=0xE;v.cram[3]=0xE00;
+        memset(v.vram+32,0x11,32);word(v.vram,0xF000,(unsigned)-cases[n].camera);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+        s3_video_set_world_cell(private_plane_cell);memcpy(before,g_ram,sizeof before);
+        for(unsigned i=0;i<320;i++)native[i]=0xFFFF0000u;
+        scanline(&v,0,native,320,out,796);
+        for(unsigned x=0;x<796;x++)CHECK(out[x]==(x<238 && cases[n].retired?0xFF0000FFu:0xFFFF0000u));
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    }
+    s_aiz_ship_art=saved;s_aiz_ship_art_attempted=attempted;s_aiz_ship_art_ready=ready;
+    CHECK(configure("off"));
+}
 static void test_aiz2_ship_cameras(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];
@@ -3381,7 +3409,7 @@ int main(int argc,char **argv)
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
-    test_aiz2_ship_cameras();
+    test_aiz2_retired_grove();test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
     test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();

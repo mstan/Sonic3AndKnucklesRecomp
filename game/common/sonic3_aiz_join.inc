@@ -57,12 +57,17 @@ static int aiz_ship_art_load(void)
     return s_aiz_ship_art_ready=1;
 }
 
-static int aiz_ship_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
+static int aiz_cached_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
 {
-    if(wx<0x4440 || wx>=0x4880 || !aiz_ship_art_load())return 0;
+    if(!aiz_ship_art_load())return 0;
     *attr=world_attr_blocks(s_world_frame,s_aiz_ship_art.blocks,wx,wy,0);
     *pixel=pattern_pixel(&s_aiz_ship_art.video,*attr,wx,wy);
     return 1;
+}
+static int aiz_ship_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
+{
+    if(wx<0x4440 || wx>=0x4880)return 0;
+    return aiz_cached_tree_sample(wx,wy,attr,pixel);
 }
 static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
                                     uint16_t *attr,uint8_t *pixel)
@@ -71,12 +76,15 @@ static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
      * this scenery. Retain the grove to the left and the finite far-right
      * cliff in their original bank; the native view and active arena stay
      * live. */
-    if(s_frame_zone || s_frame_act!=1 || s_frame_fg_x<0x4880 ||
+    int knux=s_world_frame[0xB038]==2;
+    if(s_frame_zone || s_frame_act!=1 || s_frame_fg_x<(knux?0x4100:0x4880) ||
        (nx>=0 && nx<nw))return 0;
+    /* Knuckles reaches the same boss art bank at the earlier waterfall.
+     * Its preceding grove must retain its own patterns in the left margin. */
+    if(knux)return wx>=0x3B80 && wx<0x4100?
+        aiz_cached_tree_sample(wx,wy,attr,pixel):0;
     if(wx>=0x4B80 && wx<0x4C80 && aiz_ship_art_load()) {
-        *attr=world_attr_blocks(s_world_frame,s_aiz_ship_art.blocks,wx,wy,0);
-        *pixel=pattern_pixel(&s_aiz_ship_art.video,*attr,wx,wy);
-        return 1;
+        return aiz_cached_tree_sample(wx,wy,attr,pixel);
     }
     return aiz_ship_tree_sample(wx,wy,attr,pixel);
 }
