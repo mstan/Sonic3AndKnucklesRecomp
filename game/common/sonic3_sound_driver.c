@@ -147,11 +147,11 @@ void s3_sound_post_reset(void)
         if(!ok){fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);}
         fprintf(stderr,"[sound-driver] Verified November 3, 1993 prototype soundtrack; retail SFX retained\n");
     }
-    invincibility_override=s3_themes[S3_THEME_INVINCIBLE].enabled && s3_themes[S3_THEME_INVINCIBLE].choice!=0;
+    invincibility_override=s3_themes[S3_THEME_INVINCIBLE].enabled;
     if(standalone && invincibility_override && !prototype_active)
         memcpy(bank+seq.music_index-0x400000+4*(0x32-1),bank+seq.music_index-0x400000+4*(0x2C-1),4);
     unsigned next_sample=97;
-    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled && s3_themes[t].choice){
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled){
         const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);
         int donor=choice->donor;
         if(donor>=S3_DONOR_CD_US){

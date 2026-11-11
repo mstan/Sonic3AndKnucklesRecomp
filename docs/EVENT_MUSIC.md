@@ -17,8 +17,8 @@ game extracts and verifies it automatically, then enables that theme. A verified
 donor is shared with every other matching choice and, in normal installations,
 with all three games. A cartridge already present in the running game needs no
 additional input. You can select choices while their feature is disabled, and
-enable a prepared choice later with its checkbox. **Original** disables that
-event's replacement.
+enable a prepared choice later with its checkbox. Disable the feature to use
+the game's normal theme. Your replacement choice is retained.
 
 These options enable Clone Driver automatically. Restart to apply changes.
 They currently support local play in the original campaigns; imported campaigns

@@ -19,7 +19,13 @@ int main(int argc,char **argv)
     for(unsigned t=0;t<S3_THEME_COUNT;t++){
         RecompLauncherCModFeature f;RecompLauncherCModOption o;
         CHECK(p->feature_get(NULL,(int)t,&f)&&!f.enabled&&!strcmp(f.group,"Sound"));
-        CHECK(p->feature_option_get(NULL,f.package_id,f.id,0,&o));CHECK(o.type==RECOMP_MOD_OPTION_CHOICE&&!o.disabled);total+=(unsigned)o.choice_count-1;
+        CHECK(p->feature_option_get(NULL,f.package_id,f.id,0,&o));CHECK(o.type==RECOMP_MOD_OPTION_CHOICE&&!o.disabled);total+=(unsigned)o.choice_count;
+        CHECK(!strcmp(o.default_value,s3_theme_choice(t,0)->id));
+        for(int i=0;i<o.choice_count;i++){
+            RecompLauncherCModChoice choice;
+            CHECK(p->feature_choice_get(NULL,f.package_id,f.id,o.id,i,&choice));
+            CHECK(strcmp(choice.value,"original")&&strcmp(choice.label,"Original"));
+        }
     }
     CHECK(total==21);
     if(argc==4){
@@ -27,7 +33,8 @@ int main(int argc,char **argv)
         CHECK(!s3_theme_enable(S3_THEME_LIFE,1));CHECK(!strcmp(s3_theme_choice(S3_THEME_LIFE,(unsigned)s3_themes[S3_THEME_LIFE].choice)->id,"s1-s2"));
         puts("PASS missing-donor selection remains configurable and disabled");return 0;
     }
-    CHECK(s3_theme_choose(S3_THEME_LIFE,"s1-s2"));CHECK(s3_theme_ready(S3_THEME_LIFE)&&s3_themes[S3_THEME_LIFE].enabled&&driver);
+    CHECK(s3_theme_enable(S3_THEME_LIFE,1));CHECK(s3_themes[S3_THEME_LIFE].choice==0&&s3_themes[S3_THEME_LIFE].enabled&&driver);
+    CHECK(s3_theme_choose(S3_THEME_LIFE,"s1-s2"));CHECK(s3_theme_ready(S3_THEME_LIFE)&&s3_themes[S3_THEME_LIFE].enabled);
     CHECK(s3_theme_choose(S3_THEME_CONTINUE,"s1-s2"));CHECK(s3_themes[S3_THEME_CONTINUE].enabled);
     CHECK(s3_theme_donor(S3_THEME_LIFE)==s3_theme_donor(S3_THEME_CONTINUE));
     RecompLauncherCModResource a,b;
@@ -40,11 +47,21 @@ int main(int argc,char **argv)
     CHECK(s3_theme_choose(S3_THEME_INVINCIBLE,"cd-us"));CHECK(s3_themes[S3_THEME_INVINCIBLE].enabled);
     CHECK(s3_theme_choose(S3_THEME_OVER,"cd-us"));CHECK(s3_themes[S3_THEME_OVER].enabled);
     CHECK(s3_theme_donor(S3_THEME_OVER)==s3_theme_donor(S3_THEME_INVINCIBLE));
-    CHECK(s3_theme_choose(S3_THEME_OVER,"original"));CHECK(!s3_themes[S3_THEME_OVER].enabled);
+    CHECK(p->feature_enable(NULL,"sonic3.audio.event-themes","game-over",0));CHECK(!s3_themes[S3_THEME_OVER].enabled);
+    CHECK(!strcmp(s3_theme_choice(S3_THEME_OVER,(unsigned)s3_themes[S3_THEME_OVER].choice)->id,"cd-us"));
     CHECK(p->set_enabled(NULL,"sonic3.audio.event-themes",0));CHECK(!s3_themes_enabled());
-    CHECK(p->set_enabled(NULL,"sonic3.audio.event-themes",1));CHECK(s3_themes[S3_THEME_LIFE].enabled&&s3_themes[S3_THEME_INVINCIBLE].enabled&&!s3_themes[S3_THEME_OVER].enabled&&!s3_themes[S3_THEME_CLEAR].enabled);
-    CHECK(!s3_theme_choose(S3_THEME_OVER,"typo")&&!s3_theme_choose(99,"s1"));
+    CHECK(p->set_enabled(NULL,"sonic3.audio.event-themes",1));
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)CHECK(s3_themes[t].enabled);
+    CHECK(s3_theme_enable(S3_THEME_OVER,0));
+    CHECK(!s3_theme_choose(S3_THEME_OVER,"original")&&!s3_theme_choose(S3_THEME_OVER,"typo")&&!s3_theme_choose(99,"s1"));
     CHECK(p->commit(NULL,"unused-rom"));
-    s3_themes_load(argv[1],argv[2]);CHECK(s3_themes[S3_THEME_LIFE].enabled&&s3_themes[S3_THEME_INVINCIBLE].enabled&&!s3_themes[S3_THEME_OVER].enabled);
-    puts("PASS five configurable Sound features, 21 choices, shared cartridge/disc resources, disabled selection, donor gating, auto-enable and persisted round-trip");return 0;
+    s3_themes_load(argv[1],argv[2]);CHECK(s3_themes[S3_THEME_LIFE].enabled&&s3_themes[S3_THEME_LIFE].choice==0&&s3_themes[S3_THEME_INVINCIBLE].enabled&&!s3_themes[S3_THEME_OVER].enabled);
+    CHECK(!strcmp(s3_theme_choice(S3_THEME_OVER,(unsigned)s3_themes[S3_THEME_OVER].choice)->id,"cd-us"));
+    /* A removed or unknown saved choice must never enable a different song. */
+    char path[1200];snprintf(path,sizeof path,"%s",argv[1]);
+    char *a_slash=strrchr(path,'/'),*b_slash=strrchr(path,'\\');if(!a_slash||(b_slash&&b_slash>a_slash))a_slash=b_slash;
+    size_t prefix=a_slash?(size_t)(a_slash-path)+1:0;snprintf(path+prefix,sizeof path-prefix,"%s-themes.ini",argv[2]);
+    FILE *saved=fopen(path,"ab");CHECK(saved);CHECK(fputs("game-over.choice=original\ngame-over.enabled=1\nact-clear.choice=unknown\nact-clear.enabled=1\n",saved)>=0);CHECK(!fclose(saved));
+    s3_themes_load(argv[1],argv[2]);CHECK(!s3_themes[S3_THEME_OVER].enabled&&!s3_themes[S3_THEME_CLEAR].enabled&&s3_themes[S3_THEME_LIFE].enabled);
+    puts("PASS five Sound features, 21 replacement choices, checkbox disable retains selection, first-choice activation, shared donors, donor gating and persisted round-trip");return 0;
 }

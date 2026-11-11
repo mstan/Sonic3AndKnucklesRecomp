@@ -6,7 +6,8 @@ All three cartridges have five optional Sound selectors: 1-UP, Game Over,
 Continue Screen, Act Clear and Invincibility. Each has one dropdown, including
 the original Sonic 1 / Sonic 2, Sonic 3, Sonic & Knuckles and supported prototype
 variants appropriate to that event. US Sonic CD supplies Game Over, Act Clear
-and Invincibility choices. All replacements default off.
+and Invincibility choices. All replacements default off. Disable a feature to
+use the game's normal theme; its selected replacement is retained.
 
 Choose a theme and provide its matching ROM or disc if needed. ZIPs import
 automatically. A verified donor is stored once and reused by other matching

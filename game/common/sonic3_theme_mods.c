@@ -26,7 +26,7 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,s3_theme_ids[i]);COPY(o->package_id,package);COPY(o->package_name,"Event Music");COPY(o->package_version,"0.1.0");
     COPY(o->name,s3_theme_names[i]);COPY(o->group,"Sound");COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose a theme, then provide its ROM if requested. ZIP files are extracted and verified automatically. Each donor is stored once and reused by every theme. Choosing an available theme or importing its ROM enables this option and Clone Driver. Restart to apply; local original campaigns only.");
+    COPY(o->description,"Choose a theme, then provide its ROM if requested. ZIP files are extracted and verified automatically. Each donor is stored once and reused by every theme. Choosing an available theme or importing its ROM enables this option and Clone Driver. Disable this feature to use the game's normal theme; your choice is kept. Restart to apply; local original campaigns only.");
     o->enabled=s3_themes[i].enabled;o->option_count=1;
     COPY(o->status,!s3_theme_ready(i)?"Choose the matching ROM below to enable this theme":o->enabled?"Enabled; changes apply after restart":"Ready; enable to use this theme");
     const S3ThemeChoice *choice=s3_theme_choice(i,s3_themes[i].choice);
@@ -40,17 +40,15 @@ static int enable(void *c,const char *p,const char *f,int on)
 static int enable_package(void *c,const char *p,int on)
 {
     (void)c;s3_themes_clear_error();if(!ours(p))return base&&base->set_enabled&&base->set_enabled(base->ctx,p,on);
-    int configured=0;
-    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].choice){configured=1;if(on&&!s3_theme_ready(t))return s3_theme_enable(t,1);}
-    if(on&&!configured)return s3_theme_enable(0,1);
-    for(unsigned t=0;t<S3_THEME_COUNT;t++)if((!on||s3_themes[t].choice)&&!s3_theme_enable(t,on))return 0;return 1;
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(on&&!s3_theme_ready(t))return s3_theme_enable(t,1);
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(!s3_theme_enable(t,on))return 0;return 1;
 }
 static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCModOption *o)
 {
     (void)c;if(!ours(p))return base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o);
     int t=theme(f);if(t<0||i||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,"theme");COPY(o->label,s3_theme_names[t]);COPY(o->description,"Choose freely while enabled or disabled. Matching ROMs are shared automatically.");
-    COPY(o->value,s3_theme_choice(t,s3_themes[t].choice)->id);COPY(o->default_value,"original");
+    COPY(o->value,s3_theme_choice(t,s3_themes[t].choice)->id);COPY(o->default_value,s3_theme_choice(t,0)->id);
     o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=s3_theme_choices(t);return 1;
 }
 static int choice_get(void *c,const char *p,const char *f,const char *opt,int i,RecompLauncherCModChoice *o)

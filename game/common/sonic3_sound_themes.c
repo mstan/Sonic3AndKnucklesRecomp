@@ -14,14 +14,14 @@ const char *const s3_theme_ids[]={"extra-life","game-over","continue","act-clear
 const char *const s3_theme_names[]={"1-UP Theme","Game Over Theme","Continue Screen Theme","Act Clear Theme","Invincibility Theme"};
 const char *const s3_donor_ids[]={"s1","s2","s2-aug","s2-wai","s3-proto","s3","sk","cd-us"};
 const char *const s3_donor_names[]={"Sonic 1","Sonic 2","Sonic 2 (Aug 21, 1992 prototype)","Sonic 2 (Simon Wai prototype)","Sonic 3 (Nov 3, 1993 prototype)","Sonic 3","Sonic & Knuckles","Sonic CD (US)"};
-static const S3ThemeChoice choices[S3_THEME_COUNT][7]={
-    {{"original","Original",-1},{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
-    {{"original","Original",-1},{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"original","Original",-1},{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
-    {{"original","Original",-1},{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"original","Original",-1},{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
+static const S3ThemeChoice choices[S3_THEME_COUNT][6]={
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
+    {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
 };
-static const unsigned counts[]={5,4,4,6,7};
+static const unsigned counts[]={4,3,3,5,6};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -84,7 +84,6 @@ int s3_themes_enabled(void){for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t
 int s3_theme_enable(unsigned t,int on)
 {
     *error=0;if(t>=S3_THEME_COUNT)return 0;
-    if(on && !s3_themes[t].choice){snprintf(error,sizeof error,"Choose a replacement theme first.");return 0;}
     int d=s3_theme_donor(t);
     if(on && d>=0){size_t n;free(s3_donor_read((unsigned)d,&n));}
     if(on && !s3_theme_ready(t)){snprintf(error,sizeof error,"Provide the selected theme's ROM first.");return 0;}
@@ -96,7 +95,6 @@ int s3_theme_choose(unsigned t,const char *id)
     *error=0;if(t>=S3_THEME_COUNT||!id)return 0;
     for(unsigned c=0;c<counts[t];c++)if(!strcmp(id,choices[t][c].id)){
         s3_themes[t].choice=(int)c;
-        if(!c){s3_themes[t].enabled=0;return 1;}
         if(s3_theme_ready(t)){
             if(!s3_theme_enable(t,1))s3_themes[t].enabled=0;
         }else s3_themes[t].enabled=0;
@@ -130,7 +128,7 @@ void s3_themes_load(const char *settings,const char *mode)
     }
     s3_theme_offer_prototype(s3_sound_prototype_path());
     FILE *f=fopen(file,"rb");if(!f)return;
-    char line[256];
+    char line[256];int invalid_choice[S3_THEME_COUNT]={0};
     while(fgets(line,sizeof line,f)){
         line[strcspn(line,"\r\n")]=0;
         char *value=strchr(line,'=');if(!value)continue;*value++=0;
@@ -138,11 +136,16 @@ void s3_themes_load(const char *settings,const char *mode)
             char key[80];snprintf(key,sizeof key,"%s.enabled",s3_theme_ids[t]);
             if(!strcmp(key,line))s3_themes[t].enabled=!strcmp(value,"1");
             snprintf(key,sizeof key,"%s.choice",s3_theme_ids[t]);
-            if(!strcmp(key,line))for(unsigned c=0;c<counts[t];c++)if(!strcmp(value,choices[t][c].id))s3_themes[t].choice=(int)c;
+            if(!strcmp(key,line)){
+                invalid_choice[t]=1;
+                for(unsigned c=0;c<counts[t];c++)if(!strcmp(value,choices[t][c].id)){
+                    s3_themes[t].choice=(int)c;invalid_choice[t]=0;break;
+                }
+            }
         }
     }
     fclose(f);
-    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled&&(!s3_themes[t].choice||!s3_theme_ready(t)))s3_themes[t].enabled=0;
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled&&(invalid_choice[t]||!s3_theme_ready(t)))s3_themes[t].enabled=0;
 }
 int s3_themes_save(void)
 {
