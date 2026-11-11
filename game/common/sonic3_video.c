@@ -2178,6 +2178,25 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int by=bg_world?unwrap(presentation_bg_scroll(v->vsram[1]),s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    /* Once the cave camera is selected, its full spatial layout is already
+     * available. Extend it beyond the native viewport while the uploaded
+     * plane catches up; those unseen columns can still contain blank tiles. */
+    int icz_margin_world=bg_world && s_frame_zone==5 && !s_frame_act && s_frame_bg_event==12;
+    if(bg_world && s_frame_zone==5 && !s_frame_act &&
+       s_frame_bg_event==8) {
+        unsigned remaining=((unsigned)s_world_frame[0xEECA]<<8)|s_world_frame[0xEECB];
+        if(remaining<=15) {
+            /* Each native pass replaces sixteen 16px rows, bottom first.
+             * Its pending position is already below the last uploaded row.
+             * Track their physical plane rows through the vertical wrap:
+             * pass 8 retires finite snow for a repeating panorama. */
+            unsigned mask=(unsigned)(plane_tiles((v->reg[16]>>4)&3)*8-1);
+            unsigned pending=((unsigned)s_world_frame[0xEEC8]<<8)|s_world_frame[0xEEC9];
+            unsigned first=(pending+16)&mask;
+            int replaced=((((unsigned)by&~15u)-first)&mask)<(15-remaining)*16;
+            icz_margin_world=!replaced;
+        }
+    }
     /* CNZ1BGE_Boss streams only the $200..$2FF background rows with
      * Draw_TileColumn(d1=$200,d6=$10). Their 256px canvas scrolls while
      * the room descends; the neighboring layout rows are other scenes. */
@@ -2284,7 +2303,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(bx<0 || bx>=1024)bp=0;
         }
         const uint32_t *apalette=palette,*bpalette=palette;
-        if(bg_canvas) {
+        if(bg_canvas && !(icz_margin_world && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
