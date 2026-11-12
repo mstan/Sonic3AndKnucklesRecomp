@@ -1420,6 +1420,17 @@ static void test_aiz_intro_canvas_edge(void)
             CHECK(out[x]==(source<512?0xFFFF0000u:0xFF00FF00u));
         }
     }
+    /* LBZ's independent B camera must retain that screen-centered origin
+     * at both foreground boundaries, including its lower water bands. */
+    g_ram[0xFE10]=6;g_ram[0xF711]=1;
+    word(g_ram,0xEE84,0);word(g_ram,0xEE90,0);v.vsram[0]=v.vsram[1]=0;
+    const int edges[]={0,176,336,11884,12028};
+    for(unsigned c=0;c<sizeof edges/sizeof *edges;c++) {
+        int camera=edges[c];word(g_ram,0xEE80,camera);
+        word(v.vram,0xF000,(unsigned)-camera);word(v.vram,0xF002,0);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;x++)CHECK(out[x]==(x>=238 && x<750?0xFFFF0000u:0xFF00FF00u));
+    }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_aiz_intro_live_palette(void)
@@ -3268,7 +3279,9 @@ int main(int argc,char **argv)
     word(g_ram,0xEE90,0xD0);v.vsram[1]=0xD0;
     scanline(&v,0,native,320,out,796);
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
-    CHECK(s_bg_checks>0 && s_bg_errors==0);
+    /* At the clamped foreground edge, native same-column B samples are
+     * not the centered panorama's oracle. Every output pixel is checked. */
+    CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
     word(g_ram,0xEE90,0);v.vsram[1]=0;
     /* HPZ can update its fine/coarse position before the next tile-column
      * streamer runs. Compare only the last Draw_BG interval: A802=$10,

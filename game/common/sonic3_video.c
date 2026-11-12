@@ -2085,6 +2085,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* HCZ1's parallax also belongs to the screen-centered B canvas. Its
      * left-clamped foreground must not add another pan to the water bands. */
     int hcz_background=level && s_frame_zone==1 && !s_frame_act;
+    int lbz_background=level && s_frame_zone==6 && !s_frame_act;
     /* Distant MGZ/CNZ parallax keeps the same centered screen space as
      * those scenes. MGZ2's collidable moving-room banks instead belong to
      * the world, so retain their foreground-relative projection. */
@@ -2096,7 +2097,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
-        intro_background || fbz_background || soz_background || hcz_background ||
+        intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
         mgz_background || cnz_background || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
