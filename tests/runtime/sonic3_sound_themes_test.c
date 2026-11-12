@@ -24,6 +24,11 @@ static void value(const RecompLauncherCModProvider *p,const char *group,const ch
 int main(int argc,char **argv)
 {
     CHECK(argc==3||argc==4);s3_themes_load(argv[1],argv[2]);
+    CHECK(s3_music_source(S3_MUSIC_BOSS,S3_DONOR_WAI)==13);
+    CHECK(s3_music_source(S3_MUSIC_MINIBOSS,S3_DONOR_WAI)==13);
+    CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_WAI)==11);
+    CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_S1)==12);
+    CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_S2)==19);
     const RecompLauncherCModProvider *p=s3_theme_mods(NULL);int combined=!strcmp(argv[2],"sonic3k");
     CHECK(p&&p->feature_count(NULL)==(combined?3:2)&&p->package_count(NULL)==1);
     unsigned total=0,shared=0;

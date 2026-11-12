@@ -75,7 +75,16 @@ unsigned s3_music_source(unsigned t,unsigned donor)
     static const unsigned s1[]={7,14,15,13,6,17,11,11,9};
     static const unsigned s2[]={23,26,27,25,22,30,18,18,24};
     if(t>=S3_MUSIC_COUNT)return 0;
-    if(donor<=S3_DONOR_WAI)return t<9?(donor==S3_DONOR_S1?s1[t]:s2[t]):t==S3_MUSIC_FINAL?(donor==S3_DONOR_S1?11:18):0;
+    if(donor<=S3_DONOR_WAI){
+        /* Each revision's native playlist is authoritative: the Wai $93
+         * entry is an early EHZ 2P song, while its boss is native $8E. */
+        if(t==S3_MUSIC_FINAL)return donor==S3_DONOR_S1?12:donor==S3_DONOR_WAI?11:19;
+        if(donor==S3_DONOR_WAI){
+            if(t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS)return 13;
+            if(t==S3_THEME_INVINCIBLE)return 20;
+        }
+        return t<9?(donor==S3_DONOR_S1?s1[t]:s2[t]):0;
+    }
     if(t==S3_MUSIC_MINIBOSS)return donor==S3_DONOR_S3?0x2E:0x18;
     if(t==S3_MUSIC_CREDITS)return donor==S3_DONOR_SK?0x33:0x26;
     if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_PROTO?0x2E:0x32;

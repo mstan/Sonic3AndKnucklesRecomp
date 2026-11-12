@@ -70,13 +70,13 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
 {
     static const unsigned cases[][3]={
         {S3_DONOR_S1,17,0x31},{S3_DONOR_S2,30,0x31},{S3_DONOR_PROTO,0x31,0x31},
-        {S3_DONOR_S1,11,0x19},{S3_DONOR_S2,18,0x19},{S3_DONOR_WAI,18,0x19},
-        {S3_DONOR_S1,11,0x18},{S3_DONOR_S2,18,0x18},{S3_DONOR_WAI,18,0x18},
+        {S3_DONOR_S1,11,0x19},{S3_DONOR_S2,18,0x19},{S3_DONOR_WAI,13,0x19},
+        {S3_DONOR_S1,11,0x18},{S3_DONOR_S2,18,0x18},{S3_DONOR_WAI,13,0x18},
         {S3_DONOR_S3,0x2E,0x18},{S3_DONOR_SK,0x18,0x2E},{S3_DONOR_PROTO,0x18,0x2E},
         {S3_DONOR_S3,0x25,0x25},{S3_DONOR_SK,0x25,0x25},{S3_DONOR_PROTO,0x25,0x25},
         {S3_DONOR_S3,0x19,0x19},{S3_DONOR_SK,0x19,0x19},{S3_DONOR_PROTO,0x19,0x19},
         {S3_DONOR_S3,0x30,0x30},{S3_DONOR_SK,0x30,0x30},{S3_DONOR_PROTO,0x30,0x30},
-        {S3_DONOR_S1,11,0x30},{S3_DONOR_S2,18,0x30},{S3_DONOR_WAI,18,0x30},
+        {S3_DONOR_S1,12,0x30},{S3_DONOR_S2,19,0x30},{S3_DONOR_WAI,11,0x30},
         {S3_DONOR_S3,0x26,0x33},{S3_DONOR_SK,0x33,0x26},{S3_DONOR_PROTO,0x26,0x33}
     };
     char error[256]={0};
@@ -107,7 +107,7 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
      * campaign selection without touching either the other song or SFX. */
     for(unsigned i=0;i<2;i++){
         unsigned donor=i?S3_DONOR_S2:S3_DONOR_WAI;size_t n;uint8_t *legacy=read_file(argv[3+donor],&n);
-        CHECK(s3_sound_build_track(legacy,n,donor,18,i?0x19:0x18,seq,pcm,program,bank,0x400000,&used,&next,&cache,error,sizeof error));
+        CHECK(s3_sound_build_track(legacy,n,donor,i?18:13,i?0x19:0x18,seq,pcm,program,bank,0x400000,&used,&next,&cache,error,sizeof error));
         /* Release the conversion cache before its source ROM. */
         s3_sound_music_cache_free(&cache);free(legacy);
     }

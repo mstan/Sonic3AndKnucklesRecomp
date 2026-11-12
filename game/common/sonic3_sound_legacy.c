@@ -94,8 +94,9 @@ int s3_legacy_music_source(const uint8_t *rom,size_t size,unsigned donor,unsigne
 }
 int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,S3LegacySource *s)
 {
-    static const unsigned ids[2][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22}};
-    return theme<S3_THEME_COUNT&&s3_legacy_music_source(rom,size,donor,ids[donor!=S3_DONOR_S1][theme],s);
+    static const unsigned ids[3][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22},{23,26,27,25,20}};
+    unsigned playlist=donor==S3_DONOR_S1?0:donor==S3_DONOR_WAI?2:1;
+    return theme<S3_THEME_COUNT&&s3_legacy_music_source(rom,size,donor,ids[playlist][theme],s);
 }
 typedef struct Node {uint32_t pc,target;uint16_t output;uint8_t kind,length,encoded;} Node;
 typedef struct Convert {
