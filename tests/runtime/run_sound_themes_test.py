@@ -2,6 +2,7 @@
 from pathlib import Path
 import argparse
 import os
+import shutil
 import subprocess
 import tempfile
 
@@ -18,3 +19,8 @@ with tempfile.TemporaryDirectory(prefix='s3-theme-options-') as profile:
     if a.library:
         env['SONIC_SOUND_DONOR_LIBRARY']=a.library
         subprocess.run(args,check=True,env=env)
+        proto=Path(profile)/'proto-only'
+        (proto/'sonic-sound-donors').mkdir(parents=True)
+        shutil.copy2(Path(a.library)/'sonic-sound-donors/s3-proto.bin',proto/'sonic-sound-donors/s3-proto.bin')
+        env['SONIC_SOUND_DONOR_LIBRARY']=str(proto)
+        subprocess.run([a.exe,str(proto/'settings.ini'),a.mode,'--proto-only'],check=True,env=env)

@@ -58,19 +58,18 @@ static unsigned sax(const uint8_t *data,size_t size,size_t p,size_t bytes,uint8_
     }
     return (unsigned)n;
 }
-int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,S3LegacySource *s)
+int s3_legacy_music_source(const uint8_t *rom,size_t size,unsigned donor,unsigned song,S3LegacySource *s)
 {
-    if(!rom||!s||theme>=S3_THEME_COUNT||donor>S3_DONOR_WAI||size!=(donor?0x100000u:0x80000u))return 0;
+    if(!rom||!s||song>=(donor?31u:19u)||donor>S3_DONOR_WAI||size!=(donor?0x100000u:0x80000u))return 0;
     memset(s,0,sizeof *s);s->rom=rom;s->size=size;s->donor=donor;
     if(donor==S3_DONOR_S1){
-        static const unsigned ids[]={7,14,15,13,6};
         unsigned table=bl(rom+0x71998);if(table>size||4*19>size-table)return 0;
-        s->source=bl(rom+table+4*ids[theme]);s->bank=0x70000;s->low=0x70000;s->high=0x80000;
+        s->source=bl(rom+table+4*song);s->bank=0x70000;s->low=0x70000;s->high=0x80000;
         s->env=bl(rom+0x719A4);if(s->env>size||9*4>size-s->env)return 0;
         s->env_count=9;s->zsize=unpack_s1(s);
         if(!s->zsize||s->source<s->low||s->source>s->high-64)return 0;
         unsigned speed=bl(rom+0x719A0);if(speed>size||8>size-speed)return 0;
-        s->fast_tempo=tempo(rom[ids[theme]<8?speed+ids[theme]:s->source+5]);s->force_pal=theme==S3_THEME_CONTINUE;return 1;
+        s->fast_tempo=tempo(rom[song<8?speed+song:s->source+5]);s->force_pal=song==15;return 1;
     }
     unsigned loader=donor==S3_DONOR_S2?0xEC04A:0xEC03C;
     if(be(rom+loader)!=0x4DFA||be(rom+loader+4)!=0x3E3C)return 0;
@@ -78,10 +77,9 @@ int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned them
     s->zsize=sax(rom,size,src,bytes,s->z80,sizeof s->z80,0);if(!s->zsize)return 0;
     static const unsigned playlists[]={0,0x11F5,0x11E7,0x1169};
     static const unsigned envelopes[]={0,0x1029,0x101B,0xFA9};
-    static const unsigned ids[]={23,26,27,25,22};
     static const unsigned speeds[]={0,0x1214,0x1205,0x1188};
-    s->fast_tempo=native_tempo(donor,s->z80[speeds[donor]+ids[theme]]);
-    unsigned meta=s->z80[playlists[donor]+ids[theme]],index=meta&31;
+    s->fast_tempo=native_tempo(donor,s->z80[speeds[donor]+song]);
+    unsigned meta=s->z80[playlists[donor]+song],index=meta&31;
     s->force_pal=(meta&0x40)!=0;
     s->bank=meta&128?0xF8000:0xF0000;s->source=s->bank+(le(rom+s->bank+2*index)&0x7FFF);
     s->little=1;s->low=s->bank;s->high=s->bank+0x8000;
@@ -93,6 +91,11 @@ int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned them
         s->source=0x1380;s->bank=0;s->low=0x1380;s->high=0x1380+n;
     }
     return 1;
+}
+int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,S3LegacySource *s)
+{
+    static const unsigned ids[2][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22}};
+    return theme<S3_THEME_COUNT&&s3_legacy_music_source(rom,size,donor,ids[donor!=S3_DONOR_S1][theme],s);
 }
 typedef struct Node {uint32_t pc,target;uint16_t output;uint8_t kind,length,encoded;} Node;
 typedef struct Convert {

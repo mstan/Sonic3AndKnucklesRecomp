@@ -272,10 +272,11 @@ int s3_sound_build_prototype_music(const uint8_t *rom,size_t size,const S3SoundL
     if(ok)ok=table(c,l->music_index,51*4) && table(c,l->psg_index,103*4) && table(c,l->modulation_index,18*4);
     unsigned failed_id=0;
     for(unsigned i=1;ok && i<=51;i++){
-        /* The prototype's $2E is its unique Super theme. Retail S3 uses
-         * that ID for minibosses; S&K uses $32 for Super and $33 for its
-         * second miniboss. Preserve their queue meanings in each host. */
-        unsigned donor=i==0x32?0x2E:i==0x33?0x18:i==0x2E?0x18:i;
+        /* The prototype's $2E is Super, while retail $2E is a miniboss.
+         * Standalone S3 uses the spare $32 entry for its separate Super
+         * override. S&K uses $32 for Ending and native $DC (entry $33) for
+         * Credits; its Ending has no prototype counterpart. */
+        unsigned donor=i==0x32&&standalone_s3?0x2E:i==0x33?0x26:i==0x2E?0x18:i;
         if(standalone_s3 && i>0x32)continue;
         uint32_t source=s3_sound_music_source(&c->source,rom,donor);
         if(!source)continue;
@@ -315,66 +316,96 @@ static unsigned append_sample(uint8_t *bank,size_t cap,uint32_t *used,
     unsigned slot=(*next)++;
     return slot+0x81;
 }
-int s3_sound_build_event(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,unsigned target,
+typedef struct PreparedMusicDonor {
+    const uint8_t *rom;size_t size;
+    uint8_t *samples,*bank;uint32_t sample_used;
+    S3SoundSource source;
+    uint8_t map[128];int source_valid,envelopes_ready;
+} PreparedMusicDonor;
+void s3_sound_music_cache_free(S3SoundMusicCache *cache)
+{
+    if(!cache)return;
+    for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++){
+        PreparedMusicDonor *p=cache->donors[d];if(p){free(p->samples);free(p);cache->donors[d]=NULL;}
+    }
+}
+int s3_sound_build_track(const uint8_t *rom,size_t size,unsigned donor,unsigned song,unsigned target,
                          const S3SoundLayout *l,const S3SoundPCMLayout *pcm,const uint8_t *program,
                          uint8_t *bank,size_t cap,uint32_t *used,unsigned *next_sample,
+                         S3SoundMusicCache *cache,
                          char *error,size_t error_size)
 {
-    if(!rom||!l||!pcm||!program||!bank||!used||!next_sample||donor>=S3_ROM_DONOR_COUNT||
-       theme>=S3_THEME_COUNT||!target||target>51||*used<l->program_size||*used>cap||cap>0x400000||
+    if(!rom||!l||!pcm||!program||!bank||!used||!next_sample||!cache||donor>=S3_ROM_DONOR_COUNT||
+       !target||target>51||*used<l->program_size||*used>cap||cap>0x400000||
        l->psg_index<BASE||l->psg_index-BASE+256*4>l->program_size||pcm->sample_count<126)return 0;
     uint32_t dest=(*used+1)&~1u;if(dest>cap||cap-dest<0x8000)return 0;
     /* Retail PSG envelope $26 differs between Sonic 3 and S&K. Keep their
      * tables separate when several events use different cartridges. */
     static const unsigned bases[]={103,112,125,138,64,151,202};
     unsigned psg_base=bases[donor];uint8_t drums[128]={0},map[128]={0};int bytes=0,ok=0;
-    Convert *c=NULL;S3LegacySource *legacy=NULL;uint8_t *samples=NULL;
+    Convert *c=NULL;S3LegacySource *legacy=NULL;
+    PreparedMusicDonor *prepared=cache->donors[donor];
+    if(!prepared){prepared=calloc(1,sizeof *prepared);if(!prepared)return 0;cache->donors[donor]=prepared;prepared->rom=rom;prepared->size=size;prepared->bank=bank;}
+    if(prepared->rom!=rom||prepared->size!=size||prepared->bank!=bank)return 0;
     if(donor<=S3_DONOR_WAI){
         legacy=malloc(sizeof *legacy);if(!legacy)goto done;
-        if(!s3_legacy_source(rom,size,donor,theme,legacy))goto done;
+        if(!s3_legacy_music_source(rom,size,donor,song,legacy))goto done;
         bytes=s3_legacy_song(legacy,bank+dest,cap-dest,psg_base,NULL,drums,error,error_size);
     }else{
         c=calloc(1,sizeof *c);if(!c)goto done;
         c->rom=rom;c->bank=bank;c->capacity=cap;c->cursor=dest;c->psg_base=psg_base;c->mod_base=donor==S3_DONOR_PROTO?8:18;c->drums=drums;
-        int valid=donor==S3_DONOR_PROTO?s3_sound_read_prototype(rom,size,&c->source,error,error_size):s3_sound_read_source(rom,size,&c->source,error,error_size);
-        if(!valid)goto done;
-        static const unsigned ids[]={0x2A,0x27,0x28,0x29,0x2C};
-        unsigned src=s3_sound_music_source(&c->source,rom,ids[theme]);if(!src)goto done;
+        if(!prepared->source_valid){
+            prepared->source_valid=donor==S3_DONOR_PROTO?s3_sound_read_prototype(rom,size,&prepared->source,error,error_size):s3_sound_read_source(rom,size,&prepared->source,error,error_size);
+            if(!prepared->source_valid)goto done;
+        }
+        c->source=prepared->source;
+        unsigned src=s3_sound_music_source(&c->source,rom,song);if(!src)goto done;
         bytes=convert_song(c,src,dest,1);
     }
     if(bytes<=0)goto done;*used=dest+(uint32_t)bytes;
-    samples=calloc(1,0x400000);if(!samples)goto done;memcpy(samples,program,l->program_size);
-    uint32_t sample_used=l->program_size;
-    if(!legacy){
-        if(!(donor==S3_DONOR_PROTO?s3_sound_build_prototype_pcm(rom,size,pcm,samples,0x400000,&sample_used,error,error_size):
-                                   s3_sound_build_pcm(rom,size,pcm,samples,0x400000,&sample_used,error,error_size)))goto done;
-    }
     for(unsigned i=1;i<128;i++)if(drums[i]){
+        if(prepared->map[i]){map[i]=prepared->map[i];continue;}
+        if(!prepared->samples){
+            prepared->samples=calloc(1,0x400000);if(!prepared->samples)goto done;
+            memcpy(prepared->samples,program,l->program_size);prepared->sample_used=l->program_size;
+            if(!legacy&&!(donor==S3_DONOR_PROTO?s3_sound_build_prototype_pcm(rom,size,pcm,prepared->samples,0x400000,&prepared->sample_used,error,error_size):
+                                       s3_sound_build_pcm(rom,size,pcm,prepared->samples,0x400000,&prepared->sample_used,error,error_size)))goto done;
+        }
         unsigned rate,length,flags=2;const uint8_t *wave;
         if(legacy){
-            int n=s3_legacy_sample(legacy,i+0x80,samples,0x400000,&rate);if(n<=0)goto done;length=(unsigned)n;wave=samples;
+            int n=s3_legacy_sample(legacy,i+0x80,prepared->samples,0x400000,&rate);if(n<=0)goto done;length=(unsigned)n;wave=prepared->samples;
         }else{
             unsigned slot=i-1+(donor==S3_DONOR_PROTO?70:0);if(slot>=pcm->sample_count)goto done;
-            const uint8_t *d=samples+pcm->sample_table-BASE+slot*10;uint32_t start=read32(d+2),end=read32(d+6);
-            if((d[0]&15)!=2||start<BASE||end<start||end-BASE>sample_used)goto done;
-            flags=d[0];rate=d[1];length=end-start;wave=samples+start-BASE;
+            const uint8_t *d=prepared->samples+pcm->sample_table-BASE+slot*10;uint32_t start=read32(d+2),end=read32(d+6);
+            if((d[0]&15)!=2||start<BASE||end<start||end-BASE>prepared->sample_used)goto done;
+            flags=d[0];rate=d[1];length=end-start;wave=prepared->samples+start-BASE;
         }
-        unsigned id=append_sample(bank,cap,used,pcm,next_sample,wave,length,rate,flags);if(!id)goto done;map[i]=(uint8_t)id;
+        unsigned id=append_sample(bank,cap,used,pcm,next_sample,wave,length,rate,flags);if(!id)goto done;map[i]=prepared->map[i]=(uint8_t)id;
     }
     if(legacy){
         bytes=s3_legacy_song(legacy,bank+dest,cap-dest,psg_base,map,drums,error,error_size);if(bytes<=0)goto done;
-        for(unsigned env=1;env<=legacy->env_count;env++){
+        if(!prepared->envelopes_ready)for(unsigned env=1;env<=legacy->env_count;env++){
             uint8_t values[256];int n=s3_legacy_envelope(legacy,env,values);if(n<=0||(size_t)n>cap-*used)goto done;
             memcpy(bank+*used,values,(size_t)n);write32(bank+l->psg_index-BASE+(psg_base+env-1)*4,BASE+*used);*used+=(unsigned)n;
         }
     }else{
-        static const unsigned ids[]={0x2A,0x27,0x28,0x29,0x2C};
         c->dac_map=map;c->drums=NULL;
-        bytes=convert_song(c,s3_sound_music_source(&c->source,rom,ids[theme]),dest,1);if(bytes<=0)goto done;
-        c->cursor=*used;if(!envelopes(c,l))goto done;*used=(uint32_t)c->cursor;
+        bytes=convert_song(c,s3_sound_music_source(&c->source,rom,song),dest,1);if(bytes<=0)goto done;
+        if(!prepared->envelopes_ready){c->cursor=*used;if(!envelopes(c,l))goto done;*used=(uint32_t)c->cursor;}
     }
-    write32(bank+l->music_index-BASE+(target-1)*4,((legacy?legacy->fast_tempo:1u)<<24)|BASE|dest|(legacy?legacy->force_pal:0));*used=(*used+1)&~1u;ok=1;
+    prepared->envelopes_ready=1;
+    write32(bank+l->music_index-BASE+(target-1)*4,((legacy?legacy->fast_tempo:1u)<<24)|BASE|dest|((target==0x31)||(legacy&&legacy->force_pal)));*used=(*used+1)&~1u;ok=1;
 done:
     if(!ok&&error&&error_size&&!*error)snprintf(error,error_size,"Unable to prepare the selected event theme");
-    free(samples);free(legacy);free(c);return ok;
+    free(legacy);free(c);return ok;
+}
+int s3_sound_build_event(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,unsigned target,
+                         const S3SoundLayout *l,const S3SoundPCMLayout *pcm,const uint8_t *program,
+                         uint8_t *bank,size_t cap,uint32_t *used,unsigned *next_sample,char *error,size_t error_size)
+{
+    static const unsigned ids[3][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22},{0x2A,0x27,0x28,0x29,0x2C}};
+    if(theme>=S3_THEME_COUNT||donor>=S3_ROM_DONOR_COUNT)return 0;
+    S3SoundMusicCache cache={0};
+    int ok=s3_sound_build_track(rom,size,donor,ids[donor==S3_DONOR_S1?0:donor<=S3_DONOR_WAI?1:2][theme],target,l,pcm,program,bank,cap,used,next_sample,&cache,error,error_size);
+    s3_sound_music_cache_free(&cache);return ok;
 }

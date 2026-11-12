@@ -65,6 +65,54 @@ static void mixed_retail_envelopes(char **argv,const S3SoundLayout *seq,const S3
     }
     free(rom[0]);free(rom[1]);
 }
+static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3SoundPCMLayout *pcm,
+                              const uint8_t *program,const uint8_t *base,uint32_t base_size,uint8_t *bank)
+{
+    static const unsigned cases[][3]={
+        {S3_DONOR_S1,17,0x31},{S3_DONOR_S2,30,0x31},{S3_DONOR_PROTO,0x31,0x31},
+        {S3_DONOR_S1,11,0x19},{S3_DONOR_S2,18,0x19},{S3_DONOR_WAI,18,0x19},
+        {S3_DONOR_S1,11,0x18},{S3_DONOR_S2,18,0x18},{S3_DONOR_WAI,18,0x18},
+        {S3_DONOR_S3,0x2E,0x18},{S3_DONOR_SK,0x18,0x2E},{S3_DONOR_PROTO,0x18,0x2E},
+        {S3_DONOR_S3,0x25,0x25},{S3_DONOR_SK,0x25,0x25},{S3_DONOR_PROTO,0x25,0x25},
+        {S3_DONOR_S3,0x19,0x19},{S3_DONOR_SK,0x19,0x19},{S3_DONOR_PROTO,0x19,0x19},
+        {S3_DONOR_S3,0x30,0x30},{S3_DONOR_SK,0x30,0x30},{S3_DONOR_PROTO,0x30,0x30},
+        {S3_DONOR_S1,11,0x30},{S3_DONOR_S2,18,0x30},{S3_DONOR_WAI,18,0x30},
+        {S3_DONOR_S3,0x26,0x33},{S3_DONOR_SK,0x33,0x26},{S3_DONOR_PROTO,0x26,0x33}
+    };
+    char error[256]={0};
+    for(unsigned i=0;i<sizeof cases/sizeof *cases;i++){
+        unsigned donor=cases[i][0],song=cases[i][1],target=cases[i][2];size_t size;uint8_t *rom=read_file(argv[3+donor],&size);
+        memcpy(bank,base,base_size);uint32_t used=base_size;unsigned next=70;S3SoundMusicCache cache={0};
+        int ok=s3_sound_build_track(rom,size,donor,song,target,seq,pcm,program,bank,0x400000,&used,&next,&cache,error,sizeof error);
+        if(!ok)fprintf(stderr,"new donor %u music %02X: %s\n",donor,song,error);CHECK(ok);
+        for(unsigned id=1;id<=51;id++)if(id!=target)CHECK(!memcmp(bank+seq->music_index-0x400000+4*(id-1),base+seq->music_index-0x400000+4*(id-1),4));
+        if(target==0x31)CHECK(be32(bank+seq->music_index-0x400000+4*(target-1))&1);
+        CHECK(!memcmp(bank+seq->sound_index-0x400000,base+seq->sound_index-0x400000,169*4));
+        s3_sound_music_cache_free(&cache);free(rom);
+    }
+    /* A complete per-track prototype selection must fit together, preserve
+     * the original SFX and never append duplicate envelope tables per act. */
+    size_t size;uint8_t *rom=read_file(argv[3+S3_DONOR_PROTO],&size);S3SoundMusicCache cache={0};
+    memcpy(bank,base,base_size);uint32_t used=base_size;unsigned next=70;uint8_t envelopes[39*4];
+    for(unsigned target=1;target<=51;target++){
+        if(target==0x32)continue; /* Prototype has no Ending song. */
+        unsigned song=target==0x33?0x26:target==0x2E?0x18:target;
+        int ok=s3_sound_build_track(rom,size,S3_DONOR_PROTO,song,target,seq,pcm,program,bank,0x400000,&used,&next,&cache,error,sizeof error);
+        if(!ok)fprintf(stderr,"prototype track %02X from %02X: %s\n",target,song,error);CHECK(ok);
+        if(target==1)memcpy(envelopes,bank+seq->psg_index-0x400000+64*4,sizeof envelopes);
+        else CHECK(!memcmp(envelopes,bank+seq->psg_index-0x400000+64*4,sizeof envelopes));
+    }
+    CHECK(next<=97&&used<0x400000);CHECK(!memcmp(bank+seq->sound_index-0x400000,base+seq->sound_index-0x400000,169*4));
+    /* The proposed Wai mini-boss/retail boss pairing also fits over a full
+     * campaign selection without touching either the other song or SFX. */
+    for(unsigned i=0;i<2;i++){
+        unsigned donor=i?S3_DONOR_S2:S3_DONOR_WAI;size_t n;uint8_t *legacy=read_file(argv[3+donor],&n);
+        CHECK(s3_sound_build_track(legacy,n,donor,18,i?0x19:0x18,seq,pcm,program,bank,0x400000,&used,&next,&cache,error,sizeof error));
+        /* Release the conversion cache before its source ROM. */
+        s3_sound_music_cache_free(&cache);free(legacy);
+    }
+    free(rom);printf("PASS new drowning/boss/mini-boss/title/credits conversions and 50 simultaneous prototype track entries; PCM next=%u\n",next);
+}
 int main(int argc,char **argv)
 {
     CHECK(argc==10);size_t host_size,program_size;uint8_t *host=read_file(argv[1],&host_size),*program=read_file(argv[2],&program_size);
@@ -101,5 +149,6 @@ int main(int argc,char **argv)
         recompui_sha256_compute(rom,size,after);CHECK(!memcmp(before,after,32));free(rom);
     }
     CHECK(tested==27);mixed_retail_envelopes(argv,&seq,&pcm,program,base,stats.bytes,bank);
+    individual_tracks(argv,&seq,&pcm,program,base,stats.bytes,bank);
     free(host);free(program);free(base);free(bank);return 0;
 }

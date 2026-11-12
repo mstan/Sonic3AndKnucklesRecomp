@@ -64,4 +64,14 @@ int s3_sound_build_event(const uint8_t *rom,size_t rom_size,unsigned donor,
                          const uint8_t *program,uint8_t *bank,size_t capacity,
                          uint32_t *used,unsigned *next_sample,
                          char *error,size_t error_size);
+/* One bank build shares validated donor tables and decoded percussion across
+ * every selected track. Cache lifetime ends before its input ROMs are freed. */
+typedef struct S3SoundMusicCache {void *donors[7];} S3SoundMusicCache;
+void s3_sound_music_cache_free(S3SoundMusicCache *cache);
+int s3_sound_build_track(const uint8_t *rom,size_t rom_size,unsigned donor,
+                         unsigned source_song,unsigned target,
+                         const S3SoundLayout *layout,const S3SoundPCMLayout *pcm,
+                         const uint8_t *program,uint8_t *bank,size_t capacity,
+                         uint32_t *used,unsigned *next_sample,S3SoundMusicCache *cache,
+                         char *error,size_t error_size);
 #endif
