@@ -38,6 +38,7 @@ int main(int argc,char **argv)
         uint8_t drums[128]={0},map[128];char error[256]={0};for(unsigned i=0;i<128;i++)map[i]=(uint8_t)(i+128);
         int n=s3_legacy_song(&source,bank,0x8000,104,map,drums,error,sizeof error);
         if(!n)fprintf(stderr,"%s\n",error);CHECK(n>0 && n<0x8000);
+        CHECK(bank[5]==0); /* Imported S1/S2 tracks retain their own PSG rules. */
         unsigned voices=(bank[0]<<8)|bank[1];CHECK(voices>8 && voices<(unsigned)n);
         printf("PASS donor %u theme %u source %06X bytes %d drums",donor,t,source.source,n);
         for(unsigned i=0;i<128;i++)if(drums[i])printf(" %02X",i+128);puts("");

@@ -50,6 +50,39 @@ def assemble(source, assembler, p2bin, out):
             rows.append(line)
         text = '\n'.join(rows) + '\n'
         if name == 'Sound/Engine/Sonic 2 Clone Driver v2.asm':
+            # S3's Z80 keeps a PSG channel silent when a tied note follows
+            # an envelope's note-off. The S1-derived port clears that rest
+            # early and audibly retriggers HCZ percussion. Header byte 5
+            # marks converted S3 music; PSG's unused FM voice-pointer bytes
+            # retain that mode and the preceding rest state per channel.
+            marker = '.bgm_psgloadloop:\n'
+            assert text.count(marker) == 1, 'Upstream PSG loader changed'
+            text = text.replace(marker, marker + '\tmove.b 5(a3),SMPS_Track.VoicePtr+1(a1)\n', 1)
+            start = text.index('PSGDoNext:\n')
+            end = text.index('; End of function PSGDoNext', start)
+            segment = text[start:end]
+            segment = segment.replace('PSGDoNext:\n', 'PSGDoNext:\n\tmove.b SMPS_Track.PlaybackControl(a5),SMPS_Track.VoicePtr+2(a5)\n', 1)
+            marker = '.gotnote:\n'
+            assert segment.count(marker) == 1, 'Upstream PSG note decoder changed'
+            segment = segment.replace(marker, marker + '''\ttst.b SMPS_Track.VoicePtr+1(a5)
+\tbeq.s .nativeRestReady
+\tbtst #4,SMPS_Track.PlaybackControl(a5)
+\tbeq.s .nativeRestReady
+\tbtst #1,SMPS_Track.VoicePtr+2(a5)
+\tbeq.s .nativeRestReady
+\tbset #1,SMPS_Track.PlaybackControl(a5)
+.nativeRestReady:
+''', 1)
+            text = text[:start] + segment + text[end:]
+            marker = 'SetPSGVolume:\n'
+            assert text.count(marker) == 1, 'Upstream PSG volume decoder changed'
+            text = text.replace(marker, marker + '''\ttst.b SMPS_Track.VoicePtr+1(a5)
+\tbeq.s .nativeVolumeReady
+\tbtst #4,SMPS_Track.PlaybackControl(a5)
+\tbne.s locret_7298A
+.nativeVolumeReady:
+''', 1)
+            text = text.replace('\tbra.s\tPSGDoVolFX_Loop', '\tbra.w\tPSGDoVolFX_Loop')
             # A new song resets its DAC track pan to stereo. MegaPCM keeps a
             # separate pan shadow for sample/SFX restoration; reset that too,
             # or a song without a pan command inherits the preceding song's
