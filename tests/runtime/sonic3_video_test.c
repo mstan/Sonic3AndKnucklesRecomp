@@ -1845,6 +1845,18 @@ static void test_restored_background_edges_and_reload(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     s3_video_set_background_override(restored_test_background);
+    /* Artwork alone still composes a 320px canvas, without activating a
+     * different object loader or changing cartridge range-test registers. */
+    CHECK(configure("off"));s_loader_active=0;
+    CHECK(enabled() && width(640,448,320,224)==320 && s3_video_main_cpu_divisor()==1);
+    uint8_t native_ram[65536];memcpy(native_ram,g_ram,sizeof native_ram);
+    g_cpu.D[0]=0x12345678;g_cpu.A[1]=0x111111;g_cpu.A[2]=0x222222;g_cpu.A[4]=0x444444;
+    CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    s3_video_hook(S3_RING_RANGE);s3_video_hook(S3_RING_STATUS);s3_video_hook(S3_SWING_PLATFORM_CULL);
+    CHECK(!s_loader_active && !memcmp(native_ram,g_ram,sizeof native_ram));
+    CHECK(g_cpu.D[0]==0x12345678 && g_cpu.A[1]==0x111111 && g_cpu.A[2]==0x222222 && g_cpu.A[4]==0x444444);
+    CHECK(configure("fit"));
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     const unsigned zones[]={0x100,0x400,0x401};
     const int widths[]={320,398,523,796},cameras[]={0,8,31,39,56,160};
     for(unsigned z=0;z<3;z++)for(unsigned w=0;w<4;w++)for(unsigned c=0;c<6;c++) {

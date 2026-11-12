@@ -286,7 +286,8 @@ static int configure(const char *mode)
     scene_mode_changed(was_enabled);
     return 1;
 }
-static int enabled(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)) ||
+static int expanded_world(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
+static int enabled(void) { return expanded_world() ||
     (s_background_override && s_background_override(g_ram,0,0,0,0,NULL,NULL,NULL)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
@@ -1241,7 +1242,9 @@ int s3_video_hook(uint32_t pc)
      * demo's collisions. Keep native loading/rings/culling while continuing
      * to capture and draw the same original-size actors across the canvas. */
     if(native_demo() && pc!=S3_CAPTURE && pc!=S3_PUBLISH)return 0;
-    if(pc==S3_LOAD_UPDATE && gameplay() && (enabled() || s_loader_active) && g_ram[0xFE10]<19) {
+    /* A background replacement needs host composition, while native-size
+     * gameplay keeps the cartridge's loader, ring ranges and culling. */
+    if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active) && g_ram[0xFE10]<19) {
         spawn_scene();return 1;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
@@ -1250,13 +1253,13 @@ int s3_video_hook(uint32_t pc)
     case S3_CAPTURE:capture_objects();return 0;
     case S3_PUBLISH:publish_sprites();return 0;
     case S3_RING_RANGE:
-        if(gameplay()) {g_cpu.A[1]=rings_base()+4;g_cpu.A[2]=rings_end();}
+        if(gameplay() && expanded_world()) {g_cpu.A[1]=rings_base()+4;g_cpu.A[2]=rings_end();}
         return 0;
     case S3_RING_STATUS:
-        if(gameplay())g_cpu.A[4]=0xFFFFE702u;
+        if(gameplay() && expanded_world())g_cpu.A[4]=0xFFFFE702u;
         return 0;
     default:
-        if(gameplay()) {
+        if(gameplay() && expanded_world()) {
             int x=(uint16_t)((uint16_t)g_cpu.D[0]+ram16(0xF7DA));
             int lo,hi;activation_bounds(ram16(0xEE78),s_requested_width,&lo,&hi);
             /* These platform families compare against their saved range,
