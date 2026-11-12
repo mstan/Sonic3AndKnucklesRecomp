@@ -372,6 +372,23 @@ static void test_original_order(void)
             ram[0xFFD1]=1;next=exits[i][1];s3_gameplay_zone_order(0x85E3A,ram,&next);CHECK(next==exits[i][1]);
             ram[0xFFD1]=0;ram[0xFFE9]=1;next=exits[i][1];s3_gameplay_zone_order(0x85E3A,ram,&next);CHECK(next==exits[i][1]);
         }
+        memset(ram,0,sizeof ram);ram[0xF600]=12;ram[0xFE10]=7;ram[0xFE11]=1;
+        ram[0xFAA8]=255;memcpy(before,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_departure(0x76270,ram,0xFFB0DE));
+        CHECK(!memcmp(before,ram,sizeof ram)); /* Capsule/results not finished. */
+        ram[0xFAA8]=0;memcpy(before,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_departure(0x76270,ram,0xFFB0DF));
+        CHECK(!memcmp(before,ram,sizeof ram));
+        uint32_t departure=s3_gameplay_zone_departure(0x76270,ram,0xFFB0DE);
+        CHECK(departure==(m==1?0x76456u:0));
+        if(m==1){
+            CHECK(ram[0xB0DE]==0 && ram[0xB0DF]==7 && ram[0xB0E0]==0x64 && ram[0xB0E1]==0x56);
+            CHECK(ram[0xB10C]==0 && ram[0xB10D]==59);
+            /* Only the already-completed controller changes; stage success,
+             * next-zone assignment and the capsule flags remain native. */
+            memcpy(before+0xB0DE,ram+0xB0DE,4);memcpy(before+0xB10C,ram+0xB10C,2);
+        }
+        CHECK(!memcmp(before,ram,sizeof ram));
         CHECK(p->commit(p->ctx,NULL));s3_gameplay_load("test-original-order/settings.ini",modes[m]);
         CHECK(s3_gameplay.original_zone_order==(m==1));
         CHECK(s3_gameplay_netplay_allowed()==(m!=1));
