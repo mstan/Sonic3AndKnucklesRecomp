@@ -100,16 +100,21 @@ Clone_NativeSpeedupTick:
             text = text.replace('\tbra.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', '\tbsr.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', 1)
             marker = '\trts\n; End of function SMPS_UpdateDriver'
             assert text.count(marker) == 1, 'Upstream SFX update changed'
-            text = text.replace(marker, '\tbra.w Clone_NativeSpeedupTick\n; End of function SMPS_UpdateDriver', 1)
+            text = text.replace(marker, '\tbsr.w Clone_NativeSpeedupTick\n\trts\n; End of function SMPS_UpdateDriver', 1)
             marker = '\tbra.w\tTempoWait\n; End of function UpdateMusic'
             assert text.count(marker) == 1, 'Upstream music update changed'
             text = text.replace(marker, '\tbsr.w TempoWait\n\tbra.w Clone_NativeSpeedupTick\n; End of function UpdateMusic', 1)
-            # Tail jumps above keep the original return-stack contract used
-            # by cfFadeInToPrevious when it exits a finished 1-UP sequence.
+            # Extra music reached after SFX needs the same call depth as the
+            # ordinary music pass. cfFadeInToPrevious deliberately unwinds
+            # that stack when its 1-UP sequence finishes. Music-to-music
+            # extra updates use tail jumps and retain that one call frame.
             # This point is after taking that sequence's song backup.
             marker = '.bgm_loadMusic:\n'
             assert text.count(marker) == 1, 'Upstream music loader changed'
-            text = text.replace(marker, marker + '\tbclr #f_speedup,SMPS_RAM.variables.bitfield2(a6)\n', 1)
+            # InitMusicPlayback clears the continuous SFX ID/channel count.
+            # Clear its global latch as well; leaving it set makes an active
+            # turbine decrement zero to 255 and keep looping in the next song.
+            text = text.replace(marker, marker + '\tbclr #f_speedup,SMPS_RAM.variables.bitfield2(a6)\n\tbclr #f_continuous_sfx,SMPS_RAM.bitfield1(a6)\n', 1)
             # S3's Z80 keeps a PSG channel silent when a tied note follows
             # an envelope's note-off. The S1-derived port clears that rest
             # early and audibly retriggers HCZ percussion. Header byte 5
