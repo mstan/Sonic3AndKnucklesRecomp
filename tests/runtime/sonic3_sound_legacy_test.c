@@ -43,5 +43,21 @@ int main(int argc,char **argv)
         printf("PASS donor %u theme %u source %06X bytes %d drums",donor,t,source.source,n);
         for(unsigned i=0;i<128;i++)if(drums[i])printf(" %02X",i+128);puts("");
     }
+    if(donor==S3_DONOR_WAI){
+        /* Audited prototype DAC playlist pitches; the three upper toms
+         * previously inherited unrelated, much higher retail pitches. */
+        static const unsigned expected[]={83,241,83,192,75,136,0,98,89,73,71,136,114,95};
+        S3LegacySource source;CHECK(s3_legacy_music_source(rom,(size_t)size,donor,18,&source));
+        uint8_t *sample=malloc(0x40000),*tom=malloc(0x40000);CHECK(sample&&tom);unsigned rate=0,tom_rate=0;
+        int tom_size=s3_legacy_sample(&source,0x86,tom,0x40000,&tom_rate);CHECK(tom_size>0&&tom_rate==136);
+        for(unsigned i=0;i<sizeof expected/sizeof *expected;i++){
+            int n=s3_legacy_sample(&source,0x81+i,sample,0x40000,&rate);
+            if(!expected[i]){CHECK(!n);continue;}
+            CHECK(n>0&&rate==expected[i]);
+            if(i>=11){CHECK(n==tom_size&&!memcmp(sample,tom,(size_t)n));}
+        }
+        CHECK(!s3_legacy_sample(&source,0x8F,sample,0x40000,&rate));free(sample);free(tom);
+        puts("PASS prototype percussion identity, native pitch variants and playlist bounds");
+    }
     free(rom);free(bank);return 0;
 }
