@@ -24,7 +24,7 @@ static char settings_file[1200],error[256];
 static char prototype_path[1024];
 static int prototype_selected,prototype_active,prototype_verified;
 static uint8_t theme_identity[32];
-static int invincibility_override;
+static int invincibility_override,super_override;
 int s3_sound_prototype_selected(void){return prototype_selected;}
 int s3_sound_prototype_active(void){return prototype_active;}
 int s3_sound_prototype_verified(void){return prototype_verified||s3_donor_verified(S3_DONOR_PROTO);}
@@ -84,7 +84,7 @@ int s3_sound_select(int on)
 void s3_sound_load(const char *path,const char *mode)
 {
     selected=active=bound=0;initialised=tempo=tempo_dirty=0;memset(pending,0,sizeof pending);*error=0;
-    memset(theme_identity,0,sizeof theme_identity);invincibility_override=0;
+    memset(theme_identity,0,sizeof theme_identity);invincibility_override=super_override=0;
     s3_cd_themes_reset();
     prototype_selected=prototype_active=prototype_verified=0;*prototype_path=0;
     standalone=!strcmp(mode,"sonic3");
@@ -147,11 +147,14 @@ void s3_sound_post_reset(void)
         if(!ok){fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);}
         fprintf(stderr,"[sound-driver] Verified November 3, 1993 prototype soundtrack; retail SFX retained\n");
     }
-    invincibility_override=s3_themes[S3_THEME_INVINCIBLE].enabled;
-    if(standalone && invincibility_override && !prototype_active)
+    invincibility_override=s3_music_active(S3_THEME_INVINCIBLE);
+    super_override=s3_music_active(S3_MUSIC_SUPER);
+    if(standalone && (invincibility_override||super_override) && !prototype_active)
         memcpy(bank+seq.music_index-0x400000+4*(0x32-1),bank+seq.music_index-0x400000+4*(0x2C-1),4);
-    unsigned next_sample=97;
-    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled){
+    unsigned next_sample=prototype_active?97:70;
+    const uint8_t *inputs[S3_ROM_DONOR_COUNT]={0};size_t sizes[S3_ROM_DONOR_COUNT]={0};
+    uint8_t *owned[S3_ROM_DONOR_COUNT]={0};S3SoundMusicCache cache={0};
+    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_active(t)){
         const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);
         int donor=choice->donor;
         if(donor>=S3_DONOR_CD_US){
@@ -160,31 +163,39 @@ void s3_sound_post_reset(void)
             }
             fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],choice->label);continue;
         }
-        if(!strcmp(choice->id,"s1-s2"))donor=s3_donor_verified(S3_DONOR_S1)?S3_DONOR_S1:S3_DONOR_S2;
-        const uint8_t *input=g_rom;size_t input_size=rom_size;uint8_t *owned=NULL;
-        if(donor<0)donor=standalone?S3_DONOR_S3:S3_DONOR_SK;
-        if(s3_theme_donor(t)>=0){owned=s3_donor_read((unsigned)donor,&input_size);input=owned;}
-        else if(donor==S3_DONOR_S3 || donor==S3_DONOR_SK){
-            input_size=0x200000;
+        donor=s3_music_donor(t);
+        if(!inputs[donor]){
+            inputs[donor]=g_rom;sizes[donor]=rom_size;
+            if(s3_theme_donor(t)>=0){owned[donor]=s3_donor_read((unsigned)donor,&sizes[donor]);inputs[donor]=owned[donor];}
+            else if(donor==S3_DONOR_S3 || donor==S3_DONOR_SK){
+                sizes[donor]=0x200000;
 #ifdef S3_SOUND_COMBINED
-            if(donor==S3_DONOR_S3){
-                input=g_rom+0x200000;
-                /* The verified Steam cartridge changes this region byte.
-                 * Normalize only the private donor view, never guest ROM. */
-                if(input[0x1F0]=='J'){
-                    owned=malloc(input_size);
-                    if(owned){memcpy(owned,input,input_size);owned[0x1F0]='U';}
-                    input=owned;
+                if(donor==S3_DONOR_S3){
+                    inputs[donor]=g_rom+0x200000;
+                    /* Normalize only the verified Steam cartridge's private
+                     * donor view, never the bytes read by the guest. */
+                    if(inputs[donor][0x1F0]=='J'){
+                        owned[donor]=malloc(sizes[donor]);
+                        if(owned[donor]){memcpy(owned[donor],inputs[donor],sizes[donor]);owned[donor][0x1F0]='U';}
+                        inputs[donor]=owned[donor];
+                    }
                 }
-            }
 #endif
+            }
         }
-        static const unsigned targets[]={0x2A,0x27,0x28,0x29,0x2C};
-        int ok=input && s3_sound_build_event(input,input_size,(unsigned)donor,t,targets[t],&seq,&pcm,s3_clone_program,bank,0x400000,&stats.bytes,&next_sample,error,sizeof error);
-        free(owned);
-        if(!ok){fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);free(bank);exit(1);}
+        unsigned target=s3_music_target(t);
+        int ok=inputs[donor] && s3_sound_build_track(inputs[donor],sizes[donor],(unsigned)donor,s3_music_source(t,(unsigned)donor),target,&seq,&pcm,s3_clone_program,bank,0x400000,&stats.bytes,&next_sample,&cache,error,sizeof error);
+        if(!ok){
+            fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);
+            s3_sound_music_cache_free(&cache);for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++)free(owned[d]);free(bank);exit(1);
+        }
+        if(t==S3_MUSIC_MINIBOSS){
+            static const unsigned aliases[]={0x18,0x2E};
+            for(unsigned i=0;i<2;i++)memcpy(bank+seq.music_index-0x400000+4*(aliases[i]-1),bank+seq.music_index-0x400000+4*(target-1),4);
+        }
         fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],choice->label);
     }
+    s3_sound_music_cache_free(&cache);for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++)free(owned[d]);
     if(s3_themes_enabled()){
         uint8_t hashes[64];recompui_sha256_compute(bank,stats.bytes,hashes);s3_cd_theme_identity(hashes+32);recompui_sha256_compute(hashes,sizeof hashes,theme_identity);
     }
@@ -211,7 +222,7 @@ static void queue(unsigned native,unsigned slot)
 {
     unsigned id=0;
     if(native>=1 && native<=0x32)id=native;
-    else if(native==0xDC && !standalone)id=0x33;
+    else if(native==0xDC && !standalone)id=0x33; /* S&K credits */
     else if(native>=0x33 && native<=0xDB)id=native+0xD;
     else if(native==0xE1 || native==0xE5)id=0xFB;
     else if(native==0xE4)id=0xFA;
@@ -229,7 +240,7 @@ static void queue(unsigned native,unsigned slot)
     if(!id)return;
     /* Retail Sonic 3 shares Invincibility with Super. The donor has a
      * dedicated Super theme, also used by the S&K hosts' native $32 queue. */
-    if((prototype_active || invincibility_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
+    if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
     s3_cd_theme_request(id<=0x33 && id!=native?id:native);
     if(id<=0x33 && !m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))return;
     g_cpu.D[0]=id;recomp_call_addr(slot?S3_CLONE_QUEUE_SFX:S3_CLONE_QUEUE_MUSIC);

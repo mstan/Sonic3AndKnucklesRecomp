@@ -11,6 +11,7 @@ typedef struct S3LegacySource {
     unsigned zsize, env_count, donor, little, compressed, fast_tempo, force_pal;
 } S3LegacySource;
 int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,S3LegacySource *out);
+int s3_legacy_music_source(const uint8_t *rom,size_t size,unsigned donor,unsigned song,S3LegacySource *out);
 int s3_legacy_song(const S3LegacySource *source,uint8_t *out,size_t capacity,
                    unsigned psg_base,const uint8_t dac_map[128],
                    uint8_t drums[128],char *error,size_t error_size);

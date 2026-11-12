@@ -41,6 +41,9 @@ int main(int argc,char **argv)
     s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(!s3_sound_selected());CHECK(s3_sound_netplay_allowed());
     size_t n=s3_sound_rb_save(NULL,0);uint8_t *disabled=malloc(n),*saved=malloc(n),*after=malloc(n);CHECK(disabled&&saved&&after);
     CHECK(s3_sound_rb_save(disabled,n)==n);CHECK(s3_sound_select(1));s3_sound_post_reset();CHECK(mapped && s3_sound_active() && !s3_sound_netplay_allowed());
+    uint32_t base_boss=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1));
+    uint32_t base_credits=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1));
+    uint32_t base_ending=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1));
     CHECK(!s3_sound_rb_load(disabled,n));
     int s3=!strcmp(argv[2],"sonic3");unsigned init=s3?0x1562:0x12CE,music=s3?0x15E2:0x1358,sfx=s3?0x160A:0x1380;
     memset(&g_cpu,0,sizeof g_cpu);g_cpu.A[7]=0xFFFE00;g_cpu.SR=0x271F;M68KState expected=g_cpu;expected.SR=0x2714;
@@ -78,6 +81,12 @@ int main(int argc,char **argv)
         CHECK(!s3_sound_prototype_set_path("missing-prototype.bin"));
         CHECK(!strcmp(s3_sound_prototype_path(),argv[3])); /* Keep valid selection. */
         s3_sound_post_reset();CHECK(s3_sound_prototype_active());
+        if(!s3){
+            uint32_t a=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x26-1))&0xFFFFFF)-0x400000;
+            uint32_t b=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1))&0xFFFFFF)-0x400000;
+            CHECK(a+32<=g_rom_ext_size&&b+32<=g_rom_ext_size&&!memcmp(g_rom_ext+a,g_rom_ext+b,32));
+            CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
+        }
         CHECK(!s3_sound_rb_load(saved,n)); /* Different soundtrack identity. */
         CHECK(s3_sound_rb_save(after,n)==n);after[6]^=1;CHECK(!s3_sound_rb_load(after,n));
         CHECK(s3_sound_prototype_select(0));CHECK(s3_sound_prototype_active());
@@ -105,6 +114,35 @@ int main(int argc,char **argv)
     }
     g_rom[0x2001F0]='U';free(canonical);
 #endif
+    if(!s3||argc==4){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);
+        if(s3)CHECK(s3_sound_prototype_set_path(argv[3]));
+        CHECK(s3_music_pick(S3_MUSIC_MINIBOSS,"sk-proto"));s3_sound_post_reset();
+        uint32_t mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x18-1));CHECK(mini);
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x2E - 1))==mini);
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1))==base_credits);
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1))==base_boss);
+        CHECK(!s3_sound_prototype_active());
+        CHECK(s3_sound_hook(init));
+        if(!s3){g_cpu.D[0]=0xDC;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x33);}
+    }
+    if(s3&&argc==4){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(s3_sound_prototype_set_path(argv[3]));
+        CHECK(s3_music_pick(S3_MUSIC_SUPER,"s3-proto"));s3_sound_post_reset();CHECK(!s3_sound_prototype_active());
+        CHECK(s3_sound_hook(init));
+        g_ram[0xFE19]=1;g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x32);
+        g_ram[0xFE19]=0;g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x2C);
+    }
+    if(argc==4){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(s3_sound_prototype_set_path(argv[3]));
+        CHECK(s3_music_pick(S3_MUSIC_CREDITS,"s3-proto"));s3_sound_post_reset();CHECK(!s3_sound_prototype_active());
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1))==base_boss);
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
+        CHECK(s3_sound_hook(init));g_cpu.D[0]=s3?0x26:0xDC;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==(s3?0x26u:0x33u));
+    }
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;
 }
