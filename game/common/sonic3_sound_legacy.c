@@ -173,7 +173,10 @@ int s3_legacy_song(const S3LegacySource *s,uint8_t *out,size_t capacity,unsigned
         if(n->target){int rel=c->nodes[find(c,n->target,n->kind)].output-(n->output+n->encoded-(op==0xF8?0:1));if(rel<-32768||rel>32767)goto fail;ww(out+dest+n->encoded-2,(unsigned)rel);}
     }
     unsigned voice=s->little?ptr(c,input,1):input+(int16_t)rw(c,input);ww(out,(unsigned)size);
-    static const unsigned reorder[]={0,2,1,3};
+    /* Sonic 1 stores operators 4/3/2/1; Sonic 2 already uses Clone's
+     * 4/2/3/1 order. Only the 68K donor needs its middle operators swapped. */
+    static const unsigned order_s1[]={0,2,1,3},order_s2[]={0,1,2,3};
+    const unsigned *reorder=s->donor==S3_DONOR_S1?order_s1:order_s2;
     for(int v=0;v<c->voices;v++){
         unsigned alg=rb(c,voice)&7;out[size]=(uint8_t)rb(c,voice);
         for(unsigned k=0;k<4;k++){
