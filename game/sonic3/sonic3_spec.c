@@ -292,6 +292,7 @@ static int gameplay_instruction(uint32_t pc)
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);
+        s3_gameplay_level_select(pc,g_ram);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],1))g_cpu.SR|=4u;
         return 0;

@@ -77,7 +77,7 @@ int s3_sound_select(int on)
     if(!on && prototype_selected){snprintf(error,sizeof error,"Disable the prototype soundtrack before disabling Clone Driver.");return 0;}
     if(on && !s3_sound_available()){snprintf(error,sizeof error,"Clone Driver requires the standard Z80 backend in this build.");return 0;}
 #ifdef S3_SOUND_COMBINED
-    if((on || active) && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns before enabling Clone Driver; restart after changing drivers.");return 0;}
+    if((on || active) && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns and additional characters before enabling Clone Driver; restart after changing drivers.");return 0;}
 #endif
     selected=on!=0;*error=0;return 1;
 }
@@ -241,7 +241,10 @@ static void queue(unsigned native,unsigned slot)
     /* Retail Sonic 3 shares Invincibility with Super. The donor has a
      * dedicated Super theme, also used by the S&K hosts' native $32 queue. */
     if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
-    s3_cd_theme_request(id<=0x33 && id!=native?id:native);
+    /* Native SFX start at $33, which is also Clone's relocated S&K credits
+     * entry. Only native music/control requests may stop a CD recording. */
+    if(native<=0x32 || native>=0xDC)
+        s3_cd_theme_request(id<=0x33 && id!=native?id:native);
     if(id<=0x33 && !m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))return;
     g_cpu.D[0]=id;recomp_call_addr(slot?S3_CLONE_QUEUE_SFX:S3_CLONE_QUEUE_MUSIC);
 }

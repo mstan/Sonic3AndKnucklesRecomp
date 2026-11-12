@@ -286,7 +286,8 @@ static int configure(const char *mode)
     scene_mode_changed(was_enabled);
     return 1;
 }
-static int enabled(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)) ||
+static int expanded_world(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
+static int enabled(void) { return expanded_world() ||
     (s_background_override && s_background_override(g_ram,0,0,0,0,NULL,NULL,NULL)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
@@ -1241,7 +1242,9 @@ int s3_video_hook(uint32_t pc)
      * demo's collisions. Keep native loading/rings/culling while continuing
      * to capture and draw the same original-size actors across the canvas. */
     if(native_demo() && pc!=S3_CAPTURE && pc!=S3_PUBLISH)return 0;
-    if(pc==S3_LOAD_UPDATE && gameplay() && (enabled() || s_loader_active) && g_ram[0xFE10]<19) {
+    /* A background replacement needs host composition, while native-size
+     * gameplay keeps the cartridge's loader, ring ranges and culling. */
+    if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active) && g_ram[0xFE10]<19) {
         spawn_scene();return 1;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
@@ -1250,13 +1253,13 @@ int s3_video_hook(uint32_t pc)
     case S3_CAPTURE:capture_objects();return 0;
     case S3_PUBLISH:publish_sprites();return 0;
     case S3_RING_RANGE:
-        if(gameplay()) {g_cpu.A[1]=rings_base()+4;g_cpu.A[2]=rings_end();}
+        if(gameplay() && expanded_world()) {g_cpu.A[1]=rings_base()+4;g_cpu.A[2]=rings_end();}
         return 0;
     case S3_RING_STATUS:
-        if(gameplay())g_cpu.A[4]=0xFFFFE702u;
+        if(gameplay() && expanded_world())g_cpu.A[4]=0xFFFFE702u;
         return 0;
     default:
-        if(gameplay()) {
+        if(gameplay() && expanded_world()) {
             int x=(uint16_t)((uint16_t)g_cpu.D[0]+ram16(0xF7DA));
             int lo,hi;activation_bounds(ram16(0xEE78),s_requested_width,&lo,&hi);
             /* These platform families compare against their saved range,
@@ -2082,6 +2085,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* HCZ1's parallax also belongs to the screen-centered B canvas. Its
      * left-clamped foreground must not add another pan to the water bands. */
     int hcz_background=level && s_frame_zone==1 && !s_frame_act;
+    int lbz_background=level && s_frame_zone==6 && !s_frame_act;
     /* Distant MGZ/CNZ parallax keeps the same centered screen space as
      * those scenes. MGZ2's collidable moving-room banks instead belong to
      * the world, so retain their foreground-relative projection. */
@@ -2093,7 +2097,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
-        intro_background || fbz_background || soz_background || hcz_background ||
+        intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
         mgz_background || cnz_background || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
@@ -2220,6 +2224,19 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             icz_margin_world=!replaced;
         }
     }
+    /* HCZ2's first wipe retires a spatial moving wall. Unreplaced rows
+     * only have the native columns in VRAM; use their full wall layout in
+     * the margins until the complete incoming 512px row is installed. */
+    int hcz2_margin_world=0;
+    if(hcz2_canvas && s_frame_bg_event==8) {
+        unsigned remaining=((unsigned)s_world_frame[0xEECA]<<8)|s_world_frame[0xEECB];
+        if(remaining<=15) {
+            unsigned mask=(unsigned)(plane_tiles((v->reg[16]>>4)&3)*8-1);
+            unsigned pending=((unsigned)s_world_frame[0xEEC8]<<8)|s_world_frame[0xEEC9];
+            unsigned first=(pending+16)&mask;
+            hcz2_margin_world=((((unsigned)by&~15u)-first)&mask)>=(15-remaining)*16;
+        }
+    }
     /* CNZ1BGE_Boss streams only the $200..$2FF background rows with
      * Draw_TileColumn(d1=$200,d6=$10). Their 256px canvas scrolls while
      * the room descends; the neighboring layout rows are other scenes. */
@@ -2270,7 +2287,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         bg_width=512;
     /* HCZ2's crushing wall is a moving world, not a repeating panorama.
      * Negative coordinates to its left must remain blank. */
-    if(bg_world && ((s_frame_zone==1 && s_frame_act==1 && s_frame_bg_event<=4) ||
+    if(bg_world && ((s_frame_zone==1 && s_frame_act==1 && (s_frame_bg_event<=4 || hcz2_margin_world)) ||
        s_frame_zone==22))
         bg_width=0;
     /* LRZ3's distant lava cavern occupies the first 512px. Its upper
@@ -2345,7 +2362,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(bx<0 || bx>=1024)bp=0;
         }
         const uint32_t *apalette=palette,*bpalette=palette;
-        if(bg_canvas && !(icz_margin_world && (nx<0 || nx>=nw))) {
+        if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);

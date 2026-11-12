@@ -94,8 +94,9 @@ int s3_legacy_music_source(const uint8_t *rom,size_t size,unsigned donor,unsigne
 }
 int s3_legacy_source(const uint8_t *rom,size_t size,unsigned donor,unsigned theme,S3LegacySource *s)
 {
-    static const unsigned ids[2][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22}};
-    return theme<S3_THEME_COUNT&&s3_legacy_music_source(rom,size,donor,ids[donor!=S3_DONOR_S1][theme],s);
+    static const unsigned ids[3][S3_THEME_COUNT]={{7,14,15,13,6},{23,26,27,25,22},{23,26,27,25,20}};
+    unsigned playlist=donor==S3_DONOR_S1?0:donor==S3_DONOR_WAI?2:1;
+    return theme<S3_THEME_COUNT&&s3_legacy_music_source(rom,size,donor,ids[playlist][theme],s);
 }
 typedef struct Node {uint32_t pc,target;uint16_t output;uint8_t kind,length,encoded;} Node;
 typedef struct Convert {
@@ -173,7 +174,10 @@ int s3_legacy_song(const S3LegacySource *s,uint8_t *out,size_t capacity,unsigned
         if(n->target){int rel=c->nodes[find(c,n->target,n->kind)].output-(n->output+n->encoded-(op==0xF8?0:1));if(rel<-32768||rel>32767)goto fail;ww(out+dest+n->encoded-2,(unsigned)rel);}
     }
     unsigned voice=s->little?ptr(c,input,1):input+(int16_t)rw(c,input);ww(out,(unsigned)size);
-    static const unsigned reorder[]={0,2,1,3};
+    /* Sonic 1 stores operators 4/3/2/1; Sonic 2 already uses Clone's
+     * 4/2/3/1 order. Only the 68K donor needs its middle operators swapped. */
+    static const unsigned order_s1[]={0,2,1,3},order_s2[]={0,1,2,3};
+    const unsigned *reorder=s->donor==S3_DONOR_S1?order_s1:order_s2;
     for(int v=0;v<c->voices;v++){
         unsigned alg=rb(c,voice)&7;out[size]=(uint8_t)rb(c,voice);
         for(unsigned k=0;k<4;k++){
@@ -202,9 +206,10 @@ int s3_legacy_envelope(const S3LegacySource *s,unsigned index,uint8_t out[256])
 }
 int s3_legacy_sample(const S3LegacySource *s,unsigned note,uint8_t *out,size_t capacity,unsigned *rate)
 {
-    if(!s||!out||!rate||note<0x81||note>0x91)return 0;
+    if(!s||!out||!rate||note<0x81||note>0x91||
+       (s->donor==S3_DONOR_WAI&&note>0x8E))return 0;
     static const unsigned hz[]={8201,23784,17127,15232,7328,13714,7426,9635,8720,7138,6957,22799,18262,15232,15232,13064,9806};
-    unsigned start,length,delta;const uint8_t *data;
+    unsigned start,length,delta,native_hz=hz[note-0x81];const uint8_t *data;
     if(s->donor==S3_DONOR_S1){
         unsigned sample=note==0x81?0:note==0x82?1:note>=0x88&&note<=0x8B?2:3;if(sample>=3)return 0;
         unsigned meta=0xD6+sample*8;start=le(s->z80+meta);length=le(s->z80+meta+2);delta=0x22;data=s->z80;
@@ -212,6 +217,14 @@ int s3_legacy_sample(const S3LegacySource *s,unsigned note,uint8_t *out,size_t c
     }else{
         static const unsigned ptrs[]={0,0x1233,0xF93,0xF75},rates[]={0,0x124F,0xFAF,0xF8D},deltas[]={0,0x1B3,0x197,0x179};
         unsigned entry=rates[s->donor]+(note-0x81)*2,sample=s->z80[entry];if(sample<0x81||sample>0x87)return 0;
+        if(s->donor==S3_DONOR_WAI){
+            /* This prototype's tom pitches and clap/scratch differ from
+             * retail. Its DPCM loop emits two samples in 303 base cycles,
+             * plus 13 cycles per additional DJNZ iteration per sample. */
+            unsigned wait=s->z80[entry+1];if(!wait)wait=256;
+            unsigned cycles=303+26*(wait-1);
+            native_hz=(7159090u+cycles/2)/cycles;
+        }
         unsigned meta=ptrs[s->donor]+(sample-0x81)*4;
         start=0xE8000+(le(s->z80+meta)&0x7FFF);length=le(s->z80+meta+2);delta=deltas[s->donor];data=s->rom;
         if(start>s->size||length>s->size-start)return 0;
@@ -222,5 +235,5 @@ int s3_legacy_sample(const S3LegacySource *s,unsigned note,uint8_t *out,size_t c
         unsigned v=data[start+i];accum=(accum+s->z80[delta+(v>>4)])&255;out[i*2]=(uint8_t)accum;
         accum=(accum+s->z80[delta+(v&15)])&255;out[i*2+1]=(uint8_t)accum;
     }
-    *rate=(hz[note-0x81]*256u+12550u)/25100u;return (int)(2*length);
+    *rate=(native_hz*256u+12550u)/25100u;return (int)(2*length);
 }

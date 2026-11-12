@@ -81,6 +81,15 @@ void s3_gameplay_palette_reset(uint32_t pc,uint8_t ram[65536])
      * Clear the low byte too; the original instruction retains its own CCR. */
     if(ram && palette_reset_site(pc))ram[0xF65D]=0;
 }
+void s3_gameplay_level_select(uint32_t pc,uint8_t ram[65536])
+{
+    if(!standalone_s3 || pc!=0x6AD0u || !ram || ram[0xF600]!=0x28)return;
+    /* Retail S3's level-select start updates the chosen zone but leaves an
+     * earlier checkpoint active. Its respawn then mixes the new zone with
+     * the previous position and apparent-zone title. A menu start is fresh;
+     * ordinary death/retry and SRAM progress retain their native behavior. */
+    ram[0xFE2A]=ram[0xFE2B]=ram[0xFE48]=0;
+}
 void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0)
 {
     if(!combined_mode || !s3_gameplay.original_zone_order || !ram || !d0 ||
@@ -102,6 +111,20 @@ void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0)
         else return;
         *d0=(*d0&0xFFFFFF00u)|next;
     }
+}
+uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t actor)
+{
+    actor&=0xFFFFFFu;
+    if(!combined_mode || !s3_gameplay.original_zone_order || pc!=0x76270 || !ram ||
+       word(ram,0xFE10)!=0x701 || word(ram,0xFFD0) || word(ram,0xFFE8) || ram[0xFAA8] ||
+       actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
+    /* The native controller reaches this point only after the capsule and
+     * results release it. Sandopolis follows on foot: omit the airship
+     * boarding sequence and retain the original timed fade/next-level path. */
+    unsigned o=actor&65535u;
+    ram[o]=0;ram[o+1]=7;ram[o+2]=0x64;ram[o+3]=0x56;
+    ram[o+0x2E]=0;ram[o+0x2F]=59;
+    return 0x76456;
 }
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
@@ -135,8 +158,8 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 }
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
-        (combined_mode && (pc==0x85E3Au || pc==0xC452u)) ||
-        allocation_site(pc) || title_card_site(pc) || (standalone_s3 && pc==0x19240u);}
+        (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u)) ||
+        allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
 {
@@ -314,7 +337,7 @@ static int enable(void *c,const char *p,const char *f,int on)
     if(!own(p))return base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on);
     int i=index_of(f);if(i<0)return 0;
 #ifdef S3_SOUND_COMBINED
-    if(i==9 && on && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+    if(i==9 && on && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns and additional characters before enabling the Mushroom Valley name.");return 0;}
 #endif
     *value(i)=on!=0;return 1;
 }
@@ -328,7 +351,7 @@ static int commit(void *c,const char *image)
 {
     (void)c;error[0]=0;
 #ifdef S3_SOUND_COMBINED
-    if(s3_gameplay.early_zone_names && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+    if(s3_gameplay.early_zone_names && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns and additional characters before enabling the Mushroom Valley name.");return 0;}
 #endif
     if(base&&base->commit&&!base->commit(base->ctx,image))return 0;
     return s3_gameplay_save();

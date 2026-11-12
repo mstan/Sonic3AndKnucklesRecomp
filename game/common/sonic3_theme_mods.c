@@ -99,8 +99,8 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
     int t,d=requirement(group_id(f),i,&t);if(d<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,s3_donor_ids[d]);snprintf(o->label,sizeof o->label,"%s %s",s3_donor_names[d],d>=S3_DONOR_CD_US?"disc":"ROM");
     const S3ThemeChoice *choice=s3_theme_choice((unsigned)t,(unsigned)s3_themes[t].choice);
-    COPY(o->description,!strcmp(choice->id,"s1-s2")?"Sonic 1 (JUE rev 0) or Sonic 2 (World rev 1). ZIP or raw ROM; one import covers every compatible choice.":!strcmp(choice->id,"sk-proto")?"Provide Sonic & Knuckles or the November 3, 1993 Sonic 3 prototype. Either supplies this mini-boss theme.":"Provide this unmodified cartridge as a ZIP or raw ROM. Import once; every matching track and game shares it.");
-    COPY(o->file_patterns,d>=S3_DONOR_CD_US?"*.cue,*.bin,*.sgcd,*.zip":"*.zip,*.bin,*.md,*.gen");
+    COPY(o->description,!strcmp(choice->id,"s1-s2")?"Sonic 1 (JUE rev 0) or Sonic 2 (World rev 1). ZIP or raw ROM; one import covers every compatible choice.":"Provide this unmodified cartridge as a ZIP or raw ROM. Import once; every matching track and game shares it.");
+    COPY(o->file_patterns,d>=S3_DONOR_CD_US?"*.cue,*.bin,*.sgcd,*.zip":"*.zip,*.bin,*.md,*.gen,*.68k,*");
     COPY(o->file_description,d>=S3_DONOR_CD_US?"Sonic CD disc or ZIP":"Genesis ROM or ZIP");
     if(d>=S3_DONOR_CD_US)COPY(o->description,"Choose your US disc as a CUE/BIN set, SGCD or ZIP with audio tracks. One import covers Game Over, Act Clear and Invincibility.");
     COPY(o->path,s3_donor_verified((unsigned)d)?s3_donor_path((unsigned)d):"");

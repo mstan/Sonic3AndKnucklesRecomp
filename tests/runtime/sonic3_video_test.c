@@ -839,10 +839,13 @@ static void test_competition_race(void)
     CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
     /* Time Attack chooses its menu before the outgoing race fades. Keep
      * both view scrolls and sprite ownership until the native loader clears. */
-    g_ram[0xF600]=0xC0;memcpy(ram,g_ram,sizeof ram);
-    scanline(&v,0,native,320,out,796);
-    CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
-    CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+    const unsigned exits[]={0xC0,0x28,4};
+    for(unsigned i=0;i<sizeof exits/sizeof *exits;i++){
+        g_ram[0xF600]=(uint8_t)exits[i];memcpy(ram,g_ram,sizeof ram);
+        scanline(&v,0,native,320,out,796);
+        CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
+        CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+    }
     word(g_ram,S3_COMPETITION,0);scanline(&v,0,native,320,out,796);
     CHECK(!competition_world_ready());
     CHECK(configure("off"));
@@ -1420,6 +1423,17 @@ static void test_aiz_intro_canvas_edge(void)
             CHECK(out[x]==(source<512?0xFFFF0000u:0xFF00FF00u));
         }
     }
+    /* LBZ's independent B camera must retain that screen-centered origin
+     * at both foreground boundaries, including its lower water bands. */
+    g_ram[0xFE10]=6;g_ram[0xF711]=1;
+    word(g_ram,0xEE84,0);word(g_ram,0xEE90,0);v.vsram[0]=v.vsram[1]=0;
+    const int edges[]={0,176,336,11884,12028};
+    for(unsigned c=0;c<sizeof edges/sizeof *edges;c++) {
+        int camera=edges[c];word(g_ram,0xEE80,camera);
+        word(v.vram,0xF000,(unsigned)-camera);word(v.vram,0xF002,0);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;x++)CHECK(out[x]==(x>=238 && x<750?0xFFFF0000u:0xFF00FF00u));
+    }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_aiz_intro_live_palette(void)
@@ -1845,6 +1859,18 @@ static void test_restored_background_edges_and_reload(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     s3_video_set_background_override(restored_test_background);
+    /* Artwork alone still composes a 320px canvas, without activating a
+     * different object loader or changing cartridge range-test registers. */
+    CHECK(configure("off"));s_loader_active=0;
+    CHECK(enabled() && width(640,448,320,224)==320 && s3_video_main_cpu_divisor()==1);
+    uint8_t native_ram[65536];memcpy(native_ram,g_ram,sizeof native_ram);
+    g_cpu.D[0]=0x12345678;g_cpu.A[1]=0x111111;g_cpu.A[2]=0x222222;g_cpu.A[4]=0x444444;
+    CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    s3_video_hook(S3_RING_RANGE);s3_video_hook(S3_RING_STATUS);s3_video_hook(S3_SWING_PLATFORM_CULL);
+    CHECK(!s_loader_active && !memcmp(native_ram,g_ram,sizeof native_ram));
+    CHECK(g_cpu.D[0]==0x12345678 && g_cpu.A[1]==0x111111 && g_cpu.A[2]==0x222222 && g_cpu.A[4]==0x444444);
+    CHECK(configure("fit"));
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     const unsigned zones[]={0x100,0x400,0x401};
     const int widths[]={320,398,523,796},cameras[]={0,8,31,39,56,160};
     for(unsigned z=0;z<3;z++)for(unsigned w=0;w<4;w++)for(unsigned c=0;c<6;c++) {
@@ -1923,10 +1949,11 @@ static void test_icz_partial_background_rows(void)
         {8,0x20,0x1F0,0,0},{8,0xF0,0x1F0,0,1},
         {12,0x20,0x1F0,0,1},{12,0xF0,0x1F0,0,1}
     };
-    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+    for(unsigned zone=0;zone<2;++zone)for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+        if(zone && cases[n].event!=8)continue;
         CHECK(configure("off"));CHECK(configure("32:9"));
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-        g_ram[0xF600]=12;word(g_ram,0xFE10,0x500);write32(0xB000,0x1234);
+        g_ram[0xF600]=12;word(g_ram,0xFE10,zone?0x101:0x500);write32(0xB000,0x1234);
         word(g_ram,0x8000,64);word(g_ram,0x8002,20);word(g_ram,0x8008,0x8100);
         word(g_ram,0xEEC2,cases[n].event);word(g_ram,0xEE80,0x1500);
         word(g_ram,0xEEC8,cases[n].pending);word(g_ram,0xEECA,cases[n].remaining);
@@ -3256,7 +3283,9 @@ int main(int argc,char **argv)
     word(g_ram,0xEE90,0xD0);v.vsram[1]=0xD0;
     scanline(&v,0,native,320,out,796);
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
-    CHECK(s_bg_checks>0 && s_bg_errors==0);
+    /* At the clamped foreground edge, native same-column B samples are
+     * not the centered panorama's oracle. Every output pixel is checked. */
+    CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
     word(g_ram,0xEE90,0);v.vsram[1]=0;
     /* HPZ can update its fine/coarse position before the next tile-column
      * streamer runs. Compare only the last Draw_BG interval: A802=$10,

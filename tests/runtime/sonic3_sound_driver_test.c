@@ -1,6 +1,7 @@
 #include "sonic3_sound_driver.h"
 #include "sonic3_sound_themes.h"
 #include "sonic3_state_io.h"
+#include "sonic3_cd_themes.h"
 #include "genesis_runtime.h"
 #include "sonic3_clone_program.h"
 #include <stdio.h>
@@ -13,6 +14,7 @@ uint32_t g_rom_ext_size;
 int s3_stage_pack_enabled;
 static uint8_t *mapped;
 static uint32_t tail,last_queue,last_id,stop_calls;
+static void (*extra_audio)(int16_t *,size_t,double);
 static int same_cpu(const M68KState *a,const M68KState *b)
 {
     /* Struct assignment need not preserve the padding after SR. Check the
@@ -34,7 +36,7 @@ void recomp_call_addr(uint32_t pc)
 void recomp_tail_call(uint32_t pc){tail=pc;}
 int genesis_atomic_file_store(const char *p,const void *d,size_t n){(void)p;(void)d;(void)n;return 1;}
 void cmd_send_response(const char *s){(void)s;}
-void audio_set_extra_source(void (*source)(int16_t *,size_t,double)){(void)source;}
+void audio_set_extra_source(void (*source)(int16_t *,size_t,double)){extra_audio=source;}
 int main(int argc,char **argv)
 {
     CHECK(argc==3 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);
@@ -67,7 +69,7 @@ int main(int argc,char **argv)
     CHECK(stop_calls==1 && last_id==0xFC && same_cpu(&g_cpu,&before));
     unsigned pause=s3_clone_pause_sites[0];uint8_t value=g_rom[pause+3];CHECK(s3_sound_hook(pause));CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==value && tail==pause+8);
 #ifdef S3_SOUND_COMBINED
-    s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(!s3_sound_commit());
+    s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(strstr(s3_sound_error(),"additional characters"));CHECK(!s3_sound_commit());
 #endif
     if(argc==4){
         free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
@@ -142,6 +144,25 @@ int main(int argc,char **argv)
         CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1))==base_boss);
         CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
         CHECK(s3_sound_hook(init));g_cpu.D[0]=s3?0x26:0xDC;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==(s3?0x26u:0x33u));
+    }
+    if(s3_donor_verified(S3_DONOR_CD_US)){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);
+        CHECK(s3_music_pick(S3_THEME_INVINCIBLE,"cd-us"));s3_sound_post_reset();CHECK(extra_audio);
+        CHECK(s3_sound_hook(init));g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();
+        unsigned active,theme;uint64_t position;int16_t pcm[32]={0};
+        s3_cd_theme_debug(&active,&theme,&position);CHECK(active&&theme==S3_THEME_INVINCIBLE);
+        /* Ring is native $33, while Clone uses $33 for S&K credits. Normal
+         * ring and other SFX must keep the recording and its clock running. */
+        static const unsigned effects[]={0x33,0x34,0x62,0xDB};
+        for(unsigned i=0;i<sizeof effects/sizeof *effects;i++){
+            uint64_t before_position=position;g_cpu.D[0]=effects[i];CHECK(s3_sound_hook(sfx));s3_sound_vblank();
+            memset(pcm,0,sizeof pcm);extra_audio(pcm,16,44100);s3_cd_theme_debug(&active,&theme,&position);
+            CHECK(active&&theme==S3_THEME_INVINCIBLE&&position>before_position);
+        }
+        g_cpu.D[0]=s3?0x26:0xDC;CHECK(s3_sound_hook(music));s3_sound_vblank();
+        s3_cd_theme_debug(&active,&theme,&position);CHECK(!active);s3_cd_themes_reset();
+        puts("PASS CD invincibility survives native ring/other SFX and stops on actual credits");
     }
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;

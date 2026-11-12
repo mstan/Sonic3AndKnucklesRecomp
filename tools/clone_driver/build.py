@@ -49,7 +49,105 @@ def assemble(source, assembler, p2bin, out):
                 relocation_count += n
             rows.append(line)
         text = '\n'.join(rows) + '\n'
+        if name == 'Sound/Engine/RAM.asm':
+            # Keep the S3 extra-update clock in the normal song backup, so a
+            # 1-UP restores its predecessor's speed and countdown together.
+            marker = 'SMPS_RAM_Variables ENDSTRUCT'
+            assert text.count(marker) == 1, 'Upstream song variables changed'
+            text = text.replace(marker, '\tv_native_speedup: ds.b 1\n\tv_native_speedup_timeout: ds.b 1\n\n' + marker, 1)
         if name == 'Sound/Engine/Sonic 2 Clone Driver v2.asm':
+            # S3 accelerates music with extra music updates, preserving its
+            # ordinary tempo accumulator. An alternate tempo of 1 is much
+            # too fast for slower songs. The original countdown runs after
+            # both music and SFX, including each extra music update; SFX
+            # themselves still advance only once per frame.
+            start = text.index('SpeedUpMusic:\n')
+            end = text.index('; sub_7267C:', start)
+            text = text[:start] + '''SpeedUpMusic:
+\tbtst #f_1up_playing,SMPS_RAM.variables.bitfield2(a6)
+\tbne.s SpeedUpMusic_1up
+\tmove.b #8,SMPS_RAM.variables.v_native_speedup(a6)
+\tbset #f_speedup,SMPS_RAM.variables.bitfield2(a6)
+\trts
+SpeedUpMusic_1up:
+\tmove.b #8,SMPS_RAM.variables_backup.v_native_speedup(a6)
+\tbset #f_speedup,SMPS_RAM.variables_backup.bitfield2(a6)
+\trts
+SlowDownMusic:
+\tbtst #f_1up_playing,SMPS_RAM.variables.bitfield2(a6)
+\tbne.s SlowDownMusic_1up
+\tclr.b SMPS_RAM.variables.v_native_speedup(a6)
+\tbclr #f_speedup,SMPS_RAM.variables.bitfield2(a6)
+\trts
+SlowDownMusic_1up:
+\tclr.b SMPS_RAM.variables_backup.v_native_speedup(a6)
+\tbclr #f_speedup,SMPS_RAM.variables_backup.bitfield2(a6)
+\trts
+
+Clone_NativeSpeedupTick:
+\ttst.b SMPS_RAM.variables.v_native_speedup(a6)
+\tbeq.s .done
+\ttst.b SMPS_RAM.variables.v_native_speedup_timeout(a6)
+\tbne.s .countdown
+\tmove.b SMPS_RAM.variables.v_native_speedup(a6),SMPS_RAM.variables.v_native_speedup_timeout(a6)
+\tbra.w UpdateMusic
+.countdown:
+\tsubq.b #1,SMPS_RAM.variables.v_native_speedup_timeout(a6)
+.done:
+\trts
+
+''' + text[end:]
+            text = text.replace('\tbra.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', '\tbsr.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', 1)
+            marker = '\trts\n; End of function SMPS_UpdateDriver'
+            assert text.count(marker) == 1, 'Upstream SFX update changed'
+            text = text.replace(marker, '\tbsr.w Clone_NativeSpeedupTick\n\trts\n; End of function SMPS_UpdateDriver', 1)
+            marker = '\tbra.w\tTempoWait\n; End of function UpdateMusic'
+            assert text.count(marker) == 1, 'Upstream music update changed'
+            text = text.replace(marker, '\tbsr.w TempoWait\n\tbra.w Clone_NativeSpeedupTick\n; End of function UpdateMusic', 1)
+            # Extra music reached after SFX needs the same call depth as the
+            # ordinary music pass. cfFadeInToPrevious deliberately unwinds
+            # that stack when its 1-UP sequence finishes. Music-to-music
+            # extra updates use tail jumps and retain that one call frame.
+            # This point is after taking that sequence's song backup.
+            marker = '.bgm_loadMusic:\n'
+            assert text.count(marker) == 1, 'Upstream music loader changed'
+            # InitMusicPlayback clears the continuous SFX ID/channel count.
+            # Clear its global latch as well; leaving it set makes an active
+            # turbine decrement zero to 255 and keep looping in the next song.
+            text = text.replace(marker, marker + '\tbclr #f_speedup,SMPS_RAM.variables.bitfield2(a6)\n\tbclr #f_continuous_sfx,SMPS_RAM.bitfield1(a6)\n', 1)
+            # S3's Z80 keeps a PSG channel silent when a tied note follows
+            # an envelope's note-off. The S1-derived port clears that rest
+            # early and audibly retriggers HCZ percussion. Header byte 5
+            # marks converted S3 music; PSG's unused FM voice-pointer bytes
+            # retain that mode and the preceding rest state per channel.
+            marker = '.bgm_psgloadloop:\n'
+            assert text.count(marker) == 1, 'Upstream PSG loader changed'
+            text = text.replace(marker, marker + '\tmove.b 5(a3),SMPS_Track.VoicePtr+1(a1)\n', 1)
+            start = text.index('PSGDoNext:\n')
+            end = text.index('; End of function PSGDoNext', start)
+            segment = text[start:end]
+            segment = segment.replace('PSGDoNext:\n', 'PSGDoNext:\n\tmove.b SMPS_Track.PlaybackControl(a5),SMPS_Track.VoicePtr+2(a5)\n', 1)
+            marker = '.gotnote:\n'
+            assert segment.count(marker) == 1, 'Upstream PSG note decoder changed'
+            segment = segment.replace(marker, marker + '''\ttst.b SMPS_Track.VoicePtr+1(a5)
+\tbeq.s .nativeRestReady
+\tbtst #4,SMPS_Track.PlaybackControl(a5)
+\tbeq.s .nativeRestReady
+\tbtst #1,SMPS_Track.VoicePtr+2(a5)
+\tbeq.s .nativeRestReady
+\tbset #1,SMPS_Track.PlaybackControl(a5)
+.nativeRestReady:
+''', 1)
+            text = text[:start] + segment + text[end:]
+            marker = 'SetPSGVolume:\n'
+            assert text.count(marker) == 1, 'Upstream PSG volume decoder changed'
+            text = text.replace(marker, marker + '''\ttst.b SMPS_Track.VoicePtr+1(a5)
+\tbeq.s .nativeVolumeReady
+\tbtst #4,SMPS_Track.PlaybackControl(a5)
+\tbne.s locret_7298A
+.nativeVolumeReady:
+''', 1)
+            text = text.replace('\tbra.s\tPSGDoVolFX_Loop', '\tbra.w\tPSGDoVolFX_Loop')
             # A new song resets its DAC track pan to stereo. MegaPCM keeps a
             # separate pan shadow for sample/SFX restoration; reset that too,
             # or a song without a pan command inherits the preceding song's

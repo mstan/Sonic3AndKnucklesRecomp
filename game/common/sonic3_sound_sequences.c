@@ -84,7 +84,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(fm<1 || fm>7 || psg>3){c->bad=1;return 0;}
         header=8+fm*4+psg*6;
         if(dest>c->capacity || header>c->capacity-dest){c->bad=1;return 0;}
-        memcpy(c->bank+dest,c->rom+input,4);c->bank[dest+4]=c->bank[dest+5]=0;
+        memcpy(c->bank+dest,c->rom+input,4);c->bank[dest+4]=0;c->bank[dest+5]=1; /* native S3 PSG ties */
         c->bank[dest+6]=(uint8_t)rb(c,input+4);c->bank[dest+7]=(uint8_t)rb(c,input+5);
         for(unsigned i=0;i<fm+psg;i++){
             unsigned old=input+6+(i<fm?i*4:fm*4+(i-fm)*6),out=old-input+2;
@@ -140,6 +140,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         }
         if(pc+length>c->input_bank+0x8000){c->bad=1;break;}
         n->length=(uint8_t)length;n->encoded=(uint8_t)encoded;
+        /* The verified November FBZ1 FM5 stream has a stray nA0 between
+         * nA6 and its duration at $BBD73. It adds twelve ticks every loop.
+         * Omit only that source byte, as in the corrected retail stream. */
+        if(c->source.prototype && pc==0xBBD73 && op==0x8A)n->encoded=0;
         if(op==0xF6 || op==0xF7 || op==0xF8 || op==0xFC){n->target=(uint16_t)rw(c,pc+length-2);node(c,n->target,n->kind);}
         if(op!=0xE3 && op!=0xF2 && op!=0xF9 && op!=0xF6)node(c,n->pc+length,n->kind);
     }

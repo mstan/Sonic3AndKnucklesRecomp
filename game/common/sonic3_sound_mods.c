@@ -68,7 +68,7 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
     if(!f || strcmp(f,prototype) || i || !o)return 0;
     memset(o,0,sizeof *o);COPY(o->id,"prototype-rom");COPY(o->label,"November 3, 1993 prototype ROM");
     COPY(o->description,"Sonic the Hedgehog 3 (Nov 3, 1993 prototype), 2,097,152 bytes. SHA-1 fc87a7b411302a576028b7ccd5911b1f266b59b3. Extract ROM archives first. The game verifies the donor again at startup.");
-    COPY(o->file_patterns,"*.bin,*.md,*.gen");COPY(o->file_description,"Genesis ROM");
+    COPY(o->file_patterns,"*.bin,*.md,*.gen,*.68k,*");COPY(o->file_description,"Genesis ROM");
     COPY(o->path,s3_sound_prototype_path());o->required=1;o->verified=s3_sound_prototype_verified();
     COPY(o->status,o->verified?"Verified November 3, 1993 prototype":"Choose your unmodified donor ROM");return 1;
 }

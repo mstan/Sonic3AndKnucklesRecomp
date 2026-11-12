@@ -42,6 +42,9 @@ int main(int argc,char **argv)
         CHECK(palette);
         CHECK(palette(s3?0x8C594u:0x28C594u)==0x5E9B54u);
         CHECK(palette(s3?0x8C654u:0x28C654u)==0x5E9C14u);
+        CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
+        CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
+        CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
@@ -56,6 +59,14 @@ int main(int argc,char **argv)
                 CHECK(a0==a1 && p0==p1 && c0==c1);
             }
             g_ram[0xFE11]=0;
+            /* The prototype has no outdoor canvas. The retail uploaded
+             * plane owns exterior scenery and doorway redraws. */
+            g_ram[0xEED6]=0xFF;
+            CHECK(!background(g_ram,0,0,0,0,NULL,NULL,NULL));
+            g_ram[0xEED6]=0;
+            g_ram[0xEEC3]=4;
+            CHECK(!background(g_ram,0,0,0,0,NULL,NULL,NULL));
+            g_ram[0xEEC3]=0;
         }
         g_ram[0xF664]=1;CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));g_ram[0xF664]=0;
         const unsigned hooks[]={s3?0x3500u:0x3DCAu,s3?0x351Cu:0x3DE6u,s3?0x3534u:0x3DFEu,s3?0x3550u:0x3E1Au};

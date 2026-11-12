@@ -21,6 +21,8 @@ int s3_state_menu_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_kos_owns(uint32_t pc){(void)pc;return 0;}
 int s3_kos_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6;}
+uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t *ram,uint32_t actor)
+{(void)pc;(void)ram;(void)actor;return 0;}
 uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)ram;(void)actor;return restoration && pc==0x2D6A6?0x2D756:0;}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t *ram,uint32_t p,uint16_t *sr){(void)pc;(void)ram;(void)p;(void)sr;}

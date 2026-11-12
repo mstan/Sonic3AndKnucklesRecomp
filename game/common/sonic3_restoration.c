@@ -29,7 +29,7 @@ int s3_restoration_select(unsigned component,int on)
     if(component!=PROTO_PALETTES && component!=PROTO_BADNIKS && component!=PROTO_BACKGROUNDS)return 0;
     if(standalone_sk && component==PROTO_BADNIKS)return 0;
 #ifdef S3_SOUND_COMBINED
-    if(on && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns before enabling prototype graphics.");return 0;}
+    if(on && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns and additional characters before enabling prototype graphics.");return 0;}
 #endif
     if(on){uint8_t *rom=s3_sound_prototype_read();if(!rom){snprintf(error,sizeof error,"%s",s3_sound_error());return 0;}free(rom);}
     if(on)selected|=component;else selected&=~component;return 1;
@@ -134,7 +134,7 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
     if(!(active&PROTO_BACKGROUNDS) || (ram[0xF600]&127)!=12 || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
     if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && bg_word(ram+0xEE80)<0x3680)which=0;
-    else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA])which=1+ram[0xFE11];
+    else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA] && !bg_word(ram+0xEED6) && !bg_word(ram+0xEEC2))which=1+ram[0xFE11];
     else return 0;
     const Background *bg=&backgrounds[which];if(!bg->pixels)return 0;
     if(!attr || !pixel)return 1;
@@ -144,6 +144,13 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
          * its VScroll into this donor layout can select an empty region. */
         x=sx+((int16_t)bg_word(ram+0xEE80)>>3);
         y=sy+((int16_t)bg_word(ram+0xEE84)>>3);
+    }else{
+        /* Hz_1_Deform uses a different vertical origin and 3/16 scroll
+         * from retail. Apply the donor camera to its own layout, retaining
+         * arithmetic-floor rounding below the $610 origin. */
+        int dy=3*((int16_t)(bg_word(ram+0xEE84)-0x610));
+        x=sx+((int16_t)bg_word(ram+0xEE80)>>1);
+        y=sy+0x110+(dy>=0?dy/16:-((-dy+15)/16));
     }
     x%=(int)bg->width;y%=(int)bg->height;if(x<0)x+=(int)bg->width;if(y<0)y+=(int)bg->height;
     unsigned p=bg->pixels[(size_t)y*bg->width+(unsigned)x];
@@ -191,6 +198,10 @@ static unsigned palette_source(unsigned address)
     }
     for(unsigned n=0;n<8;n++)if(address==(standalone_s3?retail_s3[n]:retail_sk[n]))return donor_address+donor[n];
     if(!standalone_s3 && (address==0xA909Cu || address==0xA90FCu))return donor_address+0x1E9DD4u;
+    /* The unimplemented prototype stages point at a shared placeholder.
+     * Their authored early palettes survive in its unused palette table. */
+    if(!standalone_s3 && (address==0xA943Cu || address==0xA949Cu))return donor_address+0x1F2F0Eu;
+    if(!standalone_s3 && address==0xA967Cu)return donor_address+0x1F2FCEu;
     return address;
 }
 void s3_restoration_post_reset(void)
@@ -198,7 +209,7 @@ void s3_restoration_post_reset(void)
     if(bound)return;bound=1;names_active=s3_gameplay.early_zone_names;
     active=selected;
 #ifdef S3_SOUND_COMBINED
-    if(active && s3_stage_pack_enabled){fprintf(stderr,"[restoration] Disable imported campaigns before prototype graphics\n");exit(1);}
+    if(active && s3_stage_pack_enabled){fprintf(stderr,"[restoration] Disable imported campaigns and additional characters before prototype graphics\n");exit(1);}
 #endif
     if(active){
         uint8_t *donor=s3_sound_prototype_read();
@@ -355,8 +366,8 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     i=component_index(i);
     COPY(o->id,feature_ids[i]);COPY(o->package_id,package);COPY(o->package_name,p.name);COPY(o->package_version,p.version);
     COPY(o->name,i==2?"Prototype backgrounds":i?"Prototype Hydrocity badnik art":"Prototype stage palettes");COPY(o->group,"Restoration");COPY(o->author,p.author);
-    COPY(o->description,i?"Use the prototype Bugernaut graphics in Hydrocity. Native movement, collision and swarming behavior are preserved. Requires your verified donor ROM. Default off; restart to apply. Local play only.":standalone_sk?"Use the prototype Flying Battery colors with the complete retail stage. Requires your verified donor ROM. Default off; restart to apply. Local play only.":standalone_s3?"Use the prototype Hydrocity and Launch Base colors with the complete retail stages. Underwater colors use the native transitions and fades. Requires your verified donor ROM. Default off; restart to apply. Local play only.":"Use the prototype Hydrocity, Flying Battery and Launch Base colors with the complete retail stages. Underwater colors use the native transitions and fades. Requires your verified donor ROM. Default off; restart to apply. Local play only.");
-    if(i==2)COPY(o->description,standalone_sk?"Use the prototype Flying Battery background artwork and its original slow parallax with complete retail terrain. Boss arenas and moving collision scenery retain their native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.":standalone_s3?"Use the prototype Hydrocity Act 1 background artwork with retail parallax and complete retail terrain. The miniboss arena retains its native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.":"Use the prototype Hydrocity Act 1 and Flying Battery background artwork. Flying Battery uses its original slow parallax; retail terrain is preserved. Boss arenas and moving collision scenery retain their native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.");
+    COPY(o->description,i?"Use the prototype Bugernaut graphics in Hydrocity. Native movement, collision and swarming behavior are preserved. Requires your verified donor ROM. Default off; restart to apply. Local play only.":standalone_sk?"Use the prototype Flying Battery, Mushroom Hill and Lava Reef Act 1 colors with the complete retail stage. Requires your verified donor ROM. Default off; restart to apply. Local play only.":standalone_s3?"Use the prototype Hydrocity and Carnival Night colors with the complete retail stages. Underwater colors use the native transitions and fades. Requires your verified donor ROM. Default off; restart to apply. Local play only.":"Use the prototype Hydrocity, Carnival Night, Flying Battery, Mushroom Hill and Lava Reef Act 1 colors with the complete retail stages. Underwater colors use the native transitions and fades. Requires your verified donor ROM. Default off; restart to apply. Local play only.");
+    if(i==2)COPY(o->description,standalone_sk?"Use the prototype Flying Battery background artwork and its original slow parallax with complete retail terrain. Outdoor scenery, doorway redraws, boss arenas and moving collision scenery retain their native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.":standalone_s3?"Use the prototype Hydrocity Act 1 background artwork with its original parallax and complete retail terrain. The miniboss arena retains its native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.":"Use the prototype Hydrocity Act 1 and Flying Battery background artwork. Both use their original parallax; retail terrain is preserved. Outdoor scenery, doorway redraws, boss arenas and moving collision scenery retain their native graphics. Enable prototype palettes for the earlier colors. Requires your donor ROM. Default off; restart to apply. Local play only.");
     COPY(o->source_name,p.source_name);COPY(o->source_url,p.source_url);
     unsigned bit=1u<<i;o->enabled=(selected&bit)!=0;
     COPY(o->status,(selected&bit)!=(active&bit)?"Restart to apply the selection":active&bit?"Enabled":s3_sound_prototype_verified()?"Verified donor; disabled":"Select your November 3, 1993 prototype ROM");return 1;
@@ -394,7 +405,7 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
     if(!resources(c,p,f)||i||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,"prototype-rom");COPY(o->label,"November 3, 1993 prototype ROM");
     COPY(o->description,"Shared donor for prototype music and graphics. Extract the ROM archive first. Expected 2,097,152 bytes; SHA-1 fc87a7b411302a576028b7ccd5911b1f266b59b3.");
-    COPY(o->file_patterns,"*.bin,*.md,*.gen");COPY(o->file_description,"Genesis ROM");COPY(o->path,s3_sound_prototype_path());
+    COPY(o->file_patterns,"*.bin,*.md,*.gen,*.68k,*");COPY(o->file_description,"Genesis ROM");COPY(o->path,s3_sound_prototype_path());
     o->required=1;o->verified=s3_sound_prototype_verified();COPY(o->status,o->verified?"Verified November 3, 1993 prototype":"Choose your unmodified donor ROM");return 1;
 }
 static int resource_path(void *c,const char *p,const char *f,const char *r,const char *path)
