@@ -1,4 +1,5 @@
 #include "sonic3_sound_driver.h"
+#include "sonic3_sound_themes.h"
 #include "sonic3_state_io.h"
 #include "genesis_runtime.h"
 #include "sonic3_clone_program.h"
@@ -33,6 +34,7 @@ void recomp_call_addr(uint32_t pc)
 void recomp_tail_call(uint32_t pc){tail=pc;}
 int genesis_atomic_file_store(const char *p,const void *d,size_t n){(void)p;(void)d;(void)n;return 1;}
 void cmd_send_response(const char *s){(void)s;}
+void audio_set_extra_source(void (*source)(int16_t *,size_t,double)){(void)source;}
 int main(int argc,char **argv)
 {
     CHECK(argc==3 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);
@@ -82,6 +84,27 @@ int main(int argc,char **argv)
         CHECK(s3_sound_rb_save(after,n)==n && s3_sound_rb_load(after,n));
         CHECK(s3_sound_select(0));
     }
+#ifdef S3_SOUND_COMBINED
+    /* The supported Steam header must provide the same built-in S3 themes
+     * without modifying the bytes the guest reads. */
+    size_t canonical_size=0;uint8_t *canonical=NULL;CHECK(g_rom[0x2001F0]=='U');
+    for(unsigned steam=0;steam<2;steam++){
+        free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
+        s3_sound_load("unused-test-settings.ini",argv[2]);
+        CHECK(s3_theme_choose(S3_THEME_LIFE,"s3"));
+        CHECK(s3_theme_choose(S3_THEME_CONTINUE,"s3"));
+        CHECK(s3_theme_choose(S3_THEME_INVINCIBLE,"s3"));
+        CHECK(s3_sound_selected() && s3_themes[S3_THEME_LIFE].enabled &&
+            s3_themes[S3_THEME_CONTINUE].enabled && s3_themes[S3_THEME_INVINCIBLE].enabled);
+        g_rom[0x2001F0]=steam?'J':'U';s3_sound_post_reset();
+        CHECK(s3_sound_active() && g_rom[0x2001F0]==(steam?'J':'U'));
+        if(!steam){
+            canonical_size=g_rom_ext_size;CHECK(canonical_size);
+            canonical=malloc(canonical_size);CHECK(canonical);memcpy(canonical,g_rom_ext,canonical_size);
+        }else CHECK(g_rom_ext_size==canonical_size && !memcmp(g_rom_ext,canonical,canonical_size));
+    }
+    g_rom[0x2001F0]='U';free(canonical);
+#endif
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;
 }

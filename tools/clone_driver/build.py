@@ -107,7 +107,7 @@ def assemble(source, assembler, p2bin, out):
         if name == 'Sound/MegaPCM - DAC Table.asm':
             marker = '\t\t\tdc.w -1'
             assert text.count(marker) == 1, 'Upstream PCM table terminator changed'
-            extra = ''.join(f'proto_dac{i:02X}: dcSample TYPE_PCM, PrototypeSample, 16000\n' for i in range(27))
+            extra = ''.join(f'proto_dac{i:02X}: dcSample TYPE_PCM, PrototypeSample, 16000\n' for i in range(56))
             text = text.replace(marker, extra + marker)
         write(inputs / name, text)
     write(inputs / 'Sound/Music.asm', 'MusicIndex:\n' + ''.join(f'ptr_mus{i:02X}: dc.l 0\n' for i in range(1, 0x34)) + 'ptr_musend:\n')
@@ -121,7 +121,7 @@ def assemble(source, assembler, p2bin, out):
     # Runtime conversion preserves retail PSG envelope IDs. Equate labels are
     # aliases of those slots; their upstream include order is not an asset ID.
     psg = 'PSG_Index:\n'
-    for number in range(1, 129):
+    for number in range(1, 257):
         psg += ''.join(name + ':\n' for name in envs if int(name[-2:], 16) == number)
         psg += '    dc.l 0\n'
     write(inputs / 'Sound/PSG Volume Envelopes.asm', psg)

@@ -1,9 +1,12 @@
 #include "sonic3_sound_driver.h"
 #include "sonic3_sound_assets.h"
+#include "sonic3_sound_themes.h"
+#include "sonic3_cd_themes.h"
 #include "sonic3_state_io.h"
 #include "genesis_runtime.h"
 #include "genesis_bus.h"
 #include "host_atomic_file.h"
+#include "sha256.h"
 #include "cmd_server.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,10 +23,12 @@ static uint8_t sound_ram[0x800],pending[3],initialised,tempo,tempo_dirty;
 static char settings_file[1200],error[256];
 static char prototype_path[1024];
 static int prototype_selected,prototype_active,prototype_verified;
+static uint8_t theme_identity[32];
+static int invincibility_override;
 int s3_sound_prototype_selected(void){return prototype_selected;}
 int s3_sound_prototype_active(void){return prototype_active;}
-int s3_sound_prototype_verified(void){return prototype_verified;}
-const char *s3_sound_prototype_path(void){return prototype_path;}
+int s3_sound_prototype_verified(void){return prototype_verified||s3_donor_verified(S3_DONOR_PROTO);}
+const char *s3_sound_prototype_path(void){return *prototype_path?prototype_path:s3_donor_verified(S3_DONOR_PROTO)?s3_donor_path(S3_DONOR_PROTO):prototype_path;}
 static uint8_t *prototype_rom(const char *path)
 {
     FILE *f=path && *path?fopen(path,"rb"):NULL;
@@ -46,13 +51,14 @@ int s3_sound_prototype_set_path(const char *path)
     }
     if(*path){uint8_t *rom=prototype_rom(path);if(!rom)return 0;free(rom);}
     snprintf(prototype_path,sizeof prototype_path,"%s",path);
+    if(*path)s3_theme_offer_prototype(path);
     prototype_verified=*path!=0;*error=0;return 1;
 }
-uint8_t *s3_sound_prototype_read(void){return prototype_rom(prototype_path);}
+uint8_t *s3_sound_prototype_read(void){return prototype_rom(s3_sound_prototype_path());}
 int s3_sound_prototype_select(int on)
 {
     if(on && !selected){snprintf(error,sizeof error,"Enable Clone Driver before selecting the prototype soundtrack.");return 0;}
-    if(on){uint8_t *rom=prototype_rom(prototype_path);prototype_verified=rom!=NULL;if(!rom)return 0;free(rom);}
+    if(on){uint8_t *rom=prototype_rom(s3_sound_prototype_path());prototype_verified=rom!=NULL;if(!rom)return 0;free(rom);}
     prototype_selected=on!=0;*error=0;return 1;
 }
 int s3_sound_selected(void){return selected;}
@@ -67,6 +73,7 @@ int s3_sound_available(void){
 }
 int s3_sound_select(int on)
 {
+    if(!on && s3_themes_enabled()){snprintf(error,sizeof error,"Disable event theme overrides before disabling Clone Driver.");return 0;}
     if(!on && prototype_selected){snprintf(error,sizeof error,"Disable the prototype soundtrack before disabling Clone Driver.");return 0;}
     if(on && !s3_sound_available()){snprintf(error,sizeof error,"Clone Driver requires the standard Z80 backend in this build.");return 0;}
 #ifdef S3_SOUND_COMBINED
@@ -77,6 +84,8 @@ int s3_sound_select(int on)
 void s3_sound_load(const char *path,const char *mode)
 {
     selected=active=bound=0;initialised=tempo=tempo_dirty=0;memset(pending,0,sizeof pending);*error=0;
+    memset(theme_identity,0,sizeof theme_identity);invincibility_override=0;
+    s3_cd_themes_reset();
     prototype_selected=prototype_active=prototype_verified=0;*prototype_path=0;
     standalone=!strcmp(mode,"sonic3");
     snprintf(settings_file,sizeof settings_file,"%s",path?path:"settings.ini");
@@ -84,22 +93,28 @@ void s3_sound_load(const char *path,const char *mode)
     size_t prefix=s?(size_t)(s-settings_file)+1:0;
     if(prefix+strlen(mode)+12>=sizeof settings_file){snprintf(error,sizeof error,"Sound settings path too long");return;}
     snprintf(settings_file+prefix,sizeof settings_file-prefix,"%s-sound.ini",mode);
-    FILE *f=fopen(settings_file,"rb");if(!f)return;
-    char line[1152];while(fgets(line,sizeof line,f)){
+    FILE *f=fopen(settings_file,"rb");
+    char line[1152];while(f && fgets(line,sizeof line,f)){
         line[strcspn(line,"\r\n")]=0;
         if(!strcmp(line,"enabled=1"))selected=1;
         if(!strcmp(line,"prototype_music=1"))prototype_selected=1;
         if(!strncmp(line,"prototype_rom=",14) && strlen(line+14)<sizeof prototype_path)
             snprintf(prototype_path,sizeof prototype_path,"%s",line+14);
-    }fclose(f);
-    if(*prototype_path){uint8_t *rom=prototype_rom(prototype_path);prototype_verified=rom!=NULL;free(rom);if(!prototype_selected)*error=0;}
+    }if(f)fclose(f);
+    s3_themes_load(path,mode);
+    if(s3_themes_enabled())selected=1;
+    if(*s3_sound_prototype_path()){
+        uint8_t *rom=prototype_rom(s3_sound_prototype_path());prototype_verified=rom!=NULL;free(rom);
+        if(prototype_verified)s3_theme_offer_prototype(s3_sound_prototype_path());
+        if(!prototype_selected)*error=0;
+    }
 }
 int s3_sound_commit(void)
 {
     if(!s3_sound_select(selected))return 0;
     if(!s3_sound_prototype_select(prototype_selected))return 0;
-    char text[1200];int n=snprintf(text,sizeof text,"[sound_driver]\nenabled=%d\nprototype_music=%d\nprototype_rom=%s\n",selected,prototype_selected,prototype_path);
-    if(!genesis_atomic_file_store(settings_file,text,(size_t)n)){snprintf(error,sizeof error,"Unable to save sound settings");return 0;}return 1;
+    char text[1200];int n=snprintf(text,sizeof text,"[sound_driver]\nenabled=%d\nprototype_music=%d\nprototype_rom=%s\n",selected,prototype_selected,s3_sound_prototype_path());
+    if(!genesis_atomic_file_store(settings_file,text,(size_t)n)){snprintf(error,sizeof error,"Unable to save sound settings");return 0;}return s3_themes_save();
 }
 int s3_sound_netplay_allowed(void){return !(selected || active);}
 void s3_sound_post_reset(void)
@@ -125,12 +140,53 @@ void s3_sound_post_reset(void)
         fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);
     }
     if(prototype_active){
-        uint8_t *donor=prototype_rom(prototype_path);
+        uint8_t *donor=prototype_rom(s3_sound_prototype_path());
         int ok=donor && s3_sound_build_prototype_music(donor,0x200000,&seq,bank,0x400000,&stats.bytes,standalone,error,sizeof error) &&
             s3_sound_build_prototype_pcm(donor,0x200000,&pcm,bank,0x400000,&stats.bytes,error,sizeof error);
         free(donor);
         if(!ok){fprintf(stderr,"[sound-driver] %s\n",error);free(bank);exit(1);}
         fprintf(stderr,"[sound-driver] Verified November 3, 1993 prototype soundtrack; retail SFX retained\n");
+    }
+    invincibility_override=s3_themes[S3_THEME_INVINCIBLE].enabled;
+    if(standalone && invincibility_override && !prototype_active)
+        memcpy(bank+seq.music_index-0x400000+4*(0x32-1),bank+seq.music_index-0x400000+4*(0x2C-1),4);
+    unsigned next_sample=97;
+    for(unsigned t=0;t<S3_THEME_COUNT;t++)if(s3_themes[t].enabled){
+        const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);
+        int donor=choice->donor;
+        if(donor>=S3_DONOR_CD_US){
+            if(!s3_cd_theme_build(t,(unsigned)donor,s3_donor_path((unsigned)donor),&seq,bank,0x400000,&stats.bytes,error,sizeof error)){
+                fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);free(bank);exit(1);
+            }
+            fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],choice->label);continue;
+        }
+        if(!strcmp(choice->id,"s1-s2"))donor=s3_donor_verified(S3_DONOR_S1)?S3_DONOR_S1:S3_DONOR_S2;
+        const uint8_t *input=g_rom;size_t input_size=rom_size;uint8_t *owned=NULL;
+        if(donor<0)donor=standalone?S3_DONOR_S3:S3_DONOR_SK;
+        if(s3_theme_donor(t)>=0){owned=s3_donor_read((unsigned)donor,&input_size);input=owned;}
+        else if(donor==S3_DONOR_S3 || donor==S3_DONOR_SK){
+            input_size=0x200000;
+#ifdef S3_SOUND_COMBINED
+            if(donor==S3_DONOR_S3){
+                input=g_rom+0x200000;
+                /* The verified Steam cartridge changes this region byte.
+                 * Normalize only the private donor view, never guest ROM. */
+                if(input[0x1F0]=='J'){
+                    owned=malloc(input_size);
+                    if(owned){memcpy(owned,input,input_size);owned[0x1F0]='U';}
+                    input=owned;
+                }
+            }
+#endif
+        }
+        static const unsigned targets[]={0x2A,0x27,0x28,0x29,0x2C};
+        int ok=input && s3_sound_build_event(input,input_size,(unsigned)donor,t,targets[t],&seq,&pcm,s3_clone_program,bank,0x400000,&stats.bytes,&next_sample,error,sizeof error);
+        free(owned);
+        if(!ok){fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);free(bank);exit(1);}
+        fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],choice->label);
+    }
+    if(s3_themes_enabled()){
+        uint8_t hashes[64];recompui_sha256_compute(bank,stats.bytes,hashes);s3_cd_theme_identity(hashes+32);recompui_sha256_compute(hashes,sizeof hashes,theme_identity);
     }
     g_rom_ext=bank;g_rom_ext_size=(stats.bytes+1)&~1u;
     memset(sound_ram,0,sizeof sound_ram);
@@ -173,7 +229,8 @@ static void queue(unsigned native,unsigned slot)
     if(!id)return;
     /* Retail Sonic 3 shares Invincibility with Super. The donor has a
      * dedicated Super theme, also used by the S&K hosts' native $32 queue. */
-    if(prototype_active && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
+    if((prototype_active || invincibility_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
+    s3_cd_theme_request(id<=0x33 && id!=native?id:native);
     if(id<=0x33 && !m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))return;
     g_cpu.D[0]=id;recomp_call_addr(slot?S3_CLONE_QUEUE_SFX:S3_CLONE_QUEUE_MUSIC);
 }
@@ -184,6 +241,7 @@ int s3_sound_hook(uint32_t pc)
     if(!active || !s3_sound_owns(pc))return 0;
     uint32_t init=standalone?0x1562:0x12CE,music=standalone?0x15E2:0x1358,sfx=standalone?0x160A:0x1380,t=standalone?0x164C:0x13C2;
     if(pc==init){
+        s3_cd_theme_request(0xE0);
         M68KState saved=g_cpu;memset(sound_ram,0,sizeof sound_ram);memset(pending,0,sizeof pending);tempo=tempo_dirty=0;
         recomp_call_addr(S3_CLONE_INITIALISE);g_cpu=saved;initialised=1;zero_move_flags();return 1;
     }
@@ -207,7 +265,11 @@ void s3_sound_vblank(void)
     M68KState saved=g_cpu;
     for(unsigned i=0;i<3;i++)if(pending[i]){queue(pending[i],i);pending[i]=0;}
     if(tempo_dirty){g_cpu.D[0]=tempo?0xFD:0xFE;recomp_call_addr(S3_CLONE_QUEUE_EXTRA);tempo_dirty=0;}
-    recomp_call_addr(S3_CLONE_GUARDED_UPDATE);g_cpu=saved;
+    recomp_call_addr(S3_CLONE_GUARDED_UPDATE);
+    /* In the pinned software RAM layout bitfield2 immediately follows the
+     * main tempo byte; bit zero is the driver's 1-UP backup flag. */
+    s3_cd_theme_frame(sound_ram[S3_CLONE_PAUSE_OFFSET]!=0,sound_ram[S3_CLONE_TEMPO_OFFSET+1]&1);
+    g_cpu=saved;
 #endif
 }
 int s3_sound_dispatch_miss(uint32_t pc)
@@ -216,7 +278,7 @@ int s3_sound_dispatch_miss(uint32_t pc)
 }
 void s3_sound_state(struct S3StateIO *io)
 {
-    uint8_t identity[40]={'S','3','S','D',1,0,0,0},incoming[40];identity[5]=(uint8_t)(bound?active:selected);
+    uint8_t identity[72]={'S','3','S','D',2,0,0,0},incoming[72];identity[5]=(uint8_t)(bound?active:selected);
     identity[6]=(uint8_t)(bound?prototype_active:prototype_selected);
 #ifdef S3_CLONE_DRIVER
     if(identity[5])for(unsigned i=0;i<32;i++){
@@ -224,9 +286,11 @@ void s3_sound_state(struct S3StateIO *io)
         identity[8+i]=(uint8_t)(((a<='9'?a-'0':a-'a'+10)<<4)|(b<='9'?b-'0':b-'a'+10));
     }
 #endif
+    memcpy(identity+40,theme_identity,sizeof theme_identity);
     memcpy(incoming,identity,sizeof incoming);s3_state_peek(io,0,incoming,sizeof incoming);
     if(memcmp(incoming,identity,sizeof incoming))io->ok=0;
     S3_STATE(io,identity);S3_STATE(io,sound_ram);S3_STATE(io,pending);S3_STATE(io,initialised);S3_STATE(io,tempo);S3_STATE(io,tempo_dirty);
+    s3_cd_theme_state(io);
 }
 size_t s3_sound_rb_save(void *dst,size_t cap)
 {
@@ -258,5 +322,6 @@ void s3_sound_command(int id,const char *json)
 #else
     (void)json;
 #endif
-    char response[200];snprintf(response,sizeof response,"{\"id\":%d,\"ok\":true,\"selected\":%d,\"active\":%d,\"initialised\":%u,\"pending\":[%u,%u,%u]}",id,selected,active,initialised,pending[0],pending[1],pending[2]);cmd_send_response(response);
+    unsigned cd_active,cd_theme;uint64_t cd_position;s3_cd_theme_debug(&cd_active,&cd_theme,&cd_position);
+    char response[384];snprintf(response,sizeof response,"{\"id\":%d,\"ok\":true,\"selected\":%d,\"active\":%d,\"initialised\":%u,\"pending\":[%u,%u,%u],\"cd\":{\"active\":%u,\"theme\":%u,\"position_q32\":%llu}}",id,selected,active,initialised,pending[0],pending[1],pending[2],cd_active,cd_theme,(unsigned long long)cd_position);cmd_send_response(response);
 }

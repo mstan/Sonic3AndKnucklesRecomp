@@ -56,4 +56,12 @@ int s3_sound_build_prototype_music(const uint8_t *rom,size_t rom_size,
 int s3_sound_build_prototype_pcm(const uint8_t *rom,size_t rom_size,
                                  const S3SoundPCMLayout *layout,uint8_t *bank,size_t capacity,
                                  uint32_t *used,char *error,size_t error_size);
+/* Append one chosen event and its own envelopes/percussion. The compiled
+ * software is read-only; all musical bytes come from the verified donor. */
+int s3_sound_build_event(const uint8_t *rom,size_t rom_size,unsigned donor,
+                         unsigned theme,unsigned target,
+                         const S3SoundLayout *layout,const S3SoundPCMLayout *pcm,
+                         const uint8_t *program,uint8_t *bank,size_t capacity,
+                         uint32_t *used,unsigned *next_sample,
+                         char *error,size_t error_size);
 #endif
