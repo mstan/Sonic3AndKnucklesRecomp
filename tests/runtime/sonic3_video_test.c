@@ -1949,10 +1949,11 @@ static void test_icz_partial_background_rows(void)
         {8,0x20,0x1F0,0,0},{8,0xF0,0x1F0,0,1},
         {12,0x20,0x1F0,0,1},{12,0xF0,0x1F0,0,1}
     };
-    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+    for(unsigned zone=0;zone<2;++zone)for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+        if(zone && cases[n].event!=8)continue;
         CHECK(configure("off"));CHECK(configure("32:9"));
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-        g_ram[0xF600]=12;word(g_ram,0xFE10,0x500);write32(0xB000,0x1234);
+        g_ram[0xF600]=12;word(g_ram,0xFE10,zone?0x101:0x500);write32(0xB000,0x1234);
         word(g_ram,0x8000,64);word(g_ram,0x8002,20);word(g_ram,0x8008,0x8100);
         word(g_ram,0xEEC2,cases[n].event);word(g_ram,0xEE80,0x1500);
         word(g_ram,0xEEC8,cases[n].pending);word(g_ram,0xEECA,cases[n].remaining);

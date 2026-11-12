@@ -608,3 +608,8 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x529AC
 kind = "game_hook"
+
+# A level-select start must not reuse the previous stage checkpoint.
+[[widescreen_site]]
+addr = 0x6AD0 # LevelSelect_StartZone
+kind = "game_hook"

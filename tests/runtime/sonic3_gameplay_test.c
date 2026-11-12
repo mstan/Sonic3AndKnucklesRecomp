@@ -30,6 +30,24 @@ static void native_timer_profile(uint8_t *ram,int standalone)
     if(!(sr&1))ram[0xFE23]=9;
 }
 static void native_timer(uint8_t *ram){native_timer_profile(ram,0);}
+static void test_level_select_checkpoint(void)
+{
+    uint8_t ram[65536],expected[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;m++){
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        memset(ram,0x6B,sizeof ram);ram[0xF600]=0x28;
+        memcpy(expected,ram,sizeof ram);
+        if(!m)expected[0xFE2A]=expected[0xFE2B]=expected[0xFE48]=0;
+        s3_gameplay_level_select(0x6AD0,ram);CHECK(!memcmp(ram,expected,sizeof ram));
+        if(!m)CHECK(s3_gameplay_owns(0x6AD0));
+        memset(ram,0x6B,sizeof ram);ram[0xF600]=12;memcpy(expected,ram,sizeof ram);
+        s3_gameplay_level_select(0x6AD0,ram);CHECK(!memcmp(ram,expected,sizeof ram));
+        ram[0xF600]=0x28;memcpy(expected,ram,sizeof ram);
+        s3_gameplay_level_select(0x6AD4,ram);CHECK(!memcmp(ram,expected,sizeof ram));
+        s3_gameplay_level_select(0x6AD0,NULL);
+    }
+}
 static void test_extended_timer(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -459,7 +477,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();
+    test_original_order();test_level_select_checkpoint();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

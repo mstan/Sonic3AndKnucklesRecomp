@@ -2224,6 +2224,19 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             icz_margin_world=!replaced;
         }
     }
+    /* HCZ2's first wipe retires a spatial moving wall. Unreplaced rows
+     * only have the native columns in VRAM; use their full wall layout in
+     * the margins until the complete incoming 512px row is installed. */
+    int hcz2_margin_world=0;
+    if(hcz2_canvas && s_frame_bg_event==8) {
+        unsigned remaining=((unsigned)s_world_frame[0xEECA]<<8)|s_world_frame[0xEECB];
+        if(remaining<=15) {
+            unsigned mask=(unsigned)(plane_tiles((v->reg[16]>>4)&3)*8-1);
+            unsigned pending=((unsigned)s_world_frame[0xEEC8]<<8)|s_world_frame[0xEEC9];
+            unsigned first=(pending+16)&mask;
+            hcz2_margin_world=((((unsigned)by&~15u)-first)&mask)>=(15-remaining)*16;
+        }
+    }
     /* CNZ1BGE_Boss streams only the $200..$2FF background rows with
      * Draw_TileColumn(d1=$200,d6=$10). Their 256px canvas scrolls while
      * the room descends; the neighboring layout rows are other scenes. */
@@ -2274,7 +2287,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         bg_width=512;
     /* HCZ2's crushing wall is a moving world, not a repeating panorama.
      * Negative coordinates to its left must remain blank. */
-    if(bg_world && ((s_frame_zone==1 && s_frame_act==1 && s_frame_bg_event<=4) ||
+    if(bg_world && ((s_frame_zone==1 && s_frame_act==1 && (s_frame_bg_event<=4 || hcz2_margin_world)) ||
        s_frame_zone==22))
         bg_width=0;
     /* LRZ3's distant lava cavern occupies the first 512px. Its upper
@@ -2349,7 +2362,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(bx<0 || bx>=1024)bp=0;
         }
         const uint32_t *apalette=palette,*bpalette=palette;
-        if(bg_canvas && !(icz_margin_world && (nx<0 || nx>=nw))) {
+        if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);

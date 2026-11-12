@@ -81,6 +81,15 @@ void s3_gameplay_palette_reset(uint32_t pc,uint8_t ram[65536])
      * Clear the low byte too; the original instruction retains its own CCR. */
     if(ram && palette_reset_site(pc))ram[0xF65D]=0;
 }
+void s3_gameplay_level_select(uint32_t pc,uint8_t ram[65536])
+{
+    if(!standalone_s3 || pc!=0x6AD0u || !ram || ram[0xF600]!=0x28)return;
+    /* Retail S3's level-select start updates the chosen zone but leaves an
+     * earlier checkpoint active. Its respawn then mixes the new zone with
+     * the previous position and apparent-zone title. A menu start is fresh;
+     * ordinary death/retry and SRAM progress retain their native behavior. */
+    ram[0xFE2A]=ram[0xFE2B]=ram[0xFE48]=0;
+}
 void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0)
 {
     if(!combined_mode || !s3_gameplay.original_zone_order || !ram || !d0 ||
@@ -150,7 +159,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
         (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u)) ||
-        allocation_site(pc) || title_card_site(pc) || (standalone_s3 && pc==0x19240u);}
+        allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
 {
