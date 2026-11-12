@@ -48,7 +48,10 @@ int main(int argc,char **argv)
             ++total;
         }
     }
-    CHECK(total==(combined?48:!strcmp(argv[2],"sonic3")?34:28));CHECK(shared==14);
+    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?34:27));CHECK(shared==(!strcmp(argv[2],"sonic3")?14:13));
+    CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
+    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==6&&s3_theme_choices(S3_MUSIC_BOSS)==5);
+    CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==2);
     CHECK(!p->set_enabled(NULL,package,1));
     if(argc==4&&!strcmp(argv[3],"--proto-only")){
         CHECK(set(p,"shared-themes","mini-boss","sk-proto")&&s3_music_active(S3_MUSIC_MINIBOSS)&&driver);
@@ -69,6 +72,9 @@ int main(int argc,char **argv)
     CHECK(s3_music_donor(S3_MUSIC_BOSS)==S3_DONOR_S2&&s3_music_donor(S3_MUSIC_MINIBOSS)==S3_DONOR_WAI);
     CHECK(p->feature_resource_count(NULL,package,"shared-themes")==3);
     CHECK(set(p,"shared-themes","title","s3"));
+    CHECK(set(p,"shared-themes","knuckles","s3"));
+    CHECK(set(p,"shared-themes","final-boss","s2-wai")&&s3_music_active(S3_MUSIC_FINAL));
+    CHECK(set(p,"shared-themes","final-boss","base"));
     CHECK(set(p,"shared-themes","credits","s3"));
     CHECK(s3_music_target(S3_MUSIC_CREDITS)==(!strcmp(argv[2],"sonic3")?0x26u:0x33u));
     CHECK(s3_music_source(S3_MUSIC_CREDITS,S3_DONOR_S3)==0x26&&s3_music_source(S3_MUSIC_CREDITS,S3_DONOR_SK)==0x33);

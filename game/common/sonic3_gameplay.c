@@ -314,7 +314,7 @@ static int enable(void *c,const char *p,const char *f,int on)
     if(!own(p))return base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on);
     int i=index_of(f);if(i<0)return 0;
 #ifdef S3_SOUND_COMBINED
-    if(i==9 && on && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+    if(i==9 && on && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns and additional characters before enabling the Mushroom Valley name.");return 0;}
 #endif
     *value(i)=on!=0;return 1;
 }
@@ -328,7 +328,7 @@ static int commit(void *c,const char *image)
 {
     (void)c;error[0]=0;
 #ifdef S3_SOUND_COMBINED
-    if(s3_gameplay.early_zone_names && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns before enabling the Mushroom Valley name.");return 0;}
+    if(s3_gameplay.early_zone_names && s3_stage_pack_enabled){COPY(error,"Disable imported campaigns and additional characters before enabling the Mushroom Valley name.");return 0;}
 #endif
     if(base&&base->commit&&!base->commit(base->ctx,image))return 0;
     return s3_gameplay_save();

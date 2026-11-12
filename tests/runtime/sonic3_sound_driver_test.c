@@ -69,7 +69,7 @@ int main(int argc,char **argv)
     CHECK(stop_calls==1 && last_id==0xFC && same_cpu(&g_cpu,&before));
     unsigned pause=s3_clone_pause_sites[0];uint8_t value=g_rom[pause+3];CHECK(s3_sound_hook(pause));CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==value && tail==pause+8);
 #ifdef S3_SOUND_COMBINED
-    s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(!s3_sound_commit());
+    s3_stage_pack_enabled=1;CHECK(!s3_sound_select(1));CHECK(strstr(s3_sound_error(),"additional characters"));CHECK(!s3_sound_commit());
 #endif
     if(argc==4){
         free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;

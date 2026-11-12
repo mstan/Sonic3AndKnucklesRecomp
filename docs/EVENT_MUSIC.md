@@ -20,18 +20,19 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Act Clear | Sonic 1 / Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 prototype; Sonic 3 & Knuckles; Sonic CD (US) |
 | Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US) |
 | Drowning | Sonic 1 / Sonic 2; Sonic 3 prototype |
-| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
-| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles / Sonic 3 prototype |
+| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype |
+| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Title Screen | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
-| Special Stage, Knuckles, Emerald | Corresponding Sonic 3 prototype music |
+| Special Stage | Sonic 3 prototype |
+| Knuckles | Sonic 3; Sonic 3 prototype |
 | Super (standalone Sonic 3) | Sonic 3 prototype |
 | Credits | Sonic 3 (Retail); Sonic & Knuckles (Retail); Sonic 3 Prototype |
-| Final Boss (S&K campaigns) | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
+| Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 
 Main boss and mini-boss choices are independent. For example, choose the
 Simon Wai boss tune for mini-bosses and retail Sonic 2 for main bosses.
 The mini-boss control covers each cartridge's applicable mini-boss queues.
-Sonic 3 can use the S&K/prototype mini-boss and S&K title music; S&K and the
+Sonic 3 can use either the S&K or prototype mini-boss and S&K title music; S&K and the
 combined game can use Sonic 3's mini-boss and title music.
 
 Only donor ROMs or discs required by the selected replacements appear below
@@ -61,7 +62,7 @@ Use Sonic 1 JUE revision 0, Sonic 2 World revision 1, or a supported original
 Sonic 3 / Sonic & Knuckles cartridge for its variants. **Sonic 1 / Sonic 2**
 accepts either supported cartridge. Providing Sonic 1 also prepares its
 Invincibility and boss choices; Sonic 2 works the same way for its variants.
-The shared S&K/prototype mini-boss choice accepts either matching cartridge.
+S&K and prototype mini-boss choices retain their distinct volume balances. The shared retail main-boss choice uses the running cartridge without another donor.
 
 The prototype builds and their source documentation are:
 

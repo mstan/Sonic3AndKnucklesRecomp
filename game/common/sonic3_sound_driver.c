@@ -77,7 +77,7 @@ int s3_sound_select(int on)
     if(!on && prototype_selected){snprintf(error,sizeof error,"Disable the prototype soundtrack before disabling Clone Driver.");return 0;}
     if(on && !s3_sound_available()){snprintf(error,sizeof error,"Clone Driver requires the standard Z80 backend in this build.");return 0;}
 #ifdef S3_SOUND_COMBINED
-    if((on || active) && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns before enabling Clone Driver; restart after changing drivers.");return 0;}
+    if((on || active) && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns and additional characters before enabling Clone Driver; restart after changing drivers.");return 0;}
 #endif
     selected=on!=0;*error=0;return 1;
 }

@@ -29,7 +29,7 @@ int s3_restoration_select(unsigned component,int on)
     if(component!=PROTO_PALETTES && component!=PROTO_BADNIKS && component!=PROTO_BACKGROUNDS)return 0;
     if(standalone_sk && component==PROTO_BADNIKS)return 0;
 #ifdef S3_SOUND_COMBINED
-    if(on && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns before enabling prototype graphics.");return 0;}
+    if(on && s3_stage_pack_enabled){snprintf(error,sizeof error,"Disable imported campaigns and additional characters before enabling prototype graphics.");return 0;}
 #endif
     if(on){uint8_t *rom=s3_sound_prototype_read();if(!rom){snprintf(error,sizeof error,"%s",s3_sound_error());return 0;}free(rom);}
     if(on)selected|=component;else selected&=~component;return 1;
@@ -209,7 +209,7 @@ void s3_restoration_post_reset(void)
     if(bound)return;bound=1;names_active=s3_gameplay.early_zone_names;
     active=selected;
 #ifdef S3_SOUND_COMBINED
-    if(active && s3_stage_pack_enabled){fprintf(stderr,"[restoration] Disable imported campaigns before prototype graphics\n");exit(1);}
+    if(active && s3_stage_pack_enabled){fprintf(stderr,"[restoration] Disable imported campaigns and additional characters before prototype graphics\n");exit(1);}
 #endif
     if(active){
         uint8_t *donor=s3_sound_prototype_read();
@@ -405,7 +405,7 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
     if(!resources(c,p,f)||i||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,"prototype-rom");COPY(o->label,"November 3, 1993 prototype ROM");
     COPY(o->description,"Shared donor for prototype music and graphics. Extract the ROM archive first. Expected 2,097,152 bytes; SHA-1 fc87a7b411302a576028b7ccd5911b1f266b59b3.");
-    COPY(o->file_patterns,"*.bin,*.md,*.gen");COPY(o->file_description,"Genesis ROM");COPY(o->path,s3_sound_prototype_path());
+    COPY(o->file_patterns,"*.bin,*.md,*.gen,*.68k,*");COPY(o->file_description,"Genesis ROM");COPY(o->path,s3_sound_prototype_path());
     o->required=1;o->verified=s3_sound_prototype_verified();COPY(o->status,o->verified?"Verified November 3, 1993 prototype":"Choose your unmodified donor ROM");return 1;
 }
 static int resource_path(void *c,const char *p,const char *f,const char *r,const char *path)
