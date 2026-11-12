@@ -7,6 +7,28 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
 static unsigned be16(const uint8_t *p){return ((unsigned)p[0]<<8)|p[1];}
+static unsigned fbz_loop_ticks(const uint8_t *bank,unsigned song,unsigned fm,unsigned used)
+{
+    unsigned pc=song+be16(bank+song+8+fm*4),last=0,ticks=0,first=0,jumps=0;
+    for(unsigned guard=0;guard<10000 && pc<used;guard++){
+        unsigned op=bank[pc++];
+        if(op==0xFE)continue; /* tie */
+        if(op<0xFE){
+            if(op>=0x80){if(pc<used && bank[pc]<0x80)last=bank[pc++];}
+            else last=op;
+            CHECK(last);ticks+=last;continue;
+        }
+        CHECK(pc<used);op=bank[pc++];
+        if(op==0x14){
+            CHECK(pc+2<=used);pc=(unsigned)((int)pc+1+(int16_t)be16(bank+pc));
+            if(jumps++)return ticks-first;
+            first=ticks;
+        }else if(op==0x0D || op==0 || op==1)++pc;
+        else if(op==0x21)pc+=4;
+        else CHECK(0);
+    }
+    CHECK(0);return 0;
+}
 static int final_echo_restores(const uint8_t *bank,uint32_t song,uint32_t used)
 {
     unsigned pc=song+be16(bank+song+8+5*4);
@@ -103,6 +125,11 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
         else CHECK(!memcmp(envelopes,bank+seq->psg_index-0x400000+64*4,sizeof envelopes));
     }
     CHECK(next<=97&&used<0x400000);CHECK(!memcmp(bank+seq->sound_index-0x400000,base+seq->sound_index-0x400000,169*4));
+    /* Both lead and delayed echo must keep the same period on subsequent
+     * loops. The source's stray note formerly made FM5 2412, not 2400. */
+    unsigned fbz=(be32(bank+seq->music_index-0x400000+4*8)&0xFFFFFF)-0x400000;
+    CHECK(fbz_loop_ticks(bank,fbz,1,used)==2400);
+    CHECK(fbz_loop_ticks(bank,fbz,5,used)==2400);
     /* The proposed Wai mini-boss/retail boss pairing also fits over a full
      * campaign selection without touching either the other song or SFX. */
     for(unsigned i=0;i<2;i++){

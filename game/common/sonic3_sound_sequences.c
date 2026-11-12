@@ -140,6 +140,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         }
         if(pc+length>c->input_bank+0x8000){c->bad=1;break;}
         n->length=(uint8_t)length;n->encoded=(uint8_t)encoded;
+        /* The verified November FBZ1 FM5 stream has a stray nA0 between
+         * nA6 and its duration at $BBD73. It adds twelve ticks every loop.
+         * Omit only that source byte, as in the corrected retail stream. */
+        if(c->source.prototype && pc==0xBBD73 && op==0x8A)n->encoded=0;
         if(op==0xF6 || op==0xF7 || op==0xF8 || op==0xFC){n->target=(uint16_t)rw(c,pc+length-2);node(c,n->target,n->kind);}
         if(op!=0xE3 && op!=0xF2 && op!=0xF9 && op!=0xF6)node(c,n->pc+length,n->kind);
     }
