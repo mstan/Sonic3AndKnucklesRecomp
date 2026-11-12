@@ -839,10 +839,13 @@ static void test_competition_race(void)
     CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
     /* Time Attack chooses its menu before the outgoing race fades. Keep
      * both view scrolls and sprite ownership until the native loader clears. */
-    g_ram[0xF600]=0xC0;memcpy(ram,g_ram,sizeof ram);
-    scanline(&v,0,native,320,out,796);
-    CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
-    CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+    const unsigned exits[]={0xC0,0x28,4};
+    for(unsigned i=0;i<sizeof exits/sizeof *exits;i++){
+        g_ram[0xF600]=(uint8_t)exits[i];memcpy(ram,g_ram,sizeof ram);
+        scanline(&v,0,native,320,out,796);
+        CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
+        CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+    }
     word(g_ram,S3_COMPETITION,0);scanline(&v,0,native,320,out,796);
     CHECK(!competition_world_ready());
     CHECK(configure("off"));
