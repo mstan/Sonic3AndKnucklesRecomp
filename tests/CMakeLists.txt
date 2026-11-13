@@ -341,7 +341,7 @@ foreach(_mode sonic3 sonic3k sandk)
 endforeach()
 add_test(NAME sound_donor_import COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/test_sound_donor_import.py")
 add_executable(sonic3_cd_themes_test runtime/sonic3_cd_themes_test.c "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
-target_include_directories(sonic3_cd_themes_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
+target_include_directories(sonic3_cd_themes_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
 add_test(NAME sound_cd_themes COMMAND sonic3_cd_themes_test)
 add_executable(sonic3_sound_event_test runtime/sonic3_sound_event_test.c
     "${S3_GAME_COMMON}/sonic3_sound_sequences.c" "${S3_GAME_COMMON}/sonic3_sound_legacy.c"
