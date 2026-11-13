@@ -1,0 +1,9 @@
+plugins { id 'com.android.application' version '8.7.3' }
+def game = file('..')
+def engine = file(providers.gradleProperty('genesisEngineRoot').orElse('../segagenesisrecomp').get())
+ext.genesisGame = [applicationId:'com.mstan.sonic3krecomp', title:'Sonic 3 & Knuckles',
+    version:'0.8.4', versionCode:804, romCrc:'63522553', romSize:4194304,
+    target:'Sonic3KRecomp', romConfig:'rom-Sonic3K.cfg', boxart:'boxart-sonic3k.tga',
+    gameRoot:game, engineRoot:engine,
+    uiRoot:file(providers.gradleProperty('genesisUiRoot').orElse('../recomp-ui').get())]
+apply from:new File(engine,'platform/android/app.gradle')
