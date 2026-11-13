@@ -1649,6 +1649,18 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
         }
         return (uint16_t)faded;
     }
+    unsigned white=v->cram[17],sum=(white&14)+((white>>4)&14)+((white>>8)&14);
+    if(sum<42&&!v->cram[16]){
+        unsigned steps=(42-sum)/2,faded=0;
+        /* Pal_DecColor removes red, green, then blue independently for
+         * every entry. Cached margin colors must follow those same steps. */
+        for(unsigned shift=0;shift<12;shift+=4){
+            unsigned target=(color>>shift)&14,remove=steps*2;
+            if(remove>target)remove=target;
+            faded|=(target-remove)<<shift;steps-=remove/2;
+        }
+        return (uint16_t)faded;
+    }
     unsigned faded=0;
     for(unsigned shift=0;shift<12;shift+=4) {
         int lo=(v->cram[16]>>shift)&14,hi=(v->cram[17]>>shift)&14;

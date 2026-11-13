@@ -1474,7 +1474,24 @@ static void test_aiz_cached_native_fade(void)
             }
         }
     }
-    word(s_world_frame,0xEE50,0);memcpy(s_aiz_intro.colors,saved,sizeof saved);
+    word(s_world_frame,0xEE50,0);
+    /* Original Pal_DecColor removes red, then green, then blue from EACH
+     * color independently. Scaling against white leaves bright margins. */
+    for(unsigned i=0;i<48;i++)expected[i]=targets[i%6];
+    v.cram[16]=0;v.cram[17]=0xEEE;
+    for(unsigned step=0;step<=21;step++){
+        aiz_palette(&s_aiz_intro,&v,out);
+        for(unsigned i=0;i<48;i++){
+            CHECK(out[i+16]==genesis_dac_cram_to_argb(expected[i],GENESIS_DAC_NORMAL));
+            if(expected[i]&0xE)expected[i]-=2;
+            else if(expected[i]&0xE0)expected[i]-=0x20;
+            else if(expected[i]&0xE00)expected[i]-=0x200;
+        }
+        if(v.cram[17]&0xE)v.cram[17]-=2;
+        else if(v.cram[17]&0xE0)v.cram[17]-=0x20;
+        else if(v.cram[17]&0xE00)v.cram[17]-=0x200;
+    }
+    memcpy(s_aiz_intro.colors,saved,sizeof saved);
 }
 static int tree_palette_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 { (void)ram;(void)x;(void)y;*cell=background?0:1;return 1; }
