@@ -326,6 +326,10 @@ const GameSpec g_game_spec = {
      * of the runner's internal byteswapped-buffer CRC path. */
     .expected_rom_crc32     = 0x9BC192CEu,
     .expected_rom_size      = 0x200000u,   /* 2 MB standalone cart */
+    /* Mirror the cartridge's RA header for the launcher's save panel.
+     * The runtime still takes the SRAM geometry from that header. */
+    .sram_start             = 0x200001u,
+    .sram_end               = 0x2003FFu,
 #ifdef GENESIS_Z80_RECOMP
     .z80_step               = s3z80_step,
 #endif
