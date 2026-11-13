@@ -166,11 +166,13 @@ static void test_native_sprite_art_ownership(void)
     CHECK(native_art_owner(S3_ART_BANK+0x30502u)==3);
     CHECK(native_art_owner(S3_SPRING_MAP)==4);
     CHECK(native_art_owner(S3_SPRING_MAP+22u)==4);
-    CHECK(native_art_owner(S3_ART_BANK+0x164016u)==5);
+    CHECK(native_art_owner(S3_CAPSULE_MAP)==5);
+    CHECK(native_art_owner(S3_ART_BANK+0x163F22u)==5);
+    CHECK(native_art_owner(S3_ART_BANK+0x164016u)==6);
     CHECK(!native_art_owner(0));
     scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
-    for(unsigned owner=1;owner<=4;++owner) {
+    for(unsigned owner=1;owner<=5;++owner) {
         const NativeArt *a=&s_native_art[owner-1];
         memset(s_native_art_cache[owner-1].pixels,0x11,a->bytes);
         s_native_art_cache[owner-1].pixels[0]=0x10;
@@ -213,7 +215,7 @@ static void test_waiting_knuckles_palette(void)
     v.cram[17]=0xEEE;memset(v.vram+32,0x22,32);
     word(g_rom,S3_KNUX_PREVIEW_PALETTE+4,0xE00);
     pal[18]=0xFFFF0000;scene.scene=1;scene.count=1;
-    scene.sprites[0]=(SceneSprite){-230,0,0x2001,0,0,256,0x500};
+    scene.sprites[0]=(SceneSprite){-230,0,0x2001,0,0,256,0x600};
     s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     GVDP original=v;static uint8_t ram[65536];memcpy(ram,g_ram,sizeof ram);
     memset(out,0,sizeof out);memset(s_priority,0,796);
