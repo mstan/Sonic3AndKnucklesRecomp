@@ -2024,6 +2024,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * to the camera, rather than moving it with the first falling column. */
     int mgz2_collapse=level && s_frame_zone==2 && s_frame_act==1 &&
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==4 && (v->reg[11]&4);
+    /* LBZ1 publishes independently falling 16px foreground columns.
+     * Their first scroll value cannot become the whole world's camera. */
+    int lbz1_columns=level && s_frame_zone==6 && !s_frame_act && (v->reg[11]&4);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
@@ -2044,7 +2047,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ground_distance=abs(unwrap((int)fg_identity,plane_y)-plane_y);
     int ship_band=aiz_ship && ship_distance<=ground_distance;
     int camera=level?unwrap(-hs_a,ship_band?ship_x:plane_x):ram16(0xEE78);
-    int camera_y=mgz2_collapse?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
+    int camera_y=(mgz2_collapse || lbz1_columns)?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
         if(level) {
             int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
@@ -2405,6 +2408,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int ay=line+(((aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
             a=plane_attr(v,base_a,nx-hs_a,ay);
             ap=pattern_pixel(v,a,nx-hs_a,ay);
+        }
+        if(lbz1_columns) {
+            if(nx>=0 && nx<nw) {
+                unsigned column=(unsigned)nx/16;
+                unsigned scroll=presentation_column_scroll(column*2,v->vsram[column*2]);
+                int ax=nx-hs_a,ay=line+(scroll&1023);
+                a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
+            } else {
+                /* LBZ1_FGVScrollArray owns ten columns at $3B60..$3BFF.
+                 * All other scenery keeps the ordinary copied camera. */
+                int ay=plane_y+line;
+                if(wx>=0x3B60 && wx<0x3C00) {
+                    unsigned at=0xA930u+(1u+(unsigned)(wx-0x3B60)/16u)*2u;
+                    ay=(int16_t)(((unsigned)s_world_frame[at]<<8)|s_world_frame[at+1])+line;
+                }
+                a=world_attr(s_world_frame,wx,ay,0);ap=pattern_pixel(v,a,wx,ay);
+            }
         }
         if(mgz2_collapse && wx>=0x3C80 && wx<0x3E00) {
             int column=nx<0?0:nx>=nw?(nw-1)/16:nx/16;
