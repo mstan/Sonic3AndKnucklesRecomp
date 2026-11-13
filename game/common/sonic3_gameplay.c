@@ -158,6 +158,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 }
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
+        pc==(standalone_s3?0xEC10u:0xDE9Cu) ||
         (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u)) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
@@ -193,6 +194,15 @@ static int timed_story(const uint8_t ram[65536])
     if(!ram || ram[0xF600]!=12 || (ram[0xFE10]>=0x13 && ram[0xFE10]<=0x15))return 0;
     unsigned demo=standalone_s3?0xFFF0:0xFFD0,competition=standalone_s3?0xFFD8:0xFFE8;
     return !word(ram,demo) && !word(ram,competition);
+}
+void s3_gameplay_hud_reset(uint32_t pc,uint8_t ram[65536])
+{
+    if(pc!=(standalone_s3?0xEC10u:0xDE9Cu)||!timed_story(ram)||!s3_gameplay.infinite_time||
+       word(ram,0xFE08)||ram[0xFE22]||ram[0xFE23]!=99||ram[0xFE24]!=59)return;
+    /* HUD_DrawInitial installs 0:00 after leaving placement. The capped
+     * clock has no next second to replace it. Ask the original HUD updater
+     * to redraw the retained time once, without advancing the game timer. */
+    ram[0xFE1E]=0x80;
 }
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],
                            uint32_t *d1,uint16_t *sr)

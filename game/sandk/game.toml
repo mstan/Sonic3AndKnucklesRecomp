@@ -710,6 +710,10 @@ kind = "game_hook"
 addr = 0x3E1A
 kind = "game_hook"
 
+# Keep a capped timer visible when debug exit rebuilds the HUD.
+[[widescreen_site]]
+addr = 0xDE9C # HUD_DrawInitial: refresh a retained capped timer after debug exit
+kind = "game_hook"
 # Optional prototype Bugernaut art and mappings.
 [[widescreen_site]]
 addr = 0x16A8
