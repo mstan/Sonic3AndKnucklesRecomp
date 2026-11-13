@@ -1823,6 +1823,30 @@ static void test_aiz2_ship_cameras(void)
     s_interpolating=0;
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static void test_act_handoff_framing(void)
+{
+    CameraHandoffPreview saved=s_handoff;int interpolating=s_interpolating;
+    memset(&s_handoff,0,sizeof s_handoff);s_interpolating=0;
+    /* Ordinary publications can move within one native tick. With no active
+     * handoff they retain native framing, including fractional presentation. */
+    CHECK(handoff_origin(0,0,796,0x4800,1,0,0,100,0,1)==0);
+    CHECK(handoff_origin(8,8,796,0x4800,1,0,0,100,0,1)==8);
+    s_interpolating=1;
+    CHECK(handoff_origin(12,12,796,0x4800,1,0,0,100,0,1)==12);
+    s_interpolating=0;memset(&s_handoff,0,sizeof s_handoff);
+    /* The real HCZ map rebase keeps its outgoing origin, pauses in place,
+     * then reaches the incoming origin monotonically over45 native ticks. */
+    CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,4,200,0,1)==412);
+    int previous=handoff_origin(0x80,128,796,0x4800,1,1,0,201,0,1);
+    CHECK(previous==412 && s_handoff.active);
+    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,202,1,1)==previous);
+    for(unsigned i=1;i<=45;++i) {
+        int current=handoff_origin(0x80,128,796,0x4800,1,1,0,201+i,0,1);
+        CHECK(current>=128 && current<=previous);previous=current;
+    }
+    CHECK(previous==128 && !s_handoff.active);
+    s_handoff=saved;s_interpolating=interpolating;
+}
 static void test_campaign_background_edges(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],baseline[796];
@@ -3124,6 +3148,7 @@ int main(int argc,char **argv)
         printf("palette %04x %04x\n",s_aiz_intro.colors[2],s_aiz_main.colors[2]);
         return 0;
     }
+    test_act_handoff_framing();
     test_campaign_background_edges();
     /* Bounded host decoding: literals, overlapping dictionary matches,
      * truncation, a reference before the output and insufficient capacity. */

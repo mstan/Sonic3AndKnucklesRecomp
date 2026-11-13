@@ -631,6 +631,8 @@ static int view_left(int camera, int w)
 {
     return scene_view_left(camera,w,0,stage_width(),g_ram[0xFE10],g_ram[0xFE11]);
 }
+#include "sonic3_camera_handoff.inc"
+
 int s3_video_presentation_camera_x(int camera)
 {
     if(s_mode==VIDEO_OFF || s_requested_width<=320)return camera;
@@ -1823,6 +1825,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(palette[i]!=palette[0])uniform_palette=0;
     }
     if(line==0 && !s_interpolating) {
+        s_handoff_palette_capture=0;
         s_ix_overlay_seen=0;
         /* A mode-changing exit can publish a menu-tagged copy of the same
          * SAT before its old level fades. Keep the installed level through
@@ -2070,6 +2073,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_left=level?scene_view_left(s_camera,width,s_display?s_display->aiz_join:0,
             s_stage_width,s_frame_zone,s_frame_act):
             camera-(width-nw)/2;
+        if(level && width>320)handoff_art_capture(v,s_world_frame,s_camera,s_frame_zone,s_frame_act,s_frame_bg_event);
+        int framed=handoff_origin(s_camera,s_camera-s_left,width,s_stage_width,
+            s_frame_zone,s_frame_act,s_frame_bg_event,
+            ((unsigned)s_world_frame[0xFE04]<<8)|s_world_frame[0xFE05],
+            ((unsigned)s_world_frame[0xF63A]<<8)|s_world_frame[0xF63B],level);
+        s_left=s_camera-framed;
         if(level && s_display && s_display->preview_knux) {
             /* This AIZ2 waiting phase adds only 0/1px heat offsets to A.
              * Recover its installed base once, so the rigid pose follows
@@ -2085,6 +2094,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             s_knux_plane_camera_y=presentation_camera(1,camera_y);
         }
     }
+    if(!s_interpolating && s_handoff_palette_capture && line<224)
+        memcpy(s_handoff_art.colors[line],palette,sizeof palette);
     int origin=level?s_camera-s_left:(width-nw)/2;
     s_native_x=origin;
     /* Imported stages' line-scroll profiles position the background. Clamping
@@ -2317,6 +2328,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_intro_canvas=bg_world && !s_frame_zone && !s_frame_act && !s_frame_bg_event;
     int background_x=-bg_origin-hs_b;
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
+    int handoff_loading=bg_world && width>320 &&
+        handoff_art_loading(s_frame_zone,s_frame_act,s_frame_bg_event);
+    const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
+    const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
+    const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
     GenesisTileRow fg={0},bg={0};
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
@@ -2359,12 +2375,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
 
         if(!fg.remaining) {
-            uint16_t attr=level?world_attr(s_world_frame,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
-            gtile_row_begin(&fg,v->vram,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+            uint16_t attr=level?world_attr(fg_world,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
+            gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         }
         if(!bg.remaining) {
-            uint16_t attr=bg_world?world_attr(s_background_frame,source_bx,by,1):plane_attr(v,base_b,bx,by);
-            gtile_row_begin(&bg,v->vram,attr,bg_world?source_bx:bx,by);
+            uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,1):plane_attr(v,base_b,bx,by);
+            gtile_row_begin(&bg,world_patterns,attr,bg_world?source_bx:bx,by);
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
@@ -2380,7 +2396,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ap=pattern_pixel(v,a,ax,line);
             if(bx<0 || bx>=1024)bp=0;
         }
-        const uint32_t *apalette=palette,*bpalette=palette;
+        /* Primary foreground colors remain native; only the retired
+         * secondary background palette needs to outlive its bank. */
+        const uint32_t *apalette=palette;
+        const uint32_t *bpalette=handoff_loading?s_handoff_art.colors[line]:palette;
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
@@ -2454,7 +2473,13 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         int joined=level && s_display && width>320 &&
             aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
+        int handoff_fg=level && width>320 &&
+            handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap);
         if(joined)apalette=palette;
+        if(handoff_fg){joined=1;apalette=palette;}
+        int handoff_bg=level && width>320 &&
+            handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
+        if(handoff_bg)bpalette=s_handoff_art.colors[line];
         if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.
@@ -2491,7 +2516,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int fire_curtain=aiz_fire && (nx<0 || nx>=nw) && (b&0x8000) && bp;
         int foreground=ap && !fire_curtain && ((a&0x8000) || !bp || !(b&0x8000));
         uint8_t p=foreground?ap:bp;
-        uint32_t ac=ap?plane_color(line,a,ap,apalette):backdrop;
+        uint32_t owned_backdrop=(handoff_loading || handoff_bg)?
+            s_handoff_art.colors[line][s_handoff_art.video.reg[7]&63]:backdrop;
+        uint32_t ac=ap?plane_color(line,a,ap,apalette):owned_backdrop;
         if(aiz_tree_color(wx,wy,nx,nw,ap))
             ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
         if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
@@ -2499,7 +2526,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(hcz_boss && nx<0 && wx<0x3680 && ap>=16 && ap<32)
             ac=hcz_boss_colors[ap-16];
         uint32_t bc=bp?(restored_background && restored_color!=0xFFFF?
-            genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color(line,b,bp,bpalette)):backdrop;
+            genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color(line,b,bp,bpalette)):owned_backdrop;
         out[x]=foreground?ac:bc;
         if(tree_arrival && nx>=nw) {
             uint16_t tree_attr;uint8_t tree_pixel;
@@ -2616,6 +2643,7 @@ static void render_scanline(const GVDP *v,int line,const uint32_t *native,int nw
     const uint8_t *ram=s_interpolating?s_world_frame:g_ram;
     life_ones_scanline(v,ram,line,out,width,origin);
     time_tens_scanline(v,ram,line,out,width,origin);
+    handoff_dip(out,width);
 }
 
 static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)
@@ -2692,6 +2720,7 @@ void s3_video_state(S3StateIO *io)
         if (mode != s_mode || ratio != s_ratio) io->ok = 0;
     }
     S3_STATE(io, mode); S3_STATE(io, ratio);
+    handoff_state(io);
     /* Published scene frames and loader ownership affect future frames.
      * Scanline scratch and decoded ROM caches are rebuilt on demand. */
     scene_frame_state(io, &s_build);
