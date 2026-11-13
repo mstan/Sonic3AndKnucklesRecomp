@@ -145,6 +145,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
          * Omit only that source byte, as in the corrected retail stream. */
         if(c->source.prototype && pc==0xBBD73 && op==0x8A)n->encoded=0;
         if(op==0xF6 || op==0xF7 || op==0xF8 || op==0xFC){n->target=(uint16_t)rw(c,pc+length-2);node(c,n->target,n->kind);}
+        /* November CNZ1 FM5 jumps past its initial voice/detune/modulation
+         * setup. Replay that setup at each phrase boundary, leaving the
+         * source ROM and all other tracks unchanged. */
+        if(c->source.prototype&&pc==0xB911D&&op==0xF6&&n->target==0x8F35){n->target=0x8F2A;node(c,n->target,n->kind);}
         if(op!=0xE3 && op!=0xF2 && op!=0xF9 && op!=0xF6)node(c,n->pc+length,n->kind);
     }
     if(c->bad)return 0;
@@ -276,12 +280,12 @@ int s3_sound_build_prototype_music(const uint8_t *rom,size_t size,const S3SoundL
     if(ok)ok=table(c,l->music_index,51*4) && table(c,l->psg_index,103*4) && table(c,l->modulation_index,18*4);
     unsigned failed_id=0;
     for(unsigned i=1;ok && i<=51;i++){
-        /* The prototype's $2E is Super, while retail $2E is a miniboss.
-         * Standalone S3 uses the spare $32 entry for its separate Super
-         * override. S&K uses $32 for Ending and native $DC (entry $33) for
-         * Credits; its Ending has no prototype counterpart. */
-        unsigned donor=i==0x32&&standalone_s3?0x2E:i==0x33?0x26:i==0x2E?0x18:i;
-        if(standalone_s3 && i>0x32)continue;
+        /* The prototype's unused $2E differs from retail's miniboss.
+         * S3 uses spare $33 for the separate Super replacement; $32 must
+         * retain its retail Ending, absent from this donor. S&K uses $33
+         * for Credits, and likewise retains its own Ending. */
+        unsigned donor=i==0x33?(standalone_s3?0x2E:0x26):i==0x2E?0x18:i;
+        if(i==0x32)continue;
         uint32_t source=s3_sound_music_source(&c->source,rom,donor);
         if(!source)continue;
         failed_id=i;

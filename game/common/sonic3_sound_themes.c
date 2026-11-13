@@ -66,9 +66,10 @@ const char *s3_donor_path(unsigned d){return d==S3_DONOR_PROTO&&prototype_from_a
 int s3_donor_verified(unsigned d){return d<S3_DONOR_COUNT && verified[d];}
 int s3_theme_choices(unsigned t){return t<S3_MUSIC_COUNT?(int)counts[rows[t].choices]:0;}
 const S3ThemeChoice *s3_theme_choice(unsigned t,unsigned c){return t<S3_MUSIC_COUNT && c<(unsigned)s3_theme_choices(t)?&choices[rows[t].choices][c]:NULL;}
-unsigned s3_music_group(unsigned t){return t<S3_MUSIC_COUNT?rows[t].group:S3_MUSIC_GROUPS;}
+unsigned s3_music_group(unsigned t)
+{return t<S3_MUSIC_COUNT?(host_combined&&rows[t].group==S3_MUSIC_SANDK?S3_MUSIC_SONIC3:rows[t].group):S3_MUSIC_GROUPS;}
 const char *s3_music_section(unsigned t){return t<S3_MUSIC_COUNT?rows[t].section:"";}
-unsigned s3_music_target(unsigned t){return t==S3_MUSIC_CREDITS&&!host_s3?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;}
+unsigned s3_music_target(unsigned t){return (t==S3_MUSIC_CREDITS&&!host_s3)||t==S3_MUSIC_SUPER?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;}
 int s3_music_available(unsigned t)
 {return t<S3_MUSIC_COUNT&&t!=S3_MUSIC_EMERALD&&(t!=S3_MUSIC_SUPER||host_s3)&&(!rows[t].group||(rows[t].group==S3_MUSIC_SONIC3?(host_s3||host_combined):!host_s3));}
 int s3_music_active(unsigned t){return s3_music_available(t)&&group_on[rows[t].group]&&s3_themes[t].enabled;}
@@ -164,19 +165,26 @@ int s3_theme_choose(unsigned t,const char *id)
     snprintf(error,sizeof error,"Unknown theme choice");return 0;
 }
 int s3_music_group_enabled(unsigned group)
-{for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(rows[t].group==group&&s3_music_active(t))return 1;return 0;}
+{for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==group&&s3_music_active(t))return 1;return 0;}
+static void group_set(unsigned group,int on)
+{
+    /* Keep the two stored campaign switches intact on load. A deliberate
+     * change to the combined campaign section controls both halves. */
+    group_on[group]=on;
+    if(host_combined&&group==S3_MUSIC_SONIC3)group_on[S3_MUSIC_SANDK]=on;
+}
 int s3_music_group_enable(unsigned group,int on)
 {
     *error=0;if(group>=S3_MUSIC_GROUPS)return 0;
-    if(!on){group_on[group]=0;return 1;}
+    if(!on){group_set(group,0);return 1;}
     unsigned selected=0;int seen[S3_DONOR_COUNT]={0};
-    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(rows[t].group==group&&s3_music_available(t)&&s3_themes[t].enabled){
+    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==group&&s3_music_available(t)&&s3_themes[t].enabled){
         ++selected;int d=s3_theme_donor(t);if(d>=0&&!seen[d]++){size_t size;free(s3_donor_read((unsigned)d,&size));}
-        if(!s3_theme_ready(t)){group_on[group]=0;snprintf(error,sizeof error,"Provide the selected music's matching ROM below.");return 0;}
+        if(!s3_theme_ready(t)){group_set(group,0);snprintf(error,sizeof error,"Provide the selected music's matching ROM below.");return 0;}
     }
     if(!selected){snprintf(error,sizeof error,"Choose a replacement track first.");return 0;}
     if(!s3_sound_select(1)){snprintf(error,sizeof error,"%s",s3_sound_error());return 0;}
-    group_on[group]=1;return 1;
+    group_set(group,1);return 1;
 }
 int s3_music_pick(unsigned t,const char *id)
 {
@@ -185,7 +193,7 @@ int s3_music_pick(unsigned t,const char *id)
     if(!strcmp(id,"base")){s3_themes[t].enabled=0;return 1;}
     for(unsigned c=0;c<(unsigned)s3_theme_choices(t);c++)if(!strcmp(id,s3_theme_choice(t,c)->id)){
         s3_themes[t].choice=(int)c;s3_themes[t].enabled=1;
-        if(!s3_music_group_enable(rows[t].group,1)){group_on[rows[t].group]=0;*error=0;}
+        if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}
         return 1;
     }
     snprintf(error,sizeof error,"Unknown music choice");return 0;
@@ -271,6 +279,6 @@ int s3_theme_import(unsigned t,const char *path,void (*progress)(void *,float,co
     for(unsigned d=0;d<S3_DONOR_COUNT;d++){size_t size;free(s3_donor_read(d,&size));}
     if(!s3_theme_ready(t)){snprintf(error,sizeof error,"This ROM belongs to another theme choice. Select %s.",s3_donor_names[expected]);return 0;}
     s3_themes[t].enabled=1;
-    if(!s3_music_group_enable(rows[t].group,1)){group_on[rows[t].group]=0;*error=0;}
+    if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}
     return 1;
 }

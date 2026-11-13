@@ -9,8 +9,12 @@ static const RecompLauncherCModProvider *base;
 static const char package[]="sonic3.audio.event-themes";
 static const char *const group_ids[]={"shared-themes","sonic3-campaign","sandk-campaign"};
 static const char *const group_names[]={"Shared Themes","Sonic 3 Campaign","Sonic & Knuckles Campaign"};
+static int combined(void){return s3_music_available(S3_MUSIC_AIZ1)&&s3_music_available(S3_MUSIC_MHZ1);}
+static const char *group_name(int g){return g==S3_MUSIC_SONIC3&&combined()?"Sonic 3 & Knuckles Campaign":group_names[g];}
+static const char *group_key(int g){return g==S3_MUSIC_SONIC3&&combined()?"sonic3k-campaign":group_ids[g];}
 static int ours(const char *p){return p&&!strcmp(p,package);}
-static int group_id(const char *id){if(id)for(int g=0;g<S3_MUSIC_GROUPS;g++)if(!strcmp(id,group_ids[g]))return g;return -1;}
+static int group_id(const char *id)
+{if(id)for(int g=0;g<S3_MUSIC_GROUPS;g++)if((g==0 || (g==1?s3_music_available(S3_MUSIC_AIZ1):s3_music_available(S3_MUSIC_MHZ1)&&!combined()))&&!strcmp(id,group_key(g)))return g;return -1;}
 static int track_id(const char *id){if(id)for(int t=0;t<S3_MUSIC_COUNT;t++)if(!strcmp(id,s3_theme_ids[t]))return t;return -1;}
 static int track_at(int group,int index)
 {
@@ -41,7 +45,7 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,package);COPY(o->name,"Music Customization");COPY(o->version,"0.2.0");
     COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose individual tracks in three music sections. Matching ROMs are imported once and shared across all choices and games. All tracks default to Base game.");
+    COPY(o->description,"Choose individual tracks in Shared Themes and this game's campaign section. Matching ROMs are imported once and shared across all choices and games. All tracks default to Base game.");
     o->enabled=s3_themes_enabled();return 1;
 }
 static int features(void *c){(void)c;return group_count()+(base&&base->feature_count?base->feature_count(base->ctx):0);}
@@ -49,8 +53,8 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
 {
     (void)c;int count=group_count();if(i>=count)return base&&base->feature_get&&base->feature_get(base->ctx,i-count,o);
     int g=group_at(i);if(g<0||!o)return 0;memset(o,0,sizeof *o);
-    COPY(o->id,group_ids[g]);COPY(o->package_id,package);COPY(o->package_name,"Music Customization");COPY(o->package_version,"0.2.0");
-    COPY(o->name,group_names[g]);COPY(o->group,"Sound");COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
+    COPY(o->id,group_key(g));COPY(o->package_id,package);COPY(o->package_name,"Music Customization");COPY(o->package_version,"0.2.0");
+    COPY(o->name,group_name(g));COPY(o->group,"Sound");COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
     COPY(o->description,"Choose each track independently. Base game leaves that track unchanged. Only ROMs needed by your selected replacements appear below, and each is shared automatically. Choosing a ready replacement or importing its ROM enables this section and Clone Driver. Disable the section to restore all its normal tracks while keeping your choices. Restart to apply; local original campaigns only.");
     o->enabled=s3_music_group_enabled((unsigned)g);
     while(track_at(g,o->option_count)>=0)++o->option_count;
@@ -81,7 +85,7 @@ static int choice_get(void *c,const char *p,const char *f,const char *opt,int i,
     (void)c;if(!ours(p))return base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,opt,i,o);
     int t=track_id(opt),g=group_id(f);if(t<0||g<0||s3_music_group((unsigned)t)!=(unsigned)g||!s3_music_available((unsigned)t)||!o)return 0;
     memset(o,0,sizeof *o);if(!i){COPY(o->value,"base");COPY(o->label,"Base game");return 1;}
-    const S3ThemeChoice *choice=s3_theme_choice((unsigned)t,(unsigned)(i-1));if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,choice->label);return 1;
+    const S3ThemeChoice *choice=s3_theme_choice((unsigned)t,(unsigned)(i-1));if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,t==S3_MUSIC_SUPER?"Unused prototype theme":choice->label);return 1;
 }
 static int set_option(void *c,const char *p,const char *f,const char *opt,const char *v)
 {
@@ -118,7 +122,17 @@ static int resource_import(void *c,const char *p,const char *f,const char *r,con
     if(!ok&&error&&capacity)snprintf(error,capacity,"%s",s3_themes_error());return ok;
 }
 static int resource_set(void *c,const char *p,const char *f,const char *r,const char *path)
-{s3_themes_clear_error();if(ours(p))return resource_import(c,p,f,r,path,"",NULL,NULL,NULL,0);return base&&base->feature_resource_set_path&&base->feature_resource_set_path(base->ctx,p,f,r,path);}
+{
+    s3_themes_clear_error();
+    if(ours(p)){
+        /* Replay restores resources before the selected options. A verified
+         * shared-library entry is valid even while this section is disabled. */
+        if(group_id(f)>=0&&r&&path)for(unsigned d=0;d<S3_DONOR_COUNT;d++)
+            if(!strcmp(r,s3_donor_ids[d])&&s3_donor_verified(d)&&!strcmp(path,s3_donor_path(d)))return 1;
+        return resource_import(c,p,f,r,path,"",NULL,NULL,NULL,0);
+    }
+    return base&&base->feature_resource_set_path&&base->feature_resource_set_path(base->ctx,p,f,r,path);
+}
 static int commit(void *c,const char *image)
 {(void)c;if(!s3_themes_validate())return 0;if(base&&base->commit&&!base->commit(base->ctx,image))return 0;return s3_themes_save();}
 static const char *last_error(void *c)
