@@ -139,6 +139,15 @@ Clone_NativeSpeedupTick:
 .nativeRestReady:
 ''', 1)
             text = text[:start] + segment + text[end:]
+            # S3 keeps the last PSG frequency when a rest is decoded. Its
+            # next duration-only event clears rest and plays that frequency
+            # again, including zero-frequency fixed-noise percussion.
+            # Legacy donors keep Clone's invalid-frequency rest contract.
+            marker = '\tmove.w\t#-1,SMPS_Track.Freq(a5)\t\t\t; Invalidate note frequency'
+            assert text.count(marker) == 1, 'Upstream PSG rest decoder changed'
+            text = text.replace(marker, '''\ttst.b SMPS_Track.VoicePtr+1(a5)
+\tbne.s .nativeRestFrequency
+''' + marker + '\n.nativeRestFrequency:', 1)
             marker = 'SetPSGVolume:\n'
             assert text.count(marker) == 1, 'Upstream PSG volume decoder changed'
             text = text.replace(marker, marker + '''\ttst.b SMPS_Track.VoicePtr+1(a5)
