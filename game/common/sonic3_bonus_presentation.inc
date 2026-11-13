@@ -1,5 +1,64 @@
 /* Finite bonus foregrounds retain their authored geometry. The complete
  * native center remains the hardware composition, including its sprite limits. */
+typedef struct BonusHudPiece {int x,y;unsigned size,attr;} BonusHudPiece;
+static GVDP s_bonus_hud_free;
+static BonusHudPiece s_bonus_hud[12];
+static unsigned s_bonus_hud_count;
+static uint8_t s_bonus_hud_rows[224];
+static void bonus_prepare_hud(const GVDP *v)
+{
+    s_bonus_hud_count=0;memset(s_bonus_hud_rows,0,sizeof s_bonus_hud_rows);
+    memcpy(&s_bonus_hud_free,v,sizeof *v);
+    unsigned base=(v->reg[5]&0x7Fu)<<9,index=0;
+    for(unsigned n=0;n<80;++n){
+        unsigned a=(base+index*8u)&65535u,attr=vram16(v,a+4),tile=attr&2047u;
+        int y=(vram16(v,a)&511)-128,x=(vram16(v,a+6)&511)-128;
+        unsigned size=v->vram[(a+2)&65535u],height=((size&3u)+1u)*8u;
+        /* These are the native bonus HUD's reserved text/digit and life
+         * banks. Position guards exclude unrelated offscreen tile users. */
+        int hud=x>=0 && x<96 && ((y>=0 && y<24 && tile>=0x6CA && tile<0x700) ||
+            (y>=192 && y<224 && tile>=0x7D4 && tile<0x7E0));
+        if(hud && s_bonus_hud_count<12){
+            s_bonus_hud[s_bonus_hud_count++]=(BonusHudPiece){x,y,size,attr};
+            for(int line=y;line<y+(int)height && line<224;++line)
+                if(line>=0)s_bonus_hud_rows[line]=1;
+            /* Recompose the native underlay on a private VDP. X=0 would
+             * mask following hardware sprites; an offscreen Y does not. */
+            s_bonus_hud_free.vram[a]=s_bonus_hud_free.vram[(a+1)&65535u]=0;
+        }
+        index=v->vram[(a+3)&65535u]&127u;if(!index)break;
+    }
+}
+static const uint32_t *bonus_without_hud(const GVDP *v,int line,const uint32_t *native,int nw,
+                                        const uint32_t *palette,const uint32_t *shadow)
+{
+    static uint8_t indices[GVDP_MAX_WIDTH];static uint32_t colors[GVDP_MAX_WIDTH];
+    if(line==0)bonus_prepare_hud(v);
+    if(line<0 || line>=224 || !s_bonus_hud_rows[line] || nw!=320)return native;
+    if(gvdp_render_scanline(&s_bonus_hud_free,line,indices)!=nw)return native;
+    for(int x=0;x<nw;++x){
+        unsigned p=indices[x];
+        colors[x]=p<64?palette[p]:p<128?shadow[p-64]:p<192?
+            genesis_dac_cram_to_argb(v->cram[p-128],GENESIS_DAC_HIGHLIGHT):0xFF000000u;
+    }
+    return colors;
+}
+static void bonus_draw_hud(const GVDP *v,int line,uint32_t *out,int width,const uint32_t *palette)
+{
+    for(unsigned n=0;n<s_bonus_hud_count;++n){
+        const BonusHudPiece *s=&s_bonus_hud[n];
+        unsigned cw=((s->size>>2)&3u)+1u,ch=(s->size&3u)+1u;
+        int iy=line-s->y;if(iy<0 || iy>=(int)ch*8)continue;
+        if(s->attr&0x1000)iy=(int)ch*8-1-iy;
+        for(unsigned i=0;i<cw*8;++i){
+            int x=s->x+(int)i;if(x<0 || x>=width)continue;
+            unsigned ix=s->attr&0x800?cw*8-1-i:i;
+            unsigned tile=((s->attr&2047u)+(ix/8)*ch+(unsigned)iy/8)&2047u;
+            unsigned p=pattern_pixel(v,(uint16_t)((s->attr&0xE000u)|tile),(int)(ix&7),iy&7);
+            if(p&15u)out[x]=palette[p];
+        }
+    }
+}
 static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *native,int nw,
                            uint32_t *out,int width,const uint32_t *palette,
                            const uint32_t *shadow,uint8_t *priority)

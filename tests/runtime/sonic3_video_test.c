@@ -5,6 +5,12 @@ uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
 static int test_private_planes;
 static int test_time_private_palette;
+static unsigned test_bonus_hud_renders;
+int gvdp_render_scanline(GVDP *v,int line,uint8_t *out) {
+    (void)line;++test_bonus_hud_renders;
+    (void)v;
+    memset(out,1,320);return 320;
+}
 int gvdp_ext_line(unsigned tile) { return test_private_planes && tile>=1 && tile<=2?(int)tile:0; }
 static uint8_t test_atlas[128];
 static int test_atlas_enabled;
@@ -362,6 +368,32 @@ static void test_level_select_word_edges(void)
         CHECK(!s_frame_bonus);
     }
     CHECK(configure("off"));
+}
+static void test_bonus_hud_position(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,before;uint32_t native[320],out[796],palette[64],shadow[64];
+    memset(&v,0,sizeof v);v.reg[1]=64;v.reg[5]=0x78;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    for(unsigned i=0;i<64;++i){palette[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);shadow[i]=palette[i];}
+    word(v.vram,0xF000,136);v.vram[0xF003]=1;
+    word(v.vram,0xF004,0x86D2);word(v.vram,0xF006,144);
+    word(v.vram,0xF008,136);word(v.vram,0xF00C,0x8123);word(v.vram,0xF00E,328);
+    memset(v.vram+0x6D2*32,0x22,32);memcpy(&before,&v,sizeof v);
+    for(int x=0;x<320;++x)native[x]=0xFF778899u;
+    test_bonus_hud_renders=0;
+    CHECK(bonus_without_hud(&v,0,native,320,palette,shadow)==native);
+    const uint32_t *clean=bonus_without_hud(&v,8,native,320,palette,shadow);
+    CHECK(clean!=native && test_bonus_hud_renders==1 && clean[16]==palette[1]);
+    CHECK(!vram16(&s_bonus_hud_free,0xF000));
+    CHECK(vram16(&s_bonus_hud_free,0xF008)==136);
+    memset(s_world_frame,0,65536);
+    bonus_scanline(&v,8,0x14,clean,320,out,796,palette,shadow,NULL);
+    bonus_draw_hud(&v,8,out,796,palette);
+    CHECK(out[16]==palette[2] && out[238+16]==palette[1]);
+    CHECK(!memcmp(&before,&v,sizeof v));
+    CHECK(bonus_without_hud(&v,40,native,320,palette,shadow)==native);
+#endif
 }
 static void test_native_bonus(void)
 {
@@ -3564,7 +3596,7 @@ int main(int argc,char **argv)
     test_aiz2_retired_grove();test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
+    test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();

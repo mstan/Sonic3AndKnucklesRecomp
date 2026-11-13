@@ -1931,9 +1931,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(s_frame_bonus) {
         if(!native)native=native_row(native_ctx);
         int origin=(width-nw)/2;
+        if(width>nw && (s_frame_zone==0x14 || s_frame_zone==0x15))
+            native=bonus_without_hud(v,line,native,nw,palette,shadow);
         bonus_scanline(v,line,(unsigned)s_frame_zone,native,nw,out,width,palette,shadow,s_priority);
         if(s_frame_zone==0x14 || s_frame_zone==0x15)
             draw_scene_sprites(v,line,out,width,origin,palette);
+        if(width>nw && (s_frame_zone==0x14 || s_frame_zone==0x15)){
+            bonus_draw_hud(v,line,out,width,palette);*hud_origin=0;
+        }
         if(line==0){++s_frames;s_native_x=origin;}
         return;
     }
