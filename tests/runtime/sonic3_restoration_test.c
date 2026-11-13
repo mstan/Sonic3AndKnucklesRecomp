@@ -45,27 +45,44 @@ int main(int argc,char **argv)
         CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
         CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
+        if(!s3){
+            CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
+            CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
+            CHECK(!memcmp(g_rom_ext+0x1F2FCE,g_rom+0xA967C,32));
+        }
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
-        CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0,color=0;uint8_t pixel=0;
+        CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
         if(!s3)for(unsigned act=0;act<2;act++) {
             g_ram[0xFE10]=4;g_ram[0xFE11]=(uint8_t)act;
             /* Repeat the authored panorama, including negative expanded
              * columns, without selecting Act 2's blank layout banks. */
             for(int y=0;y<512;y+=17)for(int x=0;x<512;x+=13) {
-                uint16_t a0,c0,a1,c1;uint8_t p0,p1;
+                uint16_t a0=0x274,c0,a1=0x274,c1;uint8_t p0,p1;
                 CHECK(background(g_ram,0,0,x,y,&a0,&p0,&c0));
                 CHECK(background(g_ram,0,0,x-512,y+512,&a1,&p1,&c1));
                 CHECK(a0==a1 && p0==p1 && c0==c1);
             }
             g_ram[0xFE11]=0;
-            /* The prototype has no outdoor canvas. The retail uploaded
-             * plane owns exterior scenery and doorway redraws. */
-            g_ram[0xEED6]=0xFF;
-            CHECK(!background(g_ram,0,0,0,0,NULL,NULL,NULL));
+            /* A doorway installs indoor/outdoor cells progressively. The
+             * uploaded cell owns replacement, including while the target
+             * canvas flag and native redraw routine have already changed. */
+            for(unsigned outdoors=0;outdoors<2;outdoors++)for(unsigned event=0;event<=16;event+=4){
+                g_ram[0xEED6]=outdoors?0xFF:0;g_ram[0xEEC3]=(uint8_t)event;
+                CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));
+                const unsigned indoor[]={0x3E,0x8E,0x274,0x2D0};
+                for(unsigned i=0;i<4;i++){
+                    attr=(uint16_t)(indoor[i]|0xE800u);
+                    CHECK(background(g_ram,0,0,0,0,&attr,&pixel,&color));
+                }
+                const unsigned outdoor[]={0,0x240,0x263,0x273,0x2D1};
+                for(unsigned i=0;i<5;i++){
+                    attr=(uint16_t)outdoor[i];pixel=7;color=0xFFFF;
+                    CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));
+                    CHECK(attr==outdoor[i]&&pixel==7&&color==0xFFFF);
+                }
+            }
             g_ram[0xEED6]=0;
-            g_ram[0xEEC3]=4;
-            CHECK(!background(g_ram,0,0,0,0,NULL,NULL,NULL));
             g_ram[0xEEC3]=0;
         }
         g_ram[0xF664]=1;CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));g_ram[0xF664]=0;

@@ -166,11 +166,13 @@ static void test_native_sprite_art_ownership(void)
     CHECK(native_art_owner(S3_ART_BANK+0x30502u)==3);
     CHECK(native_art_owner(S3_SPRING_MAP)==4);
     CHECK(native_art_owner(S3_SPRING_MAP+22u)==4);
-    CHECK(native_art_owner(S3_ART_BANK+0x164016u)==5);
+    CHECK(native_art_owner(S3_CAPSULE_MAP)==5);
+    CHECK(native_art_owner(S3_ART_BANK+0x163F22u)==5);
+    CHECK(native_art_owner(S3_ART_BANK+0x164016u)==6);
     CHECK(!native_art_owner(0));
     scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
-    for(unsigned owner=1;owner<=4;++owner) {
+    for(unsigned owner=1;owner<=5;++owner) {
         const NativeArt *a=&s_native_art[owner-1];
         memset(s_native_art_cache[owner-1].pixels,0x11,a->bytes);
         s_native_art_cache[owner-1].pixels[0]=0x10;
@@ -213,7 +215,7 @@ static void test_waiting_knuckles_palette(void)
     v.cram[17]=0xEEE;memset(v.vram+32,0x22,32);
     word(g_rom,S3_KNUX_PREVIEW_PALETTE+4,0xE00);
     pal[18]=0xFFFF0000;scene.scene=1;scene.count=1;
-    scene.sprites[0]=(SceneSprite){-230,0,0x2001,0,0,256,0x500};
+    scene.sprites[0]=(SceneSprite){-230,0,0x2001,0,0,256,0x600};
     s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
     GVDP original=v;static uint8_t ram[65536];memcpy(ram,g_ram,sizeof ram);
     memset(out,0,sizeof out);memset(s_priority,0,796);
@@ -1474,7 +1476,24 @@ static void test_aiz_cached_native_fade(void)
             }
         }
     }
-    word(s_world_frame,0xEE50,0);memcpy(s_aiz_intro.colors,saved,sizeof saved);
+    word(s_world_frame,0xEE50,0);
+    /* Original Pal_DecColor removes red, then green, then blue from EACH
+     * color independently. Scaling against white leaves bright margins. */
+    for(unsigned i=0;i<48;i++)expected[i]=targets[i%6];
+    v.cram[16]=0;v.cram[17]=0xEEE;
+    for(unsigned step=0;step<=21;step++){
+        aiz_palette(&s_aiz_intro,&v,out);
+        for(unsigned i=0;i<48;i++){
+            CHECK(out[i+16]==genesis_dac_cram_to_argb(expected[i],GENESIS_DAC_NORMAL));
+            if(expected[i]&0xE)expected[i]-=2;
+            else if(expected[i]&0xE0)expected[i]-=0x20;
+            else if(expected[i]&0xE00)expected[i]-=0x200;
+        }
+        if(v.cram[17]&0xE)v.cram[17]-=2;
+        else if(v.cram[17]&0xE0)v.cram[17]-=0x20;
+        else if(v.cram[17]&0xE00)v.cram[17]-=0x200;
+    }
+    memcpy(s_aiz_intro.colors,saved,sizeof saved);
 }
 static int tree_palette_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 { (void)ram;(void)x;(void)y;*cell=background?0:1;return 1; }
@@ -1818,7 +1837,7 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0,0x100,0x200,0x201,0x300,0x400,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
+    const unsigned zones[]={0,0x100,0x200,0x201,0x300,0x400,0x700,0x701,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         word(g_ram,0xFE10,zones[z]);int canvas=widths[w];
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
@@ -2092,6 +2111,40 @@ static void test_mgz2_falling_arena(void)
     CHECK(!memcmp(before,g_ram,sizeof before));
     word(g_ram,0xFE10,0x101);publish_sprites();scanline(&v,0,native,320,out,796);
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFF000000u);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
+static void test_lbz1_falling_columns(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x600);write32(0xB000,0x1234);
+    word(g_ram,0x8000,128);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x3B20);word(g_ram,0xEE84,0x200);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=7;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+    for(unsigned y=0;y<32;++y)for(unsigned x=0;x<64;++x)
+        word(v.vram,0xC000+(y*64+x)*2,y&1?3:1);
+    for(unsigned c=0;c<20;++c)v.vsram[c*2]=(uint16_t)(0x208+(c&1)*8);
+    word(v.vram,0xF000,(unsigned)-0x3B20);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(empty_arena_cell);memcpy(before,g_ram,sizeof before);
+    /* The installed columns can be ahead of the copied object camera.
+     * They own their falling plane pixels, never the actor projection or
+     * a repeated copy of that plane across the wider world's margins. */
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_camera_y==0x200);
+    for(int x=0;x<796;++x) {
+        int nx=x-s_native_x;
+        uint32_t expected=nx<0 || nx>=320?0xFF000000u:
+            ((nx/16)&1?0xFFFF0000u:0xFF0000FFu);
+        CHECK(out[x]==expected);
+    }
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    word(g_ram,0xFE10,0x601);publish_sprites();scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;x++)CHECK(out[x]==0xFF000000u);
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
 static void test_mgz2_perspective_owner(void)
@@ -3478,7 +3531,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();

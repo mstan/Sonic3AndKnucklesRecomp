@@ -292,6 +292,7 @@ static int gameplay_instruction(uint32_t pc)
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);
+        s3_gameplay_hud_reset(pc,g_ram);
         s3_gameplay_level_select(pc,g_ram);
         s3_gameplay_timer_hook(pc,g_ram,&g_cpu.D[1],&g_cpu.SR);
         if(s3_gameplay_skip_shield(pc,g_ram,g_cpu.A[0],1))g_cpu.SR|=4u;
@@ -325,6 +326,10 @@ const GameSpec g_game_spec = {
      * of the runner's internal byteswapped-buffer CRC path. */
     .expected_rom_crc32     = 0x9BC192CEu,
     .expected_rom_size      = 0x200000u,   /* 2 MB standalone cart */
+    /* Mirror the cartridge's RA header for the launcher's save panel.
+     * The runtime still takes the SRAM geometry from that header. */
+    .sram_start             = 0x200001u,
+    .sram_end               = 0x2003FFu,
 #ifdef GENESIS_Z80_RECOMP
     .z80_step               = s3z80_step,
 #endif

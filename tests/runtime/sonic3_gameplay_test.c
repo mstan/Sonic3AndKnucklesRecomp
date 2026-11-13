@@ -67,6 +67,12 @@ static void test_extended_timer(void)
         ram[0xFE23]=99;ram[0xFE24]=59;ram[0xFE25]=59;
         for(unsigned t=0;t<300;++t){s3_gameplay_apply(ram);native_timer_profile(ram,!m);}
         CHECK(ram[0xFE23]==99&&ram[0xFE24]==59&&ram[0xFE25]==59&&!ram[0xFE1A]);
+        unsigned redraw=m?0xDE9C:0xEC10;CHECK(s3_gameplay_owns(redraw));
+        ram[0xFE1E]=1;s3_gameplay_hud_reset(redraw,ram);
+        CHECK(ram[0xFE1E]==0x80&&ram[0xFE23]==99&&ram[0xFE24]==59);
+        ram[0xFE1E]=1;ram[0xFE08]=2;
+        s3_gameplay_hud_reset(redraw,ram);CHECK(ram[0xFE1E]==1);
+        ram[0xFE08]=0;s3_gameplay_hud_reset(redraw+2,ram);CHECK(ram[0xFE1E]==1);
         s3_gameplay.infinite_time=0;native_timer_profile(ram,!m);CHECK(ram[0xFE1A]==1);
         for(unsigned on=0;on<2;++on)for(unsigned minute=0;minute<100;++minute) {
             s3_gameplay.infinite_time=on;ram[0xFE23]=(uint8_t)minute;

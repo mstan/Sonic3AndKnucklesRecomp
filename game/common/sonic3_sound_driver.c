@@ -150,7 +150,7 @@ void s3_sound_post_reset(void)
     invincibility_override=s3_music_active(S3_THEME_INVINCIBLE);
     super_override=s3_music_active(S3_MUSIC_SUPER);
     if(standalone && (invincibility_override||super_override) && !prototype_active)
-        memcpy(bank+seq.music_index-0x400000+4*(0x32-1),bank+seq.music_index-0x400000+4*(0x2C-1),4);
+        memcpy(bank+seq.music_index-0x400000+4*(0x33-1),bank+seq.music_index-0x400000+4*(0x2C-1),4);
     unsigned next_sample=prototype_active?97:70;
     const uint8_t *inputs[S3_ROM_DONOR_COUNT]={0};size_t sizes[S3_ROM_DONOR_COUNT]={0};
     uint8_t *owned[S3_ROM_DONOR_COUNT]={0};S3SoundMusicCache cache={0};
@@ -238,9 +238,9 @@ static void queue(unsigned native,unsigned slot)
         return;
     }
     if(!id)return;
-    /* Retail Sonic 3 shares Invincibility with Super. The donor has a
-     * dedicated Super theme, also used by the S&K hosts' native $32 queue. */
-    if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x32;
+    /* Sonic 3's $32 is Ending. Its unused relocated-credits slot can hold
+     * the separate Super replacement without changing the native ending. */
+    if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x33;
     /* Native SFX start at $33, which is also Clone's relocated S&K credits
      * entry. Only native music/control requests may stop a CD recording. */
     if(native<=0x32 || native>=0xDC)

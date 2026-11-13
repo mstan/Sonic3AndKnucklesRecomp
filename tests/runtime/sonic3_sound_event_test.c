@@ -130,6 +130,15 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
     unsigned fbz=(be32(bank+seq->music_index-0x400000+4*8)&0xFFFFFF)-0x400000;
     CHECK(fbz_loop_ticks(bank,fbz,1,used)==2400);
     CHECK(fbz_loop_ticks(bank,fbz,5,used)==2400);
+    /* CNZ1 FM5 must reapply its lead voice/detune/modulation each loop,
+     * rather than retaining voice 5 from the end of the preceding phrase. */
+    unsigned cnz=(be32(bank+seq->music_index-0x400000+4*6)&0xFFFFFF)-0x400000;
+    unsigned fm5=cnz+be16(bank+cnz+8+5*4),loop=fm5+2,hits=0;
+    static const uint8_t setup[]={0xFF,0x0D,6,0xFF,1,0,0xFF,0x21,15,1,6,6,0xFF,1,1};
+    CHECK(bank[fm5]==0x80&&bank[fm5+1]==2&&!memcmp(bank+loop,setup,sizeof setup));
+    for(unsigned pc=fm5;pc+4<cnz+be16(bank+cnz);pc++)
+        if(bank[pc]==0xFF&&bank[pc+1]==0x14&&(unsigned)((int)pc+3+(int16_t)be16(bank+pc+2))==loop)++hits;
+    CHECK(hits==1);
     /* The proposed Wai mini-boss/retail boss pairing also fits over a full
      * campaign selection without touching either the other song or SFX. */
     for(unsigned i=0;i<2;i++){

@@ -134,11 +134,18 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
     if(!(active&PROTO_BACKGROUNDS) || (ram[0xF600]&127)!=12 || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
     if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && bg_word(ram+0xEE80)<0x3680)which=0;
-    else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA] && !bg_word(ram+0xEED6) && !bg_word(ram+0xEEC2))which=1+ram[0xFE11];
+    else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA])which=1+ram[0xFE11];
     else return 0;
     const Background *bg=&backgrounds[which];if(!bg->pixels)return 0;
     if(!attr || !pixel)return 1;
     if(which){
+        /* Retail doorway events install the indoor/outdoor canvas a row
+         * or column at a time. Its two authored tile sets are disjoint in
+         * both acts: indoor $3E/$8E/$274-$2D0, outdoor $0-$263. Follow the
+         * installed cell, rather than swapping the whole background when
+         * the destination flag changes or the redraw finishes. */
+        unsigned tile=*attr&2047u;
+        if(tile!=0x3Eu && tile!=0x8Eu && (tile<0x274u || tile>0x2D0u))return 0;
         /* The prototype's Level_Deform ($341EA) uses one-eighth X/Y scroll.
          * Retail FBZ selects unrelated indoor/outdoor canvases, so feeding
          * its VScroll into this donor layout can select an empty region. */
@@ -224,6 +231,13 @@ void s3_restoration_post_reset(void)
         if(!bank){free(donor);fprintf(stderr,"[restoration] Cannot allocate prototype graphics\n");exit(1);}
         if(offset>g_rom_ext_size)memset(bank+g_rom_ext_size,0,offset-g_rom_ext_size);
         memcpy(bank+offset,donor,0x200000);free(donor);
+        if(!standalone_s3 && (active&PROTO_PALETTES)){
+            /* These unused stage palettes contain an early shared sprite
+             * row (LRZ's is almost empty). Retain the retail HUD, rings,
+             * enemies and common object colors while restoring terrain. */
+            memcpy(bank+offset+0x1F2F0E,g_rom+0xA943C,32);
+            memcpy(bank+offset+0x1F2FCE,g_rom+0xA967C,32);
+        }
         g_rom_ext=bank;g_rom_ext_size=offset+0x200000u;donor_address=0x400000u+offset;
         if(active&PROTO_PALETTES)s3_video_set_palette_source(palette_source);
         fprintf(stderr,"[restoration] Verified November prototype graphics enabled (mask %u)\n",active);

@@ -609,6 +609,10 @@ kind = "game_hook"
 addr = 0x529AC
 kind = "game_hook"
 
+# Keep a capped timer visible when debug exit rebuilds the HUD.
+[[widescreen_site]]
+addr = 0xEC10 # HUD_DrawInitial: refresh a retained capped timer after debug exit
+kind = "game_hook"
 # A level-select start must not reuse the previous stage checkpoint.
 [[widescreen_site]]
 addr = 0x6AD0 # LevelSelect_StartZone

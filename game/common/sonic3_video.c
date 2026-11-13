@@ -66,9 +66,11 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
+       S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
        S3_SPRING_MAP=0x21DEA, S3_SPRING_ART=0x15EFFC };
 #else
 enum { S3_EXPLOSION_MAP=0x1E758, S3_EXPLOSION_ART=0x19200A,
+       S3_CAPSULE_MAP=0x86BFC, S3_CAPSULE_ART=0xDD990,
        S3_SPRING_MAP=0x2375C, S3_SPRING_ART=0x1927FE };
 #endif
 static unsigned native_art_owner(unsigned map)
@@ -77,7 +79,8 @@ static unsigned native_art_owner(unsigned map)
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
     if(map==S3_SPRING_MAP || map==S3_SPRING_MAP+22u)return 4;
-    if(map==S3_ART_BANK+0x164016u)return 5;
+    if(map==S3_CAPSULE_MAP || map==S3_ART_BANK+0x163F22u)return 5;
+    if(map==S3_ART_BANK+0x164016u)return 6;
     return 0;
 }
 enum { VIDEO_OFF, VIDEO_FIT, VIDEO_RATIO, VIDEO_STAGE };
@@ -1457,12 +1460,13 @@ static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
     {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
     {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1},
-    {S3_SPRING_ART,0x2EF,0x600,0x494,0}
+    {S3_SPRING_ART,0x2EF,0x600,0x494,0},
+    {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0}
 };
-static struct { uint8_t pixels[0x880];int attempted,ready; } s_native_art_cache[4];
+static struct { uint8_t pixels[0x8C0];int attempted,ready; } s_native_art_cache[5];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
-    if(!owner || owner>4)return 0;
+    if(!owner || owner>sizeof s_native_art/sizeof *s_native_art)return 0;
     const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
     if(!s_native_art_cache[owner-1].attempted) {
@@ -1614,7 +1618,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
              * its controller borrows palette 1. Preserve its authored colors
              * there while the hardware viewport and private providers own
              * their existing composition. */
-            if(!ext && s_frame_level && !s->hud && (s->slot>>8)==5 &&
+            if(!ext && s_frame_level && !s->hud && (s->slot>>8)==6 &&
                (x<origin || x>=origin+320) && p>=16 && p<32)
                 c=genesis_dac_cram_to_argb(scene_art_color(scene_read16(
                     S3_KNUX_PREVIEW_PALETTE+(p-16)*2),v),GENESIS_DAC_NORMAL);
@@ -1646,6 +1650,18 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
             unsigned target=(color>>(unsigned)shift)&14,part=steps*2;
             if(part>target)part=target;
             faded|=part<<(unsigned)shift;steps-=part/2;
+        }
+        return (uint16_t)faded;
+    }
+    unsigned white=v->cram[17],sum=(white&14)+((white>>4)&14)+((white>>8)&14);
+    if(sum<42&&!v->cram[16]){
+        unsigned steps=(42-sum)/2,faded=0;
+        /* Pal_DecColor removes red, green, then blue independently for
+         * every entry. Cached margin colors must follow those same steps. */
+        for(unsigned shift=0;shift<12;shift+=4){
+            unsigned target=(color>>shift)&14,remove=steps*2;
+            if(remove>target)remove=target;
+            faded|=(target-remove)<<shift;steps-=remove/2;
         }
         return (uint16_t)faded;
     }
@@ -2008,6 +2024,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * to the camera, rather than moving it with the first falling column. */
     int mgz2_collapse=level && s_frame_zone==2 && s_frame_act==1 &&
         ((s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==4 && (v->reg[11]&4);
+    /* LBZ1 publishes independently falling 16px foreground columns.
+     * Their first scroll value cannot become the whole world's camera. */
+    int lbz1_columns=level && s_frame_zone==6 && !s_frame_act && (v->reg[11]&4);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
@@ -2028,7 +2047,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ground_distance=abs(unwrap((int)fg_identity,plane_y)-plane_y);
     int ship_band=aiz_ship && ship_distance<=ground_distance;
     int camera=level?unwrap(-hs_a,ship_band?ship_x:plane_x):ram16(0xEE78);
-    int camera_y=mgz2_collapse?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
+    int camera_y=(mgz2_collapse || lbz1_columns)?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
         if(level) {
             int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
@@ -2098,7 +2117,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
-        mgz_background || cnz_background || restored_canvas);
+        mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
@@ -2389,6 +2408,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int ay=line+(((aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
             a=plane_attr(v,base_a,nx-hs_a,ay);
             ap=pattern_pixel(v,a,nx-hs_a,ay);
+        }
+        if(lbz1_columns) {
+            if(nx>=0 && nx<nw) {
+                unsigned column=(unsigned)nx/16;
+                unsigned scroll=presentation_column_scroll(column*2,v->vsram[column*2]);
+                int ax=nx-hs_a,ay=line+(scroll&1023);
+                a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
+            } else {
+                /* LBZ1_FGVScrollArray owns ten columns at $3B60..$3BFF.
+                 * All other scenery keeps the ordinary copied camera. */
+                int ay=plane_y+line;
+                if(wx>=0x3B60 && wx<0x3C00) {
+                    unsigned at=0xA930u+(1u+(unsigned)(wx-0x3B60)/16u)*2u;
+                    ay=(int16_t)(((unsigned)s_world_frame[at]<<8)|s_world_frame[at+1])+line;
+                }
+                a=world_attr(s_world_frame,wx,ay,0);ap=pattern_pixel(v,a,wx,ay);
+            }
         }
         if(mgz2_collapse && wx>=0x3C80 && wx<0x3E00) {
             int column=nx<0?0:nx>=nw?(nw-1)/16:nx/16;

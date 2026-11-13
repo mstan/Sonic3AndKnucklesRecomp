@@ -83,6 +83,7 @@ int main(int argc,char **argv)
         CHECK(!s3_sound_prototype_set_path("missing-prototype.bin"));
         CHECK(!strcmp(s3_sound_prototype_path(),argv[3])); /* Keep valid selection. */
         s3_sound_post_reset();CHECK(s3_sound_prototype_active());
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
         if(!s3){
             uint32_t a=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x26-1))&0xFFFFFF)-0x400000;
             uint32_t b=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1))&0xFFFFFF)-0x400000;
@@ -134,7 +135,8 @@ int main(int argc,char **argv)
         s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(s3_sound_prototype_set_path(argv[3]));
         CHECK(s3_music_pick(S3_MUSIC_SUPER,"s3-proto"));s3_sound_post_reset();CHECK(!s3_sound_prototype_active());
         CHECK(s3_sound_hook(init));
-        g_ram[0xFE19]=1;g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x32);
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
+        g_ram[0xFE19]=1;g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x33);
         g_ram[0xFE19]=0;g_cpu.D[0]=0x2C;CHECK(s3_sound_hook(music));s3_sound_vblank();CHECK(last_id==0x2C);
     }
     if(argc==4){

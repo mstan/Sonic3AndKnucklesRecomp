@@ -5,6 +5,7 @@
 #include "sonic3_sound_themes.h"
 #include "sonic3_state_io.h"
 #include "audio.h"
+#include "genesis_clocks.h"
 #include "sha256.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +13,7 @@
 
 typedef struct Song {uint8_t *pcm;uint32_t frames,gain;uint8_t hash[32];} Song;
 static Song songs[S3_THEME_COUNT];
-typedef struct CDClock {uint64_t position;uint32_t theme,active,paused,volume,fade;} CDClock;
+typedef struct CDClock {uint64_t position,frame_position;uint32_t theme,active,paused,volume,fade;} CDClock;
 static CDClock clock_state;
 static const unsigned events[]={0x2A,0x27,0x28,0x29,0x2C};
 static unsigned le16(const uint8_t *p){return p[0]|((unsigned)p[1]<<8);}
@@ -75,21 +76,22 @@ static void mix(int16_t *out,size_t frames,double rate)
     if(!clock_state.active||clock_state.paused||clock_state.theme>=S3_THEME_COUNT||rate<1||rate>384000)return;
     const Song *s=&songs[clock_state.theme];if(!s->pcm||!s->frames)return;
     uint64_t step=(uint64_t)(44100.0*4294967296.0/rate+0.5);
+    uint64_t position=clock_state.frame_position;
     for(size_t i=0;i<frames;i++){
-        uint32_t at=(uint32_t)(clock_state.position>>32);
+        uint32_t at=(uint32_t)(position>>32);
         if(at>=s->frames){
-            if(clock_state.theme!=S3_THEME_INVINCIBLE){clock_state.active=0;break;}
-            clock_state.position%=((uint64_t)s->frames<<32);at=(uint32_t)(clock_state.position>>32);
+            if(clock_state.theme!=S3_THEME_INVINCIBLE)break;
+            position%=((uint64_t)s->frames<<32);at=(uint32_t)(position>>32);
         }
         unsigned next=at+1<s->frames?at+1:clock_state.theme==S3_THEME_INVINCIBLE?0:at;
-        unsigned fraction=(unsigned)(clock_state.position&0xFFFFFFFFu)>>16;
+        unsigned fraction=(unsigned)(position&0xFFFFFFFFu)>>16;
         for(unsigned ch=0;ch<2;ch++){
             int64_t a=sample(s,at,ch),b=sample(s,next,ch);
             int64_t value=a+(((b-a)*fraction)>>16);
             value=(value*clock_state.volume*s->gain)/4294967296LL;
             value+=out[i*2+ch];out[i*2+ch]=(int16_t)(value>32767?32767:value<-32768?-32768:value);
         }
-        clock_state.position+=step;
+        position+=step;
     }
 }
 void s3_cd_themes_reset(void)
@@ -127,6 +129,21 @@ void s3_cd_theme_request(unsigned native)
 void s3_cd_theme_frame(int paused,int oneup)
 {
     clock_state.paused=paused||oneup;
+    if(clock_state.active&&!clock_state.paused){
+        const Song *s=&songs[clock_state.theme];
+        uint64_t length=(uint64_t)s->frames<<32;
+        if(clock_state.position>=length){
+            if(clock_state.theme!=S3_THEME_INVINCIBLE){clock_state.active=0;return;}
+            clock_state.position%=length;
+        }
+        /* The qualified NTSC simulation drains 895780 master cycles per
+         * tick and resets the PSG remainder, giving 3732 internal samples.
+         * Advance on that same VBlank, even in turbo/replay/rollback. The
+         * output mixer reads the completed interval without changing it. */
+        const uint64_t step=((UINT64_C(44100)<<32)+GENESIS_PSG_SAMPLE_RATE_NTSC/2)/GENESIS_PSG_SAMPLE_RATE_NTSC;
+        clock_state.frame_position=clock_state.position;
+        clock_state.position+=(895780u/240u)*step;
+    }
     if(clock_state.active&&clock_state.fade&&!clock_state.paused){
         if(clock_state.volume<=1457){clock_state.volume=0;clock_state.active=0;}else clock_state.volume-=1457;
     }
