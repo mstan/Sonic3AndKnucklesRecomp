@@ -45,6 +45,11 @@ int main(int argc,char **argv)
         CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
         CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
+        if(!s3){
+            CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
+            CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
+            CHECK(!memcmp(g_rom_ext+0x1F2FCE,g_rom+0xA967C,32));
+        }
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);

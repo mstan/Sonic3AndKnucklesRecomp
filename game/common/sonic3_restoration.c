@@ -224,6 +224,13 @@ void s3_restoration_post_reset(void)
         if(!bank){free(donor);fprintf(stderr,"[restoration] Cannot allocate prototype graphics\n");exit(1);}
         if(offset>g_rom_ext_size)memset(bank+g_rom_ext_size,0,offset-g_rom_ext_size);
         memcpy(bank+offset,donor,0x200000);free(donor);
+        if(!standalone_s3 && (active&PROTO_PALETTES)){
+            /* These unused stage palettes contain an early shared sprite
+             * row (LRZ's is almost empty). Retain the retail HUD, rings,
+             * enemies and common object colors while restoring terrain. */
+            memcpy(bank+offset+0x1F2F0E,g_rom+0xA943C,32);
+            memcpy(bank+offset+0x1F2FCE,g_rom+0xA967C,32);
+        }
         g_rom_ext=bank;g_rom_ext_size=offset+0x200000u;donor_address=0x400000u+offset;
         if(active&PROTO_PALETTES)s3_video_set_palette_source(palette_source);
         fprintf(stderr,"[restoration] Verified November prototype graphics enabled (mask %u)\n",active);
