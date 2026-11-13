@@ -130,6 +130,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             else if(op==0xE9)encoded=0; /* Clone queues own spindash pitch */
             else if(op==0xE2)encoded=rb(c,pc+1)==0xFF?2:0;
             else if(op==0xE5)encoded=n->kind==2?0:3;
+            else if(op==0xE6&&n->kind==2)encoded=0; /* native FM-only volume */
             else if(op==0xFF){
                 unsigned sub=rb(c,pc+1);
                 if(sub==0){length=3;encoded=3;}

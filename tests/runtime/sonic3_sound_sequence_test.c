@@ -24,14 +24,18 @@ static void volume_command_test(void)
     rom[0x800A]=0x60;rom[0x800B]=0x80;
     rom[0x800E]=0x70;rom[0x800F]=0x80;
     rom[0x8050]=0xF2;
-    const uint8_t notes[]={0xE5,3,0xFE,0x81,1,0xF2};
+    const uint8_t notes[]={0xE5,3,0xFE,0xE6,3,0xE6,0xFD,0x81,1,0xF2};
     memcpy(rom+0x8060,notes,sizeof notes);memcpy(rom+0x8070,notes,sizeof notes);
     CHECK(convert_song(c,0x8000,0x1000,1)>0);
     CHECK(bank[0x1005]==1); /* S3 PSG compatibility, distinct from legacy donors. */
     unsigned fm=0x1000+((bank[0x100C]<<8)|bank[0x100D]);
     unsigned psg=0x1000+((bank[0x1010]<<8)|bank[0x1011]);
     CHECK(bank[fm]==0xFF && bank[fm+1]==6 && bank[fm+2]==0xFE);
-    CHECK(bank[fm+3]==0x81 && bank[fm+4]==1);
+    CHECK(bank[fm+3]==0xFF&&bank[fm+4]==6&&bank[fm+5]==3);
+    CHECK(bank[fm+6]==0xFF&&bank[fm+7]==6&&bank[fm+8]==0xFD);
+    CHECK(bank[fm+9]==0x81 && bank[fm+10]==1);
+    /* S3's Z80 driver ignores both FM volume commands on PSG, including
+     * their parameters. S2's similarly named command has another contract. */
     CHECK(bank[psg]==0x81 && bank[psg+1]==1);
     free(c);
 }
