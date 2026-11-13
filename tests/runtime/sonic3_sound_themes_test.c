@@ -7,6 +7,8 @@
 const RecompLauncherCModProvider *s3_theme_mods(const RecompLauncherCModProvider *base);
 static const char package[]="sonic3.audio.event-themes";
 static int driver;
+static int prototype;
+int s3_sound_prototype_selected(void){return prototype;}
 int s3_sound_select(int on){driver=on!=0;return 1;}
 const char *s3_sound_error(void){return "";}
 const char *s3_sound_prototype_path(void){return "";}
@@ -29,6 +31,10 @@ int main(int argc,char **argv)
     CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_WAI)==11);
     CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_S1)==12);
     CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_S2)==19);
+    CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_S2)==17);
+    CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_WAI)==8);
+    CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_S2)==16);
+    CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_WAI)==9);
     const RecompLauncherCModProvider *p=s3_theme_mods(NULL);int combined=!strcmp(argv[2],"sonic3k");
     const char *campaign=combined?"sonic3k-campaign":!strcmp(argv[2],"sonic3")?"sonic3-campaign":"sandk-campaign";
     CHECK(p&&p->feature_count(NULL)==2&&p->package_count(NULL)==1);
@@ -45,16 +51,24 @@ int main(int argc,char **argv)
             CHECK(p->feature_choice_get(NULL,package,f.id,o.id,0,&choice)&&!strcmp(choice.value,"base"));
             for(int k=1;k<o.choice_count;k++){
                 CHECK(p->feature_choice_get(NULL,package,f.id,o.id,k,&choice));CHECK(strcmp(choice.value,"original"));
-                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"competition-menu")&&!strcmp(choice.value,"s3")));
+                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3")));
+                if(!strcmp(o.id,"final-boss"))CHECK(strcmp(choice.value,"s3")&&strcmp(choice.value,"sk"));
+                if(!strcmp(o.id,"competition-menu"))CHECK(strcmp(choice.value,"s3"));
             }
-            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"competition-menu")?3:2));else ++shared;
+            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?3:2));else ++shared;
             ++total;
         }
     }
-    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?34:27));CHECK(shared==(!strcmp(argv[2],"sonic3")?14:13));
+    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?34:28));CHECK(shared==(!strcmp(argv[2],"sonic3")?15:14));
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
     CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==6&&s3_theme_choices(S3_MUSIC_BOSS)==5);
-    CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==2);
+    CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==3);
+    CHECK(s3_music_available(S3_MUSIC_DATA)&&s3_music_group(S3_MUSIC_DATA)==S3_MUSIC_SHARED);
+    prototype=1;
+    if(strcmp(argv[2],"sandk")){
+        RecompLauncherCModChoice c;CHECK(p->feature_choice_get(NULL,package,campaign,"competition-menu",1,&c)&&!strcmp(c.value,"s3"));
+    }
+    prototype=0;
     if(s3_donor_verified(S3_DONOR_PROTO)){
         CHECK(p->feature_resource_set_path(NULL,package,campaign,"s3-proto",s3_donor_path(S3_DONOR_PROTO)));
         CHECK(!s3_themes_enabled());
@@ -137,5 +151,16 @@ int main(int argc,char **argv)
     s3_themes_load(argv[1],argv[2]);CHECK(!s3_themes_enabled());value(p,"shared-themes","extra-life","s3");
     saved=fopen(path,"ab");CHECK(saved);CHECK(fputs("game-over.choice=original\ngame-over.enabled=1\n",saved)>=0);CHECK(!fclose(saved));
     s3_themes_load(argv[1],argv[2]);CHECK(!s3_themes[S3_THEME_OVER].enabled);
+    saved=fopen(path,"wb");CHECK(saved);
+    CHECK(fputs("group.0.enabled=0\ngroup.1.enabled=1\ndata-select.choice=s3-proto\ndata-select.enabled=1\nboss.choice=s2\nboss.enabled=1\n",saved)>=0);CHECK(!fclose(saved));
+    s3_themes_load(argv[1],argv[2]);
+    CHECK(s3_music_active(S3_MUSIC_DATA)&&!s3_music_active(S3_MUSIC_BOSS));
+    value(p,"shared-themes","data-select","s3-proto");
+    CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+    CHECK(s3_music_active(S3_MUSIC_DATA)&&!s3_music_active(S3_MUSIC_BOSS));
+    CHECK(p->feature_enable(NULL,package,"shared-themes",0)&&!s3_music_active(S3_MUSIC_DATA));
+    CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+    CHECK(!s3_music_active(S3_MUSIC_DATA));value(p,"shared-themes","data-select","s3-proto");
+    CHECK(p->feature_enable(NULL,package,"shared-themes",1)&&s3_music_active(S3_MUSIC_DATA));
     puts("PASS grouped music, base defaults, same-zone-only prototype choices, independent boss/mini-boss, shared pickers, donor gating, retained group choices and legacy settings");return 0;
 }

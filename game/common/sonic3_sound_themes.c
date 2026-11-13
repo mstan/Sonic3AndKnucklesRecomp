@@ -11,6 +11,9 @@
 
 S3ThemeSelection s3_themes[S3_MUSIC_COUNT];
 static int group_on[S3_MUSIC_GROUPS]={1,1,1};
+/* Data Select moved from the campaign to Shared. Retain its saved campaign
+ * switch until the player deliberately changes the Shared section. */
+static int data_group_on=1;
 #define TRACK(symbol,id,...) id,
 const char *const s3_theme_ids[]={
 #include "sonic3_music_catalog.inc"
@@ -22,7 +25,7 @@ const char *const s3_theme_names[]={
 };
 #undef TRACK
 typedef struct MusicRow {unsigned group,target;const char *section;unsigned choices;} MusicRow;
-enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL};
+enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL,SPECIAL,DATA,SKY};
 #define TRACK(symbol,id,label,group,section,target,choices) {group,target,section,choices},
 static const MusicRow rows[]={
 #include "sonic3_music_catalog.inc"
@@ -43,10 +46,13 @@ static const S3ThemeChoice choices[][6]={
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s3","Retail (Sonic 3)",S3_DONOR_S3},{"s3-proto","Prototype (November 3, 1993)",S3_DONOR_PROTO}},
     {{"s3","Sonic 3 (Retail)",S3_DONOR_S3},{"sk","Sonic & Knuckles (Retail)",S3_DONOR_SK},{"s3-proto","Sonic 3 Prototype",S3_DONOR_PROTO}},
-    {{"s3","Sonic 3",S3_DONOR_S3},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
+    {{"s3","Sonic 3",S3_DONOR_S3},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
+    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI}},
+    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2","Sonic 2 Options",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai Level Select",S3_DONOR_WAI}},
+    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3 (unused)",S3_DONOR_S3}},
 };
-static const unsigned counts[]={4,3,3,5,6,2,5,6,3,1,2,3,2,6};
+static const unsigned counts[]={4,3,3,5,6,2,5,6,3,1,2,3,3,6,3,5,2};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -72,13 +78,19 @@ const char *s3_music_section(unsigned t){return t<S3_MUSIC_COUNT?rows[t].section
 unsigned s3_music_target(unsigned t){return (t==S3_MUSIC_CREDITS&&!host_s3)||t==S3_MUSIC_SUPER?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;}
 int s3_music_available(unsigned t)
 {return t<S3_MUSIC_COUNT&&t!=S3_MUSIC_EMERALD&&(t!=S3_MUSIC_SUPER||host_s3)&&(!rows[t].group||(rows[t].group==S3_MUSIC_SONIC3?(host_s3||host_combined):!host_s3));}
-int s3_music_active(unsigned t){return s3_music_available(t)&&group_on[rows[t].group]&&s3_themes[t].enabled;}
+int s3_music_active(unsigned t){return s3_music_available(t)&&(t==S3_MUSIC_DATA?data_group_on:group_on[rows[t].group])&&s3_themes[t].enabled;}
 unsigned s3_music_source(unsigned t,unsigned donor)
 {
     static const unsigned s1[]={7,14,15,13,6,17,11,11,9};
     static const unsigned s2[]={23,26,27,25,22,30,18,18,24};
     if(t>=S3_MUSIC_COUNT)return 0;
     if(donor<=S3_DONOR_WAI){
+        if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_S2)return 17;
+        if(t==S3_MUSIC_DATA && donor==S3_DONOR_S2)return 16;
+        /* Simon Wai's own playlist: Special Stage $89, Level Select $8A.
+         * These entries precede the retail revision's Options/SS slots. */
+        if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_WAI)return 8;
+        if(t==S3_MUSIC_DATA && donor==S3_DONOR_WAI)return 9;
         /* Each revision's native playlist is authoritative: the Wai $93
          * entry is an early EHZ 2P song, while its boss is native $8E. */
         if(t==S3_MUSIC_FINAL)return donor==S3_DONOR_S1?12:donor==S3_DONOR_WAI?11:19;
@@ -149,7 +161,7 @@ int s3_theme_enable(unsigned t,int on)
     if(on && d>=0){size_t n;free(s3_donor_read((unsigned)d,&n));}
     if(on && !s3_theme_ready(t)){snprintf(error,sizeof error,"Provide the selected theme's ROM first.");return 0;}
     if(on && !s3_sound_select(1)){snprintf(error,sizeof error,"%s",s3_sound_error());return 0;}
-    s3_themes[t].enabled=on!=0;if(on)group_on[rows[t].group]=1;return 1;
+    s3_themes[t].enabled=on!=0;if(on){group_on[rows[t].group]=1;if(t==S3_MUSIC_DATA)data_group_on=1;}return 1;
 }
 int s3_theme_choose(unsigned t,const char *id)
 {
@@ -171,6 +183,7 @@ static void group_set(unsigned group,int on)
     /* Keep the two stored campaign switches intact on load. A deliberate
      * change to the combined campaign section controls both halves. */
     group_on[group]=on;
+    if(group==S3_MUSIC_SHARED)data_group_on=on;
     if(host_combined&&group==S3_MUSIC_SONIC3)group_on[S3_MUSIC_SANDK]=on;
 }
 int s3_music_group_enable(unsigned group,int on)
@@ -202,6 +215,7 @@ void s3_themes_load(const char *settings,const char *mode)
 {
     memset(s3_themes,0,sizeof s3_themes);memset(verified,0,sizeof verified);*error=0;*prototype_alias=0;prototype_from_alias=0;
     for(unsigned g=0;g<S3_MUSIC_GROUPS;g++)group_on[g]=1;
+    data_group_on=1;
     host_s3=!strcmp(mode,"sonic3");host_combined=!strcmp(mode,"sonic3k");
     snprintf(file,sizeof file,"%s",settings?settings:"settings.ini");
     char *a=strrchr(file,'/'),*b=strrchr(file,'\\');if(!a||(b&&b>a))a=b;
@@ -225,10 +239,11 @@ void s3_themes_load(const char *settings,const char *mode)
     }
     s3_theme_offer_prototype(s3_sound_prototype_path());
     FILE *f=fopen(file,"rb");if(!f)return;
-    char line[256];int invalid_choice[S3_MUSIC_COUNT]={0},grouped=0;
+    char line[256];int invalid_choice[S3_MUSIC_COUNT]={0},grouped=0,data_group_explicit=0;
     while(fgets(line,sizeof line,f)){
         line[strcspn(line,"\r\n")]=0;
         char *value=strchr(line,'=');if(!value)continue;*value++=0;
+        if(!strcmp(line,"data-select.group-enabled")){data_group_on=!strcmp(value,"1");data_group_explicit=1;}
         for(unsigned g=0;g<S3_MUSIC_GROUPS;g++){
             char key[64];snprintf(key,sizeof key,"group.%u.enabled",g);
             if(!strcmp(key,line)){group_on[g]=!strcmp(value,"1");grouped=1;}
@@ -247,15 +262,17 @@ void s3_themes_load(const char *settings,const char *mode)
         }
     }
     fclose(f);
+    if(!data_group_explicit)data_group_on=group_on[S3_MUSIC_SONIC3];
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_themes[t].enabled){
         if(invalid_choice[t])s3_themes[t].enabled=0;
-        else if(!s3_theme_ready(t)){if(grouped)group_on[rows[t].group]=0;else s3_themes[t].enabled=0;}
+        else if(!s3_theme_ready(t)){if(t==S3_MUSIC_DATA)data_group_on=0;else if(grouped)group_on[rows[t].group]=0;else s3_themes[t].enabled=0;}
     }
 }
 int s3_themes_save(void)
 {
     char text[S3_MUSIC_COUNT*160+256];size_t used=0;
     for(unsigned g=0;g<S3_MUSIC_GROUPS;g++)used+=(size_t)snprintf(text+used,sizeof text-used,"group.%u.enabled=%d\n",g,group_on[g]);
+    used+=(size_t)snprintf(text+used,sizeof text-used,"data-select.group-enabled=%d\n",data_group_on);
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)used+=(size_t)snprintf(text+used,sizeof text-used,"%s.enabled=%d\n%s.choice=%s\n",s3_theme_ids[t],s3_themes[t].enabled,s3_theme_ids[t],s3_theme_choice(t,(unsigned)s3_themes[t].choice)->id);
     if(!genesis_atomic_file_store(file,text,used)){snprintf(error,sizeof error,"Unable to save sound themes");return 0;}
     return 1;
@@ -263,7 +280,12 @@ int s3_themes_save(void)
 int s3_themes_validate(void)
 {
     *error=0;
-    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_active(t)&&!s3_theme_enable(t,1))return 0;
+    int groups[S3_MUSIC_GROUPS],data=data_group_on;memcpy(groups,group_on,sizeof groups);
+    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_active(t)){
+        int ok=s3_theme_enable(t,1);
+        memcpy(group_on,groups,sizeof groups);data_group_on=data;
+        if(!ok)return 0;
+    }
     return 1;
 }
 int s3_theme_import(unsigned t,const char *path,void (*progress)(void *,float,const char *),void *user)

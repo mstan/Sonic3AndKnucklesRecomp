@@ -1,12 +1,14 @@
 # Music customization
 
-The **Sound** section of Mods has **Shared Themes**, **Sonic 3 Campaign** and
-**Sonic & Knuckles Campaign**. Each cartridge shows the campaigns it contains;
-the combined game shows all three sections. All tracks default to **Base game**.
+The **Sound** section of Mods has **Shared Themes** and one campaign section
+for the running game: **Sonic 3**, **Sonic & Knuckles**, or **Sonic 3 & Knuckles**.
+Common sounds, including Data Select, are available in all three games.
+All tracks default to **Base game**.
 
 Choose each song independently in its dropdown. A zone or act offers only
 **Base game** and **that same zone or act's November 1993 prototype theme**.
-Zone music cannot be exchanged with other zones or other Sonic games.
+Sky Sanctuary also offers Sonic 3's unused version of that same song.
+Other zone music cannot be exchanged with other zones or other Sonic games.
 Lava Reef Act 2 and Hidden Palace share one song and one dropdown.
 Competition, bonus stages and menus have their own applicable rows. The Competition menu offers explicit Retail and Prototype choices. Credits are in Shared Themes, with Sonic 3 retail, Sonic & Knuckles retail and Sonic 3 prototype choices.
 
@@ -23,11 +25,18 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype |
 | Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Title Screen | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
-| Special Stage | Sonic 3 prototype |
-| Knuckles | Sonic 3; Sonic 3 prototype |
+| Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype |
+| Knuckles | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
+| Data Select | Sonic 3 prototype; Sonic 3; Sonic & Knuckles; Sonic 2 Options; Sonic 2 Simon Wai Level Select |
 | Super (standalone Sonic 3) | Sonic 3 prototype |
 | Credits | Sonic 3 (Retail); Sonic & Knuckles (Retail); Sonic 3 Prototype |
 | Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
+
+The table includes stored retail overrides. A retail choice identical to
+**Base game** is omitted from the dropdown unless it is already selected or
+is needed to override the whole-prototype soundtrack. Existing selections
+remain readable and retain their effect. Moving Data Select to Shared also
+preserves its previous section's enabled state until Shared is changed.
 
 Main boss and mini-boss choices are independent. For example, choose the
 Simon Wai boss tune for mini-bosses and retail Sonic 2 for main bosses.
