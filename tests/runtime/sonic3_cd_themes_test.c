@@ -15,7 +15,11 @@ int main(int argc,char **argv)
     s3_cd_themes_reset();song(S3_THEME_OVER);song(S3_THEME_CLEAR);song(S3_THEME_INVINCIBLE);
     s3_cd_theme_request(0x2C);int16_t out[32]={0};mix(out,6,44100);
     static const int16_t expected[]={500,-1000,1500,-2000,2500,-3000,3500,-4000,500,-1000,1500,-2000};
-    CHECK(!memcmp(out,expected,sizeof expected));CHECK(clock_state.position==(uint64_t)2<<32);
+    CHECK(!memcmp(out,expected,sizeof expected));CHECK(!clock_state.position);
+    s3_cd_theme_frame(0,0);CHECK(clock_state.position&&!clock_state.frame_position);
+    CDClock rendered=clock_state;
+    int16_t repeat[32]={0};mix(repeat,6,44100);
+    CHECK(!memcmp(out,repeat,sizeof expected)&&!memcmp(&rendered,&clock_state,sizeof rendered));
     uint64_t position=clock_state.position;s3_cd_theme_frame(1,0);memset(out,0,sizeof out);mix(out,8,44100);
     CHECK(!out[0]&&clock_state.position==position);s3_cd_theme_frame(0,1);mix(out,8,44100);CHECK(clock_state.position==position);
     s3_cd_theme_frame(0,0);s3_cd_theme_request(0x2A);CHECK(clock_state.active);
@@ -27,7 +31,8 @@ int main(int argc,char **argv)
     validate.pos=0;validate.ok=1;s3_cd_theme_state(&validate);CHECK(!validate.ok&&!memcmp(&before,&clock_state,sizeof before));
     memcpy(&bad,&clock_state,sizeof bad);bad.theme=S3_THEME_LIFE;bad.active=1;memcpy(state,&bad,sizeof bad);
     validate.pos=0;validate.ok=1;s3_cd_theme_state(&validate);CHECK(!validate.ok&&!memcmp(&before,&clock_state,sizeof before));
-    s3_cd_theme_request(0x27);memset(out,0,sizeof out);mix(out,6,44100);CHECK(!clock_state.active);CHECK(!memcmp(out,expected,16)&&!out[8]&&!out[9]);
+    s3_cd_theme_request(0x27);s3_cd_theme_frame(0,0);memset(out,0,sizeof out);mix(out,6,44100);CHECK(clock_state.active);CHECK(!memcmp(out,expected,16)&&!out[8]&&!out[9]);
+    s3_cd_theme_frame(0,0);CHECK(!clock_state.active);
     s3_cd_theme_request(0x2C);s3_cd_theme_request(1);CHECK(!clock_state.active);
     s3_cd_theme_request(0x2C);s3_cd_theme_request(0xE1);for(unsigned i=0;i<45;i++)s3_cd_theme_frame(0,0);CHECK(!clock_state.active);
     s3_cd_themes_reset();
@@ -36,7 +41,13 @@ int main(int argc,char **argv)
         uint8_t bank[4096]={0};S3SoundLayout layout={512,0x400000,0,0,0};uint32_t used=512;char error[256];
         CHECK(s3_cd_theme_build(S3_THEME_INVINCIBLE,S3_DONOR_CD_US,argv[1],&layout,bank,sizeof bank,&used,error,sizeof error));
         CHECK(registered&&used==594);s3_cd_theme_request(0x2C);CHECK(clock_state.active);
-        memset(out,0,sizeof out);registered(out,16,48000);CHECK(clock_state.position);
+        s3_cd_theme_frame(0,0);uint64_t position=clock_state.position;CHECK(position);
+        memset(out,0,sizeof out);registered(out,16,48000);CHECK(clock_state.position==position);
+        CDClock audible=clock_state;
+        for(unsigned i=0;i<40;i++){s3_cd_theme_frame(0,0);registered(out,16,48000);}
+        CDClock with_output=clock_state;clock_state=audible;
+        for(unsigned i=0;i<40;i++)s3_cd_theme_frame(0,0);
+        CHECK(!memcmp(&with_output,&clock_state,sizeof clock_state));
         s3_cd_themes_reset();
     }
     puts("PASS CD stereo/loop/one-shot, cartridge transition, pause/1-UP hold, fade and exact current-build rewind; invalid state rejection");return 0;

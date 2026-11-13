@@ -83,6 +83,7 @@ int main(int argc,char **argv)
         CHECK(!s3_sound_prototype_set_path("missing-prototype.bin"));
         CHECK(!strcmp(s3_sound_prototype_path(),argv[3])); /* Keep valid selection. */
         s3_sound_post_reset();CHECK(s3_sound_prototype_active());
+        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1))==base_ending);
         if(!s3){
             uint32_t a=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x26-1))&0xFFFFFF)-0x400000;
             uint32_t b=(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1))&0xFFFFFF)-0x400000;
