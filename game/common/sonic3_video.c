@@ -2117,7 +2117,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
-        mgz_background || cnz_background || restored_canvas);
+        mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives

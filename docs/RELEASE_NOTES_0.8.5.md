@@ -4,7 +4,7 @@ Music Customization now shows Shared Themes and the campaign belonging to the ru
 
 Clone Driver retains Sonic 3 PSG pitch through rests so duration-only percussion events play correctly. Prototype Carnival Night Act 1 reapplies its FM5 setup when looping. Selecting the unused prototype Super theme in Sonic 3 preserves the separate Ending track. CD replacement playback advances from the simulation clock, allowing audio output and output-free replay to share the same state.
 
-The enhanced renderer follows Launch Base's independent foreground collapse columns, retains capsule artwork before its shared VRAM load, and follows the installed Flying Battery doorway tiles during prototype background transitions. Restored stage palettes retain the shared sprite and HUD color row. Cached scenery fades use the native component steps.
+The enhanced renderer follows Launch Base's independent foreground collapse columns, retains capsule artwork before its shared VRAM load, and follows the installed Flying Battery doorway tiles during prototype background transitions. Mushroom Hill backgrounds remain stable while the adaptive view recenters at stage edges. Restored stage palettes retain the shared sprite and HUD color row. Cached scenery fades use the native component steps.
 
 Sonic 3 exposes the launcher's native save import and clear tools. The infinite-time clock redraw retains 99:59 after leaving debug placement; the original Sonic 3 debug coordinate display is preserved.
 
