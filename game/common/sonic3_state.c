@@ -99,6 +99,7 @@ static void rollback_state(S3StateIO *io)
 {
     s3_sound_state(io);
     s3_restoration_state(io);
+    s3_video_rb_state(io);
 #ifndef SONIC3_STANDALONE
     s3_army_state(io);
 #endif

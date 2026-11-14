@@ -7,6 +7,9 @@ art after water-current transitions. Ending scenery stops at its authored
 boundary. Bonus-stage HUD elements and moving title words retain their layout
 across the expanded view.
 
+Rollback retains widescreen object-loading ownership when crossing an
+activation boundary, so resimulation creates the same objects as live play.
+
 Music Customization retains Shared Themes and the running game's campaign
 section. Data Select and the other common sounds remain available in all three
 games. Additional cartridge variants, independent saved selections and explicit

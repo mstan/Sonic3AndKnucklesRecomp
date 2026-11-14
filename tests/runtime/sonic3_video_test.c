@@ -3599,8 +3599,25 @@ int main(int argc,char **argv)
     CHECK(configure("10:7"));width(1,1,320,224);
     s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,1);
     CHECK(s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
+    /* Cross a real activation cell, then replay it with restored ownership.
+     * WRAM alone leaves the future loaded flag suppressing this allocation. */
+    static uint8_t loader_ram[65536],loaded_ram[65536];
+    static uint8_t loader_blob[sizeof s_placements+3*sizeof(unsigned)];
+    memcpy(loader_ram,g_ram,sizeof loader_ram);
+    S3StateIO loader_io={loader_blob,sizeof loader_blob,0,0,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
+    size_t loader_bytes=loader_io.pos;
     write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
     CHECK(scene_read32(0xFFB0DE)==0x123456 && ram16(0xB0EE)==640 && ram16(0xB126)==0xEB00);
+    memcpy(loaded_ram,g_ram,sizeof loaded_ram);
+    CHECK(s_placements[0].loaded);
+    memcpy(g_ram,loader_ram,sizeof loader_ram);
+    loader_io=(S3StateIO){loader_blob,loader_bytes,0,1,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && s_placements[0].loaded);
+    loader_io=(S3StateIO){loader_blob,loader_bytes,0,2,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !s_placements[0].loaded);
+    presentation_reset();write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!memcmp(loaded_ram,g_ram,sizeof loaded_ram));
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(scene_read32(0xFFB128)==0x234567 && g_ram[0xB12C]==3 && g_ram[0xB152]==3);

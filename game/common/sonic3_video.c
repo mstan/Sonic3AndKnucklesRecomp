@@ -3027,6 +3027,26 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     if(!aiz_plane_valid(&plane))io->ok=0;
     S3_STATE(io, *frame);
 }
+/* Loaded ownership changes future object allocation. It follows WRAM through
+ * rollback even when no presentation is produced during resimulation. Keep
+ * the table too: a snapshot can precede a zone's placement-cache replacement. */
+void s3_video_rb_state(S3StateIO *io)
+{
+    unsigned count=s3_state_peek_unsigned(io,s_placement_count);
+    if(count>SCENE_PLACEMENTS)io->ok=0;
+    S3_STATE(io,s_placement_count);
+    unsigned base=s3_state_peek_unsigned(io,s_placement_base);
+    if(count && base>=0x400000u)io->ok=0;
+    S3_STATE(io,s_placement_base);
+    if(s3_state_peek_unsigned(io,(unsigned)s_loader_active)>1)io->ok=0;
+    S3_STATE(io,s_loader_active);
+    for(unsigned n=0;n<count && n<SCENE_PLACEMENTS;++n) {
+        uint8_t loaded=s_placements[n].loaded;
+        s3_state_peek(io,n*sizeof(Placement)+offsetof(Placement,loaded),&loaded,sizeof loaded);
+        if(loaded>1)io->ok=0;
+    }
+    S3_STATE(io,s_placements);
+}
 void s3_video_state(S3StateIO *io)
 {
     int mode = s_mode; double ratio = s_ratio;
