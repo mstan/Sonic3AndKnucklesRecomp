@@ -18,3 +18,7 @@ ext.genesisGame = modes[mode] + [version:'0.8.4', versionCode:804,
     gameRoot:game, engineRoot:engine,
     uiRoot:file(providers.gradleProperty('genesisUiRoot').orElse('../recomp-ui').get())]
 apply from:new File(engine,'platform/android/app.gradle')
+// AGP can discover shared libraries from other previously built CMake targets.
+// Each application imports and runs only its selected cartridge mode.
+android.packagingOptions.jniLibs.excludes.addAll(
+    modes.values().findAll { it.target != modes[mode].target }.collect { '**/lib'+it.target+'.so' })
