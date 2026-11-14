@@ -129,8 +129,8 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             if(op==0xE7)encoded=1;
             else if(op==0xE9)encoded=0; /* Clone queues own spindash pitch */
             else if(op==0xE2)encoded=rb(c,pc+1)==0xFF?2:0;
-            else if(op==0xE5)encoded=n->kind==2?0:3;
-            else if(op==0xE6&&n->kind==2)encoded=0; /* native FM-only volume */
+            else if(op==0xE5)encoded=3;
+            else if(op==0xE6&&n->kind==2)encoded=3;
             else if(op==0xFF){
                 unsigned sub=rb(c,pc+1);
                 if(sub==0){length=3;encoded=3;}
@@ -170,13 +170,20 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             continue;
         }
         if(op==0xE7){c->bank[out]=0xFE;continue;}
+        if(n->kind==2&&(op==0xE5||op==0xE6)){
+            /* These FM-only commands still separate an implicit-duration
+             * PSG note from a following duration-only event. Removing them
+             * joins those two events and changes percussion timing. Clone's
+             * panning command consumes its argument and does nothing on PSG. */
+            c->bank[out]=0xFF;c->bank[out+1]=0;c->bank[out+2]=0;continue;
+        }
         c->bank[out]=0xFF;c->bank[out+1]=commands[op-0xE0];
         if(op==0xF2 && n->kind==3)c->bank[out+1]=4;
         if(op==0xE2)continue;
         if(op==0xFF){c->bank[out+1]=0x0A;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;}
         if(op==0xE5){
             /* Retail discards the first parameter, then changes FM volume
-             * using the second. PSG ignores both parameters entirely. */
+             * using the second. The PSG form was handled above. */
             c->bank[out+1]=6;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;
         }
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);

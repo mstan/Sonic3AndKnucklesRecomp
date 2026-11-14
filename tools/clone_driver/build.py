@@ -123,6 +123,18 @@ Clone_NativeSpeedupTick:
             marker = '.bgm_psgloadloop:\n'
             assert text.count(marker) == 1, 'Upstream PSG loader changed'
             text = text.replace(marker, marker + '\tmove.b 5(a3),SMPS_Track.VoicePtr+1(a1)\n', 1)
+            # S3 starts its tempo accumulator at the song's tempo. Clone
+            # applies TempoWait after the tracks, so retaining that initial
+            # value also retains S3's next-frame delay phase. Legacy donors
+            # keep Clone's zero initialization.
+            marker = '\tmove.b\td1,SMPS_RAM.variables.v_main_tempo_timeout(a6)\t; Clownacy | Cleared to avoid unintended overflow on first frame of playback'
+            assert text.count(marker) == 1, 'Upstream tempo initialization changed'
+            text = text.replace(marker, marker + '''
+\ttst.b 5(a4)
+\tbeq.s .nativeTempoReady
+\tmove.b d0,SMPS_RAM.variables.v_main_tempo_timeout(a6)
+.nativeTempoReady:
+''', 1)
             start = text.index('PSGDoNext:\n')
             end = text.index('; End of function PSGDoNext', start)
             segment = text[start:end]

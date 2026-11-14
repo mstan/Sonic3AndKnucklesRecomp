@@ -34,9 +34,10 @@ static void volume_command_test(void)
     CHECK(bank[fm+3]==0xFF&&bank[fm+4]==6&&bank[fm+5]==3);
     CHECK(bank[fm+6]==0xFF&&bank[fm+7]==6&&bank[fm+8]==0xFD);
     CHECK(bank[fm+9]==0x81 && bank[fm+10]==1);
-    /* S3's Z80 driver ignores both FM volume commands on PSG, including
-     * their parameters. S2's similarly named command has another contract. */
-    CHECK(bank[psg]==0x81 && bank[psg+1]==1);
+    /* Ignored FM volume commands retain a harmless PSG event separator.
+     * Otherwise an implicit note before one can consume a later duration. */
+    for(unsigned i=0;i<3;i++)CHECK(bank[psg+i*3]==0xFF&&bank[psg+i*3+1]==0&&bank[psg+i*3+2]==0);
+    CHECK(bank[psg+9]==0x81 && bank[psg+10]==1);
     free(c);
 }
 int main(int argc,char **argv)
