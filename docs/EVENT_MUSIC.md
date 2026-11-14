@@ -67,6 +67,26 @@ retail OST. Cartridge sound effects are retained. The unused prototype tune
 is an Invincibility choice in all three games. Previously saved standalone
 Sonic 3 Super replacements retain their separate row until cleared.
 
+## Music player
+
+With Clone Driver enabled, press **A+C** together at the title screen or level
+select to open the music player. It plays this game's tracks with the selected
+soundtrack replacements and shows the current source beside the track list.
+Use the game buttons configured in Input settings:
+
+- **Up/Down:** choose a track.
+- **Left/Right:** choose all channels or an individual DAC, FM or PSG channel.
+- **B:** play from the beginning.
+- **C:** pause or resume.
+- **A:** stop.
+- **Start:** return to the game menu.
+
+Changing the track restarts a playing song. Channel selection mutes only the
+output; all music sequences and synthesis clocks continue at the same position.
+Channel audition uses the standard chip synthesis output. Empty channel entries
+are skipped. Recorded CD audio plays its full stereo mix. Current-build states
+retain the player selection and playback, including a paused or isolated track.
+
 ## Donors
 
 Use Sonic 1 JUE revision 0, Sonic 2 World revision 1, or a supported original

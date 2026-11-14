@@ -51,7 +51,7 @@ extern void func_000D0C(void);  /* JmpTo_HInt   ($000D0C) */
 extern void func_000D10(void);  /* HInt         ($000D10) */
 
 static void sandk_call_entry_point(void) { s3_sound_post_reset(); s3_restoration_post_reset(); s3_army_init(); recomp_call_addr(0x000206u); }
-static void sandk_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); }
+static void sandk_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); s3_army_vblank(); recomp_call_addr(0x000584u); s3_sound_player_frame(g_ram[0xF604]); }
 static void sandk_load_settings(const char *path) { s3_mods_load(path, "sandk"); s3_gameplay_load(path,"sandk"); s3_sound_load(path,"sandk"); s3_restoration_settings(path,"sandk"); }
 static const struct RecompLauncherCModProvider *sandk_mods(const struct RecompLauncherCModProvider *base)
 { return s3_sound_mods(s3_restoration_mods(s3_gameplay_mods(s3_mods(base)))); }

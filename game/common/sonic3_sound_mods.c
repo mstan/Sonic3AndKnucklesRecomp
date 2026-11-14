@@ -17,7 +17,7 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,package);COPY(o->name,"Clone Driver + Mega PCM");COPY(o->version,"0.1.0");
     COPY(o->author,"Clone Driver and Mega PCM contributors");
-    COPY(o->description,"Play the cartridge's music and sound effects with Clone Driver and Mega PCM. Sound data is prepared automatically from your ROM. Restart after changing. Local play; original campaigns only.");
+    COPY(o->description,"Play the cartridge's music and sound effects with Clone Driver and Mega PCM. Sound data is prepared automatically from your ROM. Restart after changing. At the title or level select, press A+C for the music player and channel isolation. Local play; original campaigns only.");
     COPY(o->source_name,"S3K Clone Driver");COPY(o->source_url,"https://github.com/TheBlad768/skdisasm-clone-driver");
     COPY(o->license,"Driver licenses included in CLONE_DRIVER_NOTICES.txt");
     COPY(o->status,!s3_sound_available()?"Unavailable with this build's Z80 backend":s3_sound_selected()!=s3_sound_active()?"Restart to apply the selection":s3_sound_active()?"Enabled":"Disabled");
