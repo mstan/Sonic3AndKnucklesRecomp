@@ -729,6 +729,14 @@ static void test_native_demo_publication(void)
     g_ram[0xB004]=132;publish_sprites();CHECK(g_ram[0xB004]==132);
     write32(0xB0DE,0);g_ram[0xB004]=4;
     publish_sprites();CHECK(g_ram[0xB004]==132);
+    /* LBZ's walking cutscene ends on native SAT visibility. Drawing him in
+     * a wider margin must not prolong the walk or hold the player's input. */
+    write32(0xB000,S3_LBZ_KNUX);g_ram[0xB005]=14;g_ram[0xB004]=4;
+    s_build.count=1;s_build.sprites[0].x=350;
+    publish_sprites();CHECK(g_ram[0xB004]==4 && s_build.count==1);
+    g_ram[0xB004]=132;publish_sprites();CHECK(g_ram[0xB004]==132);
+    g_ram[0xB005]=12;g_ram[0xB004]=4;
+    publish_sprites();CHECK(g_ram[0xB004]==132);
     CHECK(configure("off"));
 }
 static void test_title_card_edges(void)
