@@ -126,6 +126,17 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
     ram[o+0x2E]=0;ram[o+0x2F]=59;
     return 0x76456;
 }
+uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536])
+{
+    if(!combined_mode || !s3_gameplay.original_zone_order || pc!=0x695Au || !ram ||
+       word(ram,0xFE10)!=0x800 || word(ram,0xFFD0) || word(ram,0xFFE8))return 0;
+    /* SpawnLevelMainSprites has initialized the actors but has not installed
+     * the airship's fall-into-sand controller. Enter on the same ground where
+     * that native intro normally releases control, retaining native physics. */
+    ram[0xB014]=6;ram[0xB015]=word(ram,0xFF08)==2?0x90:0x8C;
+    if(word(ram,0xB04A)||word(ram,0xB04C)){ram[0xB05E]=6;ram[0xB05F]=0x90;}
+    return 0x6986;
+}
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):
         combined_mode && (pc==0x1BB10u || pc==0x1BAECu);}
@@ -159,7 +170,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
         pc==(standalone_s3?0xEC10u:0xDE9Cu) ||
-        (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u)) ||
+        (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u || pc==0x695Au)) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
@@ -289,7 +300,7 @@ static const char *descriptions[]={
     "Restore the five unused Competition course name cards using the cartridge's original art, animation and timing. Local play only.",
     "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
     "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only.",
-    "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Uses the complete retail stages and their normal exits. Native saves retain their original zone codes. Default off; local play only.",
+    "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Sandopolis starts on solid ground. Uses the complete retail stages and their normal exits. Native saves retain their original zone codes. Default off; local play only.",
     "Use Mushroom Valley, the November 1993 level name, on native title cards and level select. The title lettering is reconstructed from your retail cartridge's font; the prototype's missing card is not claimed as recovered artwork. Default off; restart to apply. Local play only."};
 static int own_features(void){return combined_mode?10:6;}
 static int feature_index(int i){return standalone_sk && i==5?9:i;}

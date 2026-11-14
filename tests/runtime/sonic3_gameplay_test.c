@@ -30,6 +30,31 @@ static void native_timer_profile(uint8_t *ram,int standalone)
     if(!(sr&1))ram[0xFE23]=9;
 }
 static void native_timer(uint8_t *ram){native_timer_profile(ram,0);}
+static void test_original_order_entry(void)
+{
+    static uint8_t ram[65536],expected[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;++m)for(unsigned character=0;character<4;++character){
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        memset(ram,0,sizeof ram);ram[0xFE10]=8;ram[0xFF09]=(uint8_t)character;
+        ram[0xB014]=ram[0xB05E]=4;ram[0xB04D]=1;
+        memcpy(expected,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        s3_gameplay.original_zone_order=1;
+        CHECK(!s3_gameplay_zone_entry(0x695C,ram)&&!memcmp(ram,expected,sizeof ram));
+        ram[0xFFD1]=1;expected[0xFFD1]=1;
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        ram[0xFFD1]=expected[0xFFD1]=0;ram[0xFFE9]=expected[0xFFE9]=1;
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        ram[0xFFE9]=expected[0xFFE9]=0;
+        if(m==1){expected[0xB014]=expected[0xB05E]=6;expected[0xB015]=character==2?0x90:0x8C;expected[0xB05F]=0x90;}
+        CHECK(s3_gameplay_zone_entry(0x695A,ram)==(m==1?0x6986u:0u));
+        CHECK(!memcmp(ram,expected,sizeof ram));
+        ram[0xFE11]=1;memcpy(expected,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+    }
+    CHECK(!s3_gameplay_zone_entry(0x695A,NULL));
+}
 static void test_level_select_checkpoint(void)
 {
     uint8_t ram[65536],expected[65536];
@@ -483,7 +508,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();test_level_select_checkpoint();
+    test_original_order();test_original_order_entry();test_level_select_checkpoint();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

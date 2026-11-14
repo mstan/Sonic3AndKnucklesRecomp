@@ -6,7 +6,7 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 M68KState g_cpu;
 uint8_t g_ram[65536];
-static int clone,cd,audio_calls,cd_calls,renderer_calls,restoration;
+static int clone,cd,audio_calls,cd_calls,renderer_calls,restoration,entry_active;
 static uint32_t card_tail;
 static unsigned hud_reset_calls;
 int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t *ram,uint32_t actor)
@@ -21,7 +21,9 @@ int trilogy_instruction(uint32_t pc)
 int s3_state_menu_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_kos_owns(uint32_t pc){(void)pc;return 0;}
 int s3_kos_instruction(uint32_t pc){(void)pc;return 0;}
-int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C;}
+int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C || pc==0x695A;}
+uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t *ram)
+{CHECK(ram==g_ram);return pc==0x695A && entry_active?0x6986:0;}
 uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)pc;(void)ram;(void)actor;return 0;}
 uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
@@ -53,6 +55,9 @@ int main(void)
     CHECK(!s3k_instruction(0x12CE));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0x2D6A6));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0xDE9C));CHECK(hud_reset_calls==1 && !renderer_calls && g_cpu.D[0]==0x1234);
+    CHECK(!s3k_instruction(0x695A));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
+    entry_active=1;CHECK(s3k_instruction(0x695A));
+    CHECK(card_tail==0x6986 && !renderer_calls && g_cpu.D[0]==0x1234);
     restoration=1;CHECK(s3k_instruction(0x2D6A6));
     CHECK(card_tail==0x2D756 && !renderer_calls && g_cpu.D[0]==0x1234);
     puts("PASS actual hook composition: original/CD music and tempo, active Clone priority, renderer isolation");return 0;
