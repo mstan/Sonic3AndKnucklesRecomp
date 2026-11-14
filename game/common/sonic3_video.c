@@ -2593,6 +2593,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         s_frame_bg_event>=12?rocket_motion_offset(s_render):0;
     int handoff_loading=bg_world && width>320 &&
         handoff_art_loading(s_frame_zone,s_frame_act,s_frame_bg_event);
+    /* Retained handoff art is immutable during this row. Select its overlay
+     * here instead of rediscovering an inactive handoff for every pixel. */
+    int handoff_pixels=level && width>320 && s_handoff_art.valid &&
+        s_handoff_art.zone==(int)s_frame_zone && s_frame_act==1;
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
     const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
     const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
@@ -2770,13 +2774,16 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         int joined=level && s_display && width>320 &&
             aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
-        int handoff_fg=level && width>320 &&
-            handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap);
         if(joined)apalette=palette;
-        if(handoff_fg){joined=1;apalette=palette;}
-        int handoff_bg=level && width>320 &&
-            handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
-        if(handoff_bg)bpalette=s_handoff_art.colors[line];
+        int handoff_bg=0;
+        if(handoff_pixels && wx<0) {
+            if(handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap)) {
+                joined=1;apalette=palette;
+            }
+            if(s_frame_zone==1)
+                handoff_bg=handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
+            if(handoff_bg)bpalette=s_handoff_art.colors[line];
+        }
         if(lbz_incoming && nx>=nw && wx+lbz_rebase>=0x3FE0) {
             lbz_preview_sample(wx+lbz_rebase,wy,nx+lbz_x,lbz_y,&a,&ap,&b,&bp);
             joined=1;apalette=bpalette=lbz_palette;
