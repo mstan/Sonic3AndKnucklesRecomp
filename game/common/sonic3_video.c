@@ -64,7 +64,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
-       SPRITE_ENDING_POSE = 8 };
+       SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -78,6 +78,9 @@ static unsigned native_art_owner(unsigned map)
 {
 #ifdef SONIC3_STANDALONE
     if(map==0x5217Cu)return SPRITE_ENDING_POSE;
+    if(map==0x4545Eu)return SPRITE_LBZ_PILLAR;
+#else
+    if(map==0x62AFCu)return SPRITE_LBZ_PILLAR;
 #endif
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
@@ -645,6 +648,7 @@ static int view_left(int camera, int w)
 }
 #include "sonic3_camera_handoff.inc"
 #include "sonic3_lbz_preview.inc"
+#include "sonic3_lbz_rocket.inc"
 
 int s3_video_presentation_camera_x(int camera)
 {
@@ -1697,6 +1701,9 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(world && (s->slot>>8)==SPRITE_LBZ_PILLAR &&
+                      (x<origin || x>=origin+320) && lbz_rocket_load()) {
+                p=pattern_pixel(&s_lbz_rocket.video,cell,ix,iy);
             } else if(s_frame_level && !s->hud && (s->slot>>8) && native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
                 if(!p)continue;
             } else if(s_frame_level && !s_frame_zone && !s->hud &&
@@ -2532,6 +2539,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         (!s_frame_act || (s_frame_act==1 && s_frame_bg_event<=4)) &&
         lbz_camera>=0x3D80 && lbz_preview_cloud_position(lbz_camera,plane_y,lbz_shake,line,&lbz_x,&lbz_y) &&
         lbz_preview_load();
+    int lbz_rocket=level && width>320 && s_frame_zone==6 && s_frame_act==1 &&
+        s_frame_bg_event<=8 && camera>=0x3A00 && plane_y>=0x500 && lbz_rocket_load();
     uint32_t lbz_palette[64];
     if(lbz_incoming)for(unsigned i=0;i<64;++i)
         lbz_palette[i]=i<16?palette[i]:genesis_dac_cram_to_argb(
@@ -2702,6 +2711,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(lbz_incoming && nx>=nw && wx+lbz_rebase>=0x3FE0) {
             lbz_preview_sample(wx+lbz_rebase,wy,nx+lbz_x,lbz_y,&a,&ap,&b,&bp);
             joined=1;apalette=bpalette=lbz_palette;
+        }
+        if(lbz_rocket && (nx<0 || nx>=nw) && wx>=0x3C00) {
+            a=world_attr(s_lbz_rocket.world,wx,wy,0);
+            ap=pattern_pixel(&s_lbz_rocket.video,a,wx,wy);
+            joined=1;apalette=palette;
         }
         if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow

@@ -2299,6 +2299,47 @@ static void test_lbz_incoming_margin(void)
     memset(g_rom+map+0x17*2,0,2);memset(g_rom+map+0x40,0,8);
     memset(&s_lbz_preview,0,sizeof s_lbz_preview);CHECK(configure("off"));
 }
+static int lbz_rocket_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{(void)x;(void)y;*cell=background?0:ram==s_lbz_rocket.world?2:1;return 1;}
+static void test_lbz_rocket_margin(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    for(unsigned event=8;event<=12;event+=4) {
+        CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_lbz_rocket,0,sizeof s_lbz_rocket);
+        s_lbz_rocket.attempted=s_lbz_rocket.ready=1;
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(s_lbz_rocket.world,0x9010+i*2,2);}
+        memset(v.vram+32,0x11,32);memset(s_lbz_rocket.video.vram+64,0x22,32);
+        g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);write32(0xB000,0x1234);
+        word(g_ram,0x8000,154);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+        word(g_ram,0xEE80,0x3B00);word(g_ram,0xEE84,0x5A0);word(g_ram,0xEEC2,event);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x5A0;
+        v.cram[1]=0xE;v.cram[2]=0xE0;word(v.vram,0xF000,(unsigned)-0x3B00);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x3B00;s_build.camera_y=0x5A0;
+        s_visible_count=0;publish_sprites();s3_video_set_world_cell(lbz_rocket_cell);
+        memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x)CHECK(out[x]==(event==8 && x>=s_native_x+320?0xFF00FF00u:0xFFFF0000u));
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    }
+    /* Pillars keep their authored art in the margins while the same VRAM
+     * reservation still contains the preceding object's pixels. */
+#ifdef SONIC3_STANDALONE
+    CHECK(native_art_owner(0x4545E)==SPRITE_LBZ_PILLAR);
+#else
+    CHECK(native_art_owner(0x62AFC)==SPRITE_LBZ_PILLAR);
+#endif
+    SceneFrame scene={0};scene.scene=1;scene.count=1;
+    scene.sprites[0]=(SceneSprite){330,0,0x5A0,0,0,256,SPRITE_LBZ_PILLAR<<8};
+    s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
+    uint32_t pal[64]={0};pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
+    memset(v.vram+0x5A0*32,0x11,32);memset(s_lbz_rocket.video.vram+0x5A0*32,0x22,32);
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[568]==pal[2]);scene.sprites[0].x=30;
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[268]==pal[1]);
+    s_display=NULL;memset(&s_lbz_rocket,0,sizeof s_lbz_rocket);CHECK(configure("off"));
+}
 static void test_s3_ending_margin_ownership(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3848,7 +3889,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
