@@ -32,8 +32,27 @@ when the optional sound-driver assembler's include paths exceed its path limit.
 The default ABI set is `arm64-v8a,armeabi-v7a`. `-PgenesisAbis=x86_64` builds
 an emulator package. `-PgenesisQa=true` gives a debug build a separate `.qa`
 application ID and enables native diagnostics. Compilation alone does not
-qualify an ABI's gameplay, controls or audio on a device. Release signing is
-configured by the distributor; `assembleRelease` produces an unsigned APK.
+qualify an ABI's gameplay, controls or audio on a device.
+
+For a normal production package, use `assembleRelease` with `genesisQa=false`
+(the default). This disables native tracing and the Java debug-only setup
+arguments. Without a signing profile, the result is an unsigned APK.
+To sign it, set `GENESIS_SIGNING_PROPERTIES` or pass
+`-PgenesisSigningProperties=/absolute/path/to/signing.properties`. The external
+file contains the following Java properties:
+
+```properties
+storeFile=/absolute/path/to/release.jks
+storePassword=YOUR_STORE_PASSWORD
+keyAlias=YOUR_RELEASE_ALIAS
+keyPassword=YOUR_KEY_PASSWORD
+```
+
+A relative `storeFile` is resolved beside the properties file. Keep the key and
+properties outside source control and preserve them for future updates. The
+build does not create or replace signing identities. Production signing cannot
+be used with `genesisQa=true`. Verify the resulting certificate with Android's
+`apksigner verify --print-certs` before distributing an update.
 
 The Android importer accepts the raw combined cartridge above. The desktop
 runner's optional donor-ROM and external-tool conversion workflows are not
