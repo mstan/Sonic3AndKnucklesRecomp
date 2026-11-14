@@ -762,6 +762,25 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
         }
     }
 }
+static void extend_icz_snow(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
+                            int x,int y,unsigned zoom)
+{
+    if(map!=S3_ART_BANK+0x163C44u || frame!=0x22 || flags!=4 ||
+       ram16(0xFE10)!=0x501 || !enabled() || s_requested_width<=320 ||
+       (zoom && zoom!=256) || x+ram16(0xEE80)!=0x4894 ||
+       y+ram16(0xEE84)!=0x6D0)return;
+    /* The last authored snow pile ends inside the expanded exit view.
+     * Continue its two original pieces to the right edge, only while that
+     * real pile is published. Slot owner 7 clips this presentation-only
+     * continuation outside the native viewport; no collision object is added. */
+    int right=(s_requested_width+320+1)/2;
+    for(int sx=x+32;sx-16<right;sx+=32){
+        unsigned first=s_capture_frame->count;
+        add_mapping(map,frame,gfx,flags,sx,y,0,0,zoom);
+        for(unsigned n=first;n<s_capture_frame->count;++n)
+            s_capture_frame->sprites[n].slot=(uint16_t)(s_capture_slot|(7u<<8));
+    }
+}
 static void load_placements(void)
 {
     unsigned zone=ram16(0xFE10),index=(zone>>8)*8u+(zone&1u)*4u;
@@ -1153,6 +1172,7 @@ static void capture_objects(void)
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
+            if(!multi)extend_icz_snow(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
         }
     }
     if(s_capture_frame->scene==3){
@@ -1624,6 +1644,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<drawn_width;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+            if((s->slot>>8)==7 && x<origin+320)continue;
             /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
                                  x-origin+s_camera>=0x980))continue;
