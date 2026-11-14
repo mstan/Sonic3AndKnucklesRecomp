@@ -20,7 +20,7 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Game Over | Sonic 1 / Sonic 2; Sonic 3 & Knuckles; Sonic CD (US) |
 | Continue Screen | Sonic 1 / Sonic 2; Sonic 3; Sonic & Knuckles |
 | Act Clear | Sonic 1 / Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 prototype; Sonic 3 & Knuckles; Sonic CD (US) |
-| Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US) |
+| Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US); unused November 1993 prototype theme |
 | Drowning | Sonic 1 / Sonic 2; Sonic 3 prototype |
 | Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype |
 | Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
@@ -28,7 +28,6 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype |
 | Knuckles | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Data Select | Sonic 3 prototype; Sonic 3; Sonic & Knuckles; Sonic 2 Options; Sonic 2 Simon Wai Level Select |
-| Super (standalone Sonic 3) | Sonic 3 prototype |
 | Credits | Sonic 3 (Retail); Sonic & Knuckles (Retail); Sonic 3 Prototype |
 | Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 
@@ -60,10 +59,13 @@ Existing event choices are retained when updating from the earlier controls.
 Replacements enable Clone Driver automatically. Restart to apply changes.
 They support local play in original campaigns; imported campaigns and netplay
 retain their driver restrictions. Base game leaves the current soundtrack
-unchanged: a separately enabled whole-prototype soundtrack mod still applies.
-Disable that mod when mixing selected prototype tracks with the retail OST.
-Cartridge sound effects are retained. Sonic 3's normal Super music remains
-separate from Invincibility unless its Super row is explicitly replaced.
+unchanged. A previously saved whole-prototype soundtrack remains in effect;
+its Saved default soundtrack option under Clone Driver can restore Base game without
+clearing individual choices. New selections use the individual track rows.
+Restore Base game there when mixing individual prototype tracks with the
+retail OST. Cartridge sound effects are retained. The unused prototype tune
+is an Invincibility choice in all three games. Previously saved standalone
+Sonic 3 Super replacements retain their separate row until cleared.
 
 ## Donors
 

@@ -35,6 +35,7 @@ int main(int argc,char **argv)
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_WAI)==8);
     CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_S2)==16);
     CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_WAI)==9);
+    CHECK(s3_music_source(S3_THEME_INVINCIBLE,S3_DONOR_PROTO)==0x2E);
     const RecompLauncherCModProvider *p=s3_theme_mods(NULL);int combined=!strcmp(argv[2],"sonic3k");
     const char *campaign=combined?"sonic3k-campaign":!strcmp(argv[2],"sonic3")?"sonic3-campaign":"sandk-campaign";
     CHECK(p&&p->feature_count(NULL)==2&&p->package_count(NULL)==1);
@@ -59,7 +60,7 @@ int main(int argc,char **argv)
             ++total;
         }
     }
-    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?34:28));CHECK(shared==(!strcmp(argv[2],"sonic3")?15:14));
+    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?33:28));CHECK(shared==14);
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
     CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==6&&s3_theme_choices(S3_MUSIC_BOSS)==5);
     CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==3);

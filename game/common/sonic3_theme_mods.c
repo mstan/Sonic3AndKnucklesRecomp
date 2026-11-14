@@ -47,7 +47,9 @@ static int track_at(int group,int index)
     static const char *const campaign[]={"Zones","Competition","Menus","Bonus stages"};
     const char *const *sections=group==S3_MUSIC_SHARED?common:campaign;
     for(unsigned s=0;s<4;s++)for(unsigned t=0;t<S3_MUSIC_COUNT;t++)
-        if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&!strcmp(sections[s],s3_music_section(t))&&index--==0)return (int)t;
+        if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&
+           (t!=S3_MUSIC_SUPER||s3_themes[t].enabled)&&
+           !strcmp(sections[s],s3_music_section(t))&&index--==0)return (int)t;
     return -1;
 }
 static int group_at(int index)

@@ -33,12 +33,12 @@ static const MusicRow rows[]={
 #undef TRACK
 const char *const s3_donor_ids[]={"s1","s2","s2-aug","s2-wai","s3-proto","s3","sk","cd-us"};
 const char *const s3_donor_names[]={"Sonic 1","Sonic 2","Sonic 2 (Aug 21, 1992 prototype)","Sonic 2 (Simon Wai prototype)","Sonic 3 (Nov 3, 1993 prototype)","Sonic 3","Sonic & Knuckles","Sonic CD (US)"};
-static const S3ThemeChoice choices[][6]={
+static const S3ThemeChoice choices[][7]={
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
+    {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3 / Sonic & Knuckles",-1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
@@ -52,7 +52,7 @@ static const S3ThemeChoice choices[][6]={
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2","Sonic 2 Options",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai Level Select",S3_DONOR_WAI}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3 (unused)",S3_DONOR_S3}},
 };
-static const unsigned counts[]={4,3,3,5,6,2,5,6,3,1,2,3,3,6,3,5,2};
+static const unsigned counts[]={4,3,3,5,7,2,5,6,3,1,2,3,3,6,3,5,2};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -101,6 +101,7 @@ unsigned s3_music_source(unsigned t,unsigned donor)
         return t<9?(donor==S3_DONOR_S1?s1[t]:s2[t]):0;
     }
     if(t==S3_MUSIC_MINIBOSS)return donor==S3_DONOR_S3?0x2E:0x18;
+    if(t==S3_THEME_INVINCIBLE&&donor==S3_DONOR_PROTO)return 0x2E;
     if(t==S3_MUSIC_CREDITS)return donor==S3_DONOR_SK?0x33:0x26;
     if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_PROTO?0x2E:0x32;
     return rows[t].target;
