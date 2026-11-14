@@ -6,7 +6,7 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 M68KState g_cpu;
 uint8_t g_ram[65536];
-static int clone,cd,audio_calls,cd_calls,renderer_calls,restoration,entry_active;
+static int clone,cd,audio_calls,cd_calls,renderer_calls,restoration,entry_active,departure_active;
 static uint32_t card_tail;
 static unsigned hud_reset_calls;
 int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t *ram,uint32_t actor)
@@ -21,11 +21,11 @@ int trilogy_instruction(uint32_t pc)
 int s3_state_menu_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_kos_owns(uint32_t pc){(void)pc;return 0;}
 int s3_kos_instruction(uint32_t pc){(void)pc;return 0;}
-int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C || pc==0x695A;}
+int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C || pc==0x695A || pc==0x690A || pc==0x53608 || pc==0x522A0 || pc==0x1BEC6;}
 uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t *ram)
-{CHECK(ram==g_ram);return pc==0x695A && entry_active?0x6986:0;}
+{CHECK(ram==g_ram);return !entry_active?0:pc==0x695A?0x6986:pc==0x690A?0x691C:pc==0x53608?0x53648:pc==0x1BEC6?0x1BED8:0;}
 uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t *ram,uint32_t actor)
-{(void)pc;(void)ram;(void)actor;return 0;}
+{(void)ram;(void)actor;return pc==0x522A0 && departure_active?0x76456:0;}
 uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)ram;(void)actor;return restoration && pc==0x2D6A6?0x2D756:0;}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t *ram,uint32_t p,uint16_t *sr){(void)pc;(void)ram;(void)p;(void)sr;}
@@ -58,6 +58,11 @@ int main(void)
     CHECK(!s3k_instruction(0x695A));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
     entry_active=1;CHECK(s3k_instruction(0x695A));
     CHECK(card_tail==0x6986 && !renderer_calls && g_cpu.D[0]==0x1234);
+    CHECK(s3k_instruction(0x690A)&&card_tail==0x691C&&!renderer_calls);
+    CHECK(s3k_instruction(0x53608)&&card_tail==0x53648&&!renderer_calls);
+    CHECK(s3k_instruction(0x1BEC6)&&card_tail==0x1BED8&&!renderer_calls);
+    CHECK(!s3k_instruction(0x522A0)&&!renderer_calls);
+    departure_active=1;CHECK(s3k_instruction(0x522A0)&&card_tail==0x76456&&!renderer_calls);
     restoration=1;CHECK(s3k_instruction(0x2D6A6));
     CHECK(card_tail==0x2D756 && !renderer_calls && g_cpu.D[0]==0x1234);
     puts("PASS actual hook composition: original/CD music and tempo, active Clone priority, renderer isolation");return 0;

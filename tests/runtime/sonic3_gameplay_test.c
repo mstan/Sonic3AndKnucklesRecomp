@@ -73,6 +73,40 @@ static void test_level_select_checkpoint(void)
         s3_gameplay_level_select(0x6AD0,NULL);
     }
 }
+static void test_original_order_knuckles(void)
+{
+    static uint8_t ram[65536],before[65536];
+    s3_gameplay_load("unwritten-gameplay-fixture/settings.ini","sonic3k");
+    memset(ram,0,sizeof ram);ram[0xFE10]=5;ram[0xFF09]=3;
+    ram[0xB010]=0x36;ram[0xB011]=0x40;ram[0xB014]=6;ram[0xB015]=0x60;
+    memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!memcmp(before,ram,sizeof ram));
+    s3_gameplay.original_zone_order=1;
+    ram[0xFE2A]=1;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!s3_gameplay_zone_entry(0x690A,ram));
+    CHECK(!memcmp(before,ram,sizeof ram));ram[0xFE2A]=0;
+    memcpy(before,ram,sizeof ram);
+    CHECK(s3_gameplay_zone_entry(0x53608,ram)==0x53648);
+    CHECK(s3_gameplay_zone_entry(0x1BEC6,ram)==0x1BED8);
+    CHECK(!memcmp(before,ram,sizeof ram));
+    CHECK(s3_gameplay_zone_entry(0x690A,ram)==0x691C&&ram[0xFF09]==3);
+    ram[0xFF09]=2;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!s3_gameplay_zone_entry(0x690A,ram));
+    CHECK(!memcmp(before,ram,sizeof ram));
+    memset(ram,0,sizeof ram);ram[0xFE10]=3;ram[0xFE11]=1;ram[0xFF09]=3;
+    ram[0xB010]=0x4A;ram[0xB011]=0x37;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xB011]=0x39;ram[0xB02A]=2;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xB011]=0x40;ram[0xFAA8]=1;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFAA8]=0;ram[0xFF09]=1;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFF09]=3;
+    CHECK(s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE)==0x76456);
+    CHECK(ram[0xB0DE]==0&&ram[0xB0DF]==7&&ram[0xB0E0]==0x64&&ram[0xB0E1]==0x56);
+    CHECK(ram[0xB10C]==0&&ram[0xB10D]==59&&ram[0xB02E]==0x81);
+}
 static void test_extended_timer(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -508,7 +542,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();test_original_order_entry();test_level_select_checkpoint();
+    test_original_order();test_original_order_entry();test_original_order_knuckles();test_level_select_checkpoint();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

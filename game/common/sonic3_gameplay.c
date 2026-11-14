@@ -64,6 +64,8 @@ int s3_gameplay_netplay_allowed(void)
     !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards && !s3_gameplay.original_zone_order && !s3_gameplay.early_zone_names; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
+static void put_word(uint8_t *ram,unsigned p,unsigned value)
+{ram[p]=(uint8_t)(value>>8);ram[p+1]=(uint8_t)value;}
 static int shield_site(uint32_t pc)
 {return standalone_s3?(pc==0x12956u || pc==0x1299Au || pc==0x129C2u):
                      (pc==0x1193Cu || pc==0x11980u || pc==0x119A8u);}
@@ -115,12 +117,21 @@ void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0)
 uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t actor)
 {
     actor&=0xFFFFFFu;
-    if(!combined_mode || !s3_gameplay.original_zone_order || pc!=0x76270 || !ram ||
-       word(ram,0xFE10)!=0x701 || word(ram,0xFFD0) || word(ram,0xFFE8) || ram[0xFAA8] ||
+    if(!combined_mode || !s3_gameplay.original_zone_order || !ram ||
+       word(ram,0xFFD0) || word(ram,0xFFE8) || ram[0xFAA8] ||
        actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
-    /* The native controller reaches this point only after the capsule and
-     * results release it. Sandopolis follows on foot: omit the airship
-     * boarding sequence and retain the original timed fade/next-level path. */
+    unsigned zone=word(ram,0xFE10);
+    if(pc==0x522A0u && zone==0x301 && word(ram,0xFF08)==3){
+        unsigned x=word(ram,0xB010);
+        /* Use the teleporter's actual entry threshold. The native capsule,
+         * tally and camera release still happen before reaching this point. */
+        if(x<0x4A38 || ((ram[0xB02A]&2) && x<0x4A40))return 0;
+        put_word(ram,0xB018,0);put_word(ram,0xB01A,0);put_word(ram,0xB01C,0);
+        ram[0xB02E]=0x81;
+    }else if(pc!=0x76270u || zone!=0x701)return 0;
+    /* Retain the capsule/results prerequisites and the native timed exit.
+     * Mushroom Hill omits airship boarding; Carnival Night omits its portal.
+     * StartNewLevel still supplies the normal fade and next-stage setup. */
     unsigned o=actor&65535u;
     ram[o]=0;ram[o+1]=7;ram[o+2]=0x64;ram[o+3]=0x56;
     ram[o+0x2E]=0;ram[o+0x2F]=59;
@@ -128,8 +139,19 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
 }
 uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536])
 {
-    if(!combined_mode || !s3_gameplay.original_zone_order || pc!=0x695Au || !ram ||
-       word(ram,0xFE10)!=0x800 || word(ram,0xFFD0) || word(ram,0xFFE8))return 0;
+    if(!combined_mode || !s3_gameplay.original_zone_order || !ram ||
+       word(ram,0xFFD0) || word(ram,0xFFE8))return 0;
+    unsigned zone=word(ram,0xFE10);
+    if(zone==0x500 && word(ram,0xFF08)==3 && !ram[0xFE2A]){
+        /* Reuse Tails' complete native start position/camera-limit block;
+         * it enters after the snowboard route, rather than at the hilltop. */
+        if(pc==0x1BEC6u)return 0x1BED8;
+        /* Omit the portal arrival but retain the normal looping masks and
+         * plane refresh, then install the real Tails entrance controller. */
+        if(pc==0x53608u)return 0x53648;
+        if(pc==0x690Au)return 0x691C;
+    }
+    if(pc!=0x695Au || zone!=0x800)return 0;
     /* SpawnLevelMainSprites has initialized the actors but has not installed
      * the airship's fall-into-sand controller. Enter on the same ground where
      * that native intro normally releases control, retaining native physics. */
@@ -170,7 +192,8 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t ram[65536],uint32_t 
 int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
         pc==(standalone_s3?0xEC10u:0xDE9Cu) ||
-        (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u || pc==0x695Au)) ||
+        (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u || pc==0x695Au ||
+                          pc==0x690Au || pc==0x53608u || pc==0x522A0u || pc==0x1BEC6u)) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
@@ -300,7 +323,7 @@ static const char *descriptions[]={
     "Restore the five unused Competition course name cards using the cartridge's original art, animation and timing. Local play only.",
     "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
     "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only.",
-    "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Sandopolis starts on solid ground. Uses the complete retail stages and their normal exits. Native saves retain their original zone codes. Default off; local play only.",
+    "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Sandopolis starts on solid ground. Knuckles leaves Carnival Night with a fade and uses the short IceCap entrance. Uses the complete retail stages; native saves retain their original zone codes. Default off; local play only.",
     "Use Mushroom Valley, the November 1993 level name, on native title cards and level select. The title lettering is reconstructed from your retail cartridge's font; the prototype's missing card is not claimed as recovered artwork. Default off; restart to apply. Local play only."};
 static int own_features(void){return combined_mode?10:6;}
 static int feature_index(int i){return standalone_sk && i==5?9:i;}

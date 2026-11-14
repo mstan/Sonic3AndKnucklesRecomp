@@ -1184,6 +1184,18 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x695A
 kind = "game_hook"
+[[widescreen_site]]
+addr = 0x690A
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x53608
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x522A0
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1BEC6
+kind = "game_hook"
 
 # Optional Mushroom Valley font reconstruction and native menu text.
 [[widescreen_site]]
