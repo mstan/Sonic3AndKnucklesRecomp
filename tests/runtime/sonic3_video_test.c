@@ -2028,6 +2028,58 @@ static int panorama_source_cell(const uint8_t *ram,int x,int y,int background,ui
     (void)ram;(void)y;
     *cell=background?(x>=0 && x<512?1:2):0;return 1;
 }
+static void test_hcz2_panorama_scroll(void)
+{
+    static const unsigned lengths[]={8,8,0x90,0x10,8,0x30,0x18,8,8,0xA8,
+        0x30,0x18,8,8,0xA8,0x30,0x18,8,8,0xB0,0x10,8,0x7FFF};
+    static const uint8_t index[]={3,10,20,30,44,2,12,22,32,5,0,8,14,24,34,42,
+        3,2,16,26,36,1,18,28,1,6,40,1,4,38,255};
+    unsigned at=S3_ART_BANK+0x3C7D2u;uint8_t previous[80];
+    memcpy(previous,g_rom+at,sizeof previous);
+    for(unsigned n=0;n<23;n++)word(g_rom,at+n*2,lengths[n]);
+    memcpy(g_rom+at+46,index,sizeof index);
+    int old_x=s_frame_fg_x,old_y=s_frame_fg_y;
+    uint8_t old_shake[2]={s_world_frame[0xEECE],s_world_frame[0xEECF]};
+    s_frame_fg_x=0xC76;s_frame_fg_y=0x60C;
+    s_world_frame[0xEECE]=s_world_frame[0xEECF]=0;
+    const int lines[]={0,52,53,100,101,124,125,132,133,140,141};
+    const int factors[]={4,4,8,8,7,7,6,6,5,5,4};
+    for(unsigned n=0;n<sizeof lines/sizeof *lines;n++){
+        int x,y;CHECK(hcz2_panorama_position(lines[n],&x,&y));
+        CHECK(x==0xC76*factors[n]/16 && y==0x183+lines[n]);
+    }
+    s_world_frame[0xEECF]=2;
+    int x,y;CHECK(hcz2_panorama_position(0,&x,&y));
+#ifdef SONIC3_STANDALONE
+    CHECK(y==0x183);
+#else
+    CHECK(y==0x184);
+#endif
+    memcpy(g_rom+at,previous,sizeof previous);
+    s_frame_fg_x=old_x;s_frame_fg_y=old_y;
+    s_world_frame[0xEECE]=old_shake[0];s_world_frame[0xEECF]=old_shake[1];
+}
+static void test_hcz2_panorama_art(void)
+{
+    /* Native C58 scroll gives phases26/21/53. These source rows are the
+     * checked normal driver's circular-strip selections, including wrap
+     * and vertical flip, while the early VRAM bank still contains old art. */
+    static const struct {unsigned attr,address;} cases[]={
+        {0x2D2,0xA8900},{0x2D6,0xA8E60},{0x2DE,0xA9EA0},
+        {0x2EE,0xABA20},{0x2D5,0xA88E0},{0x12D2,0xA891C}};
+    int previous=s_frame_fg_x;s_frame_fg_x=0xC58;
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;n++){
+        unsigned at=S3_ART_BANK+cases[n].address;uint8_t old[4];
+        memcpy(old,g_rom+at,4);word(g_rom,at,0x1234);word(g_rom,at+2,0x5678);
+        GenesisTileRow row={0};row.bits=0xAABBCCDD;
+        hcz2_panorama_art(cases[n].attr,0,&row);CHECK(row.bits==0x12345678);
+        memcpy(g_rom+at,old,4);
+    }
+    GenesisTileRow row={0};row.bits=0xAABBCCDD;
+    hcz2_panorama_art(0x2D1,0,&row);CHECK(row.bits==0xAABBCCDD);
+    hcz2_panorama_art(0x31E,0,&row);CHECK(row.bits==0xAABBCCDD);
+    s_frame_fg_x=previous;
+}
 static void test_streamed_background_sources(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3642,7 +3694,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();

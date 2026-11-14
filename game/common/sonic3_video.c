@@ -1871,6 +1871,56 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
 
 #include "sonic3_competition.inc"
 
+static int hcz2_panorama_position(int line,int *scroll,int *y)
+{
+    /* HCZ2_Deform and ApplyDeformation use the original cartridge's band
+     * lengths/index. Its normal panorama is ready in the layout before the
+     * moving-wall name table is cleared and refreshed. */
+    unsigned table=S3_ART_BANK+0x3C7D2u,index=table+46u;
+    int shake=0;
+#ifndef SONIC3_STANDALONE
+    shake=(int16_t)(((unsigned)s_world_frame[0xEECE]<<8)|s_world_frame[0xEECF]);
+#endif
+    int cy=s_frame_fg_y-shake;
+    *y=(cy>=0?cy/4:-((-cy+3)/4))+shake+line;
+    int row=*y;unsigned band;
+    for(band=0;band<23;band++){
+        unsigned height=scene_read16(table+band*2u);
+        if(!height)return 0;
+        if(row<(int)height)break;
+        row-=(int)height;
+    }
+    if(band==23)return 0;
+    for(unsigned group=0;group<7;group++){
+        unsigned count=scene_read8(index++)+1u;
+        if(count>23)return 0;
+        for(unsigned n=0;n<count;n++)if(scene_read8(index++)==band*2u){
+            *scroll=s_frame_fg_x*(int)(8u-group)/16;return 1;
+        }
+    }
+    return 0;
+}
+static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
+{
+    /* AnimateTiles_HCZ2 does not install these parallax strips until the
+     * normal scroll differences change. Build the same row from cartridge
+     * art for the early margin, without changing VRAM or its DMA queue. */
+    static const unsigned tiles[]={0x2D2,0x2D6,0x2DE,0x2EE,0x31E};
+    static const unsigned source[]={0xA87A0,0xA8BA0,0xA93A0,0xAA3A0};
+    unsigned tile=attr&2047u,bank;
+    if(tile<tiles[0] || tile>=tiles[4])return;
+    bank=0;while(tile>=tiles[bank+1])++bank;
+    unsigned bytes=(tiles[bank+1]-tiles[bank])*32u;
+    int cx=s_frame_fg_x,base=cx*4/16;
+    unsigned phase=(unsigned)(cx*(bank<2?3:2)/16-base)&(bank==3?63u:31u);
+    unsigned low=bank==3?(0u-phase)&7u:phase&7u;
+    unsigned rotation=bank==3?((phase-1u)&56u)*(bytes/64u):(phase&24u)*(bytes/32u);
+    unsigned fy=(unsigned)y&7u;if(attr&0x1000u)fy^=7u;
+    unsigned offset=((tile-tiles[bank])*32u+fy*4u+rotation)%bytes;
+    unsigned at=S3_ART_BANK+source[bank]+low*bytes+offset;
+    row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
+        (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
+}
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
                             GameVideoNativeRow native_row, void *native_ctx,
@@ -2414,7 +2464,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
     const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
     const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
-    GenesisTileRow fg={0},bg={0};
+    int incoming_x=0,incoming_y=0;
+    int hcz2_incoming=bg_world && width>320 && s_frame_zone==1 && s_frame_act==1 &&
+        s_frame_bg_event<=12 && hcz2_panorama_position(line,&incoming_x,&incoming_y);
+    GenesisTileRow fg={0},bg={0},incoming={0};
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
      * solid snow at that boundary into the extra left view; do not expose
@@ -2485,6 +2538,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
+        }
+        if(hcz2_incoming && nx>=nw && wx>=0xC10){
+            /* The extra right view reaches the next room before the native
+             * viewport. Draw its complete panorama through both refresh
+             * passes; preserve the moving wall and every native column. */
+            int px=(nx+incoming_x)&511;
+            if(!incoming.remaining){
+                gtile_row_begin(&incoming,v->vram,
+                    world_attr(s_background_frame,px,incoming_y,1),px,incoming_y);
+                hcz2_panorama_art(incoming.attr,incoming_y,&incoming);
+            }
+            b=incoming.attr;bp=gtile_row_pixel(&incoming);bpalette=palette;
         }
         if(aiz_fire) {
             unsigned vs=1;
