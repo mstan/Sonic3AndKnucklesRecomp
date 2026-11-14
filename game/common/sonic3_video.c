@@ -2501,7 +2501,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(row>=0x8088 && row+16<=0x9000)for(unsigned i=0;i<16;++i) {
             if(!s_world_frame[row+i])continue;
             uint16_t attr=world_attr(s_world_frame,(int)i*128,wy,0);
-            if(attr==0x4002){icz_snow_edge=(int)i*128;icz_snow_attr=attr;}
+            /* A bank ahead of the camera does not cover the sky behind it.
+             * Extend only a solid snow row already at the native left edge. */
+            if(attr==0x4002 && world_attr(s_world_frame,camera,wy,0)==0x4002){
+                icz_snow_edge=(int)i*128;icz_snow_attr=attr;
+            }
             break;
         }
     }

@@ -2198,24 +2198,26 @@ static void test_icz_partial_background_rows(void)
 static void test_icz_outdoor_snow_edge(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
-    const unsigned cases[][3]={{0x500,0,1},{0x500,4,0},{0x501,0,0},{0x100,0,0}};
+    /* Do not turn empty sky before the bank into a rectangular snow wall.
+     * Once the native left edge is within snow, retain its outer fill. */
+    const unsigned cases[][4]={{0x500,0,0x300,0},{0x500,0,0x440,1},{0x500,4,0x300,0},{0x501,0,0x300,0},{0x100,0,0x300,0}};
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);s3_video_set_world_cell(NULL);
         g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n][0]);write32(0xB000,0x1234);
         word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
         word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x3C);
-        word(g_ram,0xEE80,0x300);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
+        word(g_ram,0xEE80,cases[n][2]);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
         for(unsigned i=0;i<64;++i)word(g_ram,128+i*2,1);
         for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x4002);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[33]=0xEEE;
-        memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-0x300);
+        memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-cases[n][2]);
         memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
         memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
-            int nx=x-s_native_x,wx=nx+0x300;
-            int snow=(wx>=0x400 && wx<0x480) || (cases[n][2] && nx<0 && wx>=0);
+            int nx=x-s_native_x,wx=nx+(int)cases[n][2];
+            int snow=(wx>=0x400 && wx<0x480) || (cases[n][3] && nx<0 && wx>=0);
             CHECK(out[x]==(snow?0xFFFFFFFFu:0xFF000000u));
         }
         CHECK(!memcmp(before,g_ram,sizeof before));
