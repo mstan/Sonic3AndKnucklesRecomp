@@ -1,10 +1,18 @@
 # Android build
 
-This module builds the combined Sonic 3 & Knuckles cartridge runner with the
-shared launcher. It does not contain a ROM. Supply the supported combined
-cartridge at `game/sonic3k/sonic3k.bin` when generating the native code; the
-installed app separately imports the player's matching 4 MiB cartridge
-(CRC32 `63522553`). Imports, settings and native saves stay in private app
+This module builds each Sonic 3 family cartridge runner with the shared
+launcher. Select `-PgenesisMode=sonic3`, `sandk` or `sonic3k` (the default).
+Each mode has a separate application ID and private app storage.
+
+| Mode | Game | Native target | Cartridge input | Size | CRC32 |
+| --- | --- | --- | --- | --- | --- |
+| `sonic3` | Sonic 3 | `Sonic3Recomp` | `game/sonic3/sonic3.bin` | 2 MiB | `9BC192CE` |
+| `sandk` | Sonic & Knuckles | `SonicAndKnucklesRecomp` | `game/sandk/sandk.bin` | 2 MiB | `0658F691` |
+| `sonic3k` | Sonic 3 & Knuckles | `Sonic3KRecomp` | `game/sonic3k/sonic3k.bin` | 4 MiB | `63522553` |
+
+No ROM is included in an APK. Supply the matching cartridge input when
+generating native code; the installed app separately imports the player's
+matching cartridge. Imports, settings and native saves stay in private app
 storage. An application update keeps that storage; uninstalling removes it.
 
 Requirements: Java 17, Gradle 8.11.1, Android SDK 35, CMake 3.22.1, NDK
@@ -54,7 +62,7 @@ build does not create or replace signing identities. Production signing cannot
 be used with `genesisQa=true`. Verify the resulting certificate with Android's
 `apksigner verify --print-certs` before distributing an update.
 
-The Android importer accepts the raw combined cartridge above. The desktop
+The Android importer accepts the raw cartridge for its selected mode above. The desktop
 runner's optional donor-ROM and external-tool conversion workflows are not
 provided by this importer. Widescreen defaults to Fit; saved mod choices are
 retained. In gameplay, the Touch controls button toggles the three-button pad.
