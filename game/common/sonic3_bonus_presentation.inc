@@ -81,6 +81,10 @@ static void bonus_scanline(const GVDP *v,int line,unsigned zone,const uint32_t *
         int nx=x-origin;
         if(priority)priority[x]=0;
         if(nx>=0 && nx<nw) {out[x]=native[nx];if(priority)priority[x]=2;continue;}
+        /* The bonus ID precedes its layout/decompression. Until the
+         * native level-ready flag publishes that world, the margins are
+         * the loading card's backdrop, not stale menu words at $8000. */
+        if(!s_world_frame[0xF711]){out[x]=palette[v->reg[7]&63u];continue;}
         if(zone<0x13 || zone>0x15) {out[x]=0xFF000000u;continue;}
         if(!(v->reg[1]&64)) {out[x]=native[0];continue;}
         int wx=nx-hs,sy=wy;

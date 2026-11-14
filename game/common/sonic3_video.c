@@ -546,7 +546,15 @@ typedef struct {
     uint8_t competition_sat[640]; /* paired lower-view upload */
     int competition_x,competition_y;
     unsigned competition_page;
+    int bonus_card_valid,bonus_card_x,bonus_card_y,bonus_card_exit;
+    unsigned bonus_card_gfx,bonus_card_tick;
 } SceneFrame;
+static void copy_bonus_card(SceneFrame *dst,const SceneFrame *src)
+{
+    dst->bonus_card_valid=src->bonus_card_valid;dst->bonus_card_x=src->bonus_card_x;
+    dst->bonus_card_y=src->bonus_card_y;dst->bonus_card_exit=src->bonus_card_exit;
+    dst->bonus_card_gfx=src->bonus_card_gfx;dst->bonus_card_tick=src->bonus_card_tick;
+}
 static SceneFrame s_build, s_history[3], s_display_frame;
 static const SceneFrame *s_display;
 static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy);
@@ -972,12 +980,14 @@ static void capture_objects(void)
 {
     if(ram16(S3_COMPETITION)){competition_capture_objects();return;}
     int prior_preview=s_capture_frame->preview_knux;
+    int bonus_card_found=0;
     s_capture_frame->count=0;s_capture_slot=0;s_capture_frame->aiz_super_pose=0;
     memset(s_capture_frame->code,0,sizeof s_capture_frame->code);
     if(!s_capture_readonly){s_visible_count=0;++s_scene_tick;}
     /* Start changes the mode before the last demo Render_Sprites call.
      * That completed SAT still belongs to the outgoing level, not Title. */
     s_capture_frame->scene=bonus_stage()?3:(level_ready() || demo_level_exit())?1:0;
+    if(s_capture_frame->scene!=3)s_capture_frame->bonus_card_valid=0;
     s_capture_frame->world_tag=s_capture_frame->scene==1?(unsigned)ram16(0xFE10)+1u:0u;
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
@@ -1067,6 +1077,25 @@ static void capture_objects(void)
             }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
             if(mgz2_parked_body(o,map))continue;
+#ifndef SONIC3_STANDALONE
+            unsigned frame=g_ram[o+0x22];
+            if(s_capture_frame->scene==3 && map==S3_TITLE_CARD_MAP && !(flags&4) &&
+               ((frame==19 && ram16(o+0x46)==0xC8) ||
+                (frame==20 && ram16(o+0x46)==0x128))){
+                /* BONUS and STAGE have identical motion, but the native
+                 * viewport retires STAGE first. Keep one rigid composition
+                 * until both words have crossed the expanded canvas. */
+                if(frame==19 || !bonus_card_found){
+                    unsigned parent=ram16(o+0x48);
+                    s_capture_frame->bonus_card_x=x-(frame==20?96:0);
+                    s_capture_frame->bonus_card_y=y;
+                    s_capture_frame->bonus_card_gfx=gfx;
+                    s_capture_frame->bonus_card_exit=parent>=0xB000 && parent<0xCFE0 &&
+                        ram16(parent+0x32)!=0;
+                }
+                bonus_card_found=1;continue;
+            }
+#endif
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
             if((map==S3_TITLE_CARD_MAP || (s_title_name_map && map==s_title_name_map)) && !(flags&4)) {
@@ -1125,6 +1154,27 @@ static void capture_objects(void)
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
         }
     }
+    if(s_capture_frame->scene==3){
+        unsigned tick=ram16(0xFE04);
+        if(bonus_card_found)s_capture_frame->bonus_card_valid=1;
+        else if(s_capture_frame->bonus_card_valid && s_capture_frame->bonus_card_exit){
+            if(tick!=s_capture_frame->bonus_card_tick)s_capture_frame->bonus_card_x+=32;
+        }else s_capture_frame->bonus_card_valid=0;
+        s_capture_frame->bonus_card_tick=tick;
+        if(s_capture_frame->bonus_card_x+(s_requested_width-320)/2>=s_requested_width)
+            s_capture_frame->bonus_card_valid=0;
+        if(s_capture_frame->bonus_card_valid){
+            /* Loading has not installed the bonus ring/object tables yet.
+             * Only the real card belongs to this publication; interpreting
+             * leftover menu entries as bonus actors exposes stale VRAM. */
+            if(!g_ram[0xF711])s_capture_frame->count=0;
+            s_capture_slot=0;
+            add_mapping(S3_TITLE_CARD_MAP,19,s_capture_frame->bonus_card_gfx,0,
+                s_capture_frame->bonus_card_x,s_capture_frame->bonus_card_y,2,0,0);
+            add_mapping(S3_TITLE_CARD_MAP,20,s_capture_frame->bonus_card_gfx,0,
+                s_capture_frame->bonus_card_x+96,s_capture_frame->bonus_card_y,2,0,0);
+        }
+    }
     append_aiz_plane();
 }
 
@@ -1152,6 +1202,7 @@ static void publish_sprites(void)
     if(s_build.scene==4)memcpy(s_build.competition_sat,g_ram+(s_build.competition_page?0x7D80:0x7B00),640);
     SceneFrame *dst=&s_history[s_serial%3];
     dst->count=s_build.count;dst->serial=s_serial;dst->scene=s_build.scene;dst->title=s_build.title;
+    copy_bonus_card(dst,&s_build);
     dst->world_tag=s_build.world_tag;
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
@@ -1331,6 +1382,7 @@ static void select_scene(const GVDP *v,int retain_level)
     /* Keep the selected front buffer immutable for all displayed scanlines. */
     if(s_display && s_display!=&s_display_frame) {
         s_display_frame.count=s_display->count;s_display_frame.scene=s_display->scene;
+        copy_bonus_card(&s_display_frame,s_display);
         s_display_frame.title=s_display->title;
         s_display_frame.world_tag=s_display->world_tag;
         s_display_frame.serial=s_display->serial;
@@ -1928,6 +1980,19 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     }
     if(competition_scanline(v,line,native,nw,out,width,native_row,native_ctx,palette))return;
     v=&s_video_frame;
+    const uint8_t *card_ram=s_interpolating?s_world_frame:g_ram;
+    if(s_display && s_display->scene==3 && s_display->bonus_card_valid && !card_ram[0xF711]){
+        /* The bonus loading card temporarily retains the level-select
+         * plane registers. Its finite words do not make that old menu's
+         * offscreen name-table cells into valid margin scenery. */
+        if(!native)native=native_row(native_ctx);
+        int origin=(width-nw)/2;
+        for(int x=0;x<width;++x){out[x]=palette[v->reg[7]&63u];s_priority[x]=(uint8_t)(x>=origin && x<origin+nw?2:0);}
+        if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof *out);
+        draw_scene_sprites(v,line,out,width,origin,palette);
+        if(!line){++s_frames;s_native_x=origin;}
+        return;
+    }
     if(s_frame_bonus) {
         if(!native)native=native_row(native_ctx);
         int origin=(width-nw)/2;
@@ -2710,6 +2775,10 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     if(world>0x10000u)io->ok=0;
     unsigned join=0;s3_state_peek(io,offsetof(SceneFrame,aiz_join),&join,sizeof join);
     if(join>3)io->ok=0;
+    int card[4]={frame->bonus_card_valid,frame->bonus_card_x,frame->bonus_card_y,frame->bonus_card_exit};
+    s3_state_peek(io,offsetof(SceneFrame,bonus_card_valid),card,sizeof card);
+    if(card[0]<0 || card[0]>1 || card[3]<0 || card[3]>1 ||
+       card[1] < -1024 || card[1]>8192 || card[2] < -256 || card[2]>512)io->ok=0;
     AizPlanePose plane=frame->aiz_plane;
     s3_state_peek(io,offsetof(SceneFrame,aiz_plane),&plane,sizeof plane);
     if(!aiz_plane_valid(&plane))io->ok=0;

@@ -450,6 +450,7 @@ static void test_bonus_margins(void)
     for(unsigned n=0;n<64*32;n++)word(v.vram,0xE000+n*2,1);
     word(v.vram,0xE000+63*2,2);
     for(unsigned n=0;n<320;n++)native[n]=0xFF123400u+n;
+    s_world_frame[0xF711]=1;
     bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow,NULL);
     CHECK(out[237]==palette[2] && out[558]==palette[1]);
     for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
@@ -464,11 +465,16 @@ static void test_bonus_margins(void)
     bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_SHADOW));
     test_private_planes=0;
+    /* A selected bonus ID cannot turn the previous menu's RAM into a
+     * level layout while the native loading card is still on screen. */
+    s_world_frame[0xF711]=0;
+    bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow,NULL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=238 && x<558?native[x-238]:palette[0]));
 }
 static void test_gumball_authored_extent(void)
 {
     static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
-    memset(&v,0,sizeof v);memset(s_world_frame,0,sizeof s_world_frame);
+    memset(&v,0,sizeof v);memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xF711]=1;
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[13]=0x3C;v.reg[16]=1;v.reg[11]=7;
     v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
     for(unsigned i=0;i<64;++i)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
@@ -499,7 +505,7 @@ static void test_bonus_authored_planes(void)
 {
     static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-    memset(s_world_frame,0,sizeof s_world_frame);
+    memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xF711]=1;
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[16]=1;v.reg[13]=0x3C;
     v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
     for(unsigned i=0;i<64;i++)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
@@ -714,6 +720,20 @@ static void test_title_card_edges(void)
     word(v.vram,0xC000,0);v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
     /* A bonus card with a different authored target keeps its native layout. */
     write16(o+0x46,0xC8);capture_objects();CHECK(s_build.sprites[0].hud==2);
+#ifndef SONIC3_STANDALONE
+    /* A loading bonus card must not reinterpret old ring/menu tables. */
+    g_ram[0xF600]=8;g_ram[0xFE10]=0x14;g_ram[0xF711]=0;
+    g_ram[o+0x22]=19;write16(o+0x46,0xC8);
+    word(g_rom,S3_TITLE_CARD_MAP+19*2,0x40);
+    word(g_rom,S3_TITLE_CARD_MAP+20*2,0x40);
+    unsigned stale=o+0x4A;write32(stale,0x9000);
+    write32(stale+0xC,S3_TITLE_CARD_MAP);g_ram[stale+0x22]=6;
+    write16(stale+0x10,240);write16(stale+0x14,135);
+    word(g_ram,0xAC00,4);word(g_ram,0xAC04,(uint16_t)stale);
+    capture_objects();
+    CHECK(s_build.bonus_card_valid && s_build.count==2);
+    CHECK(s_build.sprites[0].y==0 && s_build.sprites[1].x-s_build.sprites[0].x==96);
+#endif
     CHECK(configure("off"));
 }
 static void test_file_select(void)
