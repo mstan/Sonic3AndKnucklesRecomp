@@ -1,0 +1,24 @@
+plugins { id 'com.android.application' version '8.7.3' }
+def game = file('..')
+def engine = file(providers.gradleProperty('genesisEngineRoot').orElse('../segagenesisrecomp').get())
+def modes = [
+    sonic3: [applicationId:'com.mstan.sonic3recomp', title:'Sonic 3',
+        romCrc:'9BC192CE', romSize:2097152, target:'Sonic3Recomp',
+        romConfig:'rom-Sonic3.cfg', boxart:'boxart-sonic3.tga'],
+    sandk: [applicationId:'com.mstan.sonicandknucklesrecomp', title:'Sonic & Knuckles',
+        romCrc:'0658F691', romSize:2097152, target:'SonicAndKnucklesRecomp',
+        romConfig:'rom-SonicK.cfg', boxart:'boxart-sonick.tga'],
+    sonic3k: [applicationId:'com.mstan.sonic3krecomp', title:'Sonic 3 & Knuckles',
+        romCrc:'63522553', romSize:4194304, target:'Sonic3KRecomp',
+        romConfig:'rom-Sonic3K.cfg', boxart:'boxart-sonic3k.tga']
+]
+def mode = providers.gradleProperty('genesisMode').orElse('sonic3k').get()
+if (!modes.containsKey(mode)) throw new GradleException('genesisMode must be sonic3, sandk or sonic3k')
+ext.genesisGame = modes[mode] + [version:'0.8.4', versionCode:804,
+    gameRoot:game, engineRoot:engine,
+    uiRoot:file(providers.gradleProperty('genesisUiRoot').orElse('../recomp-ui').get())]
+apply from:new File(engine,'platform/android/app.gradle')
+// AGP can discover shared libraries from other previously built CMake targets.
+// Each application imports and runs only its selected cartridge mode.
+android.packagingOptions.jniLibs.excludes.addAll(
+    modes.values().findAll { it.target != modes[mode].target }.collect { '**/lib'+it.target+'.so' })
