@@ -243,8 +243,9 @@ static void queue(unsigned native,unsigned slot)
     if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x33;
     /* Native SFX start at $33, which is also Clone's relocated S&K credits
      * entry. Only native music/control requests may stop a CD recording. */
-    if(native<=0x32 || native>=0xDC)
-        s3_cd_theme_request(id<=0x33 && id!=native?id:native);
+    if((native<=0x32 || native>=0xDC) &&
+       !s3_cd_theme_request(id<=0x33 && id!=native?id:native))return;
+    if(native==0x29 && (g_ram[0xF600]&0x7F)==0x0C)s3_cd_theme_finish_clear();
     if(id<=0x33 && !m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))return;
     g_cpu.D[0]=id;recomp_call_addr(slot?S3_CLONE_QUEUE_SFX:S3_CLONE_QUEUE_MUSIC);
 }
@@ -255,7 +256,7 @@ int s3_sound_hook(uint32_t pc)
     if(!active || !s3_sound_owns(pc))return 0;
     uint32_t init=standalone?0x1562:0x12CE,music=standalone?0x15E2:0x1358,sfx=standalone?0x160A:0x1380,t=standalone?0x164C:0x13C2;
     if(pc==init){
-        s3_cd_theme_request(0xE0);
+        s3_cd_theme_driver_init();
         M68KState saved=g_cpu;memset(sound_ram,0,sizeof sound_ram);memset(pending,0,sizeof pending);tempo=tempo_dirty=0;
         recomp_call_addr(S3_CLONE_INITIALISE);g_cpu=saved;initialised=1;zero_move_flags();return 1;
     }
@@ -283,6 +284,7 @@ void s3_sound_vblank(void)
     /* In the pinned software RAM layout bitfield2 immediately follows the
      * main tempo byte; bit zero is the driver's 1-UP backup flag. */
     s3_cd_theme_frame(sound_ram[S3_CLONE_PAUSE_OFFSET]!=0,sound_ram[S3_CLONE_TEMPO_OFFSET+1]&1);
+    unsigned resume=s3_cd_theme_resume_music();if(resume)queue(resume,0);
     g_cpu=saved;
 #endif
 }
@@ -292,7 +294,7 @@ int s3_sound_dispatch_miss(uint32_t pc)
 }
 void s3_sound_state(struct S3StateIO *io)
 {
-    uint8_t identity[72]={'S','3','S','D',2,0,0,0},incoming[72];identity[5]=(uint8_t)(bound?active:selected);
+    uint8_t identity[72]={'S','3','S','D',3,0,0,0},incoming[72];identity[5]=(uint8_t)(bound?active:selected);
     identity[6]=(uint8_t)(bound?prototype_active:prototype_selected);
 #ifdef S3_CLONE_DRIVER
     if(identity[5])for(unsigned i=0;i<32;i++){

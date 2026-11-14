@@ -7,7 +7,12 @@ void s3_cd_themes_reset(void);
 int s3_cd_theme_build(unsigned theme,unsigned donor,const char *manifest,
                       const S3SoundLayout *layout,uint8_t *bank,size_t capacity,
                       uint32_t *used,char *error,size_t error_size);
-void s3_cd_theme_request(unsigned native);
+/* Zero postpones the cartridge music request while the clear recording ends. */
+int s3_cd_theme_request(unsigned native);
+void s3_cd_theme_driver_init(void);
+/* Only a real gameplay clear may continue through stage music/driver resets. */
+void s3_cd_theme_finish_clear(void);
+unsigned s3_cd_theme_resume_music(void);
 void s3_cd_theme_frame(int paused,int oneup);
 void s3_cd_theme_state(struct S3StateIO *io);
 void s3_cd_theme_identity(uint8_t out[32]);

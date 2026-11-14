@@ -13,7 +13,7 @@
 
 typedef struct Song {uint8_t *pcm;uint32_t frames,gain;uint8_t hash[32];} Song;
 static Song songs[S3_MUSIC_COUNT];
-typedef struct CDClock {uint64_t position,frame_position;uint32_t theme,active,paused,volume,fade;} CDClock;
+typedef struct CDClock {uint64_t position,frame_position;uint32_t theme,active,paused,volume,fade,carry,deferred;} CDClock;
 static CDClock clock_state;
 static const unsigned events[S3_MUSIC_COUNT]={
     [S3_THEME_OVER]=0x27,[S3_THEME_CLEAR]=0x29,[S3_THEME_INVINCIBLE]=0x2C,
@@ -127,16 +127,41 @@ int s3_cd_theme_build(unsigned t,unsigned donor,const char *manifest,const S3Sou
     be32(bank+l->music_index-0x400000+(events[t]-1)*4,0x01400000u|dest);*used=dest+82;
     audio_set_extra_source(mix);return 1;
 }
-void s3_cd_theme_request(unsigned native)
+void s3_cd_theme_driver_init(void)
 {
-    if(native==0x2A)return; /* Clone backs up/restores the silent music entry. */
+    /* A level may reset its cartridge driver before the longer CD clear has
+     * ended. Keep only that recording; all ordinary driver state still resets. */
+    if(clock_state.active&&clock_state.theme==S3_THEME_CLEAR&&clock_state.carry)return;
+    else memset(&clock_state,0,sizeof clock_state);
+}
+void s3_cd_theme_finish_clear(void)
+{
+    if(clock_state.active&&clock_state.theme==S3_THEME_CLEAR)clock_state.carry=1;
+}
+unsigned s3_cd_theme_resume_music(void)
+{
+    if(clock_state.active)return 0;
+    unsigned native=clock_state.deferred;
+    clock_state.carry=clock_state.deferred=0;
+    return native;
+}
+int s3_cd_theme_request(unsigned native)
+{
+    if(native==0x2A)return 1; /* Clone backs up/restores the silent music entry. */
+    if(clock_state.active&&clock_state.theme==S3_THEME_CLEAR&&clock_state.carry){
+        if(native==0xE1||native==0xE5)return 0;
+        if(clock_state.carry&&native>=1&&native<=0x17){
+            clock_state.deferred=native;return 0;
+        }
+    }
     if(native>=1&&native<=0x33){
         for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(cd_event(t)&&native==events[t]&&songs[t].pcm){
-            memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;return;
+            memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;return 1;
         }
-        clock_state.active=0;
+        clock_state.active=clock_state.carry=clock_state.deferred=0;
     }else if(native==0xE1||native==0xE5)clock_state.fade=1;
-    else if(native==0xE0||native==0xE2||native==0xFF)clock_state.active=0;
+    else if(native==0xE0||native==0xE2||native==0xFF)clock_state.active=clock_state.carry=clock_state.deferred=0;
+    return 1;
 }
 void s3_cd_theme_frame(int paused,int oneup)
 {
@@ -165,6 +190,8 @@ void s3_cd_theme_state(struct S3StateIO *io)
     CDClock incoming=clock_state;
     s3_state_peek(io,0,&incoming,sizeof incoming);
     if(incoming.theme>=S3_MUSIC_COUNT||incoming.active>1||incoming.paused>1||incoming.volume>65536||incoming.fade>1||
+       incoming.carry>1||incoming.deferred>0x17||(!incoming.carry&&incoming.deferred)||
+       (incoming.carry&&incoming.theme!=S3_THEME_CLEAR)||
        (incoming.active && (!songs[incoming.theme].pcm||!songs[incoming.theme].frames)))io->ok=0;
     S3_STATE(io,clock_state);
 }

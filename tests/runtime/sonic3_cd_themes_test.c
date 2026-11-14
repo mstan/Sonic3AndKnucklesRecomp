@@ -39,6 +39,26 @@ int main(int argc,char **argv)
     s3_cd_theme_frame(0,0);CHECK(!clock_state.active);
     s3_cd_theme_request(0x2C);s3_cd_theme_request(1);CHECK(!clock_state.active);
     s3_cd_theme_request(0x2C);s3_cd_theme_request(0xE1);for(unsigned i=0;i<45;i++)s3_cd_theme_frame(0,0);CHECK(!clock_state.active);
+    /* Sound-test previews stop normally; only actual clears carry over. */
+    s3_cd_theme_request(0x29);s3_cd_theme_driver_init();CHECK(!clock_state.active);
+    s3_cd_theme_request(0x29);CHECK(s3_cd_theme_request(1)&&!clock_state.active);
+    s3_cd_theme_request(0x29);s3_cd_theme_finish_clear();
+    CHECK(!s3_cd_theme_request(0xE1)&&!s3_cd_theme_request(0xE5));
+    s3_cd_theme_driver_init();CHECK(clock_state.active&&clock_state.carry);
+    CHECK(!s3_cd_theme_request(0x0D)&&!s3_cd_theme_request(0x0E));
+    CHECK(s3_cd_theme_request(0x2A));s3_cd_theme_frame(0,1);
+    CHECK(!clock_state.position&&!s3_cd_theme_resume_music());
+    save.pos=0;s3_cd_theme_state(&save);CHECK(save.ok);
+    s3_cd_theme_frame(0,0);s3_cd_theme_frame(0,0);
+    CHECK(s3_cd_theme_resume_music()==0x0E&&!s3_cd_theme_resume_music());
+    load.pos=0;s3_cd_theme_state(&load);CHECK(load.ok&&clock_state.deferred==0x0E);
+    CHECK(s3_cd_theme_request(0x2C)&&clock_state.theme==S3_THEME_INVINCIBLE);
+    CHECK(!clock_state.carry&&!clock_state.deferred);
+    s3_cd_theme_driver_init();CHECK(!clock_state.active);
+    s3_cd_theme_request(0x29);s3_cd_theme_finish_clear();CHECK(!s3_cd_theme_request(1));
+    CHECK(s3_cd_theme_request(0xE0)&&!s3_cd_theme_resume_music());
+    s3_cd_theme_request(0x29);s3_cd_theme_finish_clear();CHECK(s3_cd_theme_request(0xE2)&&!clock_state.active);
+    s3_cd_theme_request(0x29);s3_cd_theme_finish_clear();CHECK(s3_cd_theme_request(0xFF)&&!clock_state.active);
     const unsigned bosses[]={S3_MUSIC_BOSS,S3_MUSIC_MINIBOSS,S3_MUSIC_FINAL};
     for(unsigned i=0;i<3;i++){
         unsigned t=bosses[i];song(t);s3_cd_theme_request(events[t]);memset(out,0,sizeof out);mix(out,6,44100);
