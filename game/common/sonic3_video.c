@@ -694,10 +694,11 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         if(flags&2){dy=-dy-((size&3)+1)*8;attr^=0x1000;}
         /* A full brick repeats every32px while the water front advances.
          * Its coverage moves; fractional drawing keeps the texture in world phase. */
-        if(map==S3_HCZ_RUSH_MAP && size==15 && zoom==256 &&
-           (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30))size|=0x20;
-        /* Bit4 records the immutable native mapping owner. It is separate
-         * from the atlas/roof bank flags, which already occupy upper bits. */
+        if(map==S3_HCZ_RUSH_MAP && zoom==256 &&
+           (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30))
+            size|=size==15?0x20:0x10;
+        /* In AIZ, bit4 records immutable monkey-art ownership. The zone
+         * separates it from HCZ's half-brick and extended-roof uses. */
         if(map==S3_MONKEY_MAP)size|=SPRITE_MONKEY_ART;
         dx=zoom_offset(dx,zoom);dy=zoom_offset(dy,zoom);
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
@@ -1668,6 +1669,16 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             int ext=s->hud==5?0:presentation_sprite_line(s->size,cell&2047u,p>>4);
             uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):
                 s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p,s->attr):palette[p];
+            /* The current's full/half brick pieces borrow palette 2 while
+             * the identical backing uses palette 3. A wider view exposes
+             * that recoloring sweep over a large stationary wall. Keep the
+             * wall's colors on those pieces; the water-front art and the
+             * original-width composition retain their native palettes.
+             * Bit 4 marks the half pieces in HCZ, independently of the
+             * world-phase bit used by full/repeated 32px pieces. */
+            if(!ext && world && width>320 && s_frame_zone==1 && !s_frame_act &&
+               (s->size&0x30u) && (s->attr&0x6000u)==0x4000u)
+                c=palette[48u|(p&15u)];
             /* The wider view can expose the waiting cutscene actor before
              * its controller borrows palette 1. Preserve its authored colors
              * there while the hardware viewport and private providers own
