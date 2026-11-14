@@ -104,6 +104,15 @@ static double s_ratio = 16.0 / 9.0;
 static int s_requested_width = 320;
 static unsigned s_frames, s_fallbacks, s_terrain_checks, s_terrain_errors;
 static unsigned s_bg_checks, s_bg_errors, s_bg_unstreamed;
+static int s_reference_checks=-1;
+static int reference_checks_enabled(void)
+{
+    if(s_reference_checks<0) {
+        const char *value=getenv("SONIC3_REFERENCE_CHECKS");
+        s_reference_checks=value && atoi(value)!=0;
+    }
+    return s_reference_checks;
+}
 static unsigned s_scene_misses, s_scene_holds;
 static unsigned s_uninitialized_scroll_lines;
 static unsigned s_terrain_unstreamed;
@@ -2053,6 +2062,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                             GameVideoNativeRow native_row, void *native_ctx,
                             const GVDPRasterRow *raster,int *hud_origin)
 {
+    const int verify_reference=reference_checks_enabled();
     *hud_origin=(width-nw)/2;
     /* Publish one immutable art/scroll snapshot per frame. Palettes and the
      * scripted foreground VSRAM switch remain live across native HBlank. */
@@ -2867,7 +2877,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* With no published scene the final path below copies the native
          * viewport over this provisional composition. Comparing those
          * discarded samples would report errors in pixels never displayed. */
-        if(!s_interpolating && nx>=0 && nx<nw && !(x&7) && !missing_scroll && (!level || s_display)) {
+        if(verify_reference && !s_interpolating && nx>=0 && nx<nw && !(x&7) && !missing_scroll && (!level || s_display)) {
             if(level && !native_terrain_streamed(wy,s_frame_fg_y)) {
                 ++s_terrain_unstreamed;
             } else if(level && !aiz_fire_fg && !mgz2_collapse) {
@@ -2979,11 +2989,11 @@ static void scanline_lazy(const GVDP *v,int line,int nw,uint32_t *out,int width,
 void s3_video_command(int id, const char *json)
 {
     (void)json;
-    char reply[2048];
+    char reply[4096];
     snprintf(reply, sizeof reply,
         "{\"id\":%d,\"enabled\":%d,\"width\":%d,\"view_left\":%d,\"camera\":%d,"
         "\"native_x\":%d,\"stage_width\":%d,\"frames\":%u,\"fallback_frames\":%u,"
-        "\"terrain_checks\":%u,\"terrain_errors\":%u,\"background_checks\":%u,\"background_errors\":%u,\"background_unstreamed\":%u,"
+        "\"reference_checks_enabled\":%s,\"terrain_checks\":%u,\"terrain_errors\":%u,\"background_checks\":%u,\"background_errors\":%u,\"background_unstreamed\":%u,"
         "\"sprites\":%u,\"scene\":%d,\"spawned\":%u,\"pool_pressure\":%u,\"native_uninitialized_scroll_lines\":%u,"
         "\"native_unstreamed_terrain_samples\":%u,\"first_bad_x\":%d,\"first_bad_y\":%d,\"first_bad_attr\":%u,\"first_bad_expected\":%u,\"first_bad_world_y\":%d,\"first_bad_hscroll\":%d,"
         "\"scene_match_misses\":%u,\"scene_held_frames\":%u,\"main_cpu_divisor\":%u,"
@@ -2992,7 +3002,8 @@ void s3_video_command(int id, const char *json)
         "\"tick_samples\":%u,\"tick_updates\":%u,\"tick_lag\":%u,\"tick_multi\":%u,\"publication_lag\":%u,"
         "\"blue_spheres\":%d,\"special_spheres\":%u,\"special_margin_spheres\":%u}",
         id, enabled(), s_width, s_left, s_camera, s_native_x, s_stage_width,
-        s_frames, s_fallbacks, s_terrain_checks, s_terrain_errors,s_bg_checks,s_bg_errors,s_bg_unstreamed,
+        s_frames, s_fallbacks,reference_checks_enabled()?"true":"false",
+        s_terrain_checks, s_terrain_errors,s_bg_checks,s_bg_errors,s_bg_unstreamed,
         s_display?s_display->count:0,s_display?s_display->scene:-1,s_spawned,s_pool_pressure,s_uninitialized_scroll_lines,
         s_terrain_unstreamed,s_bad_x,s_bad_y,s_bad_attr,s_bad_expected,s_bad_world_y,s_bad_hscroll,
         s_scene_misses,s_scene_holds,s3_video_main_cpu_divisor(),

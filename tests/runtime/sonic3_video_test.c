@@ -3525,6 +3525,8 @@ static void test_blue_spheres(void)
 #include "sonic3_aiz_join_test.inc"
 int main(int argc,char **argv)
 {
+    /* Correctness tests retain the complete native-reference comparisons. */
+    s_reference_checks=1;
     if(argc==2) {
         FILE *rom=fopen(argv[1],"rb");CHECK(rom);
         CHECK(fread(g_rom,1,sizeof g_rom,rom)==S3_ART_BANK+0x200000u);fclose(rom);
@@ -3751,6 +3753,20 @@ int main(int argc,char **argv)
     publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
     scanline(&v,0,native,320,out,796);
     for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
+    CHECK(s_bg_checks>0 && s_bg_errors==0);
+    /* Optional reference work must never alter pixels or guest state, and
+     * disabled comparisons must not report samples as checked. */
+    static uint32_t diagnostic_pixels[796];
+    static uint8_t diagnostic_ram[sizeof g_ram];
+    memcpy(diagnostic_pixels,out,sizeof diagnostic_pixels);
+    memcpy(diagnostic_ram,g_ram,sizeof diagnostic_ram);
+    s_reference_checks=0;
+    scanline(&v,0,native,320,out,796);
+    CHECK(!memcmp(diagnostic_pixels,out,sizeof diagnostic_pixels));
+    CHECK(!memcmp(diagnostic_ram,g_ram,sizeof diagnostic_ram));
+    CHECK(!s_terrain_checks && !s_terrain_errors && !s_bg_checks && !s_bg_errors);
+    s_reference_checks=1;
+    scanline(&v,0,native,320,out,796);
     CHECK(s_bg_checks>0 && s_bg_errors==0);
     /* SOZ1 uses the same 512px desert canvas, never its later pyramid
      * layout. This regression uses the unrelated green bank above. */
