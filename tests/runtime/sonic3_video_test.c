@@ -2234,6 +2234,71 @@ static void test_icz_outdoor_snow_edge(void)
 }
 static int ending_cinematic_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {(void)ram;(void)x;(void)y;*cell=background?2:1;return 1;}
+static int lbz_preview_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)y;
+    *cell=ram==s_lbz_preview.world?(background?3:(x&8)?0:2):background?3:x>=0x4000?0:1;
+    return 1;
+}
+static void test_lbz_incoming_margin(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    const unsigned cases[][3]={{0x600,0x3D70,0},{0x600,0x3EA0,0},
+        {0x601,0x4A0,4},{0x601,0x4A0,8},{0x601,0,4}};
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+        CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_lbz_preview,0,sizeof s_lbz_preview);
+        test_private_planes=test_atlas_enabled=test_time_private_palette=0;
+        s_lbz_preview.attempted=s_lbz_preview.ready=1;
+        s_lbz_preview.colors[2]=0xE0;s_lbz_preview.colors[35]=0xEE0;
+        memset(s_lbz_preview.video.vram+64,0x22,32);memset(s_lbz_preview.video.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){
+            word(g_ram,0x9008+i*2,1);word(g_ram,0x9018+i*2,3);
+            word(s_lbz_preview.world,0x9010+i*2,0x2002);
+            word(s_lbz_preview.world,0x9018+i*2,0x6003);
+        }
+        g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n][0]);write32(0xB000,0x1234);
+        word(g_ram,0x8000,160);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+        word(g_ram,0xEE80,cases[n][1]);word(g_ram,0xEE84,0x148);
+        word(g_ram,0xEEC2,cases[n][2]);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x148;
+        v.cram[1]=0xE;v.cram[3]=0xE00;v.cram[33]=0xEEE;
+        memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+        word(v.vram,0xF000,(unsigned)-cases[n][1]);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=cases[n][1];s_build.camera_y=0x148;
+        s_visible_count=0;publish_sprites();s3_video_set_world_cell(lbz_preview_cell);
+        memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int nx=x-s_native_x,wx=nx+(int)cases[n][1];
+            uint32_t expected=wx<0x4000?0xFFFF0000u:0xFF0000FFu;
+            int rebased=wx+(cases[n][0]==0x601?0x3A00:0);
+            if((cases[n][0]==0x600 || cases[n][2]<=4) &&
+               cases[n][1]+(cases[n][0]==0x601?0x3A00:0)>=0x3D80 && nx>=320 && rebased>=0x3FE0)
+                expected=(rebased&8)?0xFF00FFFFu:0xFF00FF00u;
+            if(out[x]!=expected)fprintf(stderr,"LBZ preview case%u x%d nx%d wx%X: %08X expected %08X\n",n,x,nx,wx,out[x],expected);
+            CHECK(out[x]==expected);
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    }
+    /* A future girder begins at the arena edge. Its visual preview must
+     * respect both the native viewport and existing foreground priority. */
+    unsigned map=S3_ART_BANK+0x2B3AA;
+    word(g_rom,map+0x17*2,0x40);word(g_rom,map+0x40,1);
+    memset(g_rom+map+0x42,0,6);word(g_rom,map+0x46,0xFFF0);
+    memset(v.vram+0x433*32,0x11,32);
+    uint32_t pal[64]={0};uint8_t priority[796]={0};pal[17]=0xFF123456;
+    memset(out,0,sizeof out);priority[560]=1;priority[561]=2;
+    lbz_preview_sprites(&v,0x1C0-0x148,out,796,238,0x3EA0,0x148,pal,priority);
+    CHECK(out[558]==pal[17] && out[559]==pal[17]);
+    CHECK(!out[557] && !out[560] && !out[561] && out[562]==pal[17] && !out[566]);
+    memset(out,0,sizeof out);memset(priority,0,sizeof priority);
+    lbz_preview_sprites(&v,0x1C0-0x148,out,796,238,0x3F00,0x148,pal,priority);
+    for(unsigned x=0;x<796;++x)CHECK(!out[x]);
+    memset(g_rom+map+0x17*2,0,2);memset(g_rom+map+0x40,0,8);
+    memset(&s_lbz_preview,0,sizeof s_lbz_preview);CHECK(configure("off"));
+}
 static void test_s3_ending_margin_ownership(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3783,7 +3848,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();

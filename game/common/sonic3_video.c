@@ -644,6 +644,7 @@ static int view_left(int camera, int w)
     return scene_view_left(camera,w,0,stage_width(),g_ram[0xFE10],g_ram[0xFE11]);
 }
 #include "sonic3_camera_handoff.inc"
+#include "sonic3_lbz_preview.inc"
 
 int s3_video_presentation_camera_x(int camera)
 {
@@ -1758,10 +1759,10 @@ static int attributes_differ(const GVDP *v,uint16_t a,uint16_t b,int x,int y)
 /* The native level-entry fade adds one B, then G, then R step per tick.
  * Its white entry exposes the installed step, even when main RAM has already
  * prepared the following palette. Cached art must run that same operation. */
-static uint16_t scene_art_color(unsigned color,const GVDP *v)
+static uint16_t scene_art_color_reference(unsigned color,const GVDP *v,unsigned reference)
 {
     if((int16_t)((s_world_frame[0xEE50]<<8)|s_world_frame[0xEE51])>0) {
-        unsigned white=v->cram[17],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
+        unsigned white=v->cram[reference+1],steps=((white&14)+((white>>4)&14)+((white>>8)&14))/2;
         unsigned faded=0;
         for(int shift=8;shift>=0;shift-=4) {
             unsigned target=(color>>(unsigned)shift)&14,part=steps*2;
@@ -1770,8 +1771,8 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
         }
         return (uint16_t)faded;
     }
-    unsigned white=v->cram[17],sum=(white&14)+((white>>4)&14)+((white>>8)&14);
-    if(sum<42&&!v->cram[16]){
+    unsigned white=v->cram[reference+1],sum=(white&14)+((white>>4)&14)+((white>>8)&14);
+    if(sum<42&&!v->cram[reference]){
         unsigned steps=(42-sum)/2,faded=0;
         /* Pal_DecColor removes red, green, then blue independently for
          * every entry. Cached margin colors must follow those same steps. */
@@ -1784,12 +1785,14 @@ static uint16_t scene_art_color(unsigned color,const GVDP *v)
     }
     unsigned faded=0;
     for(unsigned shift=0;shift<12;shift+=4) {
-        int lo=(v->cram[16]>>shift)&14,hi=(v->cram[17]>>shift)&14;
+        int lo=(v->cram[reference]>>shift)&14,hi=(v->cram[reference+1]>>shift)&14;
         int c=lo+(int)((color>>shift)&14)*(hi-lo)/14;
         faded|=(unsigned)c<<shift;
     }
     return (uint16_t)faded;
 }
+static uint16_t scene_art_color(unsigned color,const GVDP *v)
+{ return scene_art_color_reference(color,v,16); }
 static uint16_t restored_art_color(unsigned color,const GVDP *v)
 {
     /* The donor's stage entry 16 can be nonblack (FBZ is $0462), so use
@@ -2520,6 +2523,19 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int incoming_x=0,incoming_y=0;
     int hcz2_incoming=bg_world && width>320 && s_frame_zone==1 && s_frame_act==1 &&
         s_frame_bg_event<=12 && hcz2_panorama_position(line,&incoming_x,&incoming_y);
+    int lbz_x=0,lbz_y=0;
+    int lbz_shake=(int16_t)(((unsigned)s_world_frame[0xEECE]<<8)|s_world_frame[0xEECF]);
+    /* Keep ownership across the act-coordinate rebase and the native
+     * bottom-up refresh, including its first partially installed row. */
+    int lbz_rebase=s_frame_act==1?0x3A00:0,lbz_camera=camera+lbz_rebase;
+    int lbz_incoming=bg_world && width>320 && s_frame_zone==6 &&
+        (!s_frame_act || (s_frame_act==1 && s_frame_bg_event<=4)) &&
+        lbz_camera>=0x3D80 && lbz_preview_cloud_position(lbz_camera,plane_y,lbz_shake,line,&lbz_x,&lbz_y) &&
+        lbz_preview_load();
+    uint32_t lbz_palette[64];
+    if(lbz_incoming)for(unsigned i=0;i<64;++i)
+        lbz_palette[i]=i<16?palette[i]:genesis_dac_cram_to_argb(
+            scene_art_color_reference(s_lbz_preview.colors[i-16],v,32),GENESIS_DAC_NORMAL);
     GenesisTileRow fg={0},bg={0},incoming={0};
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
@@ -2683,6 +2699,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int handoff_bg=level && width>320 &&
             handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
         if(handoff_bg)bpalette=s_handoff_art.colors[line];
+        if(lbz_incoming && nx>=nw && wx+lbz_rebase>=0x3FE0) {
+            lbz_preview_sample(wx+lbz_rebase,wy,nx+lbz_x,lbz_y,&a,&ap,&b,&bp);
+            joined=1;apalette=bpalette=lbz_palette;
+        }
         if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.
@@ -2824,6 +2844,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 s_knux_plane_camera_x,s_knux_plane_camera_y);
         *hud_origin=0;
         draw_scene_sprites(v,line,out,width,origin,palette);
+        if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
