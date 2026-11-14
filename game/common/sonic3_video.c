@@ -63,7 +63,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
        S3_MGZ_END_BOSS=0x6C31A, S3_WAIT_ONSCREEN=0x85AD2 };
 #endif
 
-enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10 };
+enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
+       SPRITE_ENDING_POSE = 8 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -75,6 +76,9 @@ enum { S3_EXPLOSION_MAP=0x1E758, S3_EXPLOSION_ART=0x19200A,
 #endif
 static unsigned native_art_owner(unsigned map)
 {
+#ifdef SONIC3_STANDALONE
+    if(map==0x5217Cu)return SPRITE_ENDING_POSE;
+#endif
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
@@ -1589,10 +1593,30 @@ static uint32_t competition_character_color(const GVDP *v,unsigned pixel,unsigne
     unsigned shade=(v->reg[12]&8u) && !(attr&0x8000u)?GENESIS_DAC_SHADOW:GENESIS_DAC_NORMAL;
     return genesis_dac_cram_to_argb((uint16_t)faded,(int)shade);
 }
+/* The ending's artificial camera rise belongs to a finite stage. Extra
+ * gameplay terrain and decorations have no authored role in that shot. Keep
+ * the real ending pose as it enters the wider view and retain the HUD. */
+static int ending_cinematic(void)
+{
+#ifdef SONIC3_STANDALONE
+    if(!s_frame_level || s_frame_zone!=6 || s_frame_act!=1 || s_frame_bg_event<16)return 0;
+    unsigned o=((unsigned)s_world_frame[0xFAA4]<<8)|s_world_frame[0xFAA5];
+    if(o>=0xB000 && o<0xCFCC && !((o-0xB000)%0x4A)) {
+        unsigned pc=((unsigned)s_world_frame[o]<<24)|((unsigned)s_world_frame[o+1]<<16)|
+            ((unsigned)s_world_frame[o+2]<<8)|s_world_frame[o+3];
+        if(pc>=0x51148 && pc<=0x511CC)return 1;
+    }
+    /* The pose retires that controller while the camera is still rising. */
+    if(s_display)for(unsigned n=0;n<s_display->count;++n)
+        if((s_display->sprites[n].slot>>8)==SPRITE_ENDING_POSE)return 1;
+#endif
+    return 0;
+}
 static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
                                int origin,const uint32_t *palette)
 {
     if(!s_display || s_display->scene==4)return;
+    int cinematic=ending_cinematic();
     unsigned card_slot=UINT_MAX;int card_offset=0;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
@@ -1644,6 +1668,8 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         for(int i=0;i<drawn_width;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+            if(cinematic && world && (x<origin || x>=origin+320) &&
+               (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==7 && x<origin+320)continue;
             /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
@@ -2480,6 +2506,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_intro_canvas=bg_world && !s_frame_zone && !s_frame_act && !s_frame_bg_event;
     int background_x=-bg_origin-hs_b;
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
+    int cinematic=ending_cinematic();
     int handoff_loading=bg_world && width>320 &&
         handoff_art_loading(s_frame_zone,s_frame_act,s_frame_bg_event);
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
@@ -2665,6 +2692,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ap=pattern_pixel(v,a,ax,ay);
             apalette=palette;
         }
+        if(cinematic && (nx<0 || nx>=nw))ap=0;
         if(level && !joined && (wx<0 || wx>=s_stage_width))ap=0;
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
