@@ -2340,6 +2340,48 @@ static void test_lbz_rocket_margin(void)
     memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[268]==pal[1]);
     s_display=NULL;memset(&s_lbz_rocket,0,sizeof s_lbz_rocket);CHECK(configure("off"));
 }
+static int rocket_motion_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{(void)ram;(void)x;*cell=background?0:(y&16)?2:1;return 1;}
+static void test_rocket_motion(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],paused[796];uint8_t before[65536];
+    CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_rocket_motion,0,sizeof s_rocket_motion);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);word(g_ram,0xEEC2,12);
+    write32(0xB000,0x1234);g_ram[0xB005]=2;g_ram[0xB02E]=0x83;
+    /* Events_bg begins at EED2 with a word-sized ship pointer. The two
+     * original long accumulators follow it, at +2 and +6. */
+    word(g_ram,0xEED2,0xB29A);longword(g_ram,0xEED4,0x00DB4200);longword(g_ram,0xEED8,0x01217E00);
+    CHECK(rocket_clock(g_ram)==0x01FCC000);
+    longword(g_ram,0xEED4,0);longword(g_ram,0xEED8,0x01200000);
+    word(g_ram,0xEE80,0x4390);word(g_ram,0xEE84,0x668);
+    s3_video_vblank();CHECK(!s_rocket_motion.phase);
+    g_ram[0xB02E]=0;memcpy(before,g_ram,sizeof before);s3_video_vblank();
+    CHECK(s_rocket_motion.phase==1 && s_rocket_motion.origin==0x01200000);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    word(g_ram,0x8000,154);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+    word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x668;
+    v.cram[1]=0xE;v.cram[2]=0xE0;word(v.vram,0xF000,(unsigned)-0x4390);
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x4390;s_build.camera_y=0x668;
+    s_visible_count=0;publish_sprites();s3_video_set_world_cell(rocket_motion_cell);
+    scanline(&v,0,native,320,out,796);for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000u);
+    longword(g_ram,0xEED8,0x01300000);s3_video_vblank();scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==(x<222?0xFF00FF00u:0xFFFF0000u));
+    memcpy(paused,out,sizeof out);s3_video_vblank();scanline(&v,0,native,320,out,796);CHECK(!memcmp(out,paused,sizeof out));
+    uint8_t saved[8];S3StateIO io={saved,sizeof saved,0,0,1};rocket_motion_state(&io);CHECK(io.ok && io.pos==sizeof saved);
+    memset(&s_rocket_motion,0,sizeof s_rocket_motion);io=(S3StateIO){saved,sizeof saved,0,1,1};rocket_motion_state(&io);
+    CHECK(io.ok && !s_rocket_motion.phase);io.pos=0;io.mode=2;rocket_motion_state(&io);
+    CHECK(io.ok && s_rocket_motion.phase==1 && s_rocket_motion.origin==0x01200000);
+    unsigned invalid=3;memcpy(saved+4,&invalid,sizeof invalid);io=(S3StateIO){saved,sizeof saved,0,1,1};rocket_motion_state(&io);
+    CHECK(!io.ok && s_rocket_motion.phase==1);
+    longword(g_ram,0xEED8,0x03200000);s3_video_vblank();CHECK(s_rocket_motion.phase==2);
+    scanline(&v,0,native,320,out,796);CHECK(out[0]==0xFF000000u && out[238]==0xFFFF0000u);
+    s3_video_set_world_cell(NULL);memset(&s_rocket_motion,0,sizeof s_rocket_motion);CHECK(configure("off"));
+}
 static void test_s3_ending_margin_ownership(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3889,7 +3931,7 @@ int main(int argc,char **argv)
         CHECK(s_frame_special);
     }
     test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_rocket_motion();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();

@@ -119,6 +119,8 @@ typedef struct {
     int level,special,bonus,fg_x,fg_y,bg_y,menu;
     unsigned zone,act,bg_event,tree_reveal;
     int bg_band[2];
+    uint32_t rocket_origin;
+    unsigned rocket_tracking;
 } RenderContext;
 static RenderContext s_real_context;
 static RenderContext *s_render=&s_real_context;
@@ -220,6 +222,44 @@ static uint16_t ram16(unsigned a)
 {
     a &= 0xFFFFu;
     return (uint16_t)((g_ram[a] << 8) | g_ram[(a + 1) & 0xFFFFu]);
+}
+/* The Death Egg's native camera stops before its launch motion does. Keep
+ * the outgoing foreground on that same motion clock outside the viewport. */
+static struct { uint32_t origin;unsigned phase; } s_rocket_motion;
+static uint32_t rocket_clock(const uint8_t *ram)
+{
+    uint32_t clock=0;
+    for(unsigned at=0xEED4;at<=0xEED8;at+=4)
+        clock+=((uint32_t)ram[at]<<24)|((uint32_t)ram[at+1]<<16)|
+               ((uint32_t)ram[at+2]<<8)|ram[at+3];
+    return clock;
+}
+static void rocket_motion_capture(void)
+{
+    if((g_ram[0xF600]&127)!=12 || ram16(0xFE10)!=0x601 || ram16(0xEEC2)<12) {
+        memset(&s_rocket_motion,0,sizeof s_rocket_motion);return;
+    }
+    uint32_t clock=rocket_clock(g_ram);
+    if(!s_rocket_motion.phase && ram16(0xEE80)>=0x4390 && ram16(0xEE84)>=0x660 &&
+       !g_ram[0xB02E] && g_ram[0xB005]<6) {
+        s_rocket_motion.origin=clock;s_rocket_motion.phase=1;
+    }
+    if(s_rocket_motion.phase==1 && clock-s_rocket_motion.origin>=0x2000000u)
+        s_rocket_motion.phase=2;
+}
+static int rocket_motion_offset(const RenderContext *context)
+{
+    if(!context->rocket_tracking)return 0;
+    if(context->rocket_tracking==2)return 512;
+    int32_t elapsed=(int32_t)(rocket_clock(context->world)-context->rocket_origin);
+    return elapsed<=0?0:elapsed>=0x2000000?512:elapsed>>16;
+}
+static void rocket_motion_state(S3StateIO *io)
+{
+    unsigned phase=s_rocket_motion.phase;
+    s3_state_peek(io,sizeof s_rocket_motion.origin,&phase,sizeof phase);
+    if(phase>2)io->ok=0;
+    S3_STATE(io,s_rocket_motion.origin);S3_STATE(io,s_rocket_motion.phase);
 }
 static uint16_t vram16(const GVDP *v, unsigned a)
 {
@@ -583,6 +623,7 @@ static void competition_capture_objects(void);
 static void capture_slots_vblank(void);
 void s3_video_vblank(void)
 {
+    rocket_motion_capture();
     capture_slots_vblank();
     if(s_mode!=VIDEO_OFF)ss_capture();
     if(s_interpolation_enabled && !enabled() && g_ram[0xF62A])s_ix_upload_serial=s_ix_serial;
@@ -2063,6 +2104,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             s_frame_zone=g_ram[0xFE10];
             s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
             s_frame_tree_reveal=ram16(0xEEC4);
+            s_render->rocket_origin=s_rocket_motion.origin;
+            s_render->rocket_tracking=s_rocket_motion.phase;
             if(s_frame_level && !s_frame_zone && !s_frame_act)load_aiz_art();
             /* The intro queues the main-level block definitions before its
              * two-row-at-a-time name-table refresh. Keep the outgoing background
@@ -2522,6 +2565,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int background_x=-bg_origin-hs_b;
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
     int cinematic=ending_cinematic();
+    int rocket_offset=level && s_frame_zone==6 && s_frame_act==1 &&
+        s_frame_bg_event>=12?rocket_motion_offset(s_render):0;
     int handoff_loading=bg_world && width>320 &&
         handoff_art_loading(s_frame_zone,s_frame_act,s_frame_bg_event);
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
@@ -2715,6 +2760,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(lbz_rocket && (nx<0 || nx>=nw) && wx>=0x3C00) {
             a=world_attr(s_lbz_rocket.world,wx,wy,0);
             ap=pattern_pixel(&s_lbz_rocket.video,a,wx,wy);
+            joined=1;apalette=palette;
+        }
+        if(rocket_offset && nx<0 && wx>=0x3C00 && wx<0x4380) {
+            a=world_attr(s_world_frame,wx,wy+rocket_offset,0);
+            ap=rocket_offset>=512?0:pattern_pixel(v,a,wx,wy+rocket_offset);
             joined=1;apalette=palette;
         }
         if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
@@ -2990,6 +3040,7 @@ void s3_video_state(S3StateIO *io)
     S3_STATE(io, ss_state);
     if (s3_state_peek_unsigned(io, (unsigned)ss_latched) > 1) io->ok = 0;
     S3_STATE(io, ss_latched);
+    rocket_motion_state(io);
     if (io->mode == 2) {
         interpolation_reset();
         s_display = display ? &s_display_frame : NULL;
