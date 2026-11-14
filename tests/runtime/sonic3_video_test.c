@@ -133,6 +133,30 @@ static void test_aiz_monkey_owned_art(void)
     s_display=old;s_frame_level=level;s_frame_zone=zone;
     s_aiz_monkey_ready=s_aiz_monkey_attempted=0;
 }
+static void test_hcz_turbo_spiker_art(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    const SceneFrame *old=s_display;s_display=&scene;
+    int level=s_frame_level;unsigned zone=s_frame_zone;
+    s_frame_level=1;s_frame_zone=1;s_camera=s_camera_y=0;
+    scene.scene=1;scene.count=3;
+    CHECK(native_art_owner(S3_ART_BANK+0x161212u)==SPRITE_TURBO_SPIKER);
+    CHECK(!native_art_owner(S3_ART_BANK+0x55D26u)); /* hidden terrain cover */
+    scene.sprites[0]=(SceneSprite){-64,0,0x2500,0,0,256,SPRITE_TURBO_SPIKER<<8|1};
+    scene.sprites[1]=(SceneSprite){100,0,0x2500,0,0,256,SPRITE_TURBO_SPIKER<<8|2};
+    scene.sprites[2]=(SceneSprite){400,0,0x2500,0,0,256,3}; /* water owns the live bank */
+    memset(s_turbo_art,0x12,sizeof s_turbo_art);s_turbo_art_attempted=s_turbo_art_ready=1;
+    memset(v.vram+0x500*32,0x55,32);
+    pal[17]=0xFF110000;pal[18]=0xFF220000;pal[21]=0xFF550000;
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[174]==pal[17] && out[175]==pal[18]);
+    CHECK(out[338]==pal[21] && out[638]==pal[21]);
+    s_frame_zone=0;memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[174]==pal[21]);
+    s_display=old;s_frame_level=level;s_frame_zone=zone;
+    s_turbo_art_attempted=s_turbo_art_ready=0;
+}
 static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
 static void test_hcz_surface_extent(void)
 {
@@ -3930,7 +3954,7 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_turbo_spiker_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
     test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_rocket_motion();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();

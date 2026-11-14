@@ -64,7 +64,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
-       SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9 };
+       SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -82,6 +82,7 @@ static unsigned native_art_owner(unsigned map)
 #else
     if(map==0x62AFCu)return SPRITE_LBZ_PILLAR;
 #endif
+    if(map==S3_ART_BANK+0x161212u)return SPRITE_TURBO_SPIKER;
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
@@ -1582,6 +1583,25 @@ static uint8_t aiz_monkey_pixel(unsigned attr,int x,int y)
     unsigned p=(x&1)?byte&15u:byte>>4;
     return p?(uint8_t)(p|((attr>>9)&48u)):0;
 }
+/* HCZ's water jet temporarily occupies the enemy's tile reservation. Its
+ * original sprite becomes visible earlier in the expanded view. Keep only
+ * those extra pixels tied to their own cartridge patterns. */
+static uint8_t s_turbo_art[0x720];
+static int s_turbo_art_attempted,s_turbo_art_ready;
+static int turbo_art_pixel(unsigned attr,int x,int y,uint8_t *pixel)
+{
+    unsigned tile=attr&2047u;
+    if(tile<0x500 || tile>=0x500+sizeof s_turbo_art/32)return 0;
+    if(!s_turbo_art_attempted) {
+        s_turbo_art_attempted=1;
+        s_turbo_art_ready=art_kosm(S3_ART_BANK+0x16A968,0x422,
+            s_turbo_art,sizeof s_turbo_art)==sizeof s_turbo_art;
+    }
+    if(!s_turbo_art_ready)return 0;
+    unsigned b=s_turbo_art[(tile-0x500)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?b&15u:b>>4;
+    *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+}
 /* Extra visible objects can outlive their shared native VRAM reservation.
  * Bind only these known mappings to their original ROM patterns. The guest
  * PLC queues, object lifetimes, palettes and private atlases stay authoritative. */
@@ -1745,6 +1765,10 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             } else if(world && (s->slot>>8)==SPRITE_LBZ_PILLAR &&
                       (x<origin || x>=origin+320) && lbz_rocket_load()) {
                 p=pattern_pixel(&s_lbz_rocket.video,cell,ix,iy);
+            } else if(s_frame_level && s_frame_zone==1 && !s->hud &&
+                      (s->slot>>8)==SPRITE_TURBO_SPIKER &&
+                      (x<origin || x>=origin+320) && turbo_art_pixel(cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
             } else if(s_frame_level && !s->hud && (s->slot>>8) && native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
                 if(!p)continue;
             } else if(s_frame_level && !s_frame_zone && !s->hud &&
