@@ -62,7 +62,7 @@ int main(int argc,char **argv)
     }
     CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?33:28));CHECK(shared==14);
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
-    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==6&&s3_theme_choices(S3_MUSIC_BOSS)==5);
+    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==7&&s3_theme_choices(S3_MUSIC_BOSS)==6);
     CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==3);
     CHECK(s3_music_available(S3_MUSIC_DATA)&&s3_music_group(S3_MUSIC_DATA)==S3_MUSIC_SHARED);
     prototype=1;

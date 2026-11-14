@@ -22,14 +22,14 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Act Clear | Sonic 1 / Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 prototype; Sonic 3 & Knuckles; Sonic CD (US) |
 | Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US); unused November 1993 prototype theme |
 | Drowning | Sonic 1 / Sonic 2; Sonic 3 prototype |
-| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype |
-| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
+| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
+| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
 | Title Screen | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype |
 | Knuckles | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Data Select | Sonic 3 prototype; Sonic 3; Sonic & Knuckles; Sonic 2 Options; Sonic 2 Simon Wai Level Select |
 | Credits | Sonic 3 (Retail); Sonic & Knuckles (Retail); Sonic 3 Prototype |
-| Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
+| Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
 
 The table includes stored retail overrides. A retail choice identical to
 **Base game** is omitted from the dropdown unless it is already selected or
@@ -87,7 +87,10 @@ files are accepted by contents; mismatched or modified inputs do not replace
 an existing valid donor.
 
 For Sonic CD, provide the supported US disc as a CUE/BIN set, SGCD or ZIP with
-audio tracks. One import prepares Game Over, Act Clear and Invincibility.
+audio tracks. One import prepares Game Over, Act Clear, Invincibility, Main
+Boss, Mini-boss and Final Boss. Older libraries retain their event recordings;
+import the disc again to add the boss tracks. Main Boss and Mini-boss use the
+disc's boss recording, and Final Boss uses its final-boss recording.
 Data-only ISOs cannot provide CD-DA music. Track assignments are documented in
 the [Sonic CD sound definitions](https://github.com/sonicretro/scddisasm/blob/f8cf3f0af7bf419d18182ba98554f09307ad3cc6/src/_Include/Sound.inc).
 

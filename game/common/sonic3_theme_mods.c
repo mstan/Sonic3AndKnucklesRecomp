@@ -133,10 +133,13 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
     COPY(o->description,!strcmp(choice->id,"s1-s2")?"Sonic 1 (JUE rev 0) or Sonic 2 (World rev 1). ZIP or raw ROM; one import covers every compatible choice.":"Provide this unmodified cartridge as a ZIP or raw ROM. Import once; every matching track and game shares it.");
     COPY(o->file_patterns,d>=S3_DONOR_CD_US?"*.cue,*.bin,*.sgcd,*.zip":"*.zip,*.bin,*.md,*.gen,*.68k,*");
     COPY(o->file_description,d>=S3_DONOR_CD_US?"Sonic CD disc or ZIP":"Genesis ROM or ZIP");
-    if(d>=S3_DONOR_CD_US)COPY(o->description,"Choose your US disc as a CUE/BIN set, SGCD or ZIP with audio tracks. One import covers Game Over, Act Clear and Invincibility.");
+    if(d>=S3_DONOR_CD_US)COPY(o->description,"Choose your US disc as a CUE/BIN set, SGCD or ZIP with audio tracks. One import covers the event and boss themes. Import again to extend an older library.");
     COPY(o->path,s3_donor_verified((unsigned)d)?s3_donor_path((unsigned)d):"");
     o->required=1;o->verified=s3_donor_verified((unsigned)d);o->import_on_select=1;
-    COPY(o->status,o->verified?"Verified; shared with all matching tracks":"No matching ROM provided");return 1;
+    for(unsigned track=0;track<S3_MUSIC_COUNT;track++)
+        if(s3_music_group(track)==(unsigned)group_id(f)&&s3_music_available(track)&&s3_themes[track].enabled&&s3_theme_donor(track)==d&&!s3_theme_ready(track))o->verified=0;
+    COPY(o->status,o->verified?"Verified; shared with all matching tracks":
+         d>=S3_DONOR_CD_US&&s3_donor_verified((unsigned)d)?"Import the disc again to add the selected tracks":"No matching donor provided");return 1;
 }
 static int resource_import(void *c,const char *p,const char *f,const char *r,const char *path,const char *image,
                            void (*progress)(void *,float,const char *),void *user,char *error,size_t capacity)

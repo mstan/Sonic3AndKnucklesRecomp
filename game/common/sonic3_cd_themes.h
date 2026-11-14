@@ -2,6 +2,7 @@
 #include "sonic3_sound_assets.h"
 struct S3StateIO;
 int s3_cd_donor_verify(const char *manifest,unsigned donor);
+uint64_t s3_cd_donor_available(const char *manifest,unsigned donor);
 void s3_cd_themes_reset(void);
 int s3_cd_theme_build(unsigned theme,unsigned donor,const char *manifest,
                       const S3SoundLayout *layout,uint8_t *bank,size_t capacity,

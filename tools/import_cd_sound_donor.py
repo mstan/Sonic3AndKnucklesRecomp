@@ -9,7 +9,8 @@ import wave
 
 from import_sound_donor import atomic_write
 
-TRACKS={'game-over':31,'act-clear':28,'invincibility':30}
+TRACKS={'game-over':31,'act-clear':28,'invincibility':30,
+        'boss':24,'mini-boss':24,'final-boss':25}
 
 def import_cd_donor(source, output, receipt, expected):
     from build_sonic_cd_pack import source_identity
@@ -44,8 +45,14 @@ def import_cd_donor(source, output, receipt, expected):
                 lines.extend((event+'.path='+bundle.name+'/'+target.name,event+'.sha256='+digest))
             if bundle.exists():
                 for event in TRACKS:
-                    if (bundle/(event+'.wav')).read_bytes()!=(stage/(event+'.wav')).read_bytes():
+                    existing=bundle/(event+'.wav')
+                    if existing.exists() and existing.read_bytes()!=(stage/(event+'.wav')).read_bytes():
                         raise ValueError('Cached CD audio changed; existing installation retained')
+                # Extend an older verified library only after checking every
+                # existing recording. Saves and previous tracks stay intact.
+                for event in TRACKS:
+                    existing=bundle/(event+'.wav')
+                    if not existing.exists():os.rename(stage/(event+'.wav'),existing)
             else:
                 os.rename(stage,bundle)
             manifest=output/(donor+'.ini')
