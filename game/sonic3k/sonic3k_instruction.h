@@ -19,6 +19,8 @@ static int s3k_instruction(uint32_t pc)
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_title_card_sprite(pc,g_ram,g_cpu.A[0]))return 1;
     if(s3_gameplay_owns(pc)) {
+        uint32_t entry=s3_gameplay_zone_entry(pc,g_ram);
+        if(entry){recomp_tail_call(entry);return 1;}
         uint32_t departure=s3_gameplay_zone_departure(pc,g_ram,g_cpu.A[0]);
         if(departure){recomp_tail_call(departure);return 1;}
         uint32_t card=s3_gameplay_title_card(pc,g_ram,g_cpu.A[0]);

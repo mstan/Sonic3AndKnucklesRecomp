@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.8.5 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.8.6 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -115,6 +115,16 @@ set(FM_SOURCES
     "${RUNNER_ROOT}/external/ymfm/src/ymfm_adpcm.cpp"
     "${RUNNER_ROOT}/external/ymfm/src/ymfm_pcm.cpp"
 )
+
+# Imported music owns separate wrapper instances; synthesis code stays shared.
+add_library(sonic3_vgm_music STATIC "${CMAKE_CURRENT_SOURCE_DIR}/game/common/sonic3_vgm.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/game/common/sonic3_vgm_fm.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/game/common/sonic3_vgm_psg.c"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_opn.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_ssg.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_adpcm.cpp"
+    "${RUNNER_ROOT}/external/ymfm/src/ymfm_pcm.cpp")
+target_include_directories(sonic3_vgm_music PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/game/common" "${RUNNER_ROOT}"
+    "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/external/ymfm/src" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
 
 # Prod-vs-debug TCP strip (see SonicTheHedgehogRecomp/CMakeLists.txt). ON keeps
 # the cmd_server TCP listener + frame_snapshots ring; OFF (release) swaps the
@@ -353,7 +363,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
 
     target_include_directories(${TARGET} PRIVATE ${INCLUDES_NATIVE})
     foreach(t ${TARGET})
-        target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
+        target_link_libraries(${t} PRIVATE ${COMMON_LIBS} sonic3_vgm_music)
         if(MSVC)
             target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
             target_link_options(${t} PRIVATE /MAP)
@@ -403,7 +413,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
 
 
         foreach(t ${TARGET}_cosim)
-            target_link_libraries(${t} PRIVATE ${COMMON_LIBS})
+            target_link_libraries(${t} PRIVATE ${COMMON_LIBS} sonic3_vgm_music)
             if(MSVC)
                 target_compile_options(${t} PRIVATE /W3 /WX- /utf-8 /wd4102 /wd4996 /wd4013)
                 set_source_files_properties("${GENERATED_SOURCES_FULL}"   PROPERTIES COMPILE_FLAGS "/bigobj")

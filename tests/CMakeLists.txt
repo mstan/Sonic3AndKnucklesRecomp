@@ -297,6 +297,8 @@ foreach(_mode sonic3 sonic3k sandk)
                 "${CMAKE_SOURCE_DIR}/recomp-ui/src/common" "${CMAKE_BINARY_DIR}/clone-inputs/${_mode}")
             target_include_directories(sound_driver_${_mode}_test PRIVATE "${S3_GAME_ROOT}/trilogy" ${SDL2_PARENT_INCLUDE_DIRS})
             target_link_libraries(sound_driver_${_mode}_test PRIVATE SDL2::SDL2)
+            target_sources(sound_driver_${_mode}_test PRIVATE runtime/sonic3_audio_config_stub.c)
+            target_link_libraries(sound_driver_${_mode}_test PRIVATE sonic3_vgm_music)
             target_compile_definitions(sound_driver_${_mode}_test PRIVATE S3_CLONE_DRIVER=1
                 $<$<STREQUAL:${_mode},sonic3k>:S3_SOUND_COMBINED=1>)
             if(_mode STREQUAL "sonic3k")
@@ -324,13 +326,18 @@ endforeach()
 set(S3_SOUND_DONOR_DIR "" CACHE PATH "Optional directory of private sound donor fixtures")
 set(S3_SOUND_LIBRARY_DIR "" CACHE PATH "Optional verified cartridge and CD sound donor library for provider tests")
 add_executable(sonic3_sound_themes_test runtime/sonic3_sound_themes_test.c
+    "${S3_GAME_COMMON}/sonic3_sound_assets.c" "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
+    "${S3_GAME_COMMON}/sonic3_sound_legacy.c" "${S3_GAME_COMMON}/sonic3_sound_pcm.c" "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"
     "${S3_GAME_COMMON}/sonic3_sound_themes.c" "${S3_GAME_COMMON}/sonic3_theme_mods.c"
     "${S3_GAME_COMMON}/sonic3_cd_themes.c" "${S3_GAME_ROOT}/trilogy/scd_import.c"
     "${RUNNER_ROOT}/host_atomic_file.c" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
 target_include_directories(sonic3_sound_themes_test PRIVATE "${S3_GAME_COMMON}" "${S3_GAME_ROOT}/trilogy" "${RUNNER_ROOT}"
     "${RUNNER_ROOT}/include" "${CMAKE_SOURCE_DIR}/recomp-ui/src" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common" ${SDL2_PARENT_INCLUDE_DIRS})
-target_compile_definitions(sonic3_sound_themes_test PRIVATE RECOMP_LAUNCHER=1)
+target_compile_definitions(sonic3_sound_themes_test PRIVATE RECOMP_LAUNCHER=1
+    S3_ROM_IMPORT_SOURCE="${CMAKE_SOURCE_DIR}/tools/import_campaign.py")
 target_link_libraries(sonic3_sound_themes_test PRIVATE SDL2::SDL2)
+target_sources(sonic3_sound_themes_test PRIVATE runtime/sonic3_audio_config_stub.c)
+target_link_libraries(sonic3_sound_themes_test PRIVATE sonic3_vgm_music)
 foreach(_mode sonic3 sonic3k sandk)
     set(_library_args "")
     if(S3_SOUND_LIBRARY_DIR)
@@ -340,9 +347,19 @@ foreach(_mode sonic3 sonic3k sandk)
         --exe "$<TARGET_FILE:sonic3_sound_themes_test>" --mode ${_mode} ${_library_args})
 endforeach()
 add_test(NAME sound_donor_import COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/test_sound_donor_import.py")
+add_test(NAME custom_music_import COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_CURRENT_LIST_DIR}/runtime/sonic3_custom_import_test.py" "${CMAKE_CURRENT_BINARY_DIR}/custom-music-import")
 add_executable(sonic3_cd_themes_test runtime/sonic3_cd_themes_test.c "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+target_sources(sonic3_cd_themes_test PRIVATE runtime/sonic3_audio_config_stub.c)
+target_link_libraries(sonic3_cd_themes_test PRIVATE sonic3_vgm_music)
 target_include_directories(sonic3_cd_themes_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
 add_test(NAME sound_cd_themes COMMAND sonic3_cd_themes_test)
+add_executable(sonic3_vgm_test runtime/sonic3_vgm_test.c
+    "${RUNNER_ROOT}/audio/ym2612_ymfm.cpp" "${RUNNER_ROOT}/audio/sn76489.c"
+    "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+target_include_directories(sonic3_vgm_test PRIVATE "${S3_GAME_COMMON}" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include"
+    "${RUNNER_ROOT}/external/ymfm/src" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
+target_link_libraries(sonic3_vgm_test PRIVATE sonic3_vgm_music)
+add_test(NAME sound_vgm_music COMMAND sonic3_vgm_test "${CMAKE_CURRENT_BINARY_DIR}/vgm-generated.bin")
 add_executable(sonic3_sound_event_test runtime/sonic3_sound_event_test.c
     "${S3_GAME_COMMON}/sonic3_sound_sequences.c" "${S3_GAME_COMMON}/sonic3_sound_legacy.c"
     "${S3_GAME_COMMON}/sonic3_sound_assets.c" "${S3_GAME_COMMON}/sonic3_sound_pcm.c"

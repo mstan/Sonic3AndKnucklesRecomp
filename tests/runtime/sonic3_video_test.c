@@ -5,6 +5,12 @@ uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
 static int test_private_planes;
 static int test_time_private_palette;
+static unsigned test_bonus_hud_renders;
+int gvdp_render_scanline(GVDP *v,int line,uint8_t *out) {
+    (void)line;++test_bonus_hud_renders;
+    (void)v;
+    memset(out,1,320);return 320;
+}
 int gvdp_ext_line(unsigned tile) { return test_private_planes && tile>=1 && tile<=2?(int)tile:0; }
 static uint8_t test_atlas[128];
 static int test_atlas_enabled;
@@ -126,6 +132,30 @@ static void test_aiz_monkey_owned_art(void)
     s_capture_frame=previous_capture;
     s_display=old;s_frame_level=level;s_frame_zone=zone;
     s_aiz_monkey_ready=s_aiz_monkey_attempted=0;
+}
+static void test_hcz_turbo_spiker_art(void)
+{
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    const SceneFrame *old=s_display;s_display=&scene;
+    int level=s_frame_level;unsigned zone=s_frame_zone;
+    s_frame_level=1;s_frame_zone=1;s_camera=s_camera_y=0;
+    scene.scene=1;scene.count=3;
+    CHECK(native_art_owner(S3_ART_BANK+0x161212u)==SPRITE_TURBO_SPIKER);
+    CHECK(!native_art_owner(S3_ART_BANK+0x55D26u)); /* hidden terrain cover */
+    scene.sprites[0]=(SceneSprite){-64,0,0x2500,0,0,256,SPRITE_TURBO_SPIKER<<8|1};
+    scene.sprites[1]=(SceneSprite){100,0,0x2500,0,0,256,SPRITE_TURBO_SPIKER<<8|2};
+    scene.sprites[2]=(SceneSprite){400,0,0x2500,0,0,256,3}; /* water owns the live bank */
+    memset(s_turbo_art,0x12,sizeof s_turbo_art);s_turbo_art_attempted=s_turbo_art_ready=1;
+    memset(v.vram+0x500*32,0x55,32);
+    pal[17]=0xFF110000;pal[18]=0xFF220000;pal[21]=0xFF550000;
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[174]==pal[17] && out[175]==pal[18]);
+    CHECK(out[338]==pal[21] && out[638]==pal[21]);
+    s_frame_zone=0;memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[174]==pal[21]);
+    s_display=old;s_frame_level=level;s_frame_zone=zone;
+    s_turbo_art_attempted=s_turbo_art_ready=0;
 }
 static unsigned zoom_fixture(unsigned object) { (void)object;return 128; }
 static void test_hcz_surface_extent(void)
@@ -277,6 +307,77 @@ static void test_hcz_rush_extent(void)
     extend_hcz_rush(S3_HCZ_RUSH_MAP,0,0x437A,5,0x40,80,256);CHECK(s_build.count==count);
     s_display=old;CHECK(configure("off"));
 }
+static void test_icz_exit_snow_extent(void)
+{
+    static GVDP v;uint32_t out[1603],pal[64]={0};uint8_t before[65536];
+    CHECK(configure("32:9"));memset(g_ram,0,sizeof g_ram);g_ram[0xF600]=12;
+    word(g_ram,0xFE10,0x501);word(g_ram,0xEE84,0x660);
+    unsigned map=S3_ART_BANK+0x163C44u,p=map+0x60;
+    word(g_rom,map+0x22*2,0x60);word(g_rom,p,2);
+    word(g_rom,p+2,0xF00F);word(g_rom,p+4,0x10);word(g_rom,p+6,0xFFF0);
+    word(g_rom,p+8,0x100C);word(g_rom,p+10,0x20);word(g_rom,p+12,0xFFF0);
+    memset(&v,0,sizeof v);memset(v.vram+0x10*32,0x11,20*32);pal[33]=0xFFFFFFFF;
+    const SceneFrame *old=s_display;s_display=&s_build;
+    for(unsigned width=796;width<=1603;width+=807)for(unsigned cam=0x4760;cam<=0x47A0;cam+=0x40){
+        s_requested_width=(int)width;word(g_ram,0xEE80,cam);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;
+        s_build.camera_x=s_camera=(int)cam;s_build.camera_y=s_camera_y=0x660;
+        s_capture_slot=1;memcpy(before,g_ram,sizeof before);
+        extend_icz_snow(map,0x22,0x4000,4,0x4894-(int)cam,0x70,256);
+        CHECK(s_build.count>0&&!memcmp(before,g_ram,sizeof before));
+        int origin=((int)width-320)/2;
+        for(unsigned row=0;row<2;++row){
+            memset(out,0,sizeof out);memset(s_priority,0,width);
+            draw_scene_sprites(&v,row?0x80:0x60,out,(int)width,origin,pal);
+            for(int x=0;x<(int)width;++x){
+                int nx=x-origin;
+                CHECK(out[x]==(nx>=320 && nx>=0x48A4-(int)cam?pal[33]:0));
+            }
+        }
+    }
+    unsigned count=s_build.count;s_requested_width=320;
+    extend_icz_snow(map,0x22,0x4000,4,0xF4,0x70,256);CHECK(s_build.count==count);
+    s_requested_width=796;word(g_ram,0xFE10,0x500);
+    extend_icz_snow(map,0x22,0x4000,4,0xF4,0x70,256);CHECK(s_build.count==count);
+    word(g_ram,0xFE10,0x501);
+    extend_icz_snow(map,0x21,0x4000,4,0xF4,0x70,256);CHECK(s_build.count==count);
+    extend_icz_snow(map,0x22,0x4000,4,0xD4,0x70,256);CHECK(s_build.count==count);
+    s_display=old;CHECK(configure("off"));
+}
+static void test_hcz_brick_palette(void)
+{
+    static GVDP v;uint32_t out[796],palette[64]={0};
+    memset(&v,0,sizeof v);memset(v.vram+0x392*32,0x99,16*32);
+    palette[41]=0xFF2468AC;palette[57]=0xFF135724;
+    const SceneFrame *old=s_display;s_display=&s_build;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.count=1;
+    s_build.sprites[0].attr=0x4392;s_build.sprites[0].zoom=256;
+    unsigned old_zone=s_frame_zone,old_act=s_frame_act;
+    s_frame_zone=1;s_frame_act=0;s_camera=s_camera_y=0;
+    const unsigned pieces[]={0x2F,0x17,0x6F,0x7F};
+    for(unsigned n=0;n<4;n++){
+        s_build.sprites[0].size=(uint8_t)pieces[n];
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,0,palette);
+        int sample=(pieces[n]&0x40)?400:0;
+        if(pieces[n]&0x40){
+            s_build.sprites[0].x=400;
+            memset(out,0,sizeof out);memset(s_priority,0,796);
+            draw_scene_sprites(&v,0,out,796,0,palette);
+        }
+        CHECK(out[sample]==palette[57]);
+        s_build.sprites[0].x=0;
+    }
+    /* Native width, other areas and the actual water front keep their art. */
+    for(unsigned n=0;n<4;n++){
+        s_frame_zone=n==1?0:1;s_frame_act=n==2;
+        s_build.sprites[0].size=n==3?15:0x2F;
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,n?796:320,0,palette);
+        CHECK(out[0]==palette[41]);
+    }
+    s_frame_zone=old_zone;s_frame_act=old_act;s_display=old;
+}
 static void test_hcz_brick_fractional_phase(void)
 {
     static GVDP v;uint32_t out[796],palette[64]={0};
@@ -363,6 +464,32 @@ static void test_level_select_word_edges(void)
     }
     CHECK(configure("off"));
 }
+static void test_bonus_hud_position(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,before;uint32_t native[320],out[796],palette[64],shadow[64];
+    memset(&v,0,sizeof v);v.reg[1]=64;v.reg[5]=0x78;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    for(unsigned i=0;i<64;++i){palette[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);shadow[i]=palette[i];}
+    word(v.vram,0xF000,136);v.vram[0xF003]=1;
+    word(v.vram,0xF004,0x86D2);word(v.vram,0xF006,144);
+    word(v.vram,0xF008,136);word(v.vram,0xF00C,0x8123);word(v.vram,0xF00E,328);
+    memset(v.vram+0x6D2*32,0x22,32);memcpy(&before,&v,sizeof v);
+    for(int x=0;x<320;++x)native[x]=0xFF778899u;
+    test_bonus_hud_renders=0;
+    CHECK(bonus_without_hud(&v,0,native,320,palette,shadow)==native);
+    const uint32_t *clean=bonus_without_hud(&v,8,native,320,palette,shadow);
+    CHECK(clean!=native && test_bonus_hud_renders==1 && clean[16]==palette[1]);
+    CHECK(!vram16(&s_bonus_hud_free,0xF000));
+    CHECK(vram16(&s_bonus_hud_free,0xF008)==136);
+    memset(s_world_frame,0,65536);
+    bonus_scanline(&v,8,0x14,clean,320,out,796,palette,shadow,NULL);
+    bonus_draw_hud(&v,8,out,796,palette);
+    CHECK(out[16]==palette[2] && out[238+16]==palette[1]);
+    CHECK(!memcmp(&before,&v,sizeof v));
+    CHECK(bonus_without_hud(&v,40,native,320,palette,shadow)==native);
+#endif
+}
 static void test_native_bonus(void)
 {
     static GVDP v;uint32_t native[320],out[796];
@@ -418,6 +545,7 @@ static void test_bonus_margins(void)
     for(unsigned n=0;n<64*32;n++)word(v.vram,0xE000+n*2,1);
     word(v.vram,0xE000+63*2,2);
     for(unsigned n=0;n<320;n++)native[n]=0xFF123400u+n;
+    s_world_frame[0xF711]=1;
     bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow,NULL);
     CHECK(out[237]==palette[2] && out[558]==palette[1]);
     for(unsigned n=0;n<320;n++)CHECK(out[238+n]==native[n]);
@@ -432,11 +560,16 @@ static void test_bonus_margins(void)
     bonus_scanline(&v,80,0x14,native,320,out,796,palette,shadow,NULL);
     CHECK(out[558]==genesis_dac_cram_to_argb(0xE0,GENESIS_DAC_SHADOW));
     test_private_planes=0;
+    /* A selected bonus ID cannot turn the previous menu's RAM into a
+     * level layout while the native loading card is still on screen. */
+    s_world_frame[0xF711]=0;
+    bonus_scanline(&v,0,0x15,native,320,out,796,palette,shadow,NULL);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x>=238 && x<558?native[x-238]:palette[0]));
 }
 static void test_gumball_authored_extent(void)
 {
     static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
-    memset(&v,0,sizeof v);memset(s_world_frame,0,sizeof s_world_frame);
+    memset(&v,0,sizeof v);memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xF711]=1;
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[13]=0x3C;v.reg[16]=1;v.reg[11]=7;
     v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
     for(unsigned i=0;i<64;++i)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
@@ -467,7 +600,7 @@ static void test_bonus_authored_planes(void)
 {
     static GVDP v;uint32_t native[320],out[796],palette[64],shadow[64];
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
-    memset(s_world_frame,0,sizeof s_world_frame);
+    memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xF711]=1;
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[16]=1;v.reg[13]=0x3C;
     v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;
     for(unsigned i=0;i<64;i++)palette[i]=shadow[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
@@ -620,6 +753,14 @@ static void test_native_demo_publication(void)
     g_ram[0xB004]=132;publish_sprites();CHECK(g_ram[0xB004]==132);
     write32(0xB0DE,0);g_ram[0xB004]=4;
     publish_sprites();CHECK(g_ram[0xB004]==132);
+    /* LBZ's walking cutscene ends on native SAT visibility. Drawing him in
+     * a wider margin must not prolong the walk or hold the player's input. */
+    write32(0xB000,S3_LBZ_KNUX);g_ram[0xB005]=14;g_ram[0xB004]=4;
+    s_build.count=1;s_build.sprites[0].x=350;
+    publish_sprites();CHECK(g_ram[0xB004]==4 && s_build.count==1);
+    g_ram[0xB004]=132;publish_sprites();CHECK(g_ram[0xB004]==132);
+    g_ram[0xB005]=12;g_ram[0xB004]=4;
+    publish_sprites();CHECK(g_ram[0xB004]==132);
     CHECK(configure("off"));
 }
 static void test_title_card_edges(void)
@@ -682,6 +823,20 @@ static void test_title_card_edges(void)
     word(v.vram,0xC000,0);v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
     /* A bonus card with a different authored target keeps its native layout. */
     write16(o+0x46,0xC8);capture_objects();CHECK(s_build.sprites[0].hud==2);
+#ifndef SONIC3_STANDALONE
+    /* A loading bonus card must not reinterpret old ring/menu tables. */
+    g_ram[0xF600]=8;g_ram[0xFE10]=0x14;g_ram[0xF711]=0;
+    g_ram[o+0x22]=19;write16(o+0x46,0xC8);
+    word(g_rom,S3_TITLE_CARD_MAP+19*2,0x40);
+    word(g_rom,S3_TITLE_CARD_MAP+20*2,0x40);
+    unsigned stale=o+0x4A;write32(stale,0x9000);
+    write32(stale+0xC,S3_TITLE_CARD_MAP);g_ram[stale+0x22]=6;
+    write16(stale+0x10,240);write16(stale+0x14,135);
+    word(g_ram,0xAC00,4);word(g_ram,0xAC04,(uint16_t)stale);
+    capture_objects();
+    CHECK(s_build.bonus_card_valid && s_build.count==2);
+    CHECK(s_build.sprites[0].y==0 && s_build.sprites[1].x-s_build.sprites[0].x==96);
+#endif
     CHECK(configure("off"));
 }
 static void test_file_select(void)
@@ -1823,6 +1978,30 @@ static void test_aiz2_ship_cameras(void)
     s_interpolating=0;
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+static void test_act_handoff_framing(void)
+{
+    CameraHandoffPreview saved=s_handoff;int interpolating=s_interpolating;
+    memset(&s_handoff,0,sizeof s_handoff);s_interpolating=0;
+    /* Ordinary publications can move within one native tick. With no active
+     * handoff they retain native framing, including fractional presentation. */
+    CHECK(handoff_origin(0,0,796,0x4800,1,0,0,100,0,1)==0);
+    CHECK(handoff_origin(8,8,796,0x4800,1,0,0,100,0,1)==8);
+    s_interpolating=1;
+    CHECK(handoff_origin(12,12,796,0x4800,1,0,0,100,0,1)==12);
+    s_interpolating=0;memset(&s_handoff,0,sizeof s_handoff);
+    /* The real HCZ map rebase keeps its outgoing origin, pauses in place,
+     * then reaches the incoming origin monotonically over45 native ticks. */
+    CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,4,200,0,1)==412);
+    int previous=handoff_origin(0x80,128,796,0x4800,1,1,0,201,0,1);
+    CHECK(previous==412 && s_handoff.active);
+    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,202,1,1)==previous);
+    for(unsigned i=1;i<=45;++i) {
+        int current=handoff_origin(0x80,128,796,0x4800,1,1,0,201+i,0,1);
+        CHECK(current>=128 && current<=previous);previous=current;
+    }
+    CHECK(previous==128 && !s_handoff.active);
+    s_handoff=saved;s_interpolating=interpolating;
+}
 static void test_campaign_background_edges(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],baseline[796];
@@ -1918,6 +2097,58 @@ static int panorama_source_cell(const uint8_t *ram,int x,int y,int background,ui
     (void)ram;(void)y;
     *cell=background?(x>=0 && x<512?1:2):0;return 1;
 }
+static void test_hcz2_panorama_scroll(void)
+{
+    static const unsigned lengths[]={8,8,0x90,0x10,8,0x30,0x18,8,8,0xA8,
+        0x30,0x18,8,8,0xA8,0x30,0x18,8,8,0xB0,0x10,8,0x7FFF};
+    static const uint8_t index[]={3,10,20,30,44,2,12,22,32,5,0,8,14,24,34,42,
+        3,2,16,26,36,1,18,28,1,6,40,1,4,38,255};
+    unsigned at=S3_ART_BANK+0x3C7D2u;uint8_t previous[80];
+    memcpy(previous,g_rom+at,sizeof previous);
+    for(unsigned n=0;n<23;n++)word(g_rom,at+n*2,lengths[n]);
+    memcpy(g_rom+at+46,index,sizeof index);
+    int old_x=s_frame_fg_x,old_y=s_frame_fg_y;
+    uint8_t old_shake[2]={s_world_frame[0xEECE],s_world_frame[0xEECF]};
+    s_frame_fg_x=0xC76;s_frame_fg_y=0x60C;
+    s_world_frame[0xEECE]=s_world_frame[0xEECF]=0;
+    const int lines[]={0,52,53,100,101,124,125,132,133,140,141};
+    const int factors[]={4,4,8,8,7,7,6,6,5,5,4};
+    for(unsigned n=0;n<sizeof lines/sizeof *lines;n++){
+        int x,y;CHECK(hcz2_panorama_position(lines[n],&x,&y));
+        CHECK(x==0xC76*factors[n]/16 && y==0x183+lines[n]);
+    }
+    s_world_frame[0xEECF]=2;
+    int x,y;CHECK(hcz2_panorama_position(0,&x,&y));
+#ifdef SONIC3_STANDALONE
+    CHECK(y==0x183);
+#else
+    CHECK(y==0x184);
+#endif
+    memcpy(g_rom+at,previous,sizeof previous);
+    s_frame_fg_x=old_x;s_frame_fg_y=old_y;
+    s_world_frame[0xEECE]=old_shake[0];s_world_frame[0xEECF]=old_shake[1];
+}
+static void test_hcz2_panorama_art(void)
+{
+    /* Native C58 scroll gives phases26/21/53. These source rows are the
+     * checked normal driver's circular-strip selections, including wrap
+     * and vertical flip, while the early VRAM bank still contains old art. */
+    static const struct {unsigned attr,address;} cases[]={
+        {0x2D2,0xA8900},{0x2D6,0xA8E60},{0x2DE,0xA9EA0},
+        {0x2EE,0xABA20},{0x2D5,0xA88E0},{0x12D2,0xA891C}};
+    int previous=s_frame_fg_x;s_frame_fg_x=0xC58;
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;n++){
+        unsigned at=S3_ART_BANK+cases[n].address;uint8_t old[4];
+        memcpy(old,g_rom+at,4);word(g_rom,at,0x1234);word(g_rom,at+2,0x5678);
+        GenesisTileRow row={0};row.bits=0xAABBCCDD;
+        hcz2_panorama_art(cases[n].attr,0,&row);CHECK(row.bits==0x12345678);
+        memcpy(g_rom+at,old,4);
+    }
+    GenesisTileRow row={0};row.bits=0xAABBCCDD;
+    hcz2_panorama_art(0x2D1,0,&row);CHECK(row.bits==0xAABBCCDD);
+    hcz2_panorama_art(0x31E,0,&row);CHECK(row.bits==0xAABBCCDD);
+    s_frame_fg_x=previous;
+}
 static void test_streamed_background_sources(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -1999,27 +2230,219 @@ static void test_icz_partial_background_rows(void)
 static void test_icz_outdoor_snow_edge(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
-    const unsigned cases[][3]={{0x500,0,1},{0x500,4,0},{0x501,0,0},{0x100,0,0}};
+    /* Do not turn empty sky before the bank into a rectangular snow wall.
+     * Once the native left edge is within snow, retain its outer fill. */
+    const unsigned cases[][4]={{0x500,0,0x300,0},{0x500,0,0x440,1},{0x500,4,0x300,0},{0x501,0,0x300,0},{0x100,0,0x300,0}};
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);s3_video_set_world_cell(NULL);
         g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n][0]);write32(0xB000,0x1234);
         word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
         word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x3C);
-        word(g_ram,0xEE80,0x300);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
+        word(g_ram,0xEE80,cases[n][2]);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
         for(unsigned i=0;i<64;++i)word(g_ram,128+i*2,1);
         for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x4002);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[33]=0xEEE;
-        memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-0x300);
+        memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-cases[n][2]);
         memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
         memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
-            int nx=x-s_native_x,wx=nx+0x300;
-            int snow=(wx>=0x400 && wx<0x480) || (cases[n][2] && nx<0 && wx>=0);
+            int nx=x-s_native_x,wx=nx+(int)cases[n][2];
+            int snow=(wx>=0x400 && wx<0x480) || (cases[n][3] && nx<0 && wx>=0);
             CHECK(out[x]==(snow?0xFFFFFFFFu:0xFF000000u));
         }
         CHECK(!memcmp(before,g_ram,sizeof before));
+    }
+    CHECK(configure("off"));
+}
+static int ending_cinematic_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{(void)ram;(void)x;(void)y;*cell=background?2:1;return 1;}
+static int lbz_preview_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)y;
+    *cell=ram==s_lbz_preview.world?(background?3:(x&8)?0:2):background?3:x>=0x4000?0:1;
+    return 1;
+}
+static void test_lbz_incoming_margin(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    const unsigned cases[][3]={{0x600,0x3D70,0},{0x600,0x3EA0,0},
+        {0x601,0x4A0,4},{0x601,0x4A0,8},{0x601,0,4}};
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+        CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_lbz_preview,0,sizeof s_lbz_preview);
+        test_private_planes=test_atlas_enabled=test_time_private_palette=0;
+        s_lbz_preview.attempted=s_lbz_preview.ready=1;
+        s_lbz_preview.colors[2]=0xE0;s_lbz_preview.colors[35]=0xEE0;
+        memset(s_lbz_preview.video.vram+64,0x22,32);memset(s_lbz_preview.video.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){
+            word(g_ram,0x9008+i*2,1);word(g_ram,0x9018+i*2,3);
+            word(s_lbz_preview.world,0x9010+i*2,0x2002);
+            word(s_lbz_preview.world,0x9018+i*2,0x6003);
+        }
+        g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n][0]);write32(0xB000,0x1234);
+        word(g_ram,0x8000,160);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+        word(g_ram,0xEE80,cases[n][1]);word(g_ram,0xEE84,0x148);
+        word(g_ram,0xEEC2,cases[n][2]);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x148;
+        v.cram[1]=0xE;v.cram[3]=0xE00;v.cram[33]=0xEEE;
+        memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+        word(v.vram,0xF000,(unsigned)-cases[n][1]);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=cases[n][1];s_build.camera_y=0x148;
+        s_visible_count=0;publish_sprites();s3_video_set_world_cell(lbz_preview_cell);
+        memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int nx=x-s_native_x,wx=nx+(int)cases[n][1];
+            uint32_t expected=wx<0x4000?0xFFFF0000u:0xFF0000FFu;
+            int rebased=wx+(cases[n][0]==0x601?0x3A00:0);
+            if((cases[n][0]==0x600 || cases[n][2]<=4) &&
+               cases[n][1]+(cases[n][0]==0x601?0x3A00:0)>=0x3D80 && nx>=320 && rebased>=0x3FE0)
+                expected=(rebased&8)?0xFF00FFFFu:0xFF00FF00u;
+            if(out[x]!=expected)fprintf(stderr,"LBZ preview case%u x%d nx%d wx%X: %08X expected %08X\n",n,x,nx,wx,out[x],expected);
+            CHECK(out[x]==expected);
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    }
+    /* A future girder begins at the arena edge. Its visual preview must
+     * respect both the native viewport and existing foreground priority. */
+    unsigned map=S3_ART_BANK+0x2B3AA;
+    word(g_rom,map+0x17*2,0x40);word(g_rom,map+0x40,1);
+    memset(g_rom+map+0x42,0,6);word(g_rom,map+0x46,0xFFF0);
+    memset(v.vram+0x433*32,0x11,32);
+    uint32_t pal[64]={0};uint8_t priority[796]={0};pal[17]=0xFF123456;
+    memset(out,0,sizeof out);priority[560]=1;priority[561]=2;
+    lbz_preview_sprites(&v,0x1C0-0x148,out,796,238,0x3EA0,0x148,pal,priority);
+    CHECK(out[558]==pal[17] && out[559]==pal[17]);
+    CHECK(!out[557] && !out[560] && !out[561] && out[562]==pal[17] && !out[566]);
+    memset(out,0,sizeof out);memset(priority,0,sizeof priority);
+    lbz_preview_sprites(&v,0x1C0-0x148,out,796,238,0x3F00,0x148,pal,priority);
+    for(unsigned x=0;x<796;++x)CHECK(!out[x]);
+    memset(g_rom+map+0x17*2,0,2);memset(g_rom+map+0x40,0,8);
+    memset(&s_lbz_preview,0,sizeof s_lbz_preview);CHECK(configure("off"));
+}
+static int lbz_rocket_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{(void)x;(void)y;*cell=background?0:ram==s_lbz_rocket.world?2:1;return 1;}
+static void test_lbz_rocket_margin(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    for(unsigned event=8;event<=12;event+=4) {
+        CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_lbz_rocket,0,sizeof s_lbz_rocket);
+        s_lbz_rocket.attempted=s_lbz_rocket.ready=1;
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(s_lbz_rocket.world,0x9010+i*2,2);}
+        memset(v.vram+32,0x11,32);memset(s_lbz_rocket.video.vram+64,0x22,32);
+        g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);write32(0xB000,0x1234);
+        word(g_ram,0x8000,154);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+        word(g_ram,0xEE80,0x3B00);word(g_ram,0xEE84,0x5A0);word(g_ram,0xEEC2,event);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x5A0;
+        v.cram[1]=0xE;v.cram[2]=0xE0;word(v.vram,0xF000,(unsigned)-0x3B00);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x3B00;s_build.camera_y=0x5A0;
+        s_visible_count=0;publish_sprites();s3_video_set_world_cell(lbz_rocket_cell);
+        memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x)CHECK(out[x]==(event==8 && x>=s_native_x+320?0xFF00FF00u:0xFFFF0000u));
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    }
+    /* Pillars keep their authored art in the margins while the same VRAM
+     * reservation still contains the preceding object's pixels. */
+#ifdef SONIC3_STANDALONE
+    CHECK(native_art_owner(0x4545E)==SPRITE_LBZ_PILLAR);
+#else
+    CHECK(native_art_owner(0x62AFC)==SPRITE_LBZ_PILLAR);
+#endif
+    SceneFrame scene={0};scene.scene=1;scene.count=1;
+    scene.sprites[0]=(SceneSprite){330,0,0x5A0,0,0,256,SPRITE_LBZ_PILLAR<<8};
+    s_display=&scene;s_frame_level=1;s_camera=s_camera_y=0;
+    uint32_t pal[64]={0};pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
+    memset(v.vram+0x5A0*32,0x11,32);memset(s_lbz_rocket.video.vram+0x5A0*32,0x22,32);
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);
+    CHECK(out[568]==pal[2]);scene.sprites[0].x=30;
+    memset(out,0,sizeof out);memset(s_priority,0,796);draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[268]==pal[1]);
+    s_display=NULL;memset(&s_lbz_rocket,0,sizeof s_lbz_rocket);CHECK(configure("off"));
+}
+static int rocket_motion_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{(void)ram;(void)x;*cell=background?0:(y&16)?2:1;return 1;}
+static void test_rocket_motion(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],paused[796];uint8_t before[65536];
+    CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_rocket_motion,0,sizeof s_rocket_motion);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);word(g_ram,0xEEC2,12);
+    write32(0xB000,0x1234);g_ram[0xB005]=2;g_ram[0xB02E]=0x83;
+    /* Events_bg begins at EED2 with a word-sized ship pointer. The two
+     * original long accumulators follow it, at +2 and +6. */
+    word(g_ram,0xEED2,0xB29A);longword(g_ram,0xEED4,0x00DB4200);longword(g_ram,0xEED8,0x01217E00);
+    CHECK(rocket_clock(g_ram)==0x01FCC000);
+    longword(g_ram,0xEED4,0);longword(g_ram,0xEED8,0x01200000);
+    word(g_ram,0xEE80,0x4390);word(g_ram,0xEE84,0x668);
+    s3_video_vblank();CHECK(!s_rocket_motion.phase);
+    g_ram[0xB02E]=0;memcpy(before,g_ram,sizeof before);s3_video_vblank();
+    CHECK(s_rocket_motion.phase==1 && s_rocket_motion.origin==0x01200000);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    word(g_ram,0x8000,154);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+    word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x668;
+    v.cram[1]=0xE;v.cram[2]=0xE0;word(v.vram,0xF000,(unsigned)-0x4390);
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x4390;s_build.camera_y=0x668;
+    s_visible_count=0;publish_sprites();s3_video_set_world_cell(rocket_motion_cell);
+    scanline(&v,0,native,320,out,796);for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000u);
+    longword(g_ram,0xEED8,0x01300000);s3_video_vblank();scanline(&v,0,native,320,out,796);
+    for(unsigned x=0;x<796;++x)CHECK(out[x]==(x<222?0xFF00FF00u:0xFFFF0000u));
+    memcpy(paused,out,sizeof out);s3_video_vblank();scanline(&v,0,native,320,out,796);CHECK(!memcmp(out,paused,sizeof out));
+    uint8_t saved[8];S3StateIO io={saved,sizeof saved,0,0,1};rocket_motion_state(&io);CHECK(io.ok && io.pos==sizeof saved);
+    memset(&s_rocket_motion,0,sizeof s_rocket_motion);io=(S3StateIO){saved,sizeof saved,0,1,1};rocket_motion_state(&io);
+    CHECK(io.ok && !s_rocket_motion.phase);io.pos=0;io.mode=2;rocket_motion_state(&io);
+    CHECK(io.ok && s_rocket_motion.phase==1 && s_rocket_motion.origin==0x01200000);
+    unsigned invalid=3;memcpy(saved+4,&invalid,sizeof invalid);io=(S3StateIO){saved,sizeof saved,0,1,1};rocket_motion_state(&io);
+    CHECK(!io.ok && s_rocket_motion.phase==1);
+    longword(g_ram,0xEED8,0x03200000);s3_video_vblank();CHECK(s_rocket_motion.phase==2);
+    scanline(&v,0,native,320,out,796);CHECK(out[0]==0xFF000000u && out[238]==0xFFFF0000u);
+    s3_video_set_world_cell(NULL);memset(&s_rocket_motion,0,sizeof s_rocket_motion);CHECK(configure("off"));
+}
+static void test_s3_ending_margin_ownership(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
+    const unsigned cases[][2]={{0x601,12},{0x601,16},{0x601,20},{0x600,16}};
+    for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
+        CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        test_private_planes=test_atlas_enabled=test_time_private_palette=0;
+        g_ram[0xF600]=12;word(g_ram,0xFE10,cases[n][0]);write32(0xB000,0x1234);
+        word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+        word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x7C);word(g_ram,0xEE80,512);
+        word(g_ram,0xEEC2,cases[n][1]);word(g_ram,0xFAA4,0xB128);write32(0xB128,0x511CC);
+        for(unsigned j=0;j<4;++j){word(g_ram,0x9008+j*2,1);word(g_ram,0x9010+j*2,2);}
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+        v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;v.cram[4]=0xEEE;v.cram[5]=0xEE;
+        for(unsigned j=1;j<=5;++j)memset(v.vram+j*32,j*17,32);
+        word(v.vram,0xF000,(unsigned)-512);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=512;s_build.count=3;
+        s_build.sprites[0]=(SceneSprite){-40,0,3,0,0,256,1};
+        s_build.sprites[1]=(SceneSprite){-80,0,4,0,0,256,(8u<<8)|2u};
+        s_build.sprites[2]=(SceneSprite){16,0,5,0,1,256,3};
+        publish_sprites();s3_video_set_world_cell(ending_cinematic_cell);
+        memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+        int cinematic=0;
+#ifdef SONIC3_STANDALONE
+        cinematic=cases[n][0]==0x601 && cases[n][1]>=16;
+#endif
+        for(int x=0;x<796;++x) {
+            int nx=x-s_native_x;
+            uint32_t expected=cinematic && (nx<0 || nx>=320)?0xFF0000FFu:0xFFFF0000u;
+            if(nx>=-80 && nx<-72)expected=0xFFFFFFFFu; /* original ending pose */
+            if(!cinematic && nx>=-40 && nx<-32)expected=0xFF00FF00u; /* old level actor */
+            if(x>=16 && x<24)expected=0xFFFFFF00u; /* left-anchored HUD */
+            CHECK(out[x]==expected);
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
     }
     CHECK(configure("off"));
 }
@@ -3124,6 +3547,7 @@ int main(int argc,char **argv)
         printf("palette %04x %04x\n",s_aiz_intro.colors[2],s_aiz_main.colors[2]);
         return 0;
     }
+    test_act_handoff_framing();
     test_campaign_background_edges();
     /* Bounded host decoding: literals, overlapping dictionary matches,
      * truncation, a reference before the output and insufficient capacity. */
@@ -3175,8 +3599,25 @@ int main(int argc,char **argv)
     CHECK(configure("10:7"));width(1,1,320,224);
     s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,1);
     CHECK(s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
+    /* Cross a real activation cell, then replay it with restored ownership.
+     * WRAM alone leaves the future loaded flag suppressing this allocation. */
+    static uint8_t loader_ram[65536],loaded_ram[65536];
+    static uint8_t loader_blob[sizeof s_placements+3*sizeof(unsigned)];
+    memcpy(loader_ram,g_ram,sizeof loader_ram);
+    S3StateIO loader_io={loader_blob,sizeof loader_blob,0,0,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
+    size_t loader_bytes=loader_io.pos;
     write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
     CHECK(scene_read32(0xFFB0DE)==0x123456 && ram16(0xB0EE)==640 && ram16(0xB126)==0xEB00);
+    memcpy(loaded_ram,g_ram,sizeof loaded_ram);
+    CHECK(s_placements[0].loaded);
+    memcpy(g_ram,loader_ram,sizeof loader_ram);
+    loader_io=(S3StateIO){loader_blob,loader_bytes,0,1,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && s_placements[0].loaded);
+    loader_io=(S3StateIO){loader_blob,loader_bytes,0,2,1};
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !s_placements[0].loaded);
+    presentation_reset();write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!memcmp(loaded_ram,g_ram,sizeof loaded_ram));
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(scene_read32(0xFFB128)==0x234567 && g_ram[0xB12C]==3 && g_ram[0xB152]==3);
@@ -3530,8 +3971,8 @@ int main(int argc,char **argv)
         scanline_lazy(&v,0,320,ss_output+1,canvas,test_native_row,ss_native,NULL);
         CHECK(s_frame_special);
     }
-    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_surface_extent();test_hcz_rush_extent();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
-    test_deformation_keeps_actors_still();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
+    test_sprite_atlas();test_aiz_monkey_owned_art();test_hcz_turbo_spiker_art();test_hcz_surface_extent();test_hcz_rush_extent();test_icz_exit_snow_extent();test_hcz_brick_palette();test_hcz_brick_fractional_phase();test_object_zoom();test_level_select_word_edges();test_file_select();test_competition_character_palette();test_competition_race();test_competition_pre_cull();test_competition_margin_sprites();test_results_margin_sprites();test_menu_layers();test_world_snapshot();test_hud_mapping();test_first_hud_fade();
+    test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_rocket_motion();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
@@ -3539,7 +3980,7 @@ int main(int argc,char **argv)
     test_aiz2_retired_grove();test_aiz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
-    test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
+    test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();

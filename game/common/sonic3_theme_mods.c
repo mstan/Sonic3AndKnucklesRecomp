@@ -16,13 +16,40 @@ static int ours(const char *p){return p&&!strcmp(p,package);}
 static int group_id(const char *id)
 {if(id)for(int g=0;g<S3_MUSIC_GROUPS;g++)if((g==0 || (g==1?s3_music_available(S3_MUSIC_AIZ1):s3_music_available(S3_MUSIC_MHZ1)&&!combined()))&&!strcmp(id,group_key(g)))return g;return -1;}
 static int track_id(const char *id){if(id)for(int t=0;t<S3_MUSIC_COUNT;t++)if(!strcmp(id,s3_theme_ids[t]))return t;return -1;}
+static int visible_choice(unsigned t,unsigned c)
+{
+    const S3ThemeChoice *choice=s3_theme_choice(t,c);if(!choice)return 0;
+    const char *id=choice->id;
+    int s3=!s3_music_available(S3_MUSIC_MHZ1);
+    const char *host=s3?"s3":"sk";
+    int retail=0;
+    switch(t){
+    case S3_THEME_LIFE:case S3_THEME_CONTINUE:case S3_THEME_INVINCIBLE:
+    case S3_MUSIC_DATA:retail=!strcmp(id,host);break;
+    case S3_THEME_OVER:case S3_THEME_CLEAR:retail=!strcmp(id,"s3k");break;
+    case S3_MUSIC_BOSS:case S3_MUSIC_COMPETITION:retail=!strcmp(id,"s3");break;
+    case S3_MUSIC_FINAL:retail=!strcmp(id,"s3")||!strcmp(id,"sk");break;
+    case S3_MUSIC_KNUCKLES:retail=s3&&!strcmp(id,"s3");break;
+    default:break;
+    }
+    if(!retail)return 1;
+    /* Keep an explicit saved override selectable. A full prototype
+     * soundtrack also needs one retail restoration choice per track. */
+    if(s3_themes[t].enabled && s3_themes[t].choice==(int)c)return 1;
+    return s3_sound_prototype_selected() &&
+        (t!=S3_MUSIC_FINAL || !strcmp(id,host));
+}
+static int choice_at(unsigned t,int index)
+{for(unsigned c=0;c<(unsigned)s3_theme_choices(t);++c)if(visible_choice(t,c)&&index--==0)return (int)c;return -1;}
 static int track_at(int group,int index)
 {
     static const char *const common[]={"Events","Bosses","Menus","Other music"};
     static const char *const campaign[]={"Zones","Competition","Menus","Bonus stages"};
     const char *const *sections=group==S3_MUSIC_SHARED?common:campaign;
     for(unsigned s=0;s<4;s++)for(unsigned t=0;t<S3_MUSIC_COUNT;t++)
-        if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&!strcmp(sections[s],s3_music_section(t))&&index--==0)return (int)t;
+        if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&
+           (t!=S3_MUSIC_SUPER||s3_themes[t].enabled)&&
+           !strcmp(sections[s],s3_music_section(t))&&index--==0)return (int)t;
     return -1;
 }
 static int group_at(int index)
@@ -34,7 +61,7 @@ static int requirement(int group,int index,int *track)
 {
     int seen[S3_DONOR_COUNT]={0};
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&s3_themes[t].enabled){
-        int d=s3_theme_donor(t);if(d>=0&&!seen[d]++&&index--==0){if(track)*track=(int)t;return d;}
+        int d=s3_theme_donor(t);if(d>=0&&(d==S3_DONOR_CUSTOM||!seen[d]++)&&index--==0){if(track)*track=(int)t;return d;}
     }
     return -1;
 }
@@ -78,14 +105,14 @@ static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCM
     COPY(o->id,s3_theme_ids[t]);COPY(o->label,s3_theme_names[t]);COPY(o->group,s3_music_section((unsigned)t));
     COPY(o->description,"Base game keeps the current soundtrack. Matching donor ROMs are shared automatically.");
     COPY(o->value,s3_themes[t].enabled?s3_theme_choice((unsigned)t,(unsigned)s3_themes[t].choice)->id:"base");COPY(o->default_value,"base");
-    o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=s3_theme_choices((unsigned)t)+1;return 1;
+    o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=1;while(choice_at((unsigned)t,o->choice_count-1)>=0)++o->choice_count;return 1;
 }
 static int choice_get(void *c,const char *p,const char *f,const char *opt,int i,RecompLauncherCModChoice *o)
 {
     (void)c;if(!ours(p))return base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,opt,i,o);
     int t=track_id(opt),g=group_id(f);if(t<0||g<0||s3_music_group((unsigned)t)!=(unsigned)g||!s3_music_available((unsigned)t)||!o)return 0;
     memset(o,0,sizeof *o);if(!i){COPY(o->value,"base");COPY(o->label,"Base game");return 1;}
-    const S3ThemeChoice *choice=s3_theme_choice((unsigned)t,(unsigned)(i-1));if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,t==S3_MUSIC_SUPER?"Unused prototype theme":choice->label);return 1;
+    int selected_choice=choice_at((unsigned)t,i-1);const S3ThemeChoice *choice=selected_choice<0?NULL:s3_theme_choice((unsigned)t,(unsigned)selected_choice);if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,t==S3_MUSIC_SUPER?"Unused prototype theme":choice->label);return 1;
 }
 static int set_option(void *c,const char *p,const char *f,const char *opt,const char *v)
 {
@@ -101,21 +128,37 @@ static int resource_get(void *c,const char *p,const char *f,int i,RecompLauncher
 {
     (void)c;if(!ours(p))return base&&base->feature_resource_get&&base->feature_resource_get(base->ctx,p,f,i,o);
     int t,d=requirement(group_id(f),i,&t);if(d<0||!o)return 0;memset(o,0,sizeof *o);
+    if(d==S3_DONOR_CUSTOM){
+        snprintf(o->id,sizeof o->id,"custom-%s",s3_theme_ids[t]);snprintf(o->label,sizeof o->label,"%s: custom music",s3_theme_names[t]);
+        COPY(o->description,t==S3_THEME_LIFE?"Import a finite S3 SMPS jingle that restores the previous music.":"Import S3 Z80 SMPS data, Genesis VGM/VGZ or a PCM WAV recording. Your selection is saved for this game.");
+        COPY(o->file_patterns,t==S3_THEME_LIFE?"*.bin,*.asm,*.ini":"*.bin,*.asm,*.vgm,*.vgz,*.wav,*.ini");COPY(o->file_description,"Custom music");COPY(o->path,s3_custom_path((unsigned)t));
+        o->required=1;o->verified=s3_custom_ready((unsigned)t);o->import_on_select=1;
+        COPY(o->status,o->verified?s3_custom_name((unsigned)t):"Choose a custom music file");return 1;
+    }
     COPY(o->id,s3_donor_ids[d]);snprintf(o->label,sizeof o->label,"%s %s",s3_donor_names[d],d>=S3_DONOR_CD_US?"disc":"ROM");
     const S3ThemeChoice *choice=s3_theme_choice((unsigned)t,(unsigned)s3_themes[t].choice);
     COPY(o->description,!strcmp(choice->id,"s1-s2")?"Sonic 1 (JUE rev 0) or Sonic 2 (World rev 1). ZIP or raw ROM; one import covers every compatible choice.":"Provide this unmodified cartridge as a ZIP or raw ROM. Import once; every matching track and game shares it.");
     COPY(o->file_patterns,d>=S3_DONOR_CD_US?"*.cue,*.bin,*.sgcd,*.zip":"*.zip,*.bin,*.md,*.gen,*.68k,*");
     COPY(o->file_description,d>=S3_DONOR_CD_US?"Sonic CD disc or ZIP":"Genesis ROM or ZIP");
-    if(d>=S3_DONOR_CD_US)COPY(o->description,"Choose your US disc as a CUE/BIN set, SGCD or ZIP with audio tracks. One import covers Game Over, Act Clear and Invincibility.");
+    if(d>=S3_DONOR_CD_US)COPY(o->description,"Choose your US disc as a CUE/BIN set, SGCD or ZIP with audio tracks. One import covers the event and boss themes. Import again to extend an older library.");
     COPY(o->path,s3_donor_verified((unsigned)d)?s3_donor_path((unsigned)d):"");
     o->required=1;o->verified=s3_donor_verified((unsigned)d);o->import_on_select=1;
-    COPY(o->status,o->verified?"Verified; shared with all matching tracks":"No matching ROM provided");return 1;
+    for(unsigned track=0;track<S3_MUSIC_COUNT;track++)
+        if(s3_music_group(track)==(unsigned)group_id(f)&&s3_music_available(track)&&s3_themes[track].enabled&&s3_theme_donor(track)==d&&!s3_theme_ready(track))o->verified=0;
+    COPY(o->status,o->verified?"Verified; shared with all matching tracks":
+         d>=S3_DONOR_CD_US&&s3_donor_verified((unsigned)d)?"Import the disc again to add the selected tracks":"No matching donor provided");return 1;
 }
 static int resource_import(void *c,const char *p,const char *f,const char *r,const char *path,const char *image,
                            void (*progress)(void *,float,const char *),void *user,char *error,size_t capacity)
 {
     (void)c;s3_themes_clear_error();if(!ours(p))return base&&base->feature_resource_import&&base->feature_resource_import(base->ctx,p,f,r,path,image,progress,user,error,capacity);
-    int ok=0,g=group_id(f);if(r)for(int i=0;;i++){
+    int ok=0,g=group_id(f);
+    if(r&&!strncmp(r,"custom-",7)){
+        int t=track_id(r+7);ok=t>=0&&s3_music_available((unsigned)t)&&s3_music_group((unsigned)t)==(unsigned)g&&s3_custom_import((unsigned)t,path,progress,user);
+        if(ok&&s3_music_custom((unsigned)t))ok=s3_theme_enable((unsigned)t,1);
+        if(!ok&&error&&capacity)snprintf(error,capacity,"%s",s3_themes_error());return ok;
+    }
+    if(r)for(int i=0;;i++){
         int t,d=requirement(g,i,&t);if(d<0)break;
         if(!strcmp(r,s3_donor_ids[d])){ok=s3_theme_import((unsigned)t,path,progress,user);break;}
     }
@@ -125,6 +168,10 @@ static int resource_set(void *c,const char *p,const char *f,const char *r,const 
 {
     s3_themes_clear_error();
     if(ours(p)){
+        if(r&&!strncmp(r,"custom-",7)){
+            int t=track_id(r+7),g=group_id(f);
+            return t>=0&&g>=0&&s3_music_available((unsigned)t)&&s3_music_group((unsigned)t)==(unsigned)g&&s3_custom_import((unsigned)t,path,NULL,NULL);
+        }
         /* Replay restores resources before the selected options. A verified
          * shared-library entry is valid even while this section is disabled. */
         if(group_id(f)>=0&&r&&path)for(unsigned d=0;d<S3_DONOR_COUNT;d++)

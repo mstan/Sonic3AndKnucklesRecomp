@@ -12,7 +12,9 @@ static unsigned called_pc,called_sp;
 void recomp_call_addr(uint32_t pc) { called_pc=pc;called_sp=g_cpu.A[7]; }
 static unsigned marker=17;
 static unsigned sound_marker=23,army_marker=29;
+static unsigned loader_marker=41;
 void s3_video_state(S3StateIO *io) { S3_STATE(io,marker); }
+void s3_video_rb_state(S3StateIO *io) { S3_STATE(io,loader_marker); }
 void s3_video_state_loaded(void) {}
 void s3_army_state(S3StateIO *io) { S3_STATE(io,army_marker); }
 /* Audio serialization is exercised separately with the real driver. */
@@ -35,9 +37,10 @@ int main(void)
     size_t rollback_size=s3_rb_state_save(NULL,0);
     CHECK(rollback_size && rollback_size<=sizeof snapshot);
     CHECK(s3_rb_state_save(snapshot,sizeof snapshot)==rollback_size);
-    sound_marker=31;army_marker=37;
+    sound_marker=31;army_marker=37;loader_marker=43;
     CHECK(s3_rb_state_load(snapshot,rollback_size));
     CHECK(sound_marker==23);
+    CHECK(loader_marker==41);
 #ifndef SONIC3_STANDALONE
     CHECK(army_marker==29);
 #endif

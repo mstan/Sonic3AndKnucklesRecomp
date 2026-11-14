@@ -12,6 +12,11 @@ M68KState g_cpu;
 uint8_t g_rom[0x400000],g_ram[0x10000],*g_rom_ext;
 uint32_t g_rom_ext_size;
 int s3_stage_pack_enabled;
+static void (*player_draw)(int,uint32_t *,int);
+void s3_video_set_frame_overlay(void (*draw)(int,uint32_t *,int)){player_draw=draw;}
+static int player_capture;static uint32_t player_seen;
+static unsigned audition_mask;static int audition_enabled;
+void audio_mixer_set_audition(int enabled,unsigned mask){audition_enabled=enabled;audition_mask=mask;}
 static uint8_t *mapped;
 static uint32_t tail,last_queue,last_id,stop_calls;
 static void (*extra_audio)(int16_t *,size_t,double);
@@ -29,6 +34,7 @@ uint32_t m68k_read32(uint32_t a)
 void m68k_write8(uint32_t a,uint8_t v){CHECK(a==0xC00011 && (v&0x9F)==0x9F);}
 void recomp_call_addr(uint32_t pc)
 {
+    if(pc==S3_CLONE_GUARDED_UPDATE && player_capture)player_seen=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(last_id-1))&0xFFFFFEu;
     if(pc==S3_CLONE_STOP_ALL){CHECK(g_cpu.A[6]==S3_CLONE_RAM_ADDRESS);++stop_calls;}
     if(pc==S3_CLONE_QUEUE_MUSIC || pc==S3_CLONE_QUEUE_SFX || pc==S3_CLONE_QUEUE_EXTRA){last_queue=pc;last_id=g_cpu.D[0];}
     memset(&g_cpu,0xAD,sizeof g_cpu); /* driver calls may clobber any register */
@@ -166,6 +172,30 @@ int main(int argc,char **argv)
         s3_cd_theme_debug(&active,&theme,&position);CHECK(!active);s3_cd_themes_reset();
         puts("PASS CD invincibility survives native ring/other SFX and stops on actual credits");
     }
+    free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
+    s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(s3_sound_select(1));s3_sound_post_reset();CHECK(s3_sound_hook(init));
+    size_t prefix=g_rom_ext_size;uint8_t *original=malloc(prefix);CHECK(original);memcpy(original,g_rom_ext,prefix);
+    g_ram[0xF600]=4;s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();
+    CHECK(audition_enabled && audition_mask==0x7FF);
+    CHECK(player_draw);uint32_t pixels[320]={0};player_draw(0,pixels,320);CHECK(pixels[0]==0xFF101827);
+    s3_sound_player_frame(8);s3_sound_player_frame(0); /* DAC output only */
+    CHECK(audition_enabled && audition_mask==64);
+    s3_sound_player_frame(0x10);s3_sound_player_frame(0);player_capture=1;s3_sound_vblank();player_capture=0;
+    CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==0x2A && player_seen<0x400000+prefix);
+    unsigned stopped=stop_calls;
+    s3_sound_player_frame(8);s3_sound_player_frame(0);s3_sound_vblank();
+    CHECK(stop_calls==stopped && audition_mask==1); /* change output without a restart */
+    CHECK(!memcmp(original,g_rom_ext,prefix));
+    s3_sound_player_frame(0x20);s3_sound_player_frame(0);s3_sound_vblank();CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==1);
+    size_t player_n=s3_sound_rb_save(NULL,0);uint8_t *player_saved=malloc(player_n);CHECK(player_saved && s3_sound_rb_save(player_saved,player_n)==player_n);
+    s3_sound_player_frame(8);s3_sound_player_frame(0);s3_sound_vblank();CHECK(audition_mask==2);
+    CHECK(s3_sound_rb_load(player_saved,player_n));CHECK(audition_mask==1 && audition_enabled);
+    unsigned invalid_solo=11;memcpy(player_saved+player_n-40+12,&invalid_solo,sizeof invalid_solo);
+    CHECK(!s3_sound_rb_load(player_saved,player_n));CHECK(audition_mask==1 && !memcmp(original,g_rom_ext,prefix));
+    s3_sound_player_frame(0x80);s3_sound_player_frame(0);s3_sound_vblank();CHECK(!audition_enabled);
+    memset(pixels,0,sizeof pixels);player_draw(0,pixels,320);CHECK(!pixels[0]);
+    free(original);free(player_saved);
+    puts("PASS music player controls, output selection without restart, immutable song bank, pause and current-state restoration/rejection");
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;
 }

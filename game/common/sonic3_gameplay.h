@@ -33,6 +33,8 @@ void s3_gameplay_hud_reset(uint32_t pc,uint8_t ram[65536]);
 /* Keep original SRAM zone codes while changing the three campaign links. */
 void s3_gameplay_zone_order(uint32_t pc,const uint8_t ram[65536],uint32_t *d0);
 uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t actor);
+/* Optional campaign entry; return a native continuation when replaced. */
+uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536]);
 /* Audited timer branch/formatter sites; only their consumed CCR bits or
  * display argument change. Native timer/result/death routines still execute. */
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],
