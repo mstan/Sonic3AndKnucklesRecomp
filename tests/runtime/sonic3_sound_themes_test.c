@@ -52,18 +52,18 @@ int main(int argc,char **argv)
             CHECK(p->feature_choice_get(NULL,package,f.id,o.id,0,&choice)&&!strcmp(choice.value,"base"));
             for(int k=1;k<o.choice_count;k++){
                 CHECK(p->feature_choice_get(NULL,package,f.id,o.id,k,&choice));CHECK(strcmp(choice.value,"original"));
-                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3")));
+                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3")));
                 if(!strcmp(o.id,"final-boss"))CHECK(strcmp(choice.value,"s3")&&strcmp(choice.value,"sk"));
                 if(!strcmp(o.id,"competition-menu"))CHECK(strcmp(choice.value,"s3"));
             }
-            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?3:2));else ++shared;
+            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:3));else ++shared;
             ++total;
         }
     }
     CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?33:28));CHECK(shared==14);
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
-    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==7&&s3_theme_choices(S3_MUSIC_BOSS)==6);
-    CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==3);
+    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==8&&s3_theme_choices(S3_MUSIC_BOSS)==7);
+    CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==4);
     CHECK(s3_music_available(S3_MUSIC_DATA)&&s3_music_group(S3_MUSIC_DATA)==S3_MUSIC_SHARED);
     prototype=1;
     if(strcmp(argv[2],"sandk")){
@@ -79,6 +79,29 @@ int main(int argc,char **argv)
         CHECK(set(p,"shared-themes","mini-boss","sk-proto")&&s3_music_active(S3_MUSIC_MINIBOSS)&&driver);
         CHECK(s3_music_donor(S3_MUSIC_MINIBOSS)==(!strcmp(argv[2],"sonic3")?S3_DONOR_PROTO:S3_DONOR_SK));
         puts("PASS mini-boss accepts the prototype donor or the host S&K cartridge");return 0;
+    }
+    if(argc==4&&!strcmp(argv[3],"--custom")){
+        const char *source=getenv("GENESIS_CUSTOM_TEST_SOURCE");CHECK(source&&*source);
+        char manifest[1024];
+        CHECK(set(p,"shared-themes","boss","custom"));CHECK(!s3_themes_enabled());
+        CHECK(p->feature_resource_count(NULL,package,"shared-themes")==1);
+        RecompLauncherCModResource resource;CHECK(p->feature_resource_get(NULL,package,"shared-themes",0,&resource));
+        CHECK(!strcmp(resource.id,"custom-boss")&&!resource.verified&&strstr(resource.label,"Main Boss"));
+        CHECK(p->feature_resource_import(NULL,package,"shared-themes",resource.id,source,"",NULL,NULL,NULL,0));
+        snprintf(manifest,sizeof manifest,"%s",s3_custom_path(S3_MUSIC_BOSS));
+        CHECK(s3_music_active(S3_MUSIC_BOSS)&&s3_custom_ready(S3_MUSIC_BOSS)&&driver);
+        CHECK(set(p,"shared-themes","mini-boss","custom"));
+        CHECK(p->feature_resource_count(NULL,package,"shared-themes")==2);
+        CHECK(p->feature_resource_set_path(NULL,package,"shared-themes","custom-mini-boss",manifest));
+        CHECK(p->feature_enable(NULL,package,"shared-themes",1));
+        CHECK(s3_music_active(S3_MUSIC_BOSS)&&s3_music_active(S3_MUSIC_MINIBOSS));
+        CHECK(!p->feature_resource_set_path(NULL,package,campaign,"custom-boss",manifest));
+        CHECK(!p->feature_resource_set_path(NULL,package,"shared-themes","custom-boss","missing-custom-recording.wav"));
+        CHECK(!strcmp(s3_custom_path(S3_MUSIC_BOSS),manifest));
+        CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+        value(p,"shared-themes","boss","custom");value(p,"shared-themes","mini-boss","custom");
+        CHECK(s3_music_active(S3_MUSIC_BOSS)&&s3_custom_ready(S3_MUSIC_MINIBOSS));
+        puts("PASS per-track custom resources, friendly labels, profile persistence, scope and failed-import preservation");return 0;
     }
     if(argc==4){
         CHECK(set(p,"shared-themes","boss","s2-wai"));CHECK(!s3_themes_enabled()&&!driver);

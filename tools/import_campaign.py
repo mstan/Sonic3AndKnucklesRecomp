@@ -132,11 +132,15 @@ def write_receipt(path,bundle,kind):
 
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--campaign',required=True,choices=tuple(KINDS)+('sonic_cd','sound'))
+    p.add_argument('--campaign',required=True,choices=tuple(KINDS)+('sonic_cd','sound','custom'))
     for n in ('source','s3k','out'):p.add_argument('--'+n,required=True,type=Path)
     p.add_argument('--receipt',type=Path);p.add_argument('--validator',type=Path)
     a=p.parse_args(argv)
     try:
+        if a.campaign=='custom':
+            from import_custom_music import import_custom
+            import_custom(a.source,a.out,a.receipt,str(a.s3k))
+            return 0
         if a.campaign=='sound':
             from import_sound_donor import import_donor
             import_donor(a.source,a.out,a.receipt,str(a.s3k).split(','))

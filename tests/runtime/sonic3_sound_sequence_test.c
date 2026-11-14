@@ -40,8 +40,21 @@ static void volume_command_test(void)
     CHECK(bank[psg+9]==0x81 && bank[psg+10]==1);
     free(c);
 }
+static void custom_sequence_test(void)
+{
+    uint8_t raw[]={0x18,0x80,1,1,1,0x30,0x10,0x80,0,0,0x11,0x80,0,0,0,0,0xF2,0xAE,0x10,0x80,4,0xF6,0x11,0x80};
+    uint8_t saved[sizeof raw],out[32768];memcpy(saved,raw,sizeof raw);S3SoundCustomInfo info={0};char error[256];
+    CHECK(s3_sound_convert_custom(raw,sizeof raw,NULL,out,sizeof out,&info,error,sizeof error));
+    CHECK(info.bytes>sizeof raw&&!info.restores&&!memcmp(saved,raw,sizeof raw));
+    raw[11]=0xFF;CHECK(!s3_sound_convert_custom(raw,sizeof raw,NULL,out,sizeof out,&info,error,sizeof error));raw[11]=0x80;
+    raw[0]=0x16;raw[19]=0xE2;raw[20]=0xFF;raw[21]=0xF2;
+    CHECK(s3_sound_convert_custom(raw,22,NULL,out,sizeof out,&info,error,sizeof error)&&info.restores);
+    CHECK(!s3_sound_convert_custom(raw,9,NULL,out,sizeof out,&info,error,sizeof error));
+    raw[2]=7;raw[3]=3;CHECK(!s3_sound_convert_custom(raw,22,NULL,out,sizeof out,&info,error,sizeof error));
+}
 int main(int argc,char **argv)
 {
+    custom_sequence_test();
     volume_command_test();
     CHECK(argc==4);size_t size,program_size;uint8_t *rom=read_file(argv[1],&size),*program=read_file(argv[2],&program_size);
     CHECK(program_size>=84 && !memcmp(program,"S3CR",4) && be32(program+4)==program_size);

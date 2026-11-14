@@ -25,6 +25,12 @@ uint32_t s3_sound_music_source(const S3SoundSource *source,
 uint32_t s3_sound_sfx_source(const S3SoundSource *source,
                             const uint8_t *rom, unsigned id);
 
+typedef struct S3SoundCustomInfo {unsigned bytes,restores;} S3SoundCustomInfo;
+/* Accept one self-contained Z80 S3/S&K SMPS bank at logical $8000. NULL
+ * source validates its graph without binding cartridge-specific percussion. */
+int s3_sound_convert_custom(const uint8_t *input,size_t bytes,const S3SoundSource *source,
+                            uint8_t *output,size_t capacity,S3SoundCustomInfo *info,char *error,size_t error_size);
+
 typedef struct S3SoundLayout {
     uint32_t program_size;
     uint32_t music_index, sound_index, psg_index, modulation_index;

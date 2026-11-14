@@ -14,9 +14,9 @@ typedef struct Convert {
     S3SoundSource source;
     const uint8_t *rom;
     uint8_t *bank;
-    size_t capacity,cursor;
+    size_t capacity,cursor,input_size;
     uint32_t input_bank;
-    int bad,count,voices;
+    int bad,count,voices,restore_seen;
     unsigned psg_base,mod_base;
     const uint8_t *dac_map;
     uint8_t *drums;
@@ -26,7 +26,7 @@ typedef struct Convert {
     S3SoundAssetStats stats;
 } Convert;
 static unsigned rb(Convert *c,uint32_t p)
-{if(p>=c->source.rom_size){c->bad=1;return 0;}return c->rom[p];}
+{if(p>=(c->input_size?c->input_size:c->source.rom_size)){c->bad=1;return 0;}return c->rom[p];}
 static unsigned rw(Convert *c,uint32_t p){return rb(c,p)|(rb(c,p+1)<<8);}
 static unsigned zb(Convert *c,uint32_t p)
 {if(p>=sizeof c->source.z80){c->bad=1;return 0;}return c->source.z80[p];}
@@ -137,6 +137,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
                 else if(sub==7){length=2;encoded=0;} /* queue reset is internal */
                 else {c->bad=1;break;}
             }else if(op==0xEB || op==0xF1 || op==0xFD || op==0xFE){c->bad=1;break;}
+            if(op==0xE2&&rb(c,pc+1)==0xFF)c->restore_seen=1;
             if(op==0xEF){unsigned voice=rb(c,pc+1);if(voice>=128){c->bad=1;break;}if((int)voice>c->voices)c->voices=(int)voice;}
         }
         if(pc+length>c->input_bank+0x8000){c->bad=1;break;}
@@ -424,4 +425,26 @@ int s3_sound_build_event(const uint8_t *rom,size_t size,unsigned donor,unsigned 
     S3SoundMusicCache cache={0};
     int ok=s3_sound_build_track(rom,size,donor,ids[donor==S3_DONOR_S1?0:donor<=S3_DONOR_WAI?1:2][theme],target,l,pcm,program,bank,cap,used,next_sample,&cache,error,error_size);
     s3_sound_music_cache_free(&cache);return ok;
+}
+
+/* Raw S3-family Z80 SMPS data uses $8000-based, little-endian pointers and
+ * an embedded instrument table. Reuse the cartridge graph converter so
+ * custom input has the same command validation and native timing contract. */
+int s3_sound_convert_custom(const uint8_t *input,size_t bytes,const S3SoundSource *source,
+                            uint8_t *out,size_t capacity,S3SoundCustomInfo *info,char *error,size_t en)
+{
+    if(!input||bytes<10||bytes>0x8000||input[2]<1||input[2]>7||input[3]>3||
+       bytes<6u+input[2]*4u+input[3]*6u||!out||capacity<8||capacity>0x8000||
+       (input[0]|((unsigned)input[1]<<8))<0x8000) {
+        if(error&&en)snprintf(error,en,"Use an S3 Z80 SMPS bank based at $8000 with embedded instruments");return 0;
+    }
+    Convert *c=calloc(1,sizeof *c);uint8_t *rom=calloc(1,0x8000+bytes);
+    if(!c||!rom){free(c);free(rom);return 0;}memcpy(rom+0x8000,input,bytes);
+    if(source)c->source=*source;
+    else{c->source.rom_size=0x400000;c->source.volume_count=51;c->source.modulation_count=8;}
+    c->source.prototype=0;c->rom=rom;c->input_size=0x8000+bytes;c->bank=out;c->capacity=capacity;c->cursor=0;
+    int n=convert_song(c,0x8000,0,1),ok=n>0&&!c->bad;
+    if(ok&&info){info->bytes=(unsigned)n;info->restores=c->restore_seen!=0;}
+    if(!ok&&error&&en)snprintf(error,en,"Invalid or unsupported S3 SMPS sequence at $%04X, command $%02X",c->last_pc&0xFFFFu,c->last_op);
+    free(c);free(rom);return ok;
 }

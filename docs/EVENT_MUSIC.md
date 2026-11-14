@@ -87,6 +87,31 @@ Channel audition uses the standard chip synthesis output. Empty channel entries
 are skipped. Recorded CD audio plays its full stereo mix. Current-build states
 retain the player selection and playback, including a paused or isolated track.
 
+## Custom music files
+
+Each available music row also offers **Custom music**. Select it, then import
+the file in the matching resource below the dropdown. Selections are saved
+separately for each game. Restart to apply them. Native sound effects remain
+available with custom music.
+
+- **SMPS BIN:** a self-contained Sonic 3 Z80 music bank, based at `$8000`,
+  with embedded instruments and at most 32 KiB. Samples and envelopes use
+  the running cartridge's repertoire.
+- **SMPS ASM:** the supported Sonic 3 SMPS2ASM data directives with
+  `smpsHeaderStartSong 3`. Labels, notes, instruments, common coordination
+  commands, loops and calls are assembled locally. External files, arbitrary
+  assembly instructions and unsupported driver extensions are rejected.
+- **VGM/VGZ:** one NTSC Genesis YM2612 and PSG, with ordinary register writes,
+  waits, loops, uncompressed DAC banks and finite DAC streams. Other chips,
+  compressed sample banks, timer-driven CSM and unsupported stream modes are rejected.
+- **WAV:** uncompressed mono or stereo PCM, 8–192 kHz and 8–32 bit, normalized
+  to stereo 44.1 kHz. Recordings are limited to about three minutes. Stage
+  recordings loop from their beginning; short event recordings play once.
+
+The 1-UP row accepts synthesized SMPS jingles that restore the previous music.
+WAV recordings play their full stereo mix. SMPS and VGM support channel audition
+in the music player. Import errors retain the previous valid selection.
+
 ## Donors
 
 Use Sonic 1 JUE revision 0, Sonic 2 World revision 1, or a supported original

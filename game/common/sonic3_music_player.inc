@@ -18,12 +18,17 @@ static unsigned player_pointer(unsigned row)
 static int player_recorded(unsigned row)
 {
     unsigned t=s_player_tracks[row];
-    return t<S3_MUSIC_COUNT && s3_music_active(t) && s3_theme_donor(t)>=S3_DONOR_CD_US;
+    return t<S3_MUSIC_COUNT && s3_music_active(t) && (s3_music_custom(t)?s3_custom_kind(t)==S3_CUSTOM_PCM:s3_theme_donor(t)>=S3_DONOR_CD_US);
 }
 static int player_channel(unsigned row,unsigned solo)
 {
     if(!solo)return 1;
     if(!s_player_count || row>=s_player_count || solo>10 || player_recorded(row))return 0;
+    unsigned track=s_player_tracks[row];
+    if(track<S3_MUSIC_COUNT&&s3_music_custom(track)&&s3_custom_kind(track)==S3_CUSTOM_VGM){
+        unsigned mask=solo==1?64:solo<=7?1u<<(solo-2):solo==10?3u<<9:1u<<(solo-1);
+        return (s3_vgm_channels(track)&mask)!=0;
+    }
     unsigned a=player_pointer(row);
     if(a<0x400000 || a+8>s_player_bank_end)return 0;
     unsigned fm=g_rom_ext[a-0x400000+2],psg=g_rom_ext[a-0x400000+3];
@@ -42,6 +47,7 @@ static void player_audition(void)
     else if(s_player.solo<=7 && s_player.solo)mask=1u<<(s_player.solo-2);
     else if(s_player.solo>=8)mask=s_player.solo==10?(3u<<9):(1u<<(s_player.solo-1));
     audio_mixer_set_audition(s_player.open && !player_recorded(s_player.track),mask);
+    s3_vgm_audition(s_player.open?mask:0x7ff);
 }
 static void player_stop(void)
 {
@@ -155,7 +161,7 @@ static void player_overlay(int line,uint32_t *out,int width)
     player_text(line,out,width,x,100,player_recorded(s_player.track)?"RECORDED AUDIO - FULL MIX ONLY":"CHANNELS CHANGE WITHOUT RESTARTING",0xFF9CAEC6);
     unsigned track=s_player_tracks[s_player.track];
     const char *source=prototype_active?"November 1993 prototype":"Base game";
-    if(track<S3_MUSIC_COUNT && s3_music_active(track))source=s3_theme_choice(track,(unsigned)s3_themes[track].choice)->label;
+    if(track<S3_MUSIC_COUNT && s3_music_active(track))source=s3_music_custom(track)?s3_custom_name(track):s3_theme_choice(track,(unsigned)s3_themes[track].choice)->label;
     player_text(line,out,width,x,112,source,0xFFCBD5E1);
     for(int n=-3;n<=3;n++) {
         int at=(int)s_player.track+n;if(at<0 || at>=(int)s_player_count)continue;

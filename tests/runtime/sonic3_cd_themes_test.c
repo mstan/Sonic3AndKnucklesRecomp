@@ -67,6 +67,15 @@ int main(int argc,char **argv)
         CDClock prior=clock_state;s3_cd_theme_request(0x2A);s3_cd_theme_frame(0,1);CHECK(clock_state.position==prior.position);
         s3_cd_theme_request(0x29);CHECK(clock_state.theme==S3_THEME_CLEAR);
     }
+    /* Custom stage recordings share the same clock and 1-UP suspension. */
+    song(S3_MUSIC_AIZ1);songs[S3_MUSIC_AIZ1].custom=1;songs[S3_MUSIC_AIZ1].native=1;songs[S3_MUSIC_AIZ1].loop=1;
+    CHECK(s3_cd_theme_request(1));CHECK(clock_state.active&&clock_state.theme==S3_MUSIC_AIZ1);
+    memset(out,0,sizeof out);mix(out,6,44100);CHECK(!memcmp(out,expected,sizeof expected));
+    uint8_t before_identity[32],after_identity[32];s3_cd_theme_identity(before_identity);
+    uint64_t saved_position=clock_state.position;s3_cd_theme_request(0x2A);s3_cd_theme_frame(0,1);CHECK(clock_state.position==saved_position);
+    s3_cd_theme_frame(0,0);CHECK(clock_state.position>saved_position);
+    songs[S3_MUSIC_AIZ1].loop=0;s3_cd_theme_identity(after_identity);CHECK(memcmp(before_identity,after_identity,32));
+    s3_cd_theme_frame(0,0);CHECK(!clock_state.active);
     s3_cd_themes_reset();
     if(argc>=2){
         CHECK(s3_cd_donor_verify(argv[1],S3_DONOR_CD_US));CHECK(!s3_cd_donor_verify(argv[1],S3_DONOR_S3));

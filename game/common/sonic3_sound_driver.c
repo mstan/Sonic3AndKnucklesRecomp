@@ -2,6 +2,7 @@
 #include "sonic3_sound_assets.h"
 #include "sonic3_sound_themes.h"
 #include "sonic3_cd_themes.h"
+#include "sonic3_vgm.h"
 #include "sonic3_state_io.h"
 #include "sonic3_video.h"
 #include "genesis_runtime.h"
@@ -167,6 +168,21 @@ void s3_sound_post_reset(void)
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_active(t)){
         const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);
         int donor=choice->donor;
+        if(donor==S3_DONOR_CUSTOM){
+            int ok=0;
+            if(s3_custom_kind(t)==S3_CUSTOM_SMPS){
+                size_t bytes=0;uint8_t *raw=s3_custom_sequence(t,&bytes);S3SoundSource source;S3SoundCustomInfo info={0};
+                unsigned dest=(stats.bytes+1u)&~1u,cap=0x400000u-dest;if(cap>0x8000)cap=0x8000;
+                ok=raw&&s3_sound_read_source(g_rom,rom_size,&source,error,sizeof error)&&
+                    s3_sound_convert_custom(raw,bytes,&source,bank+dest,cap,&info,error,sizeof error);
+                if(ok){uint32_t pointer=0x01400000u|dest;unsigned at=seq.music_index-0x400000+(s3_music_target(t)-1)*4;
+                    for(unsigned i=0;i<4;i++)bank[at+i]=(uint8_t)(pointer>>(24-i*8));stats.bytes=dest+info.bytes;}
+                free(raw);
+            }else if(s3_custom_kind(t)==S3_CUSTOM_VGM)ok=s3_vgm_theme_build(t,s3_music_target(t),s3_custom_data(t),s3_custom_hash(t),&seq,bank,0x400000,&stats.bytes,error,sizeof error);
+            else ok=s3_recording_build(t,s3_music_target(t),s3_custom_data(t),s3_custom_hash(t),s3_custom_loop(t),&seq,bank,0x400000,&stats.bytes,error,sizeof error);
+            if(!ok){fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);free(bank);exit(1);}
+            fprintf(stderr,"[sound-driver] %s: custom %s\n",s3_theme_names[t],s3_custom_kind(t)==S3_CUSTOM_SMPS?"SMPS":s3_custom_kind(t)==S3_CUSTOM_VGM?"VGM":"recording");continue;
+        }
         if(donor>=S3_DONOR_CD_US){
             if(!s3_cd_theme_build(t,(unsigned)donor,s3_donor_path((unsigned)donor),&seq,bank,0x400000,&stats.bytes,error,sizeof error)){
                 fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);free(bank);exit(1);
@@ -324,7 +340,7 @@ int s3_sound_dispatch_miss(uint32_t pc)
 }
 void s3_sound_state(struct S3StateIO *io)
 {
-    uint8_t identity[72]={'S','3','S','D',5,0,0,0},incoming[72];identity[5]=(uint8_t)(bound?active:selected);
+    uint8_t identity[72]={'S','3','S','D',6,0,0,0},incoming[72];identity[5]=(uint8_t)(bound?active:selected);
     identity[6]=(uint8_t)(bound?prototype_active:prototype_selected);
 #ifdef S3_CLONE_DRIVER
     if(identity[5])for(unsigned i=0;i<32;i++){
@@ -340,6 +356,7 @@ void s3_sound_state(struct S3StateIO *io)
 #ifdef S3_CLONE_DRIVER
     player_state(io);
 #endif
+    s3_vgm_state(io);
 }
 size_t s3_sound_rb_save(void *dst,size_t cap)
 {

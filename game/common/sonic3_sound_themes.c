@@ -67,12 +67,13 @@ static char file[1200],library_settings[1200],paths[S3_DONOR_COUNT][1024],error[
 static int verified[S3_DONOR_COUNT],host_s3,host_combined;
 static char prototype_alias[1024];
 static int prototype_from_alias;
+#include "sonic3_custom_music.inc"
 const char *s3_themes_error(void){return error;}
 void s3_themes_clear_error(void){*error=0;}
 const char *s3_donor_path(unsigned d){return d==S3_DONOR_PROTO&&prototype_from_alias?prototype_alias:d<S3_DONOR_COUNT?paths[d]:"";}
 int s3_donor_verified(unsigned d){return d<S3_DONOR_COUNT && verified[d];}
-int s3_theme_choices(unsigned t){return t<S3_MUSIC_COUNT?(int)counts[rows[t].choices]:0;}
-const S3ThemeChoice *s3_theme_choice(unsigned t,unsigned c){return t<S3_MUSIC_COUNT && c<(unsigned)s3_theme_choices(t)?&choices[rows[t].choices][c]:NULL;}
+int s3_theme_choices(unsigned t){return t<S3_MUSIC_COUNT?(int)counts[rows[t].choices]+1:0;}
+const S3ThemeChoice *s3_theme_choice(unsigned t,unsigned c){static const S3ThemeChoice custom={"custom","Custom music",S3_DONOR_CUSTOM};return t>=S3_MUSIC_COUNT?NULL:c==counts[rows[t].choices]?&custom:c<counts[rows[t].choices]?&choices[rows[t].choices][c]:NULL;}
 unsigned s3_music_group(unsigned t)
 {return t<S3_MUSIC_COUNT?(host_combined&&rows[t].group==S3_MUSIC_SANDK?S3_MUSIC_SONIC3:rows[t].group):S3_MUSIC_GROUPS;}
 const char *s3_music_section(unsigned t){return t<S3_MUSIC_COUNT?rows[t].section:"";}
@@ -154,7 +155,7 @@ static const char *choice_id(unsigned t,const char *id)
     return id;
 }
 int s3_theme_donor(unsigned t){int d=s3_music_donor(t);return host_has(d)?-1:d;}
-int s3_theme_ready(unsigned t){int d=s3_theme_donor(t);return t<S3_MUSIC_COUNT&&(d<0||(d==S3_DONOR_CD_US?!!(cd_available&(UINT64_C(1)<<t)):verified[d]));}
+int s3_theme_ready(unsigned t){int d=s3_theme_donor(t);if(d==S3_DONOR_CUSTOM)return s3_custom_ready(t);return t<S3_MUSIC_COUNT&&(d<0||(d==S3_DONOR_CD_US?!!(cd_available&(UINT64_C(1)<<t)):verified[d]));}
 int s3_themes_enabled(void){for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_active(t))return 1;return 0;}
 int s3_theme_enable(unsigned t,int on)
 {
@@ -194,7 +195,7 @@ int s3_music_group_enable(unsigned group,int on)
     if(!on){group_set(group,0);return 1;}
     unsigned selected=0;int seen[S3_DONOR_COUNT]={0};
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==group&&s3_music_available(t)&&s3_themes[t].enabled){
-        ++selected;int d=s3_theme_donor(t);if(d>=0&&!seen[d]++){size_t size;free(s3_donor_read((unsigned)d,&size));}
+        ++selected;int d=s3_theme_donor(t);if(d>=0&&d<S3_DONOR_COUNT&&!seen[d]++){size_t size;free(s3_donor_read((unsigned)d,&size));}
         if(!s3_theme_ready(t)){group_set(group,0);snprintf(error,sizeof error,"Provide the selected music's matching ROM below.");return 0;}
     }
     if(!selected){snprintf(error,sizeof error,"Choose a replacement track first.");return 0;}
@@ -222,7 +223,7 @@ void s3_themes_load(const char *settings,const char *mode)
     snprintf(file,sizeof file,"%s",settings?settings:"settings.ini");
     char *a=strrchr(file,'/'),*b=strrchr(file,'\\');if(!a||(b&&b>a))a=b;
     size_t prefix=a?(size_t)(a-file)+1:0;
-    snprintf(file+prefix,sizeof file-prefix,"%s-themes.ini",mode);
+    snprintf(file+prefix,sizeof file-prefix,"%s-themes.ini",mode);custom_load();
     snprintf(library_settings,sizeof library_settings,"%s",settings?settings:"settings.ini");
     /* Explicit profile overrides isolate QA and portable installs. Ordinary
      * installs share one donor library across all three executables. */
@@ -293,6 +294,11 @@ int s3_themes_validate(void)
 int s3_theme_import(unsigned t,const char *path,void (*progress)(void *,float,const char *),void *user)
 {
     *error=0;if(t>=S3_MUSIC_COUNT||!path||!*path||strpbrk(path,"\r\n"))return 0;
+    if(s3_music_custom(t)){
+        if(!s3_custom_import(t,path,progress,user))return 0;
+        s3_themes[t].enabled=1;
+        if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}return 1;
+    }
     int expected=s3_theme_donor(t);if(expected<0)return 0;
     char imported[1024];
     const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);

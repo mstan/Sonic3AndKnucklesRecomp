@@ -7,11 +7,12 @@
 #include "audio.h"
 #include "genesis_clocks.h"
 #include "sha256.h"
+#include "sonic3_vgm.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct Song {uint8_t *pcm;uint32_t frames,gain;uint8_t hash[32];} Song;
+typedef struct Song {uint8_t *pcm;uint32_t frames,gain;uint8_t hash[32];unsigned native,custom,loop,vgm;} Song;
 static Song songs[S3_MUSIC_COUNT];
 typedef struct CDClock {uint64_t position,frame_position;uint32_t theme,active,paused,volume,fade,carry,deferred;} CDClock;
 static CDClock clock_state;
@@ -22,7 +23,7 @@ static unsigned le16(const uint8_t *p){return p[0]|((unsigned)p[1]<<8);}
 static uint32_t le32(const uint8_t *p){return le16(p)|((uint32_t)le16(p+2)<<16);}
 static void be32(uint8_t *p,uint32_t v){p[0]=(uint8_t)(v>>24);p[1]=(uint8_t)(v>>16);p[2]=(uint8_t)(v>>8);p[3]=(uint8_t)v;}
 static int cd_event(unsigned t){return t<S3_MUSIC_COUNT&&events[t]!=0;}
-static int cd_loop(unsigned t){return t==S3_THEME_INVINCIBLE||t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS||t==S3_MUSIC_FINAL;}
+static int cd_loop(unsigned t){if(t<S3_MUSIC_COUNT&&songs[t].custom)return (int)songs[t].loop;return t==S3_THEME_INVINCIBLE||t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS||t==S3_MUSIC_FINAL;}
 static int hex(const char *p,size_t n)
 {if(strlen(p)!=n)return 0;for(size_t i=0;i<n;i++)if(!((p[i]>='0'&&p[i]<='9')||(p[i]>='a'&&p[i]<='f')))return 0;return 1;}
 static int wav(const char *path,const char *hash,Song *out)
@@ -40,6 +41,36 @@ static int wav(const char *path,const char *hash,Song *out)
         !memcmp(raw+36,"data",4)&&le32(raw+40)==(uint32_t)n-44&&!(le32(raw+40)&3);
     if(ok&&out){out->frames=((uint32_t)n-44)/4;memcpy(out->hash,digest,32);memmove(raw,raw+44,(size_t)n-44);out->pcm=raw;raw=NULL;}
     free(raw);return ok;
+}
+static void mix(int16_t *out,size_t frames,double rate);
+int s3_recording_verify(const char *path,const char *hash){return wav(path,hash,NULL);}
+static int silent_music(unsigned native,const S3SoundLayout *l,uint8_t *bank,size_t cap,uint32_t *used)
+{
+    unsigned dest=used?(*used+1u)&~1u:0;
+    if(native<1||native>0x33||!l||!bank||!used||dest>cap||cap-dest<82)return 0;
+    uint8_t *p=bank+dest;memset(p,0,82);p[1]=56;p[2]=7;p[3]=3;p[6]=p[7]=1;
+    for(unsigned i=0;i<10;i++){unsigned at=i<7?8+i*4:36+(i-7)*6;p[at+1]=54;}
+    p[54]=0xFF;p[55]=0x10;be32(bank+l->music_index-0x400000+(native-1)*4,0x01400000u|dest);*used=dest+82;return 1;
+}
+int s3_recording_build(unsigned t,unsigned native,const char *path,const char *hash,int loop,
+                      const S3SoundLayout *l,uint8_t *bank,size_t cap,uint32_t *used,char *error,size_t en)
+{
+    Song song={0};
+    if(t>=S3_MUSIC_COUNT || t==S3_THEME_LIFE || !wav(path,hash,&song)||!silent_music(native,l,bank,cap,used)) {
+        free(song.pcm);
+        if(error&&en)snprintf(error,en,"Provide a verified custom recording; 1-UP requires synthesized music");return 0;
+    }
+    song.gain=65536;song.native=native;song.custom=1;song.loop=loop!=0;
+    free(songs[t].pcm);songs[t]=song;audio_set_extra_source(mix);return 1;
+}
+int s3_vgm_theme_build(unsigned t,unsigned native,const char *path,const char *hash,
+                      const S3SoundLayout *l,uint8_t *bank,size_t cap,uint32_t *used,char *error,size_t en)
+{
+    if(t>=S3_MUSIC_COUNT||t==S3_THEME_LIFE||!s3_vgm_build(t,path,hash)||!silent_music(native,l,bank,cap,used)){
+        if(error&&en)snprintf(error,en,"Custom VGM failed validation; 1-UP needs a restoring SMPS jingle");return 0;}
+    Song song={0};song.frames=UINT32_MAX;song.gain=65536;song.native=native;song.custom=1;song.vgm=1;
+    for(unsigned i=0;i<32;i++){unsigned a=(unsigned char)hash[i*2],b=(unsigned char)hash[i*2+1];song.hash[i]=(uint8_t)(((a<='9'?a-'0':a-'a'+10)<<4)|(b<='9'?b-'0':b-'a'+10));}
+    free(songs[t].pcm);songs[t]=song;audio_set_extra_source(mix);return 1;
 }
 static int manifest_read(const char *path,unsigned donor,int wanted,Song *out,uint64_t *available)
 {
@@ -85,6 +116,7 @@ static int32_t sample(const Song *s,uint32_t frame,unsigned channel)
 static void mix(int16_t *out,size_t frames,double rate)
 {
     if(!clock_state.active||clock_state.paused||clock_state.theme>=S3_MUSIC_COUNT||rate<1||rate>384000)return;
+    if(songs[clock_state.theme].vgm){s3_vgm_mix(out,frames,rate,clock_state.volume);return;}
     const Song *s=&songs[clock_state.theme];if(!s->pcm||!s->frames)return;
     uint64_t step=(uint64_t)(44100.0*4294967296.0/rate+0.5);
     uint64_t position=clock_state.frame_position;
@@ -107,6 +139,7 @@ static void mix(int16_t *out,size_t frames,double rate)
 }
 void s3_cd_themes_reset(void)
 {
+    s3_vgm_reset();
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++){free(songs[t].pcm);memset(&songs[t],0,sizeof songs[t]);}
     memset(&clock_state,0,sizeof clock_state);
 }
@@ -155,8 +188,9 @@ int s3_cd_theme_request(unsigned native)
         }
     }
     if(native>=1&&native<=0x33){
-        for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(cd_event(t)&&native==events[t]&&songs[t].pcm){
-            memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;return 1;
+        for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if((cd_event(t)||songs[t].custom)&&native==(songs[t].custom?songs[t].native:events[t])&&(songs[t].pcm||songs[t].vgm)){
+            memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;
+            if(songs[t].vgm)s3_vgm_start(t);return 1;
         }
         clock_state.active=clock_state.carry=clock_state.deferred=0;
     }else if(native==0xE1||native==0xE5)clock_state.fade=1;
@@ -166,6 +200,10 @@ int s3_cd_theme_request(unsigned native)
 void s3_cd_theme_frame(int paused,int oneup)
 {
     clock_state.paused=paused||oneup;
+    if(clock_state.active&&songs[clock_state.theme].vgm){
+        if(s3_vgm_finished()){clock_state.active=0;return;}
+        s3_vgm_frame(clock_state.theme,clock_state.paused);
+    }
     if(clock_state.active&&!clock_state.paused){
         const Song *s=&songs[clock_state.theme];
         uint64_t length=(uint64_t)s->frames<<32;
@@ -192,12 +230,12 @@ void s3_cd_theme_state(struct S3StateIO *io)
     if(incoming.theme>=S3_MUSIC_COUNT||incoming.active>1||incoming.paused>1||incoming.volume>65536||incoming.fade>1||
        incoming.carry>1||incoming.deferred>0x17||(!incoming.carry&&incoming.deferred)||
        (incoming.carry&&incoming.theme!=S3_THEME_CLEAR)||
-       (incoming.active && (!songs[incoming.theme].pcm||!songs[incoming.theme].frames)))io->ok=0;
+       (incoming.active && ((!songs[incoming.theme].pcm&&!songs[incoming.theme].vgm)||!songs[incoming.theme].frames)))io->ok=0;
     S3_STATE(io,clock_state);
 }
 void s3_cd_theme_identity(uint8_t out[32])
 {
-    uint8_t hashes[S3_MUSIC_COUNT*36]={0};for(unsigned t=0;t<S3_MUSIC_COUNT;t++){memcpy(hashes+t*36,songs[t].hash,32);be32(hashes+t*36+32,songs[t].gain);}
+    uint8_t hashes[S3_MUSIC_COUNT*48]={0};for(unsigned t=0;t<S3_MUSIC_COUNT;t++){uint8_t *p=hashes+t*48;memcpy(p,songs[t].hash,32);be32(p+32,songs[t].gain);be32(p+36,songs[t].native);be32(p+40,songs[t].custom);be32(p+44,songs[t].loop);}
     recompui_sha256_compute(hashes,sizeof hashes,out);
 }
 void s3_cd_theme_debug(unsigned *active,unsigned *theme,uint64_t *position)
