@@ -69,7 +69,9 @@ set(SDL2_BUNDLED "${RUNNER_ROOT}/external/SDL2/SDL2-2.28.5")
 # SDL2 discovery. Windows pins the bundled VC devel package (NO_DEFAULT_PATH
 # keeps a stray MSYS2 SDL2 from leaking msys64 headers onto cl.exe). macOS/Linux
 # use the system/Homebrew SDL2 (Apple Silicon: /opt/homebrew).
-if(WIN32)
+if(ANDROID)
+    include("${RECOMP_ROOT}/cmake/GenesisRecompAndroid.cmake")
+elseif(WIN32)
     set(SDL2_DIR "${SDL2_BUNDLED}/cmake" CACHE PATH "" FORCE)
     find_package(SDL2 REQUIRED CONFIG NO_DEFAULT_PATH PATHS "${SDL2_DIR}")
 else()
@@ -91,7 +93,9 @@ endif()
 # The runner includes SDL as <SDL2/SDL.h> (the bundled Windows devel layout).
 # Homebrew's SDL2::SDL2 points the include dir *at* .../include/SDL2, so add
 # its parent so <SDL2/SDL.h> resolves the same way on every platform.
-set(SDL2_PARENT_INCLUDE_DIRS "")
+if(NOT ANDROID)
+    set(SDL2_PARENT_INCLUDE_DIRS "")
+endif()
 foreach(_inc IN LISTS SDL2_INCLUDE_DIRS)
     get_filename_component(_inc_name "${_inc}" NAME)
     if(_inc_name STREQUAL "SDL2")
@@ -175,7 +179,10 @@ option(GEN_DEV_TRACE
 option(GENESIS_BUILD_COSIM
     "Build the differential co-simulation targets (dev-only, never shipped)" OFF)
 
-set(COMMON_LIBS SDL2::SDL2main SDL2::SDL2)
+set(COMMON_LIBS SDL2::SDL2)
+if(NOT ANDROID)
+    list(PREPEND COMMON_LIBS SDL2::SDL2main)
+endif()
 if(WIN32)
     list(APPEND COMMON_LIBS ws2_32 comdlg32)
 elseif(UNIX)
@@ -187,6 +194,7 @@ endif()
 #   from this repo's game/<game_dir>/ (an absolute, caller-owned directory).
 set(S3_GAME_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/game")
 set(S3_GAME_COMMON "${S3_GAME_ROOT}/common")
+set(RECOMP_UI_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/recomp-ui" CACHE PATH "recomp-ui checkout")
 # Raw machine/host snapshots belong to this source, compiler and build setup.
 file(GLOB_RECURSE _state_inputs CONFIGURE_DEPENDS
     "${RUNNER_ROOT}/*.c" "${RUNNER_ROOT}/*.cpp" "${RUNNER_ROOT}/*.h"
@@ -257,7 +265,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${S3_GAME_COMMON}/sonic3_sound_themes.c"
         "${S3_GAME_COMMON}/sonic3_theme_mods.c"
         "${S3_GAME_COMMON}/sonic3_cd_themes.c"
-        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+        "${RECOMP_UI_ROOT}/src/common/sha256.c")
     # The source's queued decompressor changes its IRQ return PC. Compile this
     # small program with the existing explicit-PC native backend so its RTE
     # bookmark semantics do not depend on a suspended C call continuation.
@@ -265,6 +273,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(KOS_DIR "${CMAKE_CURRENT_BINARY_DIR}/${PREFIX}-kos-native")
     set(KOS_CORE "${RECOMP_ROOT}/external/m68k-recomp-core/runtime")
     set(KOS_NATIVE "${KOS_DIR}/sonic3_kos_native_module.c")
+    if(NOT TARGET M68kStepRecomp)
+        message(FATAL_ERROR "Sonic generation needs a host GENESIS_M68K_STEP_RECOMPILER_EXE")
+    endif()
     foreach(SHARD RANGE 0 31)
         if(SHARD LESS 10)
             set(SHARD_NAME "0${SHARD}")
@@ -322,7 +333,7 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${GAME}"
         "${S3_GAME_ROOT}/trilogy"
         "${S3_GAME_COMMON}"                      # sonic3_video.h (all modes)
-        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common"
+        "${RECOMP_UI_ROOT}/src/common"
         "${NATIVE_GAME}"
     )
     if(GENESIS_Z80_RECOMP)
@@ -333,7 +344,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
 
     # Native â€” recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
-    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
+    if(ANDROID)
+        add_library(${TARGET} SHARED ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
+    else()
+        add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
+    endif()
     add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
@@ -453,7 +468,7 @@ foreach(_repo SOURCE ENGINE UI DISASM)
     elseif(_repo STREQUAL "ENGINE")
         set(_dir "${RECOMP_ROOT}")
     elseif(_repo STREQUAL "UI")
-        set(_dir "${CMAKE_SOURCE_DIR}/recomp-ui")
+        set(_dir "${RECOMP_UI_ROOT}")
     else()
         set(_dir "${S3_GAME_ROOT}/skdisasm")
     endif()
@@ -484,7 +499,7 @@ endforeach()
 # it per mode via g_game_spec.boxart -> assets/img/boxart-<mode>.tga. Defines
 # RECOMP_LAUNCHER.
 set(RECOMP_UI_ENABLE_MODS ON CACHE BOOL "Expose Sonic 3 family's opt-in built-in mods")
-include(${CMAKE_SOURCE_DIR}/recomp-ui/recomp_ui.cmake)
+include(${RECOMP_UI_ROOT}/recomp_ui.cmake)
 recomp_target_launcher_ui(Sonic3Recomp
     CONSOLE genesis
     BOXART ${CMAKE_SOURCE_DIR}/boxart-sonic3.tga  BOXART_NAME boxart-sonic3.tga)
