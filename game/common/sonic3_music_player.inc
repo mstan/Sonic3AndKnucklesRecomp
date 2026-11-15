@@ -142,13 +142,8 @@ static void player_text(int line,uint32_t *out,int width,int x,int y,const char 
 }
 static void player_overlay(int line,uint32_t *out,int width)
 {
-    if(!active || !initialised || !s_player_count)return;
+    if(!active || !initialised || !s_player_count || !s_player.open)return;
     int x=(width-320)/2+14;
-    if(!s_player.open) {
-        if((g_ram[0xF600]&127)==4 || g_ram[0xF600]==0x28)
-            player_text(line,out,width,x,208,"A+C: MUSIC PLAYER",0xFFFFFFFF);
-        return;
-    }
     for(int i=0;i<width;i++)out[i]=0xFF101827;
     static const char *const channels[]={"ALL CHANNELS","DAC","FM1","FM2","FM3","FM4","FM5","FM6","PSG1","PSG2","PSG3 / NOISE"};
     player_text(line,out,width,x,12,"MUSIC PLAYER",0xFF62D9FF);

@@ -72,7 +72,7 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,package);COPY(o->name,"Music Customization");COPY(o->version,"0.2.0");
     COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose individual tracks in Shared Themes and this game's campaign section. Matching ROMs are imported once and shared across all choices and games. All tracks default to Base game.");
+    COPY(o->description,"Choose individual tracks in Shared Themes and this game's campaign section. Matching ROMs are imported once and shared across all choices and games. All tracks default to Base game. With Clone Driver enabled, press A+C at the title or level-select screen for the music player.");
     o->enabled=s3_themes_enabled();return 1;
 }
 static int features(void *c){(void)c;return group_count()+(base&&base->feature_count?base->feature_count(base->ctx):0);}
@@ -82,7 +82,7 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     int g=group_at(i);if(g<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,group_key(g));COPY(o->package_id,package);COPY(o->package_name,"Music Customization");COPY(o->package_version,"0.2.0");
     COPY(o->name,group_name(g));COPY(o->group,"Sound");COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose each track independently. Base game leaves that track unchanged. Only ROMs needed by your selected replacements appear below, and each is shared automatically. Choosing a ready replacement or importing its ROM enables this section and Clone Driver. Disable the section to restore all its normal tracks while keeping your choices. Restart to apply; local original campaigns only.");
+    COPY(o->description,"Choose each track independently. Base game leaves it unchanged. Required ROMs are shared automatically. Selecting a ready replacement or importing its ROM enables this section and Clone Driver. Disable to restore normal tracks without losing choices. Restart to apply. With Clone Driver enabled, press A+C at the title or level select for the music player. Local original campaigns only.");
     o->enabled=s3_music_group_enabled((unsigned)g);
     while(track_at(g,o->option_count)>=0)++o->option_count;
     int ready=1;for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==(unsigned)g&&s3_music_available(t)&&s3_themes[t].enabled&&!s3_theme_ready(t))ready=0;

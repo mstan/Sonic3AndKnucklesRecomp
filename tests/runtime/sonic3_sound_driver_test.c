@@ -175,6 +175,19 @@ int main(int argc,char **argv)
     free(g_rom_ext);g_rom_ext=NULL;g_rom_ext_size=0;s3_stage_pack_enabled=0;
     s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(s3_sound_select(1));s3_sound_post_reset();CHECK(s3_sound_hook(init));
     size_t prefix=g_rom_ext_size;uint8_t *original=malloc(prefix);CHECK(original);memcpy(original,g_rom_ext,prefix);
+    /* A closed player never adds graphics to either original menu. The
+     * launch gesture remains available without an on-screen prompt. */
+    CHECK(player_draw);
+    uint32_t menu_pixels[320];
+    static const unsigned menu_modes[]={4,0x28};
+    for(unsigned m=0;m<sizeof menu_modes/sizeof *menu_modes;++m) {
+        g_ram[0xF600]=(uint8_t)menu_modes[m];
+        for(int line=0;line<224;++line) {
+            for(unsigned x=0;x<320;++x)menu_pixels[x]=0xFF123456u+x;
+            player_draw(line,menu_pixels,320);
+            for(unsigned x=0;x<320;++x)CHECK(menu_pixels[x]==0xFF123456u+x);
+        }
+    }
     g_ram[0xF600]=4;s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();
     CHECK(audition_enabled && audition_mask==0x7FF);
     CHECK(player_draw);uint32_t pixels[320]={0};player_draw(0,pixels,320);CHECK(pixels[0]==0xFF101827);
