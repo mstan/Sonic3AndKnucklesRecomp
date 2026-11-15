@@ -15,4 +15,6 @@ int s3_cd_import(const char *disc,const char *rom,const char *settings,
 int s3_rom_import(unsigned kind,const char *source,const char *rom,const char *settings,
                   char content[1024],char donor[1024],char *error,size_t capacity,
                   void (*progress)(void *,float,const char *),void *user);
+int s3_custom_music_import(const char *source,const char *track,const char *settings,char content[1024],
+                         char *error,size_t capacity,void (*progress)(void *,float,const char *),void *user);
 #endif

@@ -879,7 +879,11 @@ void s3_army_vblank(void)
 int s3_army_state_ready(void) { return inside_actor < 0 && !inside_solid; }
 void s3_army_state(S3StateIO *io)
 {
-    unsigned config[2] = { (unsigned)s3_army.enabled, s3_army.size };
+    /* Disabled preferences do not affect simulation. Diagnostic exports
+     * intentionally omit disabled feature options, so their saved size
+     * must not change replay/rollback identity while the crowd is off. */
+    unsigned config[2] = { (unsigned)s3_army.enabled,
+                          s3_army.enabled ? s3_army.size : 0 };
     if (io->mode) {
         if (io->pos > io->size || sizeof config > io->size - io->pos) { io->ok = 0; return; }
         if (memcmp(io->data + io->pos, config, sizeof config)) io->ok = 0;

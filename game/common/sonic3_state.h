@@ -12,6 +12,7 @@ int s3_state_menu_instruction(uint32_t pc);
 void s3_state_call_resume(uint32_t pc);
 struct S3StateIO;
 void s3_video_state(struct S3StateIO *io);
+void s3_video_rb_state(struct S3StateIO *io);
 /* Notify presentation only after the full native-state reader succeeds. */
 void s3_video_state_loaded(void);
 void s3_army_state(struct S3StateIO *io);

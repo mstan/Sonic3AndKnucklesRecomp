@@ -26,7 +26,7 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
 }
 static void rewind_presentation_state(S3StateIO *io)
 {
-    unsigned version=6;
+    unsigned version=7;
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
     int mode=s_mode;double ratio=s_ratio;
@@ -79,6 +79,7 @@ static void rewind_presentation_state(S3StateIO *io)
         s3_state_bytes(io,ss_state+SS_EXTRA,SS_KINDS*8);
         s3_state_bytes(io,ss_state+SS_BOARD,sizeof ss_board);
     }
+    rocket_motion_state(io);
     if(io->mode==2 && io->ok) {
         interpolation_reset();s_render=&s_real_context;
         ss_latched=(int)special;

@@ -49,7 +49,7 @@ extern void func_000F9E(void);  /* JmpTo_HInt   ($000F9E) */
 extern void func_000FA2(void);  /* HInt         ($000FA2) */
 
 static void s3_call_entry_point(void) { s3_sound_post_reset(); s3_restoration_post_reset(); recomp_call_addr(0x000206u); }
-static void s3_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); recomp_call_addr(0x000802u); }
+static void s3_call_vblank(void)      { s3_sound_vblank(); s3_video_vblank(); recomp_call_addr(0x000802u); s3_sound_player_frame(g_ram[0xF604]); }
 static void s3_call_hblank(void)      { recomp_call_addr(0x000F9Eu); }
 
 /* Native startup waits are resumable frame boundaries. Their instruction

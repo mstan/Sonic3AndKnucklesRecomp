@@ -115,3 +115,11 @@ cmake --build build --config Release --target genesisrecomp_generate_sonic3k
 > Sonic & Knuckles alone shares the S&K master boot path with the combined cart,
 > so its disasm data is regenerated from the same byte-perfect `skdisasm`
 > `sonic3k.lst` at offset 0 — see `game/sandk/game.toml`.
+
+## Renderer reference comparisons
+
+Native terrain and background reference comparisons are optional diagnostics.
+Set `SONIC3_REFERENCE_CHECKS=1` before launching to enable them. They are off
+during normal gameplay. The video diagnostic response reports
+`reference_checks_enabled`; zero comparison counts while disabled mean those
+samples were not checked. Both renderer unit suites enable the comparisons.

@@ -13,6 +13,18 @@ enum { S3_MUSIC_SHARED, S3_MUSIC_SONIC3, S3_MUSIC_SANDK, S3_MUSIC_GROUPS };
 enum { S3_DONOR_S1, S3_DONOR_S2, S3_DONOR_AUG, S3_DONOR_WAI,
        S3_DONOR_PROTO, S3_DONOR_S3, S3_DONOR_SK, S3_ROM_DONOR_COUNT,
        S3_DONOR_CD_US=S3_ROM_DONOR_COUNT, S3_DONOR_COUNT };
+enum { S3_DONOR_CUSTOM=256 };
+enum { S3_CUSTOM_PCM=1,S3_CUSTOM_SMPS=2,S3_CUSTOM_VGM=3 };
+int s3_custom_kind(unsigned track);
+uint8_t *s3_custom_sequence(unsigned track,size_t *bytes);
+int s3_music_custom(unsigned track);
+int s3_custom_ready(unsigned track);
+const char *s3_custom_path(unsigned track);
+const char *s3_custom_name(unsigned track);
+const char *s3_custom_data(unsigned track);
+const char *s3_custom_hash(unsigned track);
+int s3_custom_loop(unsigned track);
+int s3_custom_import(unsigned track,const char *path,void (*progress)(void *,float,const char *),void *user);
 typedef struct S3ThemeChoice { const char *id, *label; int donor; } S3ThemeChoice;
 typedef struct S3ThemeSelection { int enabled, choice; } S3ThemeSelection;
 extern S3ThemeSelection s3_themes[S3_MUSIC_COUNT];
