@@ -2649,6 +2649,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             break;
         }
     }
+    /* Select optional scenery providers once, using this row's immutable
+     * scene. Native-center pixels never consume either margin provider. */
+    int join_pixels=level && s_display && width>320 &&
+        aiz_join_near(s_display->aiz_join,s_camera);
+    int retired_tree_pixels=level && aiz_retired_tree_near();
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -2782,7 +2787,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 bpalette=by>=0x380?intro_palette:forest_palette;
             }
         }
-        int joined=level && s_display && width>320 &&
+        int joined=join_pixels && (nx<0 || nx>=320) &&
             aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
         if(joined)apalette=palette;
         int handoff_bg=0;
@@ -2808,7 +2813,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ap=rocket_offset>=512?0:pattern_pixel(v,a,wx,wy+rocket_offset);
             joined=1;apalette=palette;
         }
-        if(level && aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
+        if(retired_tree_pixels && (nx<0 || nx>=nw) &&
+           aiz_retired_tree_sample(nx,nw,wx,wy,&a,&ap))apalette=palette;
         /* AIZ1_ScreenEvent / AIZ_TreeReveal selectively upload the hollow
          * tree's 16px blocks before committing whole 128px layout chunks.
          * Its locked camera keeps the entire 256px reveal strip resident

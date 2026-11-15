@@ -69,6 +69,12 @@ static int aiz_ship_tree_sample(int wx,int wy,uint16_t *attr,uint8_t *pixel)
     if(wx<0x4440 || wx>=0x4880)return 0;
     return aiz_cached_tree_sample(wx,wy,attr,pixel);
 }
+/* Scene eligibility is immutable while a scanline is composed. */
+static int aiz_retired_tree_near(void)
+{
+    return !s_frame_zone && s_frame_act==1 &&
+        s_frame_fg_x>=(s_world_frame[0xB038]==2?0x4100:0x4880);
+}
 static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
                                     uint16_t *attr,uint8_t *pixel)
 {
@@ -77,7 +83,7 @@ static int aiz_retired_tree_sample(int nx,int nw,int wx,int wy,
      * cliff in their original bank; the native view and active arena stay
      * live. */
     int knux=s_world_frame[0xB038]==2;
-    if(s_frame_zone || s_frame_act!=1 || s_frame_fg_x<(knux?0x4100:0x4880) ||
+    if(!aiz_retired_tree_near() ||
        (nx>=0 && nx<nw))return 0;
     /* Knuckles reaches the same boss art bank at the earlier waterfall.
      * Its preceding grove must retain its own patterns in the left margin. */
