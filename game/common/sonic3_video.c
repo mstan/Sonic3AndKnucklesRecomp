@@ -177,6 +177,7 @@ static unsigned presentation_column_scroll(unsigned column,unsigned fallback);
 static void presentation_overlay_begin(int width);
 static void presentation_overlay_end(int width);
 static int presentation_plane_line(unsigned tile);
+static const uint8_t *presentation_plane_tiles(void);
 static uint16_t presentation_ext_color(int row,int line,int nib);
 static uint16_t scene_art_color(unsigned color,const GVDP *v);
 static const uint8_t *presentation_sprite_patterns(unsigned flags,unsigned *bytes);
@@ -454,6 +455,42 @@ static uint32_t plane_color(int line,uint16_t attr,unsigned pixel,const uint32_t
     int ext=pixel && !(attr&0x6000u)?presentation_plane_line(attr&2047u):0;
     return ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,pixel&15u),GENESIS_DAC_NORMAL):palette[pixel];
 }
+typedef struct {
+    const uint8_t *tiles;
+    unsigned ready;
+    uint32_t colors[GVDP_EXT_LINES][16];
+} PlaneColorRow;
+/* Ownership and color banks are immutable during a row. Capture their map
+ * once, and convert each extended bank once instead of calling across the
+ * renderer interface for every foreground and background pixel. */
+static void plane_color_row_init(PlaneColorRow *row)
+{ row->tiles=presentation_plane_tiles();row->ready=0; }
+static void plane_color_row_fill(PlaneColorRow *row,int line,unsigned ext)
+{
+    unsigned bank=ext-1;
+    for(unsigned n=0;n<16;++n)row->colors[bank][n]=genesis_dac_cram_to_argb(
+        presentation_ext_color(line,(int)ext,(int)n),GENESIS_DAC_NORMAL);
+    row->ready|=1u<<bank;
+}
+#if defined(_MSC_VER)
+#define S3_PLANE_COLOR_INLINE __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+#define S3_PLANE_COLOR_INLINE inline __attribute__((always_inline))
+#else
+#define S3_PLANE_COLOR_INLINE inline
+#endif
+static S3_PLANE_COLOR_INLINE uint32_t plane_color_row(PlaneColorRow *row,int line,uint16_t attr,
+                                                     unsigned pixel,const uint32_t *palette)
+{
+    unsigned ext=pixel && !(attr&0x6000u) && row->tiles?row->tiles[attr&2047u]:0;
+    if(!ext)return palette[pixel];
+    /* Keep the original handling of invalid snapshot metadata too. */
+    if(ext>GVDP_EXT_LINES)return plane_color(line,attr,pixel,palette);
+    unsigned bank=ext-1,bit=1u<<bank;
+    if(!(row->ready&bit))plane_color_row_fill(row,line,ext);
+    return row->colors[bank][pixel&15u];
+}
+#undef S3_PLANE_COLOR_INLINE
 static int plane_tiles(int bits) { return bits == 1 ? 64 : bits == 3 ? 128 : 32; }
 static uint16_t plane_attr(const GVDP *v, unsigned base, int x, int y)
 {
@@ -2654,6 +2691,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int join_pixels=level && s_display && width>320 &&
         aiz_join_near(s_display->aiz_join,s_camera);
     int retired_tree_pixels=level && aiz_retired_tree_near();
+    PlaneColorRow plane_colors;plane_color_row_init(&plane_colors);
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -2853,7 +2891,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         uint8_t p=foreground?ap:bp;
         uint32_t owned_backdrop=(handoff_loading || handoff_bg)?
             s_handoff_art.colors[line][s_handoff_art.video.reg[7]&63]:backdrop;
-        uint32_t ac=ap?plane_color(line,a,ap,apalette):owned_backdrop;
+        uint32_t ac=ap?plane_color_row(&plane_colors,line,a,ap,apalette):owned_backdrop;
         if(aiz_tree_color(wx,wy,nx,nw,ap))
             ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
         if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
@@ -2861,7 +2899,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(hcz_boss && nx<0 && wx<0x3680 && ap>=16 && ap<32)
             ac=hcz_boss_colors[ap-16];
         uint32_t bc=bp?(restored_background && restored_color!=0xFFFF?
-            genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color(line,b,bp,bpalette)):owned_backdrop;
+            genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color_row(&plane_colors,line,b,bp,bpalette)):owned_backdrop;
         out[x]=foreground?ac:bc;
         if(tree_arrival && nx>=nw) {
             uint16_t tree_attr;uint8_t tree_pixel;
@@ -3249,6 +3287,8 @@ static const SceneFrame *interpolation_native_scene(const GVDP *v)
 }
 static int presentation_plane_line(unsigned tile)
 { return s_interpolating?ix_current()->plane_lines[tile&2047u]:gvdp_ext_line(tile); }
+static const uint8_t *presentation_plane_tiles(void)
+{ return s_interpolating?ix_current()->plane_lines:gvdp_ext_tiles(); }
 static uint16_t presentation_ext_color(int row,int line,int nib)
 {
     if(!s_interpolating)return gvdp_ext_color(row,line,nib);

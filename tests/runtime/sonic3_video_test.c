@@ -4,6 +4,8 @@ uint8_t g_ram[65536],g_rom[0x400000];
 uint8_t *g_rom_ext;
 uint32_t g_rom_ext_size;
 static int test_private_planes;
+static const uint8_t *test_plane_color_tiles;
+static uint16_t test_row_colors[2][GVDP_EXT_LINES*16];
 static int test_time_private_palette;
 static unsigned test_bonus_hud_renders;
 int gvdp_render_scanline(GVDP *v,int line,uint8_t *out) {
@@ -11,7 +13,17 @@ int gvdp_render_scanline(GVDP *v,int line,uint8_t *out) {
     (void)v;
     memset(out,1,320);return 320;
 }
-int gvdp_ext_line(unsigned tile) { return test_private_planes && tile>=1 && tile<=2?(int)tile:0; }
+int gvdp_ext_line(unsigned tile) {
+    if(test_plane_color_tiles) {
+        unsigned value=test_plane_color_tiles[tile&2047u];
+        return value<=GVDP_EXT_LINES?(int)value:0;
+    }
+    return test_private_planes && tile>=1 && tile<=2?(int)tile:0;
+}
+const uint8_t *gvdp_ext_tiles(void) {
+    static const uint8_t tiles[2048]={0,1,2};
+    return test_plane_color_tiles?test_plane_color_tiles:test_private_planes?tiles:NULL;
+}
 static uint8_t test_atlas[128];
 static int test_atlas_enabled;
 const uint8_t *gvdp_sprite_patterns(unsigned flags,unsigned *bytes) {
@@ -24,6 +36,8 @@ int gvdp_sprite_palette_line(unsigned flags,unsigned tile,unsigned source) {
     return gvdp_sprite_pattern_line(flags,tile);
 }
 uint16_t gvdp_ext_color(int row,int line,int nib) {
+    if(test_plane_color_tiles && line>=1 && line<=GVDP_EXT_LINES && nib>=0 && nib<16)
+        return test_row_colors[row>=112][(line-1)*16+nib];
     if(test_time_private_palette && line==2 && (nib==1 || nib==15))
         return (uint16_t)(row<32?(nib==1?0xE:0xE00):(nib==1?0xE0:0xEEE));
     return test_private_planes && nib==1?(uint16_t)(line==1?(row>=80?0xE0:0xE):line==2?0xE00:0):0;
@@ -3522,11 +3536,39 @@ static void test_blue_spheres(void)
     interpolation_reset();CHECK(!ss_latched && !ss_ready);
 }
 
+static void test_row_plane_colors(void)
+{
+    static uint8_t tiles[2048];
+    uint32_t palettes[2][64];
+    for(unsigned n=0;n<2048;++n)tiles[n]=(uint8_t)(n%4);
+    tiles[2047]=255;test_plane_color_tiles=tiles;
+    for(unsigned n=0;n<GVDP_EXT_LINES*16;++n) {
+        test_row_colors[0][n]=(uint16_t)((n*0x222u)&0xEEEu);
+        test_row_colors[1][n]=(uint16_t)(((47u-n)*0x222u^0x202u)&0xEEEu);
+    }
+    for(unsigned n=0;n<64;++n){palettes[0][n]=0xFF123400u+n;palettes[1][n]=0xFF567800u+n;}
+    const int rows[]={0,79,111,112,223};
+    const unsigned ids[]={0,1,2,3,7,31,63,2047};
+    PlaneColorRow colors;
+    for(unsigned r=0;r<sizeof rows/sizeof *rows;++r) {
+        plane_color_row_init(&colors);
+        for(unsigned flags=0;flags<16;++flags)for(unsigned t=0;t<sizeof ids/sizeof *ids;++t)
+            for(unsigned pixel=0;pixel<64;++pixel) {
+                uint16_t attr=(uint16_t)(ids[t]|((flags&3u)<<13)|((flags&4u)?0x1800u:0)|((flags&8u)?0x8000u:0));
+                const uint32_t *palette=palettes[(pixel+t)&1u];
+                CHECK(plane_color_row(&colors,rows[r],attr,pixel,palette)==plane_color(rows[r],attr,pixel,palette));
+            }
+    }
+    test_plane_color_tiles=NULL;plane_color_row_init(&colors);
+    for(unsigned pixel=0;pixel<64;++pixel)
+        CHECK(plane_color_row(&colors,0,1,pixel,palettes[0])==palettes[0][pixel]);
+}
 #include "sonic3_aiz_join_test.inc"
 int main(int argc,char **argv)
 {
     /* Correctness tests retain the complete native-reference comparisons. */
     s_reference_checks=1;
+    test_row_plane_colors();
     if(argc==2) {
         FILE *rom=fopen(argv[1],"rb");CHECK(rom);
         CHECK(fread(g_rom,1,sizeof g_rom,rom)==S3_ART_BANK+0x200000u);fclose(rom);
