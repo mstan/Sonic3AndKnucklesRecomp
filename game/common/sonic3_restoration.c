@@ -164,8 +164,14 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
     *attr=(uint16_t)(((p&48u)<<9)|((p&128u)<<8));*pixel=(uint8_t)(p&63u);
     if(color){
         *color=0xFFFF;
-        if((active&PROTO_PALETTES) && *pixel>=16)
-            *color=!which && (int16_t)bg_word(ram+0xEE84)+sy>=(int)bg_word(ram+0xF646)?bg->water[*pixel]:bg->colors[*pixel];
+        if((active&PROTO_PALETTES) && *pixel>=16) {
+            /* Native HCZ1 deliberately keeps the first current tunnel dry
+             * even below Water_level. Follow its published raster palette:
+             * VInt selects full-water or normal, then HInt2 switches the following row. */
+            int wet=!which && ram[0xF730] &&
+                (ram[0xF64E] || sy>(int)ram[0xF625]);
+            *color=wet?bg->water[*pixel]:bg->colors[*pixel];
+        }
     }return 1;
 }
 static size_t font(unsigned zone,uint8_t *dst,size_t cap)

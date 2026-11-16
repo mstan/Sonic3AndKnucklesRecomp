@@ -5,6 +5,8 @@ residency flags across bonus returns and act transitions. Flying Battery keeps
 its foreground, background and cloud artwork with their correct owners.
 Mushroom Hill prototype terrain palettes also apply during native direct palette
 copies while retaining the shared object colors.
+Hydrocity prototype backgrounds follow the native water-palette scanlines,
+including the dry first current tunnel.
 
 The Mushroom Hill ending keeps the ship and propellers together in expanded
 views using their native scrolling and presentation period. Standalone Sonic 3

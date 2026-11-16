@@ -55,6 +55,40 @@ int main(int argc,char **argv)
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
+        if(!sk) {
+            /* Actual first-tunnel publication: water=$500 above camera=$526,
+             * but VInt uses normal colors and HInt=$FF never switches onscreen.
+             * Expected colors come from the donor's independent palette banks. */
+            static const struct {unsigned flag,full,hint;int row;unsigned wet;} cases[]={
+                {1,0,255,0,0},{1,0,255,120,0},{1,0,255,223,0},
+                {1,0,64,63,0},{1,0,64,64,0},{1,0,64,65,1},
+                {1,1,255,0,1},{1,1,255,223,1},
+                {0,1,0,120,0},{1,0,0,0,0},{1,0,0,1,1},{1,0,223,223,0}
+            };
+            g_ram[0xEE80]=5;g_ram[0xEE81]=0x10;
+            g_ram[0xEE84]=5;g_ram[0xEE85]=0x26;
+            g_ram[0xF646]=5;g_ram[0xF647]=0;
+            unsigned checked=0,distinct=0;
+            for(unsigned c=0;c<sizeof cases/sizeof cases[0];++c) {
+                g_ram[0xF730]=(uint8_t)cases[c].flag;
+                g_ram[0xF64E]=(uint8_t)cases[c].full;
+                g_ram[0xF625]=(uint8_t)cases[c].hint;
+                uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+                for(int x=0;x<512;x+=7) {
+                    attr=0;color=0;pixel=0;
+                    CHECK(background(g_ram,0,0,x,cases[c].row,&attr,&pixel,&color));
+                    if(pixel<16)continue;
+                    unsigned dry=word(g_rom_ext+0x1E9B54+(pixel-16)*2);
+                    unsigned wet=word(g_rom_ext+0x1E9C14+pixel*2);
+                    CHECK(color==(cases[c].wet?wet:dry));
+                    ++checked;distinct+=dry!=wet;
+                }
+                CHECK(!memcmp(before,g_ram,sizeof before));
+            }
+            CHECK(checked>100 && distinct>50);
+            memset(g_ram+0xEE80,0,8);g_ram[0xF730]=g_ram[0xF64E]=g_ram[0xF625]=0;
+            g_ram[0xF646]=0;
+        }
         if(!s3)for(unsigned act=0;act<2;act++) {
             g_ram[0xFE10]=4;g_ram[0xFE11]=(uint8_t)act;
             /* Repeat the authored panorama, including negative expanded
