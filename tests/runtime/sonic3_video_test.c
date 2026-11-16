@@ -2253,6 +2253,32 @@ static void test_mhz2_ship_cameras(void)
 static void test_mhz2_ship_cameras(void){}
 #endif
 #ifndef SONIC3_STANDALONE
+static unsigned ordinary_capture_queries;
+static int ordinary_capture_background(const uint8_t *ram,int x,int y,int sx,int sy,
+                                       uint16_t *attr,uint8_t *pixel,uint16_t *color)
+{
+    (void)ram;(void)x;(void)y;(void)sx;(void)sy;(void)attr;(void)pixel;(void)color;
+    ++ordinary_capture_queries;return 0;
+}
+static void test_ordinary_capture_provider_scope(void)
+{
+    uint8_t before[65536];
+    memset(g_ram,0,sizeof g_ram);CHECK(configure("off"));
+    g_ram[0xF600]=12;g_ram[0xFE10]=7;
+    word(g_ram,0xEEAA,0xFFF);s_capture_frame=&s_build;s_capture_readonly=1;
+    word(g_rom,0x1000,2);word(g_rom,0x1002,1);memset(g_rom+0x1004,0,6);
+    for(unsigned n=0;n<3;++n) {
+        unsigned o=0xB000+n*0x4A;
+        write32(o,0x1234);write32(o+12,0x1000);
+        word(g_ram,o+0x10,128+n*16);word(g_ram,o+0x14,128);
+        word(g_ram,0xAC02+n*2,o);
+    }
+    word(g_ram,0xAC00,6);memcpy(before,g_ram,sizeof before);
+    s3_video_set_background_override(ordinary_capture_background);ordinary_capture_queries=0;
+    capture_objects();CHECK(s_build.count==3);
+    CHECK(ordinary_capture_queries==0 && !memcmp(before,g_ram,sizeof before));
+    s3_video_set_background_override(NULL);s_capture_readonly=0;
+}
 static void test_mhz2_rotor_margins(void)
 {
     static GVDP v;uint32_t out[798],pal[64]={0};uint8_t before[65536];
@@ -2302,6 +2328,28 @@ static void test_mhz2_rotor_margins(void)
     memset(s_priority,0,796);draw_scene_sprites(&v,81,out+1,796,238,pal);
     for(int x=0;x<796;++x)CHECK(out[x+1]==(((x>=198 && x<206)||(x>=710 && x<718))?0xFFFF0000u:0x12345678u));
     CHECK(!memcmp(before,g_ram,sizeof before));
+    /* Resolve both clipping edges at each supported mapping zoom. Native
+     * cells retain only the center; projected cells retain only margins. */
+    word(v.vram,0xF000,(uint16_t)-0x45BB);v.vsram[0]=0x86;
+    memset(v.vram+32,0x11,128);
+    const int starts[]={-16,0,222,234,238,250,542,554,558,570,790};
+    const unsigned zooms[]={128,256,512};
+    for(unsigned kind=0;kind<2;++kind)for(unsigned z=0;z<3;++z)
+        for(unsigned pos=0;pos<sizeof starts/sizeof starts[0];++pos) {
+            int base=starts[pos],span=32*(int)zooms[z]/256;
+            s_build.count=1;
+            s_build.sprites[0]=(SceneSprite){(int16_t)(base-238+(kind?0:0x45BB)),
+                (int16_t)(82+(kind?0:0x86)),1,12,
+                (uint8_t)(kind?2:SCENE_MHZ_ROTOR),(uint16_t)zooms[z],5};
+            for(unsigned i=0;i<798;++i)out[i]=0x12345678u;
+            memset(s_priority,0,796);draw_scene_sprites(&v,82,out+1,796,238,pal);
+            for(int x=0;x<796;++x) {
+                int inside=x>=238 && x<558;
+                int red=x>=base && x<base+span && (kind?inside:!inside);
+                CHECK(out[x+1]==(red?0xFFFF0000u:0x12345678u));
+            }
+            CHECK(out[0]==0x12345678u && out[797]==0x12345678u);
+        }
     /* Native borrow leaves both actor positions zero before arrival. Do
      * not wrap a phantom rotor ahead of the finite incoming ship. */
     s_build.count=0;word(g_ram,0xA800,0x47BA);word(g_ram,0xB128+0x14,0);word(g_ram,0xB172+0x14,0);
@@ -4366,6 +4414,9 @@ int main(int argc,char **argv)
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();test_mhz2_rotor_margins();
+#ifndef SONIC3_STANDALONE
+    test_ordinary_capture_provider_scope();
+#endif
     test_private_plane_colors();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();

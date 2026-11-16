@@ -1209,6 +1209,11 @@ static void capture_objects(void)
             }
         }
     }
+    /* Rotor projection belongs only to the finite MHZ2 ending scene.
+     * Native interpolation also captures ordinary actors: do not query an
+     * optional background provider for every one of those actors. */
+    int mhz_rotors=s_requested_width>320 && s_capture_frame->scene==1 &&
+        ram16(0xFE10)==0x701 && ram16(0xEEC0)==16 && enabled();
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1322,7 +1327,7 @@ static void capture_objects(void)
                     add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
             } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
-            extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
+            if(mhz_rotors)extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
             if(pylon) {
                 unsigned end=s_capture_frame->count;
                 int lo=left-cam,hi=lo+s_requested_width;
@@ -1832,6 +1837,10 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
 {
     if(!s_display || s_display->scene==4)return;
     int cinematic=ending_cinematic();
+#ifndef SONIC3_STANDALONE
+    int mhz_rotors=s_frame_level && s_frame_zone==7 && s_frame_act==1 &&
+        (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16;
+#endif
     unsigned card_slot=UINT_MAX;int card_offset=0;
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
@@ -1853,9 +1862,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int world=!s->hud && s_display->scene==1;
         int native_rotor=0;
 #ifndef SONIC3_STANDALONE
-        if(s->hud==2 && s_frame_level && s_frame_zone==7 && s_frame_act==1 &&
-           (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16 &&
-           slot>0 && slot<SCENE_SLOTS && s_display->code[slot]==0x5582E) {
+        if(mhz_rotors && s->hud==2 && slot>0 && slot<SCENE_SLOTS && s_display->code[slot]==0x5582E) {
             unsigned o=0xB000u+(slot-1u)*0x4Au;
             native_rotor=o==(((unsigned)s_world_frame[0xA80C]<<8)|s_world_frame[0xA80D]) ||
                          o==(((unsigned)s_world_frame[0xA80E]<<8)|s_world_frame[0xA80F]);
@@ -1900,7 +1907,18 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         int iy=(line-y)*256/(int)zoom;
         if(s->size&0x20u)iy=(iy+dy)&31;
         if(s->attr&0x1000)iy=ch*8-1-iy;
-        for(int i=0;i<drawn_width;++i) {
+        /* A mapping piece is at most64px at the supported zoom. Resolve
+         * the rotor's native/margin ownership once for that piece, leaving
+         * the ordinary sprite pixel path free of optional rotor work. */
+        int first=0,last=drawn_width,center=(width-320)/2;
+        if(s->hud==SCENE_MHZ_ROTOR) {
+            if(base<center) {if(last>center-base)last=center-base;}
+            else if(first<center+320-base)first=center+320-base;
+        } else if(native_rotor) {
+            if(first<center-base)first=center-base;
+            if(last>center+320-base)last=center+320-base;
+        }
+        for(int i=first;i<last;++i) {
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
             if(cinematic && world && (x<origin || x>=origin+320) &&
@@ -1910,11 +1928,7 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
                                  x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
-            if((s->hud==5 || s->hud==SCENE_MHZ_ROTOR) && x>=(width-320)/2 && x<(width+320)/2)continue;
-            /* The native pose remains authoritative inside320px. Its
-             * stale/wrapped screen position must not ghost over the lifted
-             * presentation of that same rotor in either added margin. */
-            if(native_rotor && (x<(width-320)/2 || x>=(width+320)/2))continue;
+            if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
             if((s->size&0xD0u)==0x50u && (s_priority[x]&4u))continue;
             int ix=i*256/(int)zoom;
             if(s->size&0x20u)ix=(ix+dx)&31;
