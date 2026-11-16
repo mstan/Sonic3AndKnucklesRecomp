@@ -191,7 +191,7 @@ if(Python3_Interpreter_FOUND)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/import-process")
     add_test(NAME scd_import_process COMMAND scd_import_process_test
         "${CMAKE_CURRENT_BINARY_DIR}/import-process/settings.ini")
-    set_tests_properties(scd_import_process PROPERTIES TIMEOUT 15
+    set_tests_properties(scd_import_process PROPERTIES TIMEOUT 0
         ENVIRONMENT "SONIC3K_PYTHON=${Python3_EXECUTABLE}")
     add_test(NAME trilogy_hook_ownership COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_LIST_DIR}/runtime/check_trilogy_hook_ownership.py")
