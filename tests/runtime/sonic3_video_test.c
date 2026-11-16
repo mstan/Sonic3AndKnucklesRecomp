@@ -2440,10 +2440,10 @@ static void test_mhz2_ship_cameras(void){}
 #endif
 #ifndef SONIC3_STANDALONE
 static unsigned ordinary_capture_queries;
-static int ordinary_capture_background(const uint8_t *ram,int x,int y,int sx,int sy,
+static int ordinary_capture_background(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,
                                        uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
-    (void)ram;(void)x;(void)y;(void)sx;(void)sy;(void)attr;(void)pixel;(void)color;
+    (void)ram;(void)x;(void)y;(void)sx;(void)sy;(void)presentation_camera_x;(void)attr;(void)pixel;(void)color;
     ++ordinary_capture_queries;return 0;
 }
 static void test_ordinary_capture_provider_scope(void)
@@ -2599,9 +2599,12 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0,0x100,0x200,0x201,0x300,0x400,0x700,0x701,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
+    /* Ordinary CNZ1/MHZ2 derive B from A, rather than holding B while A
+     * moves. Their real deformation contract is tested separately below. */
+    const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
         word(g_ram,0xFE10,zones[z]);int canvas=widths[w];
+        word(g_ram,0xEEC2,0);
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
         for(unsigned c=0;c<sizeof cameras/sizeof cameras[0];c++) {
             int camera=cameras[c];word(g_ram,0xEE80,camera);word(v.vram,0xF000,(unsigned)-camera);
@@ -2618,13 +2621,63 @@ static void test_campaign_background_edges(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
-static int restored_test_x,restored_test_pixels;
-static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,
+static int edge_parallax_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)y;*cell=background?(uint16_t)(2+((x>>4)&1)):0;return 1;
+}
+static void test_bounded_parallax_projection(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],reference[796],narrow[320];
+    static uint8_t before[65536];
+    const unsigned zones[]={0x300,0x701};
+    for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
+    for(unsigned z=0;z<2;++z) {
+#ifdef SONIC3_STANDALONE
+        if(z)continue;
+#endif
+        for(unsigned band=0;band<(z?1u:5u);++band) {
+            static const int ys[]={0,0x80,0xB0,0x110,0x1D0};
+            static const int speeds[]={1,4,8,14,16};
+            int y=z?0:ys[band],speed=z?12:speeds[band];
+            CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+            memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+            write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);
+            word(g_ram,0xEE90,y);v.vsram[1]=(uint16_t)y;
+            v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+            v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+            v.cram[2]=0xE;v.cram[3]=0xE0;
+            memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+            for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,2);word(g_ram,0x9018+n*2,3);}
+            s3_video_set_world_cell(edge_parallax_cell);
+            for(unsigned c=0;c<4;++c) {
+                static const int cameras[]={0,145,223,238};
+                int camera=z?(c?cameras[c]:152):cameras[c],lag=c&1?4:0;
+                word(g_ram,0xEE80,camera+lag);word(g_ram,0xEEB6,camera+lag);
+                word(v.vram,0xF000,(unsigned)-camera);
+                word(v.vram,0xF002,(unsigned)-(camera*speed/32));
+                memset(&s_build,0,sizeof s_build);s_build.scene=1;
+                s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
+                memcpy(before,g_ram,sizeof before);
+                scanline(&v,0,native,320,out,796);
+                if(!c)memcpy(reference,out,sizeof reference);
+                else CHECK(!memcmp(reference,out,sizeof reference));
+                scanline(&v,0,native,320,narrow,320);
+                CHECK(!memcmp(narrow,native,sizeof native));
+                CHECK(!memcmp(before,g_ram,sizeof before));
+            }
+            s3_video_set_world_cell(NULL);CHECK(configure("off"));
+        }
+    }
+}
+static int restored_test_x,restored_test_pixels,restored_test_camera;
+static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,
                                     uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
     (void)ram;(void)y;(void)sy;
     if(!attr || !pixel)return 1;
     CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx);
+    CHECK(presentation_camera_x==restored_test_camera);
     *attr=0;*pixel=1;*color=0xFFFF;return 1;
 }
 static void test_restored_background_edges_and_reload(void)
@@ -2659,6 +2712,7 @@ static void test_restored_background_edges_and_reload(void)
         word(g_ram,0xFE10,zones[z]);word(g_ram,0xEE80,camera);
         word(v.vram,0xF000,(unsigned)-camera);
         restored_test_x=-(canvas-320)/2;restored_test_pixels=0;
+        restored_test_camera=view_left(camera,canvas)+(canvas-320)/2;
         scanline(&v,0,native,320,out,canvas);
         CHECK(restored_test_pixels==canvas && s_native_x==camera-view_left(camera,canvas));
     }
@@ -4678,6 +4732,7 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
+    test_bounded_parallax_projection();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();

@@ -36,10 +36,12 @@ void s3_video_set_hud_object(S3VideoHudObject fn);
 /* Native title-name mappings supplied by a game-owned optional restoration. */
 void s3_video_set_title_card_name_map(unsigned map);
 /* Optional ROM-derived background. NULL outputs ask whether this published
- * scene needs the renderer even at native aspect. No guest-state writes. */
+ * scene needs the renderer even at native aspect. The explicit camera is
+ * the center of the presented view; eligibility still uses native RAM.
+ * No guest-state writes. */
 /* color=0xFFFF retains the live palette; other values are donor CRAM colors
  * which receive the current scene fade before composition. */
-typedef int (*S3VideoBackground)(const uint8_t *ram,int world_x,int world_y,int screen_x,int screen_y,uint16_t *attr,uint8_t *pixel,uint16_t *color);
+typedef int (*S3VideoBackground)(const uint8_t *ram,int world_x,int world_y,int screen_x,int screen_y,int presentation_camera_x,uint16_t *attr,uint8_t *pixel,uint16_t *color);
 void s3_video_set_background_override(S3VideoBackground read);
 /* Optional game-owned replacement for a cartridge palette source. The
  * returned ROM address is read before the renderer applies the scene fade. */

@@ -418,7 +418,7 @@ static int configure(const char *mode)
 }
 static int expanded_world(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
 static int enabled(void) { return expanded_world() ||
-    (s_background_override && s_background_override(g_ram,0,0,0,0,NULL,NULL,NULL)); }
+    (s_background_override && s_background_override(g_ram,0,0,0,0,(int16_t)ram16(0xEE80),NULL,NULL,NULL)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
     /* LevelLoop ($650C) still waits for the real V-int every tick.
@@ -2213,6 +2213,34 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
     row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
         (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
 }
+/* Native deformation follows its 320px camera. At a bounded expanded
+ * edge that camera can move inside a stationary physical view. Reproject
+ * only the ordinary city/forest bands from the same published phase;
+ * cutscene canvases and independently moving scenery retain their owners. */
+static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by)
+{
+    int delta=(width-nw)/2-origin,numerator=0,phase=camera;
+    if(width<=nw || !delta || !s_frame_level || s_frame_bg_event)return scroll;
+    if(s_frame_zone==3 && !s_frame_act) {
+        numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
+    }
+#ifndef SONIC3_STANDALONE
+    else if(s_frame_zone==7 && s_frame_act==1) {
+        numerator=12;
+        phase=(int16_t)(((unsigned)s_world_frame[0xEEB6]<<8)|s_world_frame[0xEEB7])+
+              camera-s_frame_fg_x;
+    }
+#endif
+    if(!numerator)return scroll;
+    int before=phase*numerator,after=(phase+delta)*numerator;
+    before=before>=0?before/32:-((-before+31)/32);
+    after=after>=0?after/32:-((-after+31)/32);
+    /* Completed HScroll identifies the native bank. Fractional sampling
+     * can round between its two adjacent integer phases. */
+    int distance=(-scroll-before+256)&511;distance-=256;
+    if(distance < -1 || distance > 1)return scroll;
+    return scroll-(after-before);
+}
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
                             GameVideoNativeRow native_row, void *native_ctx,
@@ -2578,7 +2606,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
     int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
     int restored_canvas=level && s_background_override &&
-        s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
+        s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
         mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
@@ -2690,6 +2718,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by);
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
@@ -3061,7 +3090,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         uint16_t restored_color=0xFFFF;
         int restored_background=level && s_background_override &&
-            s_background_override(s_world_frame,bx,by,x-bg_origin,line,&b,&bp,&restored_color);
+            s_background_override(s_world_frame,bx,by,x-bg_origin,line,
+                width>nw?s_left+(width-nw)/2:s_frame_fg_x,&b,&bp,&restored_color);
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
         if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
            wx>=0x360 && wx<0x980) {
