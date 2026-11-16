@@ -251,6 +251,212 @@ static void test_native_sprite_art_ownership(void)
     uint8_t pixel=99;CHECK(!native_art_pixel(65535,0,0,0,&pixel) && pixel==99);
     memset(s_native_art_cache,0,sizeof s_native_art_cache);s_display=previous;s_frame_level=level;
 }
+static void test_native_placement_residency(void)
+{
+    memset(g_ram,0,sizeof g_ram);s_placement_count=s_placement_base=0;s_loader_active=0;
+    CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;write32(0xB000,1);
+    word(g_ram,0xFE10,0x701);word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
+    write16(0xEE78,0x400);write16(0xEE7C,0x700);write16(0xB010,0x485);
+    /* The real MHZ2 entry's placement fields; the fixture supplies only its
+     * dispatch marker, leaving native respawn and slot ownership observable. */
+    longword(g_rom,S3_PLACEMENTS+7*8+4,0x100000);
+    word(g_rom,0x100000,0x4E8);word(g_rom,0x100002,0x7EC);
+    g_rom[0x100004]=0x82;g_rom[0x100005]=0x20;word(g_rom,0x100006,65535);
+    write32(0xEF5A,0x110000);
+    longword(g_rom,0x110000+0x82*4,0x123456);
+    longword(g_rom,0x5CC96+0x82*4,0x123456);
+    spawn_scene();
+    CHECK(!scene_read32(0xFFB0DE) && scene_read32(0xFFB128)==0x123456);
+    CHECK(ram16(0xB138)==0x4E8 && ram16(0xB13C)==0x7EC && g_ram[0xB154]==0x20);
+    CHECK(ram16(0xB170)==0xEB00 && g_ram[0xEB00]==0x80);
+    /* Independently reproduce the retail Clear_SpriteRingMem traversal:
+     * its LEA precedes the test, so B0DE is never visited. Preserve lower
+     * persistent bits while releasing only reservations of live actors. */
+    g_ram[0xEB00]=0x85;
+    unsigned native_slot=0xB0DE;
+    for(unsigned n=0;n<90;++n) {
+        native_slot+=0x4A;
+        if(scene_read32(0xFF0000u+native_slot) && ram16(native_slot+0x48))
+            g_ram[ram16(native_slot+0x48)]&=127;
+    }
+    CHECK(native_slot==0xCAE2 && g_ram[0xEB00]==5);
+    write32(0xB128,0); /* The ensuing native bonus/act initialization clears actors. */
+    spawn_scene();
+    CHECK(scene_read32(0xFFB128)==0x123456 && g_ram[0xEB00]==0x85);
+    /* A killed/collected actor can intentionally retain bit7 without a live
+     * owner. It must not be resurrected by a generic orphan sweep. */
+    write32(0xB128,0);spawn_scene();
+    CHECK(!scene_read32(0xFFB128) && g_ram[0xEB00]==0x85);
+    /* Clear native eligibility, as on MHZ's act handoff: an earlier host
+     * allocation must not suppress it. The final native slot is usable too. */
+    g_ram[0xEB00]=0;
+    for(unsigned o=0xB128;o<0xCAE2;o+=0x4A)write32(o,1);
+    spawn_scene();
+    CHECK(!scene_read32(0xFFB0DE) && scene_read32(0xFFCAE2)==0x123456);
+    CHECK(ram16(0xCB2A)==0xEB00 && g_ram[0xEB00]==0x80);
+    g_ram[0xEB00]=0;spawn_scene();
+    CHECK(s_pool_pressure==1 && !g_ram[0xEB00] && !scene_read32(0xFFB0DE));
+    CHECK(configure("off"));
+}
+static void test_fbz_title_card_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static SceneFrame scene;static uint8_t before[65536];
+    uint32_t out[796],pal[64]={0};const SceneFrame *previous=s_display;
+    CHECK(configure("32:9"));width(796,224,320,224);
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    scene.scene=1;scene.count=1;s_display=&scene;s_frame_level=1;s_frame_zone=4;
+    s_camera=s_camera_y=0;pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;
+    for(unsigned n=0;n<2;++n) {
+        const NativeArt *a=&s_fbz_art[n];unsigned owner=SPRITE_FBZ_BUTTON+n;
+        memset(s_fbz_art_cache[n].pixels,0x11,a->bytes);
+        s_fbz_art_cache[n].attempted=s_fbz_art_cache[n].ready=1;
+        memset(v.vram+a->tile*32,0x22,a->bytes);
+        scene.sprites[0]=(SceneSprite){4,0,(uint16_t)a->tile,0,0,256,(uint16_t)(owner<<8)};
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[242]==pal[1]);
+        /* A native-size render still consumes the installed VDP patterns. */
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,320,0,pal);CHECK(out[4]==pal[2]);
+    }
+    memset(s_fbz_art_cache,0,sizeof s_fbz_art_cache);
+    memset(g_ram,0,sizeof g_ram);s_capture_frame=&s_build;
+    g_ram[0xF600]=12;g_ram[0xFE10]=4;g_ram[0xF711]=1;
+    word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);word(g_ram,0xEEAA,0xFFF);
+    write16(0xEE80,0x1000);write32(0xB000,S3_WAIT_ONSCREEN);
+    write32(0xB034,0x89494);g_ram[0xB004]=6;g_ram[0xB006]=g_ram[0xB007]=32;
+    write16(0xB010,0xF38);write16(0xB014,64);
+    /* The native allocator can put the card in its final inclusive slot.
+     * Its lifetime must still authorize the initial margin-only pose. */
+    write32(0xCAE2,1);write32(0xCAEE,S3_TITLE_CARD_MAP);
+    CHECK(level_title_card_active());
+    word(g_ram,0xAC00,2);word(g_ram,0xAC02,0xB000);
+    uint8_t saved_map[10];memcpy(saved_map,g_rom+0x8977C,sizeof saved_map);
+    memset(g_rom+0x8977C,0,sizeof saved_map);word(g_rom,0x8977C,2);word(g_rom,0x8977E,1);
+    memcpy(before,g_ram,sizeof before);capture_objects();
+    unsigned found=0;
+    for(unsigned n=0;n<s_build.count;++n)if((s_build.sprites[n].slot>>8)==SPRITE_FBZ_BLASTER) {
+        CHECK(s_build.sprites[n].x==-200 && s_build.sprites[n].y==64);
+        CHECK(s_build.sprites[n].attr==0xA506);++found;
+    }
+    CHECK(found==1 && !memcmp(before,g_ram,sizeof before));
+    const SceneFrame *captured=s_display;s_display=&s_build;
+    s_frame_level=1;s_frame_zone=4;s_camera=0x1000;s_camera_y=0;
+    pal[18]=pal[2];
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    draw_scene_sprites(&v,64,out,796,238,pal);CHECK(out[38]==pal[18]);
+    s_display=captured;
+    publish_sprites();CHECK(!memcmp(before,g_ram,sizeof before));
+    /* No preview starts the guest, leaks into native width or survives an
+     * unrelated waiting callback. The existing card visibility gate stays. */
+    s_requested_width=320;capture_objects();
+    for(unsigned n=0;n<s_build.count;++n)CHECK((s_build.sprites[n].slot>>8)!=SPRITE_FBZ_BLASTER);
+    s_requested_width=796;write32(0xB034,0x89496);capture_objects();
+    for(unsigned n=0;n<s_build.count;++n)CHECK((s_build.sprites[n].slot>>8)!=SPRITE_FBZ_BLASTER);
+    memcpy(g_rom+0x8977C,saved_map,sizeof saved_map);s_display=previous;CHECK(configure("off"));
+#endif
+}
+#ifndef SONIC3_STANDALONE
+static int fbz_boss_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;
+    *cell=(uint16_t)(background?2+((x>>4)&1):1);
+    /* A mismatched physical scroll would sample a different world row. */
+    if(y!=(background?0x28C:0x58C) && y!=(background?0x28D:0x58D))*cell=4;
+    return 1;
+}
+#endif
+static void test_fbz_boss_plane_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];uint32_t native[320]={0},out[796];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0xFE10,0x401);word(g_ram,0xEEC0,4);word(g_ram,0xEEC2,0x10);
+    word(g_ram,0x8000,128);word(g_ram,0x8002,128);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x2B30);word(g_ram,0xEE84,0x58C);word(g_ram,0xEE90,0x28C);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    /* Actual FBZ2 event ownership: physical A scrolls with the clouds,
+     * physical B with the stage. Poison both uploaded name tables. */
+    v.vsram[0]=0x28C;v.vsram[1]=0x58C;
+    word(v.vram,0xF000,(uint16_t)-0x530);word(v.vram,0xF002,(uint16_t)-0x2B30);
+    for(unsigned i=0;i<64*32;++i){word(v.vram,0xC000+i*2,4);word(v.vram,0xE000+i*2,4);}
+    for(unsigned y=0;y<8;++y)for(unsigned x=0;x<4;++x)v.vram[32+y*4+x]=x<2?0x11:0;
+    memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);memset(v.vram+128,0x44,32);
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;
+    s_build.camera_x=0x2B30;s_build.camera_y=0x58C;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);s3_video_set_world_cell(fbz_boss_cell);
+    for(unsigned priority=0;priority<4;++priority) {
+        for(unsigned n=0;n<4;++n) {
+            word(g_ram,0x9008+n*2,1|((priority&1)?0x8000:0));
+            word(g_ram,0x9010+n*2,2|((priority&2)?0x8000:0));
+            word(g_ram,0x9018+n*2,3|((priority&2)?0x8000:0));
+            word(g_ram,0x9020+n*2,4);
+        }
+        memcpy(before,g_ram,sizeof before);GVDP untouched=v;
+        for(unsigned line=0;line<2;++line) {
+            scanline(&v,(int)line,native,320,out,796);
+            for(int x=0;x<796;++x) {
+                int nx=x-s_native_x;
+                int fg=((nx+0x2B30)&7)<4 && (priority&1) && !(priority&2);
+                uint32_t bg=((nx+0x530)>>4)&1?0xFF0000FFu:0xFF00FF00u;
+                CHECK(out[x]==(fg?0xFFFF0000u:bg));
+            }
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&untouched,&v,sizeof v));
+    }
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+#endif
+}
+static void test_fbz_preboss_art_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
+    const SceneFrame *previous=s_display;int level=s_frame_level;
+    unsigned zone=s_frame_zone,act=s_frame_act;
+    memset(&v,0,sizeof v);memset(&scene,0,sizeof scene);
+    CHECK(native_art_owner(0x53518)==SPRITE_FBZ_PREBOSS);
+    s_display=&scene;scene.scene=1;scene.count=1;
+    s_frame_level=1;s_frame_zone=4;s_frame_act=1;s_camera=s_camera_y=0;
+    pal[1]=0xFFFF0000;pal[2]=0xFF00FF00;pal[5]=0xFF0000FF;
+    for(unsigned bank=2;bank<4;++bank) {
+        const NativeArt *a=&s_fbz_art[bank];
+        memset(s_fbz_art_cache[bank].pixels,0x12,a->bytes);
+        s_fbz_art_cache[bank].pixels[0]=0x10;
+        s_fbz_art_cache[bank].attempted=s_fbz_art_cache[bank].ready=1;
+        memset(v.vram+a->tile*32,0x55,a->bytes+32);
+        scene.sprites[0]=(SceneSprite){-64,0,(uint16_t)a->tile,0,(uint8_t)(bank==2?2:0),256,SPRITE_FBZ_PREBOSS<<8};
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);
+        CHECK(out[174]==pal[1] && !out[175] && out[176]==pal[1]);
+        /* Native priority still hides a low-priority preview. */
+        memset(out,0,sizeof out);memset(s_priority,1,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);CHECK(!out[174]);
+        scene.sprites[0].attr|=0x8000;
+        memset(out,0,sizeof out);memset(s_priority,1,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[174]==pal[1]);
+        /* Both the native viewport of a wide frame and a native-size
+         * output keep installed VRAM, even before its PLC arrives. */
+        scene.sprites[0].x=4;
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[242]==pal[5]);
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,320,0,pal);CHECK(out[4]==pal[5]);
+        scene.sprites[0].x=-64;
+        scene.sprites[0].attr=(uint16_t)(a->tile+a->bytes/32);
+        if(bank==2)scene.sprites[0].attr=0x3A2; /* Immediately before cloud bank. */
+        memset(v.vram+(scene.sprites[0].attr&2047u)*32,0x55,32);
+        memset(out,0,sizeof out);memset(s_priority,0,796);
+        draw_scene_sprites(&v,0,out,796,238,pal);CHECK(out[174]==pal[5]);
+    }
+    memset(s_fbz_art_cache,0,sizeof s_fbz_art_cache);
+    s_display=previous;s_frame_level=level;s_frame_zone=zone;s_frame_act=act;
+#endif
+}
 static void test_waiting_knuckles_palette(void)
 {
     static GVDP v;static SceneFrame scene;uint32_t out[796],pal[64]={0};
@@ -3643,8 +3849,8 @@ int main(int argc,char **argv)
     CHECK(configure("10:7"));width(1,1,320,224);
     s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,1);
     CHECK(s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
-    /* Cross a real activation cell, then replay it with restored ownership.
-     * WRAM alone leaves the future loaded flag suppressing this allocation. */
+    /* Cross a real activation cell, then replay it with restored WRAM and
+     * placement-table identity. No future host residency latch may hide it. */
     static uint8_t loader_ram[65536],loaded_ram[65536];
     static uint8_t loader_blob[sizeof s_placements+3*sizeof(unsigned)];
     memcpy(loader_ram,g_ram,sizeof loader_ram);
@@ -3652,19 +3858,20 @@ int main(int argc,char **argv)
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
     size_t loader_bytes=loader_io.pos;
     write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
-    CHECK(scene_read32(0xFFB0DE)==0x123456 && ram16(0xB0EE)==640 && ram16(0xB126)==0xEB00);
+    CHECK(!scene_read32(0xFFB0DE));
+    CHECK(scene_read32(0xFFB128)==0x123456 && ram16(0xB138)==640 && ram16(0xB170)==0xEB00);
     memcpy(loaded_ram,g_ram,sizeof loaded_ram);
-    CHECK(s_placements[0].loaded);
+    CHECK(g_ram[0xEB00]&128);
     memcpy(g_ram,loader_ram,sizeof loader_ram);
     loader_io=(S3StateIO){loader_blob,loader_bytes,0,1,1};
-    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && s_placements[0].loaded);
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
     loader_io=(S3StateIO){loader_blob,loader_bytes,0,2,1};
-    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !s_placements[0].loaded);
+    s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
     presentation_reset();write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
     CHECK(!memcmp(loaded_ram,g_ram,sizeof loaded_ram));
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
-    CHECK(scene_read32(0xFFB128)==0x234567 && g_ram[0xB12C]==3 && g_ram[0xB152]==3);
+    CHECK(scene_read32(0xFFB172)==0x234567 && g_ram[0xB176]==3 && g_ram[0xB19C]==3);
     /* AIZ's art-loading miniboss cutscene must not enter the expanded
      * activation margin: its VRAM bank still belongs to a stage PLC. */
     word(g_rom,0x10000C,0x3020);word(g_rom,0x10000E,0x8060);g_rom[0x100010]=3;
@@ -3680,7 +3887,7 @@ int main(int argc,char **argv)
         CHECK(!(g_ram[0xEB02]&128));
         write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
         CHECK(g_ram[0xEB02]&128);
-        CHECK(scene_read32(0xFFB172)==hcz_scripted[i]);write32(0xB172,0);
+        CHECK(scene_read32(0xFFB1BC)==hcz_scripted[i]);write32(0xB1BC,0);
     }
     g_ram[0xEB02]=0;
     longword(g_rom,0x11000C,S3_AIZ_MINIBOSS_CUTSCENE);
@@ -3691,7 +3898,7 @@ int main(int argc,char **argv)
     CHECK(!(g_ram[0xEB02]&128));
     write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(g_ram[0xEB02]&128);
-    CHECK(scene_read32(0xFFB172)==S3_AIZ_MINIBOSS_CUTSCENE);
+    CHECK(scene_read32(0xFFB1BC)==S3_AIZ_MINIBOSS_CUTSCENE);
     /* A placed capsule must survive an approach/backtrack before the boss
      * locks the camera. Native deletion intentionally keeps its loaded bit. */
     word(g_rom,0x100012,0x4560);word(g_rom,0x100014,0x8060);g_rom[0x100016]=4;
@@ -3704,7 +3911,7 @@ int main(int argc,char **argv)
     CHECK(!(g_ram[0xEB03]&128));
     write16(0xEE78,0x4390);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(g_ram[0xEB03]&128);
-    CHECK(scene_read32(0xFFB1BC)==S3_EGG_CAPSULE);
+    CHECK(scene_read32(0xFFB206)==S3_EGG_CAPSULE);
     /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
      * the two earlier slots and verify a real placement goes past it. */
     write32(0xB172,0);write32(0xB1BC,0);
@@ -3874,6 +4081,9 @@ int main(int argc,char **argv)
     for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,n%64<32?1:2);
     g_ram[0xFE10]=4;
     for(unsigned act=0;act<2;++act)for(unsigned event=0;event<=16;event+=4) {
+#ifndef SONIC3_STANDALONE
+        if(act && event==16)continue; /* The boss owns the opposite planes. */
+#endif
         g_ram[0xFE11]=(uint8_t)act;word(g_ram,0xEEC2,event);
         scanline(&v,0,native,320,out,796);
         int bg_anchor=act?s_native_x:238;
@@ -4039,7 +4249,7 @@ int main(int argc,char **argv)
     test_private_plane_colors();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
-    test_title_card_edges();
+    test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
     test_interpolation_owned_and_readonly();
@@ -4051,6 +4261,7 @@ int main(int argc,char **argv)
     test_local_presentation_state();
     test_blue_spheres();
     test_aiz_join();
+    test_native_placement_residency();
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
 }

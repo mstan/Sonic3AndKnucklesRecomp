@@ -709,6 +709,16 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x3E1A
 kind = "game_hook"
+# Direct MHZ2 terrain sources: entry, seasons and boss fade.
+[[widescreen_site]]
+addr = 0x54D7C
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x550CA
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x765C0
+kind = "game_hook"
 
 # Keep a capped timer visible when debug exit rebuilds the HUD.
 [[widescreen_site]]

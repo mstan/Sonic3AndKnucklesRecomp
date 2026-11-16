@@ -4,7 +4,8 @@ static void test_local_presentation_state(void)
     CHECK(configure("off"));CHECK(configure("fit"));width(796,224,320,224);
     memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);presentation_reset();
     s_visible_count=0;s_placement_count=2;s_placement_base=0x1234;s_loader_active=1;
-    memset(s_placements,0,sizeof s_placements);s_placements[1].loaded=1;
+    memset(s_placements,0,sizeof s_placements);
+    s_placements[1].address=0x123A;s_placements[1].state=0xEB01;g_ram[0xEB01]=0x80;
     g_ram[0xF600]=12;g_ram[0xFE10]=0x22;write32(0xB000,0x123456);
     word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);word(g_ram,0xEE80,512);
     v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
@@ -38,6 +39,7 @@ static void test_local_presentation_state(void)
     CHECK(s_upload_serial>uploaded);scanline(&v,0,native,320,out,796);
     CHECK(out[actor_x]!=expected[actor_x]);
     presentation_reset();CHECK(!s_upload_serial);s_background_frame[65535]=0;s_placement_count=0;
+    g_ram[0xEB01]=1; /* Presentation restore must not revive old native residency. */
     size_t current_size=presentation_state_save(NULL,0);
     uint8_t *before=(uint8_t*)malloc(current_size),*after=(uint8_t*)malloc(current_size);CHECK(before&&after);
     CHECK(presentation_state_save(before,current_size)==current_size);
@@ -53,7 +55,8 @@ static void test_local_presentation_state(void)
     CHECK(presentation_state_load(blob,bytes,1));
     CHECK(s_build.aiz_super_pose==2 && s_upload_serial==uploaded);
     CHECK(s_background_frame[65535]==0x5A && s_world_frame[65535]==0xA5);
-    CHECK(s_placement_count==2 && s_placement_base==0x1234 && s_placements[1].loaded);
+    CHECK(s_placement_count==2 && s_placement_base==0x1234 &&
+          s_placements[1].address==0x123A && s_placements[1].state==0xEB01 && g_ram[0xEB01]==1);
     /* First restored render, with no native tick/publication in between. */
     scanline(&v,0,native,320,out,796);CHECK(!memcmp(expected,out,sizeof out));
     CHECK(!memcmp(ram_before,g_ram,sizeof ram_before) && !memcmp(&restored,&v,sizeof v));

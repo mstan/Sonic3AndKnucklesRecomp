@@ -45,6 +45,8 @@ int main(int argc,char **argv)
         CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
         CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
+        CHECK(palette(0xA945C)==(s3?0xA945Cu:0x5F2F2Eu));
+        CHECK(palette(0xA94BC)==(s3?0xA94BCu:0x5F2F2Eu));
         if(!s3){
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
@@ -92,6 +94,21 @@ int main(int argc,char **argv)
             g_cpu.A[2]=s3?0x8C654:0xA8E5C;g_cpu.SR=0x2715;
             CHECK(s3_restoration_instruction(hooks[i]));
             CHECK(g_cpu.A[2]==0x5E9C14 && g_cpu.SR==0x2715);
+        }
+        if(!s3){
+            const unsigned direct[]={0x54D7C,0x550CA,0x765C0};
+            const unsigned opcode[]={0x2AD1,0x2AD9,0x24D9};
+            for(unsigned i=0;i<3;++i)for(unsigned season=0;season<3;++season){
+                CHECK(word(g_rom+direct[i])==opcode[i]);
+                g_cpu.A[1]=season==0?0xA945Cu:season==1?0xA94BCu:0x550FEu;
+                g_cpu.SR=0x2715;g_cpu.D[0]=0x11223344;M68KState expected=g_cpu;
+                if(season<2)expected.A[1]=0x5F2F2E;
+                CHECK(s3_restoration_instruction(direct[i]));
+                CHECK(!memcmp(&g_cpu,&expected,sizeof expected));
+                g_cpu.A[1]+=4;expected=g_cpu;
+                CHECK(s3_restoration_instruction(direct[i]));
+                CHECK(!memcmp(&g_cpu,&expected,sizeof expected));
+            }
         }
         g_cpu.A[0]=s3?0x16A3E2:0x36A3E2;
         CHECK(word(g_rom+g_cpu.A[0]-2)==16 || sk);CHECK(word(g_rom_ext+0x11667C)==9);

@@ -64,7 +64,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 #endif
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
-       SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10 };
+       SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
+       SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -81,6 +82,9 @@ static unsigned native_art_owner(unsigned map)
     if(map==0x4545Eu)return SPRITE_LBZ_PILLAR;
 #else
     if(map==0x62AFCu)return SPRITE_LBZ_PILLAR;
+    if(map==0x2C71Eu)return SPRITE_FBZ_BUTTON;
+    if(map==0x8977Cu)return SPRITE_FBZ_BLASTER;
+    if(map==0x53518u)return SPRITE_FBZ_PREBOSS;
 #endif
     if(map==S3_ART_BANK+0x161212u)return SPRITE_TURBO_SPIKER;
     if(map==S3_EXPLOSION_MAP)return 1;
@@ -700,7 +704,7 @@ void s3_video_vblank(void)
     s_tick_was_active=active;s_tick_last=tick;s_tick_zone=zone;s_tick_serial=s_serial;
 }
 static unsigned s_visible_objects[144], s_visible_count;
-typedef struct { unsigned address; uint16_t x, y; uint8_t id, subtype, loaded; uint16_t state; } Placement;
+typedef struct { unsigned address; uint16_t x, y; uint8_t id, subtype; uint16_t state; } Placement;
 static Placement s_placements[SCENE_PLACEMENTS];
 static unsigned s_placement_count, s_placement_base;
 static int s_loader_active;
@@ -890,7 +894,7 @@ static void load_placements(void)
         Placement *q=&s_placements[s_placement_count];
         q->address=p;q->x=(uint16_t)x;q->y=scene_read16(p+2);
         q->id=scene_read8(p+4);q->subtype=scene_read8(p+5);
-        q->state=(uint16_t)(0xEB00+s_placement_count++);q->loaded=0;
+        q->state=(uint16_t)(0xEB00+s_placement_count++);
     }
 }
 static unsigned placement_code(const Placement *p)
@@ -908,15 +912,15 @@ static void spawn_scene(void)
     int lo,hi;activation_bounds(camera,w,&lo,&hi);
     int player=ram16(0xB010);s_pool_pressure=0;
     int ylo=(cy&~127)-128,yhi=(cy&~127)+512;
-    for(unsigned i=0;i<s_placement_count;++i) {
-        Placement *p=&s_placements[i];
-        if((int)p->x<lo || (int)p->x>=hi)p->loaded=0;
-    }
     for(unsigned pass=0;pass<s_placement_count;++pass) {
         int best=-1,distance=INT_MAX;
         for(unsigned i=0;i<s_placement_count;++i) {
             Placement *p=&s_placements[i];
-            if(p->loaded || (g_ram[p->state]&128) || (int)p->x<lo || (int)p->x>=hi)continue;
+            /* Native clears bit 7 for live placements before a bonus/act
+             * reload. A separate host-loaded latch outlives that clear and
+             * suppresses valid incoming actors. Keep native respawn state
+             * authoritative, including intentional dead/collected bits. */
+            if((g_ram[p->state]&128) || (int)p->x<lo || (int)p->x>=hi)continue;
             /* This cutscene's initializer loads PLC $5A into the same VRAM
              * bank that AIZ1_Resize subsequently uses for PLC $0C at camera
              * $2E00. Early wide activation reverses their native order and
@@ -945,19 +949,22 @@ static void spawn_scene(void)
         }
         if(best<0)break;
         Placement *p=&s_placements[best];unsigned o;
-        for(o=0xB0DE;o<0xCAE2;o+=0x4A) {
+        /* AllocateObject/CreateNewSprite4 and Clear_SpriteRingMem advance
+         * past B0DE before testing. Using that skipped slot leaves its
+         * placement marked loaded when native bonus cleanup clears actors. */
+        for(o=0xB128;o<=0xCAE2;o+=0x4A) {
             /* Same reservation as the native allocators: HCZ1's fixed
              * splash must not overwrite a live act-transition controller. */
             if(o==0xB172 && ram16(0xFE10)==0x100 && !ram16(S3_COMPETITION))continue;
             if(!scene_read32(0xFF0000u+o))break;
         }
-        if(o>=0xCAE2){++s_pool_pressure;break;}
+        if(o>0xCAE2){++s_pool_pressure;break;}
         write16(o+0x10,p->x);write16(o+0x14,p->y&4095);
         unsigned flip=(p->y>>13)&3;
         write8(o+4,flip);write8(o+0x2A,flip);write16(o+0x48,p->state);
         write8(o+0x2C,p->subtype);write8(p->state,g_ram[p->state]|128);
         write32(o,placement_code(p));
-        p->loaded=1;++s_spawned;
+        ++s_spawned;
     }
     unsigned r=0,l=0;
     while(r<s_placement_count && s_placements[r].x<(unsigned)((camera&~127)+640))++r;
@@ -1093,6 +1100,14 @@ static int mgz2_parked_body(unsigned o,unsigned map)
     }
     return 0;
 }
+static int level_title_card_active(void)
+{
+    if((g_ram[0xF600]&127)!=12 || bonus_stage())return 0;
+    for(unsigned o=0xB0DE;o<=0xCAE2;o+=0x4A)
+        if(scene_read32(0xFF0000u+o) && scene_read32(0xFF000Cu+o)==S3_TITLE_CARD_MAP)
+            return 1;
+    return 0;
+}
 static void capture_objects(void)
 {
     if(ram16(S3_COMPETITION)){competition_capture_objects();return;}
@@ -1129,6 +1144,8 @@ static void capture_objects(void)
     int left=gameplay()?view_left(cam,s_requested_width):cam-(s_requested_width-320)/2;
     int mask=ram16(0xEEAA);
     int level_hud=gameplay() && g_ram[0xF711];
+    int returning_card=s_requested_width>320 && g_ram[0xFE10]==4 &&
+        !native_demo() && level_title_card_active();
     int glowing_rings=s_capture_frame->scene==3 && g_ram[0xFE10]==0x14;
     if(level_hud) {
         unsigned blink=(g_ram[0xFE05]&8)==0;
@@ -1193,6 +1210,22 @@ static void capture_objects(void)
                 s_capture_frame->oy[s_capture_slot]=(int16_t)(cy+y);
             }
             unsigned map=scene_read32(0xFF0000u+o+0xC),gfx=ram16(o+0xA);
+            unsigned mapping_frame=g_ram[o+0x22];
+#ifndef SONIC3_STANDALONE
+            /* WaitOffscreen deliberately queues an empty map until the
+             * native SAT starts the enemy. During a returning card, starting
+             * it early would overwrite the card's borrowed patterns. Display
+             * only its initial cartridge pose in the extra view instead;
+             * its callback, render flags and DPLC timing remain native. */
+            if(returning_card && s_capture_frame->scene==1 && g_ram[0xFE10]==4 &&
+               s_capture_frame->code[s_capture_slot]==S3_WAIT_ONSCREEN &&
+               scene_read32(0xFF0000u+o+0x34)==0x89494u &&
+               (x+(int)g_ram[o+7]<0 || x-(int)g_ram[o+7]>=320)) {
+                map=0x8977C;gfx=0xA506;mapping_frame=0;flags&=~2u;
+            }
+#else
+            (void)returning_card;
+#endif
             if(mgz2_parked_body(o,map))continue;
 #ifndef SONIC3_STANDALONE
             unsigned frame=g_ram[o+0x22];
@@ -1251,7 +1284,7 @@ static void capture_objects(void)
                     if(flags&4){sx=(int16_t)(ram16(child)-cam);sy=((ram16(child+2)-cy+128)&mask)-128;}
                     add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
-            } else add_mapping(map,g_ram[o+0x22],gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
+            } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
             if(pylon) {
                 unsigned end=s_capture_frame->count;
                 int lo=left-cam,hi=lo+s_requested_width;
@@ -1298,12 +1331,7 @@ static void capture_objects(void)
 
 static void publish_sprites(void)
 {
-    int card=0;
-    if((g_ram[0xF600]&127)==12 && !bonus_stage())
-        for(unsigned o=0xB0DE;o<0xCAE2;o+=0x4A)
-            if(scene_read32(0xFF0000u+o) && scene_read32(0xFF000Cu+o)==S3_TITLE_CARD_MAP) {
-                card=1;break;
-            }
+    int card=level_title_card_active();
     /* Demo inputs were authored for native object activation/visibility.
      * Showing an actor in a margin must not change its next simulated tick. */
     for(unsigned n=0;!native_demo() && n<s_visible_count;++n) {
@@ -1677,6 +1705,38 @@ static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pi
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
+/* FBZ reloads these reservations only after its returning title card leaves.
+ * The expanded presentation owns original patterns, rather than borrowing
+ * whichever glyph currently occupies the same native VRAM tile number. */
+#ifndef SONIC3_STANDALONE
+static const NativeArt s_fbz_art[]={
+    {0x165E80,0x82,0xC0,0x500,1},
+    {0xDC6C2,0x302,0x500,0x506,1},
+    {0x165826,0x292,0x640,0x3A3,1},
+    {0x165AB8,0x112,0x200,0x3D5,1}
+};
+static struct {uint8_t pixels[0x640];int attempted,ready;} s_fbz_art_cache[4];
+#endif
+static int fbz_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
+{
+#ifndef SONIC3_STANDALONE
+    if(owner<SPRITE_FBZ_BUTTON || owner>SPRITE_FBZ_PREBOSS)return 0;
+    unsigned tile=attr&2047u,index=owner==SPRITE_FBZ_PREBOSS?
+        (tile<0x3D5?2u:3u):owner-SPRITE_FBZ_BUTTON;
+    const NativeArt *a=&s_fbz_art[index];
+    if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
+    if(!s_fbz_art_cache[index].attempted) {
+        s_fbz_art_cache[index].attempted=1;
+        s_fbz_art_cache[index].ready=art_kosm(a->address,a->compressed,s_fbz_art_cache[index].pixels,a->bytes)==a->bytes;
+    }
+    if(!s_fbz_art_cache[index].ready)return 0;
+    unsigned byte=s_fbz_art_cache[index].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?byte&15u:byte>>4;
+    *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+#else
+    (void)owner;(void)attr;(void)x;(void)y;(void)pixel;return 0;
+#endif
+}
 static int title_card_black(const GVDP *v)
 {
     if(!s_display || s_display->scene || v->reg[16]!=1)return 0;
@@ -1814,6 +1874,18 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             } else if(s_frame_level && s_frame_zone==1 && !s->hud &&
                       (s->slot>>8)==SPRITE_TURBO_SPIKER &&
                       (x<origin || x>=origin+320) && turbo_art_pixel(cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
+            } else if(s_frame_level && s_frame_zone==4 && width>320 && !s->hud &&
+                      (s->slot>>8)>=SPRITE_FBZ_BUTTON && (s->slot>>8)<=SPRITE_FBZ_BLASTER &&
+                      fbz_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
+            } else if(s_frame_level && s_frame_zone==4 && s_frame_act==1 && width>320 &&
+                      (s->slot>>8)==SPRITE_FBZ_PREBOSS &&
+                      (x<(s->hud==2?(width-320)/2:origin) ||
+                       x>=(s->hud==2?(width-320)/2:origin)+320) &&
+                      fbz_art_pixel(SPRITE_FBZ_PREBOSS,cell,ix&7,iy&7,&p)) {
+                /* The future clouds/pillar can enter the extra view before
+                 * the subboss PLC owns their native tile reservation. */
                 if(!p)continue;
             } else if(s_frame_level && !s->hud && (s->slot>>8) && native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
                 if(!p)continue;
@@ -2321,6 +2393,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * displayed. Do not expose the incoming level before its own display
      * list/planes reach VBlank. */
     if(s_display && s_display->scene!=1)level=0;
+    /* FBZ2BGE_BossEvent installs the clouds on A and the physical stage
+     * on B, including both scroll words. Keep logical world sampling tied
+     * to those installed owners through the boss and exit refresh. */
+    int fbz_flipped=0;
+#ifndef SONIC3_STANDALONE
+    fbz_flipped=level && s_frame_zone==4 && s_frame_act==1 && s_frame_bg_event==0x10;
+#endif
+    if(fbz_flipped){int swap=hs_a;hs_a=hs_b;hs_b=swap;}
     int missing_scroll=0;
     /* AIZ2's battleship borrows the top of A for a second world camera.
      * HInt6 restores ordinary foreground VSRAM below that band. Unwrapping
@@ -2339,7 +2419,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int lbz1_columns=level && s_frame_zone==6 && !s_frame_act && (v->reg[11]&4);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
-    unsigned fg_scroll=(aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
+    unsigned fg_scroll=fbz_flipped?presentation_column_scroll(1,v->vsram[1]):
+        (aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
     /* A fractional scroll can lie between two bobbing ship positions.
      * Select the camera from this row's completed HInt identity, then
      * interpolate its position. A fractional value cannot identify a bank. */
@@ -2438,6 +2519,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
+    if(fbz_flipped){unsigned swap=base_a;base_a=base_b;base_b=swap;}
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
      * on the full-screen Window ($E000, 64 tiles per row), while B ($C000)
      * holds the complete 1024px card strip (128 tiles per row).
@@ -2514,7 +2596,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * (X=0 indoors, X=$200 outdoors). Its doorway events replace that
      * canvas a row/column at a time. The uploaded plane is authoritative
      * for both the selected bank and every mixed transition frame. */
-    int fbz_canvas=bg_world && s_frame_zone==4;
+    int fbz_canvas=bg_world && s_frame_zone==4 && !fbz_flipped;
     /* ICZ1's outdoor bank starts at layout X=$1880; the snow and cave
      * entrance then replace it in strips. ICZ2 also swaps complete indoor
      * and outdoor canvases. Keep those uploaded compositions through each
@@ -2541,7 +2623,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
-    int by=bg_world?unwrap(presentation_bg_scroll(v->vsram[1]),s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
+    int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
@@ -2887,7 +2970,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * the opaque high-priority flames cover that extra scenery too.
          * Keep native overlap ordering and transparent flame edges intact. */
         int fire_curtain=aiz_fire && (nx<0 || nx>=nw) && (b&0x8000) && bp;
-        int foreground=ap && !fire_curtain && ((a&0x8000) || !bp || !(b&0x8000));
+        /* Equal-priority opaque pixels still obey hardware A over B,
+         * even while the background is the layer installed on A. */
+        int foreground=ap && !fire_curtain && (fbz_flipped?
+            (!bp || ((a&0x8000) && !(b&0x8000))):
+            ((a&0x8000) || !bp || !(b&0x8000)));
         uint8_t p=foreground?ap:bp;
         uint32_t owned_backdrop=(handoff_loading || handoff_bg)?
             s_handoff_art.colors[line][s_handoff_art.video.reg[7]&63]:backdrop;
@@ -3089,9 +3176,8 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     if(!aiz_plane_valid(&plane))io->ok=0;
     S3_STATE(io, *frame);
 }
-/* Loaded ownership changes future object allocation. It follows WRAM through
- * rollback even when no presentation is produced during resimulation. Keep
- * the table too: a snapshot can precede a zone's placement-cache replacement. */
+/* Preserve the selected placement table through rollback: a snapshot can
+ * precede a zone's cache replacement. Residency itself belongs to WRAM. */
 void s3_video_rb_state(S3StateIO *io)
 {
     unsigned count=s3_state_peek_unsigned(io,s_placement_count);
@@ -3102,11 +3188,6 @@ void s3_video_rb_state(S3StateIO *io)
     S3_STATE(io,s_placement_base);
     if(s3_state_peek_unsigned(io,(unsigned)s_loader_active)>1)io->ok=0;
     S3_STATE(io,s_loader_active);
-    for(unsigned n=0;n<count && n<SCENE_PLACEMENTS;++n) {
-        uint8_t loaded=s_placements[n].loaded;
-        s3_state_peek(io,n*sizeof(Placement)+offsetof(Placement,loaded),&loaded,sizeof loaded);
-        if(loaded>1)io->ok=0;
-    }
     S3_STATE(io,s_placements);
 }
 void s3_video_state(S3StateIO *io)
@@ -3174,7 +3255,7 @@ static void competition_card_scanline(const GVDP *v,int line,uint32_t *out,int w
     unsigned map=S3_TITLE_CARD_MAP,layout=S3_ART_BANK+0x2D90Cu;
     unsigned entry=layout+scene_read16(layout+18*2);
     unsigned pieces=scene_read16(entry);if(pieces>16)return;
-    for(unsigned o=0xB000;o<0xCAE2;o+=0x4A) {
+    for(unsigned o=0xB000;o<=0xCAE2;o+=0x4A) {
         if(scene_read32(0xFF0000u+o+12)!=map || g_ram[o+0x22]!=18 ||
            scene_read32(0xFF0000u+o)!=(S3_ART_BANK?0x2D9CCu:0x2CCD8u))continue;
         int ox=(int16_t)ram16(o+16)-128+(width-320)/2,oy=(int16_t)ram16(o+20)-128;

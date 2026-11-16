@@ -208,6 +208,7 @@ static unsigned palette_source(unsigned address)
     /* The unimplemented prototype stages point at a shared placeholder.
      * Their authored early palettes survive in its unused palette table. */
     if(!standalone_s3 && (address==0xA943Cu || address==0xA949Cu))return donor_address+0x1F2F0Eu;
+    if(!standalone_s3 && (address==0xA945Cu || address==0xA94BCu))return donor_address+0x1F2F2Eu;
     if(!standalone_s3 && address==0xA967Cu)return donor_address+0x1F2FCEu;
     return address;
 }
@@ -301,6 +302,11 @@ int s3_restoration_instruction(unsigned pc)
     for(unsigned i=0;i<4;i++)if(pc==sites[i]){
         g_cpu.A[2]=palette_source(g_cpu.A[2]);
         return 1;
+    }
+    /* MHZ2 copies terrain directly through A1, bypassing PalLoad.
+     * Keep native copy/fade timing, destinations and object colors. */
+    if(!standalone_s3 && (pc==0x54D7Cu || pc==0x550CAu || pc==0x765C0u)){
+        g_cpu.A[1]=palette_source(g_cpu.A[1]);return 1;
     }
     if(pc==(standalone_s3?0x1D5Cu:0x1AD2u)){
         if(!names_active)return 1;
