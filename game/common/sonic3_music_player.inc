@@ -1,4 +1,4 @@
-/* Local audition from the cartridge's latched controller input. All music
+/* Local audition from sealed simulation controller input. All music
  * sequences and chip channels keep running; selection only changes output. */
 static struct {
     unsigned open,previous,track,solo,playing,paused,request,swallow,last_music,return_music;
@@ -6,25 +6,34 @@ static struct {
 static uint32_t s_player_bank_end;
 static unsigned s_player_count,s_player_tracks[S3_MUSIC_COUNT+1];
 
-static unsigned player_id(unsigned row)
+static unsigned player_theme(unsigned row)
 {
     unsigned t=s_player_tracks[row];
+    /* Retail Super Sonic uses invincibility. Sonic 3 can replace it
+     * independently, including retaining retail music beside an override. */
+    if(t==S3_MUSIC_SUPER && !(standalone &&
+       (prototype_active || invincibility_override || super_override)))return S3_THEME_INVINCIBLE;
+    return t;
+}
+static unsigned player_id(unsigned row)
+{
+    unsigned t=player_theme(row);
     return t==S3_MUSIC_COUNT?0x32:s3_music_target(t);
 }
 static const char *player_name(unsigned row)
-{return s_player_tracks[row]==S3_MUSIC_COUNT?(standalone?"Ending Theme":"Super Theme"):s3_theme_names[s_player_tracks[row]];}
+{return s_player_tracks[row]==S3_MUSIC_COUNT?"Ending Theme":s3_theme_names[s_player_tracks[row]];}
 static unsigned player_pointer(unsigned row)
 {return m68k_read32(S3_CLONE_MUSIC_INDEX+4*(player_id(row)-1))&0xFFFFFEu;}
 static int player_recorded(unsigned row)
 {
-    unsigned t=s_player_tracks[row];
+    unsigned t=player_theme(row);
     return t<S3_MUSIC_COUNT && s3_music_active(t) && (s3_music_custom(t)?s3_custom_kind(t)==S3_CUSTOM_PCM:s3_theme_donor(t)>=S3_DONOR_CD_US);
 }
 static int player_channel(unsigned row,unsigned solo)
 {
     if(!solo)return 1;
     if(!s_player_count || row>=s_player_count || solo>10 || player_recorded(row))return 0;
-    unsigned track=s_player_tracks[row];
+    unsigned track=player_theme(row);
     if(track<S3_MUSIC_COUNT&&s3_music_custom(track)&&s3_custom_kind(track)==S3_CUSTOM_VGM){
         unsigned mask=solo==1?64:solo<=7?1u<<(solo-2):solo==10?3u<<9:1u<<(solo-1);
         return (s3_vgm_channels(track)&mask)!=0;
@@ -63,10 +72,10 @@ static void player_reset(void)
 static int player_bind(uint32_t *used,size_t capacity)
 {
     (void)capacity;s_player_bank_end=0x400000+*used;
-    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if((s3_music_available(t) || t==S3_MUSIC_EMERALD) &&
-       (t!=S3_MUSIC_SUPER || super_override || prototype_active)) {
-        unsigned id=s3_music_target(t);
-        if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))s_player_tracks[s_player_count++]=t;
+    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_available(t) || t==S3_MUSIC_EMERALD || t==S3_MUSIC_SUPER) {
+        s_player_tracks[s_player_count]=t;
+        unsigned id=player_id(s_player_count);
+        if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))++s_player_count;
     }
     if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1)))s_player_tracks[s_player_count++]=S3_MUSIC_COUNT;
     return s_player_count!=0;
@@ -81,20 +90,21 @@ void s3_sound_player_frame(unsigned buttons)
     }
     if(!s_player.open && (mode==4 || mode==0x28) &&
        (buttons&0x60)==0x60 && (pressed&0x60)) {
-        s_player.open=1;s_player.return_music=s_player.last_music;s_player.request=2;
+        s_player.open=1;s_player.solo=s_player.playing=s_player.paused=0;
+        s_player.return_music=s_player.last_music;s_player.request=2;
         s_player.swallow=1;
     } else if(s_player.open && !s_player.swallow) {
-        if(pressed&0x80){s_player.open=0;s_player.playing=s_player.paused=0;s_player.request=3;s_player.swallow=1;}
+        if(pressed&0x10){s_player.open=0;s_player.playing=s_player.paused=0;s_player.request=3;s_player.swallow=1;}
         else if(pressed&3) {
             s_player.track=(s_player.track+s_player_count+((pressed&1)?-1:1))%s_player_count;
-            if(!player_channel(s_player.track,s_player.solo))s_player.solo=0;
-            if(s_player.playing)s_player.request=1;
+            s_player.solo=s_player.playing=s_player.paused=0;s_player.request=2;
         } else if((pressed&12) && !player_recorded(s_player.track)) {
             do{s_player.solo=(s_player.solo+11+((pressed&4)?-1:1))%11;}
             while(!player_channel(s_player.track,s_player.solo));
-        } else if(pressed&0x10){s_player.playing=1;s_player.paused=0;s_player.request=1;}
-        else if((pressed&0x20) && s_player.playing)s_player.paused^=1;
-        else if(pressed&0x40){s_player.playing=s_player.paused=0;s_player.request=2;}
+        } else if((buttons&0x60)==0x60 && (pressed&0x60)) {
+            if(s_player.playing)s_player.paused^=1;
+        } else if(pressed&(0x40|0x80)){s_player.playing=1;s_player.paused=0;s_player.request=1;}
+        else if(pressed&0x20){s_player.playing=s_player.paused=0;s_player.request=2;}
     }
     if(s_player.open || s_player.swallow)memset(g_ram+0xF604,0,4);
     if(s_player.open && mode==4){g_ram[0xF614]=2;g_ram[0xF615]=0x58;}
@@ -151,11 +161,11 @@ static void player_overlay(int line,uint32_t *out,int width)
     player_text(line,out,width,x,42,s_player.playing?(s_player.paused?"PAUSED":"PLAYING"):"STOPPED",0xFF9FE7AB);
     player_text(line,out,width,x+72,42,channels[s_player.solo],0xFFFFFFFF);
     player_text(line,out,width,x,60,"UP/DOWN: TRACK   LEFT/RIGHT: CHANNEL",0xFFCBD5E1);
-    player_text(line,out,width,x,72,"B: PLAY FROM START   C: PAUSE/RESUME",0xFFCBD5E1);
-    player_text(line,out,width,x,84,"A: STOP   START: BACK",0xFFCBD5E1);
+    player_text(line,out,width,x,72,"A/START: PLAY   C: STOP   B: BACK",0xFFCBD5E1);
+    player_text(line,out,width,x,84,"A+C: PAUSE/RESUME",0xFFCBD5E1);
     player_text(line,out,width,x,100,player_recorded(s_player.track)?"RECORDED AUDIO - FULL MIX ONLY":"CHANNELS CHANGE WITHOUT RESTARTING",0xFF9CAEC6);
-    unsigned track=s_player_tracks[s_player.track];
-    const char *source=prototype_active?"November 1993 prototype":"Base game";
+    unsigned track=player_theme(s_player.track);
+    const char *source=prototype_active?"November 1993 prototype":"Stock";
     if(track<S3_MUSIC_COUNT && s3_music_active(track))source=s3_music_custom(track)?s3_custom_name(track):s3_theme_choice(track,(unsigned)s3_themes[track].choice)->label;
     player_text(line,out,width,x,112,source,0xFFCBD5E1);
     for(int n=-3;n<=3;n++) {

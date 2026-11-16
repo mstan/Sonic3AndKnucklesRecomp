@@ -10,6 +10,7 @@ typedef struct {
     int competition_title_cards;
     int original_zone_order;
     int early_zone_names;
+    int no_save_emeralds;
 } S3GameplayConfig;
 extern S3GameplayConfig s3_gameplay;
 void s3_gameplay_load(const char *settings_path,const char *mode);

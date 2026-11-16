@@ -33,6 +33,12 @@ int main(int argc,char **argv)
     CHECK(s3_music_source(S3_MUSIC_FINAL,S3_DONOR_S2)==19);
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_S2)==17);
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_WAI)==8);
+    CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_S1)==8);
+    CHECK(s3_music_source(S3_THEME_INVINCIBLE,S3_DONOR_WAI)==20);
+    CHECK(s3_music_source(S3_MUSIC_SUPER,S3_DONOR_S2)==21);
+    CHECK(s3_music_source(S3_MUSIC_SUPER,S3_DONOR_WAI)==20);
+    CHECK(s3_music_source(S3_MUSIC_COMPETITION,S3_DONOR_S2)==16);
+    CHECK(s3_music_source(S3_MUSIC_COMPETITION,S3_DONOR_WAI)==9);
     CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_S2)==16);
     CHECK(s3_music_source(S3_MUSIC_DATA,S3_DONOR_WAI)==9);
     CHECK(s3_music_source(S3_THEME_INVINCIBLE,S3_DONOR_PROTO)==0x2E);
@@ -52,15 +58,15 @@ int main(int argc,char **argv)
             CHECK(p->feature_choice_get(NULL,package,f.id,o.id,0,&choice)&&!strcmp(choice.value,"base"));
             for(int k=1;k<o.choice_count;k++){
                 CHECK(p->feature_choice_get(NULL,package,f.id,o.id,k,&choice));CHECK(strcmp(choice.value,"original"));
-                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3")));
+                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3"))||(!strcmp(o.id,"competition-menu")&&(!strcmp(choice.value,"s2")||!strcmp(choice.value,"s2-wai"))));
                 if(!strcmp(o.id,"final-boss"))CHECK(strcmp(choice.value,"s3")&&strcmp(choice.value,"sk"));
                 if(!strcmp(o.id,"competition-menu"))CHECK(strcmp(choice.value,"s3"));
             }
-            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:3));else ++shared;
+            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:!strcmp(o.id,"competition-menu")?5:3));else ++shared;
             ++total;
         }
     }
-    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?33:28));CHECK(shared==14);
+    CHECK(total==(combined?47:!strcmp(argv[2],"sonic3")?34:28));CHECK(shared==(!strcmp(argv[2],"sonic3")?15:14));
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&!s3_music_available(S3_MUSIC_EMERALD));
     CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==8&&s3_theme_choices(S3_MUSIC_BOSS)==7);
     CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==4);

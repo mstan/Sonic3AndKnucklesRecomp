@@ -215,12 +215,12 @@ void s3_sound_post_reset(void)
             fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],error);
             s3_sound_music_cache_free(&cache);for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++)free(owned[d]);free(bank);exit(1);
         }
-        if(t==S3_MUSIC_MINIBOSS){
-            static const unsigned aliases[]={0x18,0x2E};
-            for(unsigned i=0;i<2;i++)memcpy(bank+seq.music_index-0x400000+4*(aliases[i]-1),bank+seq.music_index-0x400000+4*(target-1),4);
-        }
         fprintf(stderr,"[sound-driver] %s: %s\n",s3_theme_names[t],choice->label);
     }
+    /* Both cartridge requests must use every kind of replacement, including
+     * custom SMPS and the silent entries backing VGM/recorded/CD music. */
+    if(s3_music_active(S3_MUSIC_MINIBOSS))
+        memcpy(bank+seq.music_index-0x400000+4*(0x2E - 1),bank+seq.music_index-0x400000+4*(0x18 - 1),4);
     s3_sound_music_cache_free(&cache);for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++)free(owned[d]);
     if(s3_themes_enabled()){
         uint8_t hashes[64];recompui_sha256_compute(bank,stats.bytes,hashes);s3_cd_theme_identity(hashes+32);recompui_sha256_compute(hashes,sizeof hashes,theme_identity);
@@ -325,7 +325,7 @@ void s3_sound_vblank(void)
         else if(!s_player.paused && pause && !(pause&0x80))sound_ram[S3_CLONE_PAUSE_OFFSET]=0x80;
     }
     for(unsigned i=0;i<3;i++)if(pending[i]){queue(pending[i],i);pending[i]=0;}
-    if(tempo_dirty){g_cpu.D[0]=tempo?0xFD:0xFE;recomp_call_addr(S3_CLONE_QUEUE_EXTRA);tempo_dirty=0;}
+    if(tempo_dirty){g_cpu.D[0]=0x100u|tempo;recomp_call_addr(S3_CLONE_QUEUE_EXTRA);tempo_dirty=0;}
     recomp_call_addr(S3_CLONE_GUARDED_UPDATE);
     /* In the pinned software RAM layout bitfield2 immediately follows the
      * main tempo byte; bit zero is the driver's 1-UP backup flag. */

@@ -164,8 +164,14 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
     *attr=(uint16_t)(((p&48u)<<9)|((p&128u)<<8));*pixel=(uint8_t)(p&63u);
     if(color){
         *color=0xFFFF;
-        if((active&PROTO_PALETTES) && *pixel>=16)
-            *color=!which && (int16_t)bg_word(ram+0xEE84)+sy>=(int)bg_word(ram+0xF646)?bg->water[*pixel]:bg->colors[*pixel];
+        if((active&PROTO_PALETTES) && *pixel>=16) {
+            /* Native HCZ1 deliberately keeps the first current tunnel dry
+             * even below Water_level. Follow its published raster palette:
+             * VInt selects full-water or normal, then HInt2 switches the following row. */
+            int wet=!which && ram[0xF730] &&
+                (ram[0xF64E] || sy>(int)ram[0xF625]);
+            *color=wet?bg->water[*pixel]:bg->colors[*pixel];
+        }
     }return 1;
 }
 static size_t font(unsigned zone,uint8_t *dst,size_t cap)
@@ -208,6 +214,7 @@ static unsigned palette_source(unsigned address)
     /* The unimplemented prototype stages point at a shared placeholder.
      * Their authored early palettes survive in its unused palette table. */
     if(!standalone_s3 && (address==0xA943Cu || address==0xA949Cu))return donor_address+0x1F2F0Eu;
+    if(!standalone_s3 && (address==0xA945Cu || address==0xA94BCu))return donor_address+0x1F2F2Eu;
     if(!standalone_s3 && address==0xA967Cu)return donor_address+0x1F2FCEu;
     return address;
 }
@@ -301,6 +308,11 @@ int s3_restoration_instruction(unsigned pc)
     for(unsigned i=0;i<4;i++)if(pc==sites[i]){
         g_cpu.A[2]=palette_source(g_cpu.A[2]);
         return 1;
+    }
+    /* MHZ2 copies terrain directly through A1, bypassing PalLoad.
+     * Keep native copy/fade timing, destinations and object colors. */
+    if(!standalone_s3 && (pc==0x54D7Cu || pc==0x550CAu || pc==0x765C0u)){
+        g_cpu.A[1]=palette_source(g_cpu.A[1]);return 1;
     }
     if(pc==(standalone_s3?0x1D5Cu:0x1AD2u)){
         if(!names_active)return 1;

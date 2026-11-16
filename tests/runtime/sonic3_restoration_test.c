@@ -45,6 +45,8 @@ int main(int argc,char **argv)
         CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
         CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
+        CHECK(palette(0xA945C)==(s3?0xA945Cu:0x5F2F2Eu));
+        CHECK(palette(0xA94BC)==(s3?0xA94BCu:0x5F2F2Eu));
         if(!s3){
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
@@ -53,6 +55,40 @@ int main(int argc,char **argv)
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;
         CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
+        if(!sk) {
+            /* Actual first-tunnel publication: water=$500 above camera=$526,
+             * but VInt uses normal colors and HInt=$FF never switches onscreen.
+             * Expected colors come from the donor's independent palette banks. */
+            static const struct {unsigned flag,full,hint;int row;unsigned wet;} cases[]={
+                {1,0,255,0,0},{1,0,255,120,0},{1,0,255,223,0},
+                {1,0,64,63,0},{1,0,64,64,0},{1,0,64,65,1},
+                {1,1,255,0,1},{1,1,255,223,1},
+                {0,1,0,120,0},{1,0,0,0,0},{1,0,0,1,1},{1,0,223,223,0}
+            };
+            g_ram[0xEE80]=5;g_ram[0xEE81]=0x10;
+            g_ram[0xEE84]=5;g_ram[0xEE85]=0x26;
+            g_ram[0xF646]=5;g_ram[0xF647]=0;
+            unsigned checked=0,distinct=0;
+            for(unsigned c=0;c<sizeof cases/sizeof cases[0];++c) {
+                g_ram[0xF730]=(uint8_t)cases[c].flag;
+                g_ram[0xF64E]=(uint8_t)cases[c].full;
+                g_ram[0xF625]=(uint8_t)cases[c].hint;
+                uint8_t before[65536];memcpy(before,g_ram,sizeof before);
+                for(int x=0;x<512;x+=7) {
+                    attr=0;color=0;pixel=0;
+                    CHECK(background(g_ram,0,0,x,cases[c].row,&attr,&pixel,&color));
+                    if(pixel<16)continue;
+                    unsigned dry=word(g_rom_ext+0x1E9B54+(pixel-16)*2);
+                    unsigned wet=word(g_rom_ext+0x1E9C14+pixel*2);
+                    CHECK(color==(cases[c].wet?wet:dry));
+                    ++checked;distinct+=dry!=wet;
+                }
+                CHECK(!memcmp(before,g_ram,sizeof before));
+            }
+            CHECK(checked>100 && distinct>50);
+            memset(g_ram+0xEE80,0,8);g_ram[0xF730]=g_ram[0xF64E]=g_ram[0xF625]=0;
+            g_ram[0xF646]=0;
+        }
         if(!s3)for(unsigned act=0;act<2;act++) {
             g_ram[0xFE10]=4;g_ram[0xFE11]=(uint8_t)act;
             /* Repeat the authored panorama, including negative expanded
@@ -92,6 +128,21 @@ int main(int argc,char **argv)
             g_cpu.A[2]=s3?0x8C654:0xA8E5C;g_cpu.SR=0x2715;
             CHECK(s3_restoration_instruction(hooks[i]));
             CHECK(g_cpu.A[2]==0x5E9C14 && g_cpu.SR==0x2715);
+        }
+        if(!s3){
+            const unsigned direct[]={0x54D7C,0x550CA,0x765C0};
+            const unsigned opcode[]={0x2AD1,0x2AD9,0x24D9};
+            for(unsigned i=0;i<3;++i)for(unsigned season=0;season<3;++season){
+                CHECK(word(g_rom+direct[i])==opcode[i]);
+                g_cpu.A[1]=season==0?0xA945Cu:season==1?0xA94BCu:0x550FEu;
+                g_cpu.SR=0x2715;g_cpu.D[0]=0x11223344;M68KState expected=g_cpu;
+                if(season<2)expected.A[1]=0x5F2F2E;
+                CHECK(s3_restoration_instruction(direct[i]));
+                CHECK(!memcmp(&g_cpu,&expected,sizeof expected));
+                g_cpu.A[1]+=4;expected=g_cpu;
+                CHECK(s3_restoration_instruction(direct[i]));
+                CHECK(!memcmp(&g_cpu,&expected,sizeof expected));
+            }
         }
         g_cpu.A[0]=s3?0x16A3E2:0x36A3E2;
         CHECK(word(g_rom+g_cpu.A[0]-2)==16 || sk);CHECK(word(g_rom_ext+0x11667C)==9);

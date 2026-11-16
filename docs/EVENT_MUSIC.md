@@ -3,14 +3,14 @@
 The **Sound** section of Mods has **Shared Themes** and one campaign section
 for the running game: **Sonic 3**, **Sonic & Knuckles**, or **Sonic 3 & Knuckles**.
 Common sounds, including Data Select, are available in all three games.
-All tracks default to **Base game**.
+All tracks default to **Stock**.
 
 Choose each song independently in its dropdown. A zone or act offers only
-**Base game** and **that same zone or act's November 1993 prototype theme**.
+**Stock** and **that same zone or act's November 1993 prototype theme**.
 Sky Sanctuary also offers Sonic 3's unused version of that same song.
 Other zone music cannot be exchanged with other zones or other Sonic games.
 Lava Reef Act 2 and Hidden Palace share one song and one dropdown.
-Competition, bonus stages and menus have their own applicable rows. The Competition menu offers explicit Retail and Prototype choices. Credits are in Shared Themes, with Sonic 3 retail, Sonic & Knuckles retail and Sonic 3 prototype choices.
+Competition, bonus stages and menus have their own applicable rows. The Competition menu offers retail and prototype Sonic 3 music, Sonic 2 Options, and Simon Wai Level Select. Credits are in Shared Themes, with Sonic 3 retail, Sonic & Knuckles retail and Sonic 3 prototype choices.
 
 **Shared Themes** contains the event, boss, title and other shared music:
 
@@ -20,19 +20,20 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 | Game Over | Sonic 1 / Sonic 2; Sonic 3 & Knuckles; Sonic CD (US) |
 | Continue Screen | Sonic 1 / Sonic 2; Sonic 3; Sonic & Knuckles |
 | Act Clear | Sonic 1 / Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 prototype; Sonic 3 & Knuckles; Sonic CD (US) |
-| Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US); unused November 1993 prototype theme |
+| Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US); unused November 1993 prototype theme; Simon Wai Invincibility / Super Sonic |
 | Drowning | Sonic 1 / Sonic 2; Sonic 3 prototype |
 | Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
 | Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
 | Title Screen | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
-| Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype |
+| Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 1 |
 | Knuckles | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Data Select | Sonic 3 prototype; Sonic 3; Sonic & Knuckles; Sonic 2 Options; Sonic 2 Simon Wai Level Select |
 | Credits | Sonic 3 (Retail); Sonic & Knuckles (Retail); Sonic 3 Prototype |
 | Final Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
+| Super (standalone Sonic 3) | Unused November 1993 prototype theme; Sonic 2 Super Sonic; Simon Wai Invincibility / Super Sonic |
 
 The table includes stored retail overrides. A retail choice identical to
-**Base game** is omitted from the dropdown unless it is already selected or
+**Stock** is omitted from the dropdown unless it is already selected or
 is needed to override the whole-prototype soundtrack. Existing selections
 remain readable and retain their effect. Moving Data Select to Shared also
 preserves its previous section's enabled state until Shared is changed.
@@ -53,19 +54,20 @@ A selection can be prepared before its ROM is supplied, but the section cannot
 be enabled until all its requirements are verified.
 
 Disable a section to restore its normal music while retaining every selected
-replacement. Choose **Base game** for a single row to stop replacing that song.
+replacement. Choose **Stock** for a single row to stop replacing that song.
 Existing event choices are retained when updating from the earlier controls.
 
 Replacements enable Clone Driver automatically. Restart to apply changes.
 They support local play in original campaigns; imported campaigns and netplay
-retain their driver restrictions. Base game leaves the current soundtrack
+retain their driver restrictions. Stock leaves the current soundtrack
 unchanged. A previously saved whole-prototype soundtrack remains in effect;
-its Saved default soundtrack option under Clone Driver can restore Base game without
+its Saved default soundtrack option under Clone Driver can restore Stock without
 clearing individual choices. New selections use the individual track rows.
-Restore Base game there when mixing individual prototype tracks with the
+Restore Stock there when mixing individual prototype tracks with the
 retail OST. Cartridge sound effects are retained. The unused prototype tune
-is an Invincibility choice in all three games. Previously saved standalone
-Sonic 3 Super replacements retain their separate row until cleared.
+is an Invincibility choice in all three games. Standalone Sonic 3 also has
+an independent Super row. Sonic & Knuckles and the combined game use their
+Invincibility selection during Super Sonic, following their native music queues.
 
 ## Music player
 
@@ -74,14 +76,14 @@ select to open the music player. It plays this game's tracks with the selected
 soundtrack replacements and shows the current source beside the track list.
 Use the game buttons configured in Input settings:
 
-- **Up/Down:** choose a track.
+- **Up/Down:** choose a track, stopping playback and selecting all channels.
 - **Left/Right:** choose all channels or an individual DAC, FM or PSG channel.
-- **B:** play from the beginning.
-- **C:** pause or resume.
-- **A:** stop.
-- **Start:** return to the game menu.
+- **A or Start:** play from the beginning.
+- **C:** stop.
+- **B:** return to the game menu.
+- **A+C:** pause or resume a playing track.
 
-Changing the track restarts a playing song. Channel selection mutes only the
+Track selection wraps at either end. Channel selection mutes only the
 output; all music sequences and synthesis clocks continue at the same position.
 Channel audition uses the standard chip synthesis output. Empty channel entries
 are skipped. Recorded CD audio plays its full stereo mix. Current-build states

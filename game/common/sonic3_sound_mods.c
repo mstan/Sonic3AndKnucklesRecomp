@@ -17,7 +17,7 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,package);COPY(o->name,"Clone Driver + Mega PCM");COPY(o->version,"0.1.0");
     COPY(o->author,"Clone Driver and Mega PCM contributors");
-    COPY(o->description,"Play the cartridge's music and sound effects with Clone Driver and Mega PCM. Sound data is prepared automatically from your ROM. Restart after changing. At the title or level select, press A+C for the music player and channel isolation. Local play; original campaigns only.");
+    COPY(o->description,"Play the cartridge's music and sound effects with Clone Driver and Mega PCM. Sound data is prepared automatically from your ROM. Restart after changing. At the title or level select, press A+C for the music player and channel isolation. In the player, A/Start plays, C stops, B returns, and A+C pauses or resumes. Local play; original campaigns only.");
     COPY(o->source_name,"S3K Clone Driver");COPY(o->source_url,"https://github.com/TheBlad768/skdisasm-clone-driver");
     COPY(o->license,"Driver licenses included in CLONE_DRIVER_NOTICES.txt");
     COPY(o->status,!s3_sound_available()?"Unavailable with this build's Z80 backend":s3_sound_selected()!=s3_sound_active()?"Restart to apply the selection":s3_sound_active()?"Enabled":"Disabled");
@@ -43,14 +43,14 @@ static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCM
     (void)c;if(!ours(p))return base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o);
     if(!f||strcmp(f,feature)||i||!o||!s3_sound_prototype_selected())return 0;
     memset(o,0,sizeof *o);COPY(o->id,saved_soundtrack);COPY(o->label,"Saved default soundtrack");COPY(o->group,"Music");
-    COPY(o->description,"Your previously saved November 1993 soundtrack is retained. Choose Base game to restore retail defaults without changing individual track choices or their section switches. Restart to apply.");
+    COPY(o->description,"Your previously saved November 1993 soundtrack is retained. Choose Stock to restore retail defaults without changing individual track choices or their section switches. Restart to apply.");
     COPY(o->value,"s3-proto");COPY(o->default_value,"base");o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=2;return 1;
 }
 static int choice_get(void *c,const char *p,const char *f,const char *opt,int i,RecompLauncherCModChoice *o)
 {
     (void)c;if(!ours(p))return base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,opt,i,o);
     if(!saved_option(f,opt)||!o||i<0||i>1)return 0;
-    memset(o,0,sizeof *o);COPY(o->value,i?"s3-proto":"base");COPY(o->label,i?"November 1993 prototype":"Base game");return 1;
+    memset(o,0,sizeof *o);COPY(o->value,i?"s3-proto":"base");COPY(o->label,i?"November 1993 prototype":"Stock");return 1;
 }
 static int set_option(void *c,const char *p,const char *f,const char *opt,const char *value)
 {

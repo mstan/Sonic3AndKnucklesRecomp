@@ -21,8 +21,8 @@ int s3_sound_commit(void);
 int s3_sound_netplay_allowed(void);
 void s3_sound_post_reset(void);
 void s3_sound_vblank(void);
-/* Call after native VBlank has latched its controller row. */
-void s3_sound_player_frame(unsigned latched_buttons);
+/* Call after native VBlank with the tick's sealed GPAD_* held buttons. */
+void s3_sound_player_frame(unsigned held_buttons);
 int s3_sound_owns(uint32_t pc);
 int s3_sound_hook(uint32_t pc);
 int s3_sound_dispatch_miss(uint32_t pc);
