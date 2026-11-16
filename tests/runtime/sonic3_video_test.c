@@ -1773,6 +1773,87 @@ static int intro_canvas_cell(const uint8_t *ram,int x,int y,int background,uint1
 {
     (void)ram;(void)y;*cell=background?(x<512?1:2):0;return 1;
 }
+static unsigned art_row_queries;
+static int art_row_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;++art_row_queries;
+    *cell=(uint16_t)(1+(((unsigned)x>>4)&31u));
+    *cell|=(uint16_t)((((unsigned)y>>3)+(unsigned)background)&3u)<<10;
+    return 1;
+}
+static void test_private_art_tile_rows(void)
+{
+    static GVDP art[2];static uint8_t blocks[2][0x1800],before[65536];
+    memset(g_ram,0,sizeof g_ram);memset(art,0,sizeof art);memset(blocks,0,sizeof blocks);
+    for(unsigned bank=0;bank<2;++bank) {
+        for(unsigned tile=1;tile<160;++tile)for(unsigned byte=0;byte<32;++byte)
+            art[bank].vram[tile*32+byte]=(uint8_t)(((tile+byte+bank)%15+1)*17);
+        for(unsigned block=1;block<=32;++block)for(unsigned part=0;part<4;++part)
+            word(blocks[bank],block*8+part*2,(block*4+part)|((block&3u)<<13)|((part&3u)<<11));
+    }
+    word(g_ram,0x8000,8);word(g_ram,0x8002,8);
+    for(unsigned row=0;row<128;row+=4)for(unsigned bg=0;bg<2;++bg) {
+        unsigned base=0x8100+bg*0x500+row*8;
+        word(g_ram,0x8008+row+bg*2,base);
+        for(unsigned x=0;x<8;++x)g_ram[base+x]=(uint8_t)(1+(row/4+x)%32);
+    }
+    for(unsigned chunk=1;chunk<=32;++chunk)for(unsigned cell=0;cell<64;++cell)
+        word(g_ram,chunk*128+cell*2,1+(chunk+cell)%32);
+    const int ys[]={0,7,8,2047,2048,-8};
+    const int starts[]={-9,320,0,511,-1};
+    for(unsigned provider=0;provider<2;++provider)for(unsigned bank=0;bank<2;++bank)
+        for(unsigned mask=0;mask<2;++mask)for(unsigned bg=0;bg<2;++bg)
+            for(unsigned yy=0;yy<sizeof ys/sizeof ys[0];++yy) {
+                word(g_ram,0xEEAE,mask?0x3C:0x7C);memcpy(before,g_ram,sizeof before);
+                s3_video_set_world_cell(provider?art_row_cell:NULL);
+                WorldArtRow row;world_art_row_init(&row,g_ram,blocks[bank],art[bank].vram,ys[yy],bg);
+                for(unsigned run=0;run<sizeof starts/sizeof starts[0];++run)
+                    for(int x=starts[run];x<starts[run]+41;++x) {
+                        uint16_t expected=world_attr_blocks(g_ram,blocks[bank],x,ys[yy],bg),actual=0;
+                        unsigned pixel=world_art_row_pixel(&row,x,&actual);
+                        CHECK(actual==expected && pixel==pattern_pixel(&art[bank],expected,x,ys[yy]));
+                    }
+                CHECK(!memcmp(before,g_ram,sizeof before));
+            }
+    /* The provider still owns the same cells, with one translation per
+     * eight contiguous pixels rather than one per private-art pixel. */
+    s3_video_set_world_cell(art_row_cell);WorldArtRow row;
+    world_art_row_init(&row,g_ram,blocks[0],art[0].vram,0,0);art_row_queries=0;
+    for(int x=0;x<256;++x){uint16_t attr;world_art_row_pixel(&row,x,&attr);}
+    CHECK(art_row_queries==32);
+    art_row_queries=0;
+    for(int x=0;x<256;++x)world_attr_blocks(g_ram,blocks[0],x,0,0);
+    CHECK(art_row_queries==256);s3_video_set_world_cell(NULL);
+}
+static void test_private_art_render_translation_count(void)
+{
+    static GVDP v;static AizArt saved[2];uint32_t native[320]={0},out[796];
+    int ready=s_aiz_art_ready,attempted=s_aiz_art_attempted;
+    memcpy(&saved[0],&s_aiz_intro,sizeof saved[0]);memcpy(&saved[1],&s_aiz_main,sizeof saved[1]);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;write32(0xB000,0x1234);
+    word(g_ram,0x8000,64);word(g_ram,0x8002,64);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,64);word(g_ram,0xEE78,64);word(g_ram,0xEEAE,0x7C);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;word(v.vram,0xF000,(unsigned)-64);
+    v.cram[1]=v.cram[17]=0xEEE;
+    for(unsigned i=0;i<sizeof s_aiz_intro.blocks;i+=2) {
+        word(s_aiz_intro.blocks,i,1);word(s_aiz_main.blocks,i,1);
+    }
+    memset(s_aiz_intro.video.vram+32,0x11,32);memset(s_aiz_main.video.vram+32,0x22,32);
+    s_aiz_art_ready=s_aiz_art_attempted=1;
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(art_row_cell);art_row_queries=0;
+    scanline(&v,0,native,320,out,796);
+    /* Both private margin planes now translate in eight-pixel runs. This
+     * bound also permits native reference probes; the old per-pixel override
+     * alone performs more than796 translations for these same margins. */
+    CHECK(art_row_queries<796);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    memcpy(&s_aiz_intro,&saved[0],sizeof saved[0]);memcpy(&s_aiz_main,&saved[1],sizeof saved[1]);
+    s_aiz_art_ready=ready;s_aiz_art_attempted=attempted;
+}
 static void test_aiz_intro_canvas_edge(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];
@@ -4420,7 +4501,7 @@ int main(int argc,char **argv)
     test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_rocket_motion();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
+    test_private_art_tile_rows();test_private_art_render_translation_count();test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();test_mhz2_rotor_margins();
 #ifndef SONIC3_STANDALONE

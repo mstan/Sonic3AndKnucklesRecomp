@@ -444,6 +444,34 @@ static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int w
 }
 static uint16_t world_attr(const uint8_t *ram,int wx,int wy,int background)
 { return world_attr_blocks(ram,ram+0x9000,wx,wy,background); }
+/* One immutable source/bank/vertical identity for this scanline only.
+ * Private art overrides use the same eight-pixel decoder as native planes,
+ * instead of translating layout/chunk/block and decoding again per pixel. */
+typedef struct {
+    GenesisTileRow tile;
+    const uint8_t *ram,*blocks,*patterns;
+    unsigned row_mask;
+    int y,background,next_x;
+} WorldArtRow;
+static void world_art_row_init(WorldArtRow *row,const uint8_t *ram,
+                               const uint8_t *blocks,const uint8_t *patterns,int y,int background)
+{
+    row->tile.remaining=0;row->ram=ram;row->blocks=blocks;row->patterns=patterns;
+    unsigned mask=((unsigned)ram[0xEEAE]<<8)|ram[0xEEAF];
+    row->row_mask=mask==0x3C?0x3Cu:0x7Cu;
+    row->y=y;row->background=background;row->next_x=0;
+}
+static uint8_t world_art_row_pixel(WorldArtRow *row,int x,uint16_t *attr)
+{
+    /* A native viewport gap or a wrapped source must start its own run. */
+    if(!row->tile.remaining || x!=row->next_x) {
+        uint16_t cell=world_attr_blocks_mask(row->ram,row->blocks,x,row->y,
+                                            row->background,row->row_mask);
+        gtile_row_begin(&row->tile,row->patterns,cell,x,row->y);
+    }
+    row->next_x=x+1;*attr=row->tile.attr;
+    return gtile_row_pixel(&row->tile);
+}
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
 {
     int fx = x & 7, fy = y & 7;
@@ -2687,6 +2715,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         lbz_palette[i]=i<16?palette[i]:genesis_dac_cram_to_argb(
             scene_art_color_reference(s_lbz_preview.colors[i-16],v,32),GENESIS_DAC_NORMAL);
     GenesisTileRow fg={0},bg={0},incoming={0};
+    WorldArtRow aiz_fg[2],aiz_bg;
+    if(aiz_banks) {
+        world_art_row_init(&aiz_fg[0],s_world_frame,s_aiz_intro.blocks,s_aiz_intro.video.vram,wy,0);
+        world_art_row_init(&aiz_fg[1],s_world_frame,s_aiz_main.blocks,s_aiz_main.video.vram,wy,0);
+        if(s_frame_bg_event==0) {
+            const AizArt *art=by>=0x380?&s_aiz_intro:&s_aiz_main;
+            world_art_row_init(&aiz_bg,s_background_frame,art->blocks,art->video.vram,by,1);
+        }
+    }
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
      * solid snow at that boundary into the extra left view; do not expose
@@ -2833,16 +2870,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
              * art. Only extend beyond the native viewport; its live animated
              * art, palette changes and scripted reveals remain authoritative. */
             int intro=wx<0x1300;
-            const AizArt *art=intro?&s_aiz_intro:&s_aiz_main;
             if(intro || s_frame_bg_event<8) {
-                a=world_attr_blocks(s_world_frame,art->blocks,wx,wy,0);
-                ap=pattern_pixel(&art->video,a,wx,wy);
+                ap=world_art_row_pixel(&aiz_fg[intro?0:1],wx,&a);
                 apalette=intro?intro_palette:forest_palette;
             }
             if(s_frame_bg_event==0) {
-                art=by>=0x380?&s_aiz_intro:&s_aiz_main;
-                b=world_attr_blocks(s_background_frame,art->blocks,source_bx,by,1);
-                bp=pattern_pixel(&art->video,b,source_bx,by);
+                bp=world_art_row_pixel(&aiz_bg,source_bx,&b);
                 bpalette=by>=0x380?intro_palette:forest_palette;
             }
         }
