@@ -4232,6 +4232,67 @@ static void test_mhz_capsule_waiting_pose(void)
     memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);s_display=NULL;
 #endif
 }
+#ifndef SONIC3_STANDALONE
+static unsigned mhz_band_foreground;
+static int mhz_band_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)x;(void)y;*cell=background?2:mhz_band_foreground;return 1;
+}
+#endif
+static void test_mhz_arena_installed_band(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,untouched;static uint8_t before[65536];
+    uint32_t native[320],out[798];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;word(g_ram,0xFE10,0x701);write32(0xB000,0x1234);
+    word(g_ram,0x8000,160);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x4180);word(g_ram,0xEE84,0x280);word(g_ram,0xEE90,0x180);
+    word(g_ram,0xEEC0,8);word(g_ram,0xEEC2,24);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.vsram[0]=0x280;v.vsram[1]=0x180;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    memset(v.vram+96,0x33,32);memset(v.vram+128,0x44,32);memset(v.vram+160,0x55,32);
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;v.cram[5]=0xEE0;
+    for(unsigned n=0;n<4;++n){word(g_ram,0x9008+n*2,2);word(g_ram,0x9010+n*2,3);}
+    for(unsigned n=0;n<64*32;++n){word(v.vram,0xC000+n*2,1);word(v.vram,0xE000+n*2,(n&1)?4:5);}
+    for(unsigned y=0;y<224;++y){word(v.vram,0xF000+y*4,(uint16_t)-3);word(v.vram,0xF002+y*4,(uint16_t)-5);}
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);s3_video_set_world_cell(mhz_band_cell);
+    for(unsigned fg=0;fg<2;++fg)for(unsigned active=0;active<4;++active) {
+        mhz_band_foreground=fg;
+        g_ram[0xEED2]=(active&1)?255:0;g_ram[0xEED3]=(active&2)?255:0;
+        memcpy(before,g_ram,sizeof before);memcpy(&untouched,&v,sizeof v);
+        for(unsigned row=0;row<3;++row) {
+            int line=row==0?0:row==1?47:48;
+            out[0]=out[797]=0xDEADBEEF;scanline(&v,line,native,320,out+1,796);
+            for(int x=0;x<796;++x) {
+                int a=line<48 && (active&1);
+                int b=line<48 && (active&2);
+                int bx=x-238+5;
+                uint32_t expected=a?0xFFFF0000u:fg?0xFF00FF00u:
+                    b?(((bx>>3)&1)?0xFFFFFFFFu:0xFF00FFFFu):0xFF0000FFu;
+                CHECK(out[x+1]==expected);
+            }
+            CHECK(out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&untouched,&v,sizeof v));
+    }
+    /* Retirement and other acts keep their ordinary world, even if an
+     * unrelated event happens to leave these scratch bytes nonzero. */
+    mhz_band_foreground=1;g_ram[0xEED2]=g_ram[0xEED3]=255;
+    word(g_ram,0xEEC2,36);scanline(&v,0,native,320,out+1,796);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==0xFF00FF00u);
+    word(g_ram,0xEEC2,24);word(g_ram,0xFE10,0x700);
+    scanline(&v,0,native,320,out+1,796);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==0xFF00FF00u);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    for(unsigned x=0;x<320;++x)native[x]=0xFF000000u+x;
+    scanline(&v,0,native,320,out,320);CHECK(!memcmp(native,out,sizeof native));
+#endif
+}
 static void test_mhz_custom_publication(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -4768,6 +4829,7 @@ int main(int argc,char **argv)
 #endif
     test_private_plane_colors();
     test_mhz_custom_publication();
+    test_mhz_arena_installed_band();
     test_mhz_capsule_waiting_pose();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
