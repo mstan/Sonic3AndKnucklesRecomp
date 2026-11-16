@@ -35,7 +35,8 @@ static int s3_knux_preview_needed(const uint8_t *ram)
 {
     if(!ram || ram[0xF600]!=0x0C || s3_knux_preview_word(ram,0xFE10)!=1 ||
        ram[0xB038]==2)return 0;
-    /* Defeat can release the camera while the boss is still retiring.
+    /* The live boss can pan the ledge into the margin before defeat.
+     * Defeat can release the camera while the boss is still retiring.
      * Keep the waiting actor on its ledge throughout that controller,
      * before loc_694D4's capsule wait. Its native pose and 120-tick wait
      * stay unchanged; its successor still allocates the real actor. */
@@ -45,7 +46,7 @@ static int s3_knux_preview_needed(const uint8_t *ram)
                       s3_knux_preview_word(ram,o+2);
         unsigned callback=(unsigned)s3_knux_preview_word(ram,o+0x34)<<16 |
                           s3_knux_preview_word(ram,o+0x36);
-        if(code==0x47360 || code==0x473C6 || code==0x47402 ||
+        if(code==0x4711E || code==0x47360 || code==0x473C6 || code==0x47402 ||
            (code==0x53CE2 && callback==0x47360) ||
            (code==0x53008 && callback==0x47390))return 1;
 #else

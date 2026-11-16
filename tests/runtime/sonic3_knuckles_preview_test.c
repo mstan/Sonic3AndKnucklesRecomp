@@ -8,28 +8,41 @@ static void word(uint8_t *p,unsigned a,unsigned n){p[a]=(uint8_t)(n>>8);p[a+1]=(
 static void lng(uint8_t *p,unsigned a,unsigned n){word(p,a,n>>16);word(p,a+2,n);}
 static void predicate_test(void)
 {
-    uint8_t ram[65536]={0};
+    uint8_t ram[65536]={0},before[65536];
     CHECK(!s3_knux_preview_needed(NULL));CHECK(!s3_knux_preview_needed(ram));
     ram[0xF600]=0x0C;word(ram,0xFE10,1);ram[0xB038]=1;
-    lng(ram,0xCF82,0x69526);
 #ifdef SONIC3_STANDALONE
-    CHECK(!s3_knux_preview_needed(ram));
-    lng(ram,0xCF82,0x694D4);CHECK(!s3_knux_preview_needed(ram));
+    const unsigned live=0x4711E,retiring=0x47360,wait=0x473C6,
+        approach=0x47402,handover=0x4744A,draw_wait=0x53CE2,
+        fade_callback=0x47360,timer_wait=0x53008,capsule_callback=0x47390;
 #else
-    CHECK(s3_knux_preview_needed(ram));
-    /* Real capsule-wait controller and the native far-right camera cap:
-     * the ledge enters the margin before automatic approach starts. */
-    lng(ram,0xCF82,0x6923E);CHECK(s3_knux_preview_needed(ram));
-    lng(ram,0xCF82,0x694D4);word(ram,0xEE80,0x4980);
-    uint8_t before[65536];memcpy(before,ram,sizeof before);
+    const unsigned live=0x6923E,retiring=0x694D4,wait=0x694D4,
+        approach=0x69526,handover=0x69588,draw_wait=0x85668,
+        fade_callback=0x69482,timer_wait=0x8488A,capsule_callback=0x694A4;
+#endif
+    /* Actual live Firepod controller: the native camera has panned right,
+     * with HP still positive. Reading the derived pose must leave all RAM unchanged.
+     */
+    lng(ram,0xCF82,live);ram[0xCF82+0x29]=8;word(ram,0xEE78,0x4980);
+    memcpy(before,ram,sizeof before);
     CHECK(s3_knux_preview_needed(ram));CHECK(!memcmp(before,ram,sizeof before));
-    ram[0xB038]=2;CHECK(!s3_knux_preview_needed(ram));ram[0xB038]=0;
+    const unsigned phases[]={retiring,wait,approach};
+    for(unsigned i=0;i<sizeof phases/sizeof *phases;++i) {
+        lng(ram,0xCF82,phases[i]);memcpy(before,ram,sizeof before);
+        CHECK(s3_knux_preview_needed(ram));CHECK(!memcmp(before,ram,sizeof before));
+    }
+    lng(ram,0xCF82,draw_wait);lng(ram,0xCF82+0x34,fade_callback);
+    CHECK(s3_knux_preview_needed(ram));
+    lng(ram,0xCF82,timer_wait);lng(ram,0xCF82+0x34,capsule_callback);
+    CHECK(s3_knux_preview_needed(ram));
+    lng(ram,0xCF82,handover);CHECK(!s3_knux_preview_needed(ram));
+    lng(ram,0xCF82,live);
+    ram[0xB038]=2;CHECK(!s3_knux_preview_needed(ram));ram[0xB038]=1;
     word(ram,0xFE10,0);CHECK(!s3_knux_preview_needed(ram));
     word(ram,0xFE10,0x2001);CHECK(!s3_knux_preview_needed(ram));word(ram,0xFE10,1);
     ram[0xF600]=0x8C;CHECK(!s3_knux_preview_needed(ram));ram[0xF600]=0x0C;
-    lng(ram,0xCF82,0x69588);CHECK(!s3_knux_preview_needed(ram));
-    lng(ram,0xCF82,0);lng(ram,0xB206,0x69526);CHECK(s3_knux_preview_needed(ram));
-#endif
+    lng(ram,0xCF82,0);CHECK(!s3_knux_preview_needed(ram));
+    lng(ram,0xB206,live);CHECK(s3_knux_preview_needed(ram));
 }
 static uint8_t *synthetic_rom(void)
 {
@@ -52,9 +65,6 @@ static void render_test(void)
 {
     uint8_t *rom=synthetic_rom();uint32_t out[800];
     fill(out);s3_knux_preview_scanline(rom,92,out,800,240,0x4B8E - 370,0x17D-100);
-#ifdef SONIC3_STANDALONE
-    for(int x=0;x<800;++x)CHECK(out[x]==0x12345678);
-#else
     for(int x=0;x<800;++x) {
         uint32_t wanted=0x12345678;
         if(x>=598 && x<606)wanted=0xFF0000FF;
@@ -89,7 +99,6 @@ static void render_test(void)
     memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
     word(rom,S3_KNUX_PREVIEW_MAP+0x80+4,0);
     word(rom,S3_KNUX_PREVIEW_MAP+0x80+6,60);CHECK(!s3_knux_preview_load(rom));
-#endif
     free(rom);memset(&s3_knux_preview_cache,0,sizeof s3_knux_preview_cache);
 }
 static uint8_t *read_file(const char *name,size_t bytes)
