@@ -4187,6 +4187,51 @@ static void test_row_plane_colors(void)
         CHECK(plane_color_row(&colors,0,1,pixel,palettes[0])==palettes[0][pixel]);
 }
 #include "sonic3_aiz_join_test.inc"
+static void test_mhz_capsule_waiting_pose(void)
+{
+#ifndef SONIC3_STANDALONE
+    static SceneFrame scene;static uint8_t before[65536];
+    uint32_t out[798],palette[64]={0};
+    memset(&scene,0,sizeof scene);scene.scene=1;scene.world_tag=0x702;
+    memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xFE10]=7;s_world_frame[0xFE11]=1;
+    longword(s_world_frame,0xB128,0x76164);
+    s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_display=&scene;
+    s_camera=0x4420;s_camera_y=0x280;
+    word(g_rom,S3_CAPSULE_MAP,24);word(g_rom,S3_CAPSULE_MAP+10,32);
+    word(g_rom,S3_CAPSULE_MAP+24,1);g_rom[S3_CAPSULE_MAP+26]=252;
+    g_rom[S3_CAPSULE_MAP+27]=0;word(g_rom,S3_CAPSULE_MAP+28,0);word(g_rom,S3_CAPSULE_MAP+30,65532);
+    word(g_rom,S3_CAPSULE_MAP+32,1);g_rom[S3_CAPSULE_MAP+34]=0;
+    g_rom[S3_CAPSULE_MAP+35]=0;word(g_rom,S3_CAPSULE_MAP+36,1);word(g_rom,S3_CAPSULE_MAP+38,65532);
+    memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);
+    s_native_art_cache[4].attempted=s_native_art_cache[4].ready=1;
+    memset(s_native_art_cache[4].pixels,0x11,32);memset(s_native_art_cache[4].pixels+32,0x22,32);
+    palette[1]=0xFFFF0000;palette[2]=0xFF00FF00;
+    if(s_priority_capacity<796){s_priority=realloc(s_priority,796);CHECK(s_priority);s_priority_capacity=796;}
+    memcpy(before,s_world_frame,sizeof before);
+    for(unsigned test=0;test<5;++test) {
+        for(unsigned x=0;x<798;++x)out[x]=0xDEADBEEF;
+        memset(s_priority,0,796);
+        s_camera=test==2?0x45C0:test==3?0x46C0:0x4420;
+        if(test==4)memset(s_priority,2,796); /* real sprites keep priority */
+        int line=test==1?124:156;
+        mhz_capsule_preview_scanline(line,out+1,796,238,palette);
+        int px=238+0x4640-s_camera-4;
+        for(int x=0;x<796;++x) {
+            int drawn=test!=2 && test!=4 && x>=px && x<px+8 && (x<238 || x>=558);
+            CHECK(out[x+1]==(drawn?palette[test==1?2:1]:0xDEADBEEF));
+        }
+        CHECK(out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+        CHECK(!memcmp(before,s_world_frame,sizeof before));
+    }
+    CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
+    scene.count=1;scene.sprites[0].slot=5u<<8;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));scene.count=0;
+    longword(s_world_frame,0xB128,0x75FD4);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x85668);longword(s_world_frame,0xB15C,0x761B2);CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB15C,0x761B0);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x761E8);s_world_frame[0xFE11]=0;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);s_display=NULL;
+#endif
+}
 static void test_mhz_custom_publication(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -4255,6 +4300,7 @@ int main(int argc,char **argv)
         CHECK(load_aiz_monkey_art());
 #ifndef SONIC3_STANDALONE
         CHECK(mhz_custom_load());
+        {uint8_t pixel;CHECK(native_art_pixel(5,0x494,0,0,&pixel));}
         printf("MHZ complete custom chunks/blocks/patterns: %zu/%zu/%zu\n",
             s_mhz_custom.chunks_size,s_mhz_custom.blocks_size,sizeof s_mhz_custom.tiles);
 #endif
@@ -4722,6 +4768,7 @@ int main(int argc,char **argv)
 #endif
     test_private_plane_colors();
     test_mhz_custom_publication();
+    test_mhz_capsule_waiting_pose();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_fbz_entrance_margin_ownership();test_fbz_physical_stage_edge();test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();

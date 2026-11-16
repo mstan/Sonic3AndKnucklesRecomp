@@ -1840,6 +1840,62 @@ static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pi
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
+/* The original boss allocates its stationary capsule only after falling
+ * below the native screen. A wider view already sees that authored ledge.
+ * Extend the waiting body/button there until their real published sprites
+ * take over; native allocation, collision and the camera pan are untouched. */
+static int mhz_capsule_preview_needed(const uint8_t *ram,const SceneFrame *scene)
+{
+#ifndef SONIC3_STANDALONE
+    if(!scene || scene->scene!=1 || scene->world_tag!=0x702 ||
+       ram[0xFE10]!=7 || ram[0xFE11]!=1 || ram[0xB038]>2)return 0;
+    for(unsigned n=0;n<scene->count;++n)
+        if((scene->sprites[n].slot>>8)==5)return 0;
+    for(unsigned o=0xB000;o<=0xCAE2;o+=0x4A) {
+        unsigned code=((unsigned)ram[o]<<24)|((unsigned)ram[o+1]<<16)|
+            ((unsigned)ram[o+2]<<8)|ram[o+3];
+        unsigned callback=((unsigned)ram[o+0x34]<<24)|((unsigned)ram[o+0x35]<<16)|
+            ((unsigned)ram[o+0x36]<<8)|ram[o+0x37];
+        if(code==0x76164 || code==0x761E8 || code==0x7623C ||
+           (code==0x85668 && callback==0x761B2))return 1;
+    }
+#else
+    (void)ram;(void)scene;
+#endif
+    return 0;
+}
+static void mhz_capsule_preview_scanline(int line,uint32_t *out,int width,
+                                         int origin,const uint32_t *palette)
+{
+    int y=0x320-s_camera_y;
+    if(width<=320 || !s_frame_level || s_frame_zone!=7 || s_frame_act!=1 ||
+       line<y-44 || line>=y+32 ||
+       !mhz_capsule_preview_needed(s_world_frame,s_display))return;
+    for(unsigned part=0;part<2;++part) {
+        unsigned frame=part?5:0;
+        unsigned p=S3_CAPSULE_MAP+(int16_t)scene_read16(S3_CAPSULE_MAP+frame*2);
+        unsigned count=scene_read16(p);p+=2;if(count>32)return;
+        for(unsigned n=0;n<count;++n,p+=6) {
+            unsigned size=scene_read8(p+1);if(size>15)return;
+            int cw=((size>>2)&3)+1,ch=(size&3)+1;
+            int py=y-(part?0x24:0)+(int8_t)scene_read8(p),iy=line-py;
+            if(iy<0 || iy>=ch*8)continue;
+            int px=origin+0x4640-s_camera+(int16_t)scene_read16(p+4);
+            unsigned attr=(scene_read16(p+2)+0x8494u)&65535u;
+            if(attr&0x1000u)iy=ch*8-1-iy;
+            for(int dx=0;dx<cw*8;++dx) {
+                int x=px+dx;
+                if(x<0 || x>=width || (x>=origin && x<origin+320) || (s_priority[x]&2u))continue;
+                int ix=attr&0x800u?cw*8-1-dx:dx;
+                unsigned tile=(attr&0xF800u)|((attr+ix/8*ch+iy/8)&2047u);
+                uint8_t pixel=0;
+                if(!native_art_pixel(5,tile,ix&7,iy&7,&pixel) || !pixel)continue;
+                if((attr&0x8000u) || !(s_priority[x]&1u))out[x]=palette[pixel];
+                s_priority[x]|=2u;
+            }
+        }
+    }
+}
 /* FBZ reloads these reservations only after its returning title card leaves.
  * The expanded presentation owns original patterns, rather than borrowing
  * whichever glyph currently occupies the same native VRAM tile number. */
@@ -3216,6 +3272,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         *hud_origin=0;
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
+        mhz_capsule_preview_scanline(line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
