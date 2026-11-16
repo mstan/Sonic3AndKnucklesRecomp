@@ -370,10 +370,22 @@ static int demo_level_exit(void)
     return native_demo() && (g_ram[0xF600]&127)==4 && s_frame_level &&
         s_frame_zone==g_ram[0xFE10] && s_frame_act==g_ram[0xFE11];
 }
+static int stage_map_width(unsigned chunks,unsigned zone,unsigned act)
+{
+    int w=(int)chunks*128;
+#ifndef SONIC3_STANDALONE
+    /* FBZ1 stores alternate room layouts at X=$3000 and beyond. Its
+     * native screen events copy those templates into the playable map;
+     * the $4400-wide storage header is not a visible stage boundary. */
+    if(zone==4 && !act && chunks==0x88)w=0x3000;
+#else
+    (void)zone;(void)act;
+#endif
+    return w>=320 && w<=32768?w:320;
+}
 static int stage_width(void)
 {
-    int w=ram16(0x8000)*128;
-    return w>=320 && w<=32768?w:320;
+    return stage_map_width(ram16(0x8000),g_ram[0xFE10],g_ram[0xFE11]);
 }
 static int level_ready(void)
 {
@@ -2494,8 +2506,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int camera_y=(mgz2_collapse || lbz1_columns)?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
         if(level) {
-            int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
-            s_stage_width=stage>=320 && stage<=32768?stage:320;
+            unsigned chunks=((unsigned)s_world_frame[0x8000]<<8)|s_world_frame[0x8001];
+            s_stage_width=stage_map_width(chunks,s_frame_zone,s_frame_act);
         }
         /* HScroll/VScroll include heat and underwater deformation. Those
          * offsets belong to the planes, never to the object camera or the
