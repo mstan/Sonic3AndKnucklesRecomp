@@ -850,8 +850,7 @@ static void scene_mode_changed(int was_enabled)
         s_frame_menu=MENU_NONE;s_frame_level=0;
         for(unsigned n=0;n<3;++n)s_history[n].serial=0;
     }
-    /* Once adopted, the host loader also maintains a native-width window
-     * on opt-out until the next level init, preserving existing object state. */
+    /* The native cursor remains authoritative when expanded admission ends. */
 }
 static int zoom_offset(int offset, unsigned zoom)
 {
@@ -1034,6 +1033,13 @@ static void spawn_scene(void)
         int best=-1,distance=INT_MAX;
         for(unsigned i=0;i<s_placement_count;++i) {
             Placement *p=&s_placements[i];
+            /* The cartridge cursor owns its complete preload interval, not
+             * just the visible 320px. A collapsing actor deliberately clears
+             * its respawn bit while its cursor stays past that placement.
+             * Rechecking that cell each tick would resurrect it immediately.
+             * Only admit additional cells outside the original interval. */
+            if((int)p->x>=((camera-128)&~127) &&
+               (int)p->x<(camera&~127)+640)continue;
             /* Native clears bit 7 for live placements before a bonus/act
              * reload. A separate host-loaded latch outlives that clear and
              * suppresses valid incoming actors. Keep native respawn state
@@ -1084,13 +1090,6 @@ static void spawn_scene(void)
         write32(o,placement_code(p));
         ++s_spawned;
     }
-    unsigned r=0,l=0;
-    while(r<s_placement_count && s_placements[r].x<(unsigned)((camera&~127)+640))++r;
-    while(l<s_placement_count && (int)s_placements[l].x<((camera-128)&~127))++l;
-    write32(0xF772,s_placement_base+r*6);write32(0xF776,s_placement_base+l*6);
-    write16(0xF77A,0xEB00+r);write16(0xF77C,0xEB00+l);
-    write16(0xF76E,camera&0xFF80);write16(0xF770,cy&0xFF80);
-    write16(0xF7DA,(camera-128)&0xFF80);write16(0xEF64,(cy-128)&0xFF80);
 }
 static S3VideoRingLayout s_ring_layout;
 void s3_video_set_ring_layout(S3VideoRingLayout fn) { s_ring_layout = fn; }
@@ -1576,7 +1575,7 @@ int s3_video_hook(uint32_t pc)
     /* A background replacement needs host composition, while native-size
      * gameplay keeps the cartridge's loader, ring ranges and culling. */
     if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active) && g_ram[0xFE10]<19) {
-        spawn_scene();return 1;
+        spawn_scene();return 0;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
     switch(pc) {

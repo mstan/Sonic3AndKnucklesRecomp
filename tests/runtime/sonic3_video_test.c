@@ -257,9 +257,10 @@ static void test_native_placement_residency(void)
     CHECK(configure("32:9"));width(796,224,320,224);
     g_ram[0xF600]=12;g_ram[0xF711]=1;write32(0xB000,1);
     word(g_ram,0xFE10,0x701);word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
-    write16(0xEE78,0x400);write16(0xEE7C,0x700);write16(0xB010,0x485);
-    /* The real MHZ2 entry's placement fields; the fixture supplies only its
-     * dispatch marker, leaving native respawn and slot ownership observable. */
+    write16(0xEE78,0x200);write16(0xEE7C,0x700);write16(0xB010,0x485);
+    /* The real MHZ2 entry's placement fields, beyond the original preload
+     * interval at this camera. The fixture supplies only its dispatch marker,
+     * leaving native respawn and slot ownership observable. */
     longword(g_rom,S3_PLACEMENTS+7*8+4,0x100000);
     word(g_rom,0x100000,0x4E8);word(g_rom,0x100002,0x7EC);
     g_rom[0x100004]=0x82;g_rom[0x100005]=0x20;word(g_rom,0x100006,65535);
@@ -297,6 +298,24 @@ static void test_native_placement_residency(void)
     CHECK(ram16(0xCB2A)==0xEB00 && g_ram[0xEB00]==0x80);
     g_ram[0xEB00]=0;spawn_scene();
     CHECK(s_pool_pressure==1 && !g_ram[0xEB00] && !scene_read32(0xFFB0DE));
+    /* Within the original 128px-aligned preload interval, only the ROM
+     * cursor may admit a placement. Fragment creation intentionally clears
+     * its bit without moving that cursor; a stationary scan must not reload
+     * the parent. Keep the native front/back pointers and coarse cells too. */
+    memset(g_ram+0xB128,0,0xCAE2+0x4A-0xB128);
+    write16(0xEE78,0x400);g_ram[0xF76C]=4;
+    write16(0xF76E,0x400);write16(0xF770,0x700);
+    write32(0xF772,0x100006);write32(0xF776,0x100000);
+    write16(0xF77A,0xEB01);write16(0xF77C,0xEB00);
+    write16(0xF7DA,0x380);write16(0xEF64,0x680);
+    uint8_t cursor[18];memcpy(cursor,g_ram+0xF76C,sizeof cursor);
+    for(unsigned tick=0;tick<128;++tick) {
+        int handled=s3_video_hook(S3_LOAD_UPDATE);
+        CHECK(!g_ram[0xEB00] && !scene_read32(0xFFB128));
+        CHECK(!handled);
+        CHECK(!memcmp(cursor,g_ram+0xF76C,sizeof cursor));
+        CHECK(ram16(0xF7DA)==0x380 && ram16(0xEF64)==0x680);
+    }
     CHECK(configure("off"));
 }
 static void test_fbz_title_card_ownership(void)
@@ -4213,9 +4232,9 @@ int main(int argc,char **argv)
     g_rom[0x10000A]=2;word(g_rom,0x10000C,65535);
     write32(0xEF5A,0x110000);longword(g_rom,0x110004,0x123456);longword(g_rom,0x110008,0x234567);
     longword(g_rom,0x5CC9A,0x123456);longword(g_rom,0x5CC9E,0x234567);
-    CHECK(configure("10:7"));width(1,1,320,224);
-    s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,1);
-    CHECK(s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
+    CHECK(configure("20:9"));width(1,1,320,224);
+    s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,128);
+    CHECK(!s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
     /* Cross a real activation cell, then replay it with restored WRAM and
      * placement-table identity. No future host residency latch may hide it. */
     static uint8_t loader_ram[65536],loaded_ram[65536];
@@ -4224,7 +4243,7 @@ int main(int argc,char **argv)
     S3StateIO loader_io={loader_blob,sizeof loader_blob,0,0,1};
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
     size_t loader_bytes=loader_io.pos;
-    write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    write16(0xEE78,0);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
     CHECK(!scene_read32(0xFFB0DE));
     CHECK(scene_read32(0xFFB128)==0x123456 && ram16(0xB138)==640 && ram16(0xB170)==0xEB00);
     memcpy(loaded_ram,g_ram,sizeof loaded_ram);
@@ -4234,7 +4253,7 @@ int main(int argc,char **argv)
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
     loader_io=(S3StateIO){loader_blob,loader_bytes,0,2,1};
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
-    presentation_reset();write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    presentation_reset();write16(0xEE78,0);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
     CHECK(!memcmp(loaded_ram,g_ram,sizeof loaded_ram));
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
@@ -4252,9 +4271,8 @@ int main(int argc,char **argv)
         word(g_ram,0x8000,256);s_placement_count=0;g_ram[0xEB02]=0;
         write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
         CHECK(!(g_ram[0xEB02]&128));
-        write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
-        CHECK(g_ram[0xEB02]&128);
-        CHECK(scene_read32(0xFFB1BC)==hcz_scripted[i]);write32(0xB1BC,0);
+        write16(0xEE78,0x2E00);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+        CHECK(!(g_ram[0xEB02]&128)); /* Handed to the native cursor, not duplicated. */
     }
     g_ram[0xEB02]=0;
     longword(g_rom,0x11000C,S3_AIZ_MINIBOSS_CUTSCENE);
@@ -4263,9 +4281,8 @@ int main(int argc,char **argv)
     s_placement_count=0;
     write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!(g_ram[0xEB02]&128));
-    write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
-    CHECK(g_ram[0xEB02]&128);
-    CHECK(scene_read32(0xFFB1BC)==S3_AIZ_MINIBOSS_CUTSCENE);
+    write16(0xEE78,0x2E00);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!(g_ram[0xEB02]&128));
     /* A placed capsule must survive an approach/backtrack before the boss
      * locks the camera. Native deletion intentionally keeps its loaded bit. */
     word(g_rom,0x100012,0x4560);word(g_rom,0x100014,0x8060);g_rom[0x100016]=4;
@@ -4276,9 +4293,8 @@ int main(int argc,char **argv)
     CHECK(!(g_ram[0xEB03]&128));
     write16(0xEE78,16886);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!(g_ram[0xEB03]&128));
-    write16(0xEE78,0x4390);s3_video_hook(S3_LOAD_UPDATE);
-    CHECK(g_ram[0xEB03]&128);
-    CHECK(scene_read32(0xFFB206)==S3_EGG_CAPSULE);
+    write16(0xEE78,0x4390);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!(g_ram[0xEB03]&128));
     /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
      * the two earlier slots and verify a real placement goes past it. */
     write32(0xB172,0);write32(0xB1BC,0);
@@ -4286,7 +4302,7 @@ int main(int argc,char **argv)
     word(g_rom,0x100000,640);word(g_rom,0x100002,0x8060);
     word(g_rom,0x100006,65535);
     g_rom[0x100004]=1;g_ram[0xEB00]=0;
-    word(g_ram,0xFE10,0x100);write16(0xEE78,128);s_placement_count=0;
+    word(g_ram,0xFE10,0x100);write16(0xEE78,0);s_placement_count=0;
     s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!scene_read32(0xFFB172));
     CHECK(scene_read32(0xFFB1BC)==0x123456);
