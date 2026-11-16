@@ -78,6 +78,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
     unsigned roots[10],kinds[10],headers[10],root_count=0,header;
     int prototype_oneup=music && c->source.prototype &&
         input==s3_sound_music_source(&c->source,c->rom,0x2A);
+    int prototype_competition=music && c->source.prototype && input==0xD4CB8;
     c->input_bank=input&~0x7FFFu;c->count=0;c->voices=-1;memset(c->map,0xFF,sizeof c->map);
     unsigned fm=music?rb(c,input+2):0,psg=music?rb(c,input+3):0;
     if(music){
@@ -151,6 +152,13 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
          * setup. Replay that setup at each phrase boundary, leaving the
          * source ROM and all other tracks unchanged. */
         if(c->source.prototype&&pc==0xB911D&&op==0xF6&&n->target==0x8F35){n->target=0x8F2A;node(c,n->target,n->kind);}
+        /* Competition FM2 and its delayed FM5 echo share this phrase.
+         * Move its setup after the one-time $60 rest, inside the loop;
+         * otherwise later passes retain voice $0E and detune zero. */
+        if(prototype_competition && n->kind==0){
+            if(pc==0xD5067 || pc==0xD5069 || pc==0xD506B)n->encoded=0;
+            if(pc==0xD5072)n->encoded+=12;
+        }
         if(op!=0xE3 && op!=0xF2 && op!=0xF9 && op!=0xF6)node(c,n->pc+length,n->kind);
     }
     if(c->bad)return 0;
@@ -166,6 +174,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
     for(int i=0;i<c->count && !c->bad;i++){
         Node *n=&c->nodes[i];uint32_t pc=c->input_bank+(n->pc&0x7FFFu);size_t out=dest+n->output;unsigned op=rb(c,pc);
         if(!n->encoded)continue;
+        if(prototype_competition && n->kind==0 && pc==0xD5072){
+            static const uint8_t setup[]={0xFF,0x0D,0x0D,0xFF,1,3,0xFF,0x21,15,1,6,6};
+            memcpy(c->bank+out,setup,sizeof setup);out+=sizeof setup;
+        }
         if(op<0xE0){
             c->bank[out]=(uint8_t)(n->kind==1 && op>=0x81 && c->dac_map?c->dac_map[op&127]:op+(c->source.prototype && n->kind==1 && op>=0x81?70:0));
             continue;

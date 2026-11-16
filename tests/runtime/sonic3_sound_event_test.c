@@ -7,7 +7,7 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 static uint32_t be32(const uint8_t *p){return ((uint32_t)p[0]<<24)|((uint32_t)p[1]<<16)|((uint32_t)p[2]<<8)|p[3];}
 static unsigned be16(const uint8_t *p){return ((unsigned)p[0]<<8)|p[1];}
-static unsigned fbz_loop_ticks(const uint8_t *bank,unsigned song,unsigned fm,unsigned used)
+static unsigned fbz_loop_ticks(const uint8_t *bank,unsigned song,unsigned fm,unsigned used,unsigned loop)
 {
     unsigned pc=song+be16(bank+song+8+fm*4),last=0,ticks=0,first=0,jumps=0;
     for(unsigned guard=0;guard<10000 && pc<used;guard++){
@@ -21,9 +21,11 @@ static unsigned fbz_loop_ticks(const uint8_t *bank,unsigned song,unsigned fm,uns
         CHECK(pc<used);op=bank[pc++];
         if(op==0x14){
             CHECK(pc+2<=used);pc=(unsigned)((int)pc+1+(int16_t)be16(bank+pc));
-            if(jumps++)return ticks-first;
-            first=ticks;
-        }else if(op==0x0D || op==0 || op==1)++pc;
+            if(!loop || pc==loop){
+                if(jumps++)return ticks-first;
+                first=ticks;
+            }
+        }else if(op==0x0D || op==0 || op==1 || op==6)++pc;
         else if(op==0x21)pc+=4;
         else CHECK(0);
     }
@@ -128,8 +130,8 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
     /* Both lead and delayed echo must keep the same period on subsequent
      * loops. The source's stray note formerly made FM5 2412, not 2400. */
     unsigned fbz=(be32(bank+seq->music_index-0x400000+4*8)&0xFFFFFF)-0x400000;
-    CHECK(fbz_loop_ticks(bank,fbz,1,used)==2400);
-    CHECK(fbz_loop_ticks(bank,fbz,5,used)==2400);
+    CHECK(fbz_loop_ticks(bank,fbz,1,used,0)==2400);
+    CHECK(fbz_loop_ticks(bank,fbz,5,used,0)==2400);
     /* CNZ1 FM5 must reapply its lead voice/detune/modulation each loop,
      * rather than retaining voice 5 from the end of the preceding phrase. */
     unsigned cnz=(be32(bank+seq->music_index-0x400000+4*6)&0xFFFFFF)-0x400000;
@@ -139,6 +141,26 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
     for(unsigned pc=fm5;pc+4<cnz+be16(bank+cnz);pc++)
         if(bank[pc]==0xFF&&bank[pc+1]==0x14&&(unsigned)((int)pc+3+(int16_t)be16(bank+pc+2))==loop)++hits;
     CHECK(hits==1);
+    /* Competition FM2/FM5 share one phrase. The initial $60 rest must
+     * occur only once; each later loop restores voice $0D/detune3 before
+     * its first event instead of retaining the phrase's final voice. */
+    unsigned competition=(be32(bank+seq->music_index-0x400000+4*(0x2D-1))&0xFFFFFF)-0x400000;
+    unsigned fm2=competition+be16(bank+competition+8+2*4);
+    static const uint8_t competition_setup[]={0xFF,0x0D,0x0D,0xFF,1,3,0xFF,0x21,15,1,6,6};
+    CHECK(bank[fm2]==0x80 && bank[fm2+1]==0x60);
+    CHECK(!memcmp(bank+fm2+2,competition_setup,sizeof competition_setup));
+    unsigned fm5_echo=competition+be16(bank+competition+8+5*4);
+    CHECK(bank[fm5_echo]==0x80 && bank[fm5_echo+1]==3);
+    CHECK(bank[fm5_echo+2]==0xFF && bank[fm5_echo+3]==0x14);
+    CHECK((unsigned)((int)fm5_echo+5+(int16_t)be16(bank+fm5_echo+4))==fm2);
+    hits=0;
+    for(unsigned pc=competition;pc+4<competition+be16(bank+competition);pc++)
+        if(bank[pc]==0xFF && bank[pc+1]==0x14 &&
+           (unsigned)((int)pc+3+(int16_t)be16(bank+pc+2))==fm2+2)++hits;
+    CHECK(hits==1);
+    unsigned competition_ticks=fbz_loop_ticks(bank,competition,2,used,fm2+2);
+    CHECK(competition_ticks==fbz_loop_ticks(bank,competition,5,used,fm2+2));
+    printf("PASS Competition lead/echo loop period %u ticks, one-time96-tick lead-in and3-tick echo\n",competition_ticks);
     /* The proposed Wai mini-boss/retail boss pairing also fits over a full
      * campaign selection without touching either the other song or SFX. */
     for(unsigned i=0;i<2;i++){
