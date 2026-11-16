@@ -2350,6 +2350,15 @@ static void test_mhz2_rotor_margins(void)
             }
             CHECK(out[0]==0x12345678u && out[797]==0x12345678u);
         }
+    /* The published MHZ scene retains the projected pose even if the
+     * next live context has changed. State publication owns this dispatch. */
+    s_build.world_tag=0x702;s_frame_level=0;s_frame_zone=0;s_frame_act=0;
+    s_build.count=1;s_build.sprites[0]=(SceneSprite){0x45BB-240,216,1,0,SCENE_MHZ_ROTOR,256,5};
+    for(unsigned i=0;i<798;++i)out[i]=0x12345678u;
+    memset(s_priority,0,796);draw_scene_sprites(&v,82,out+1,796,238,pal);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==((x<6)?0xFFFF0000u:0x12345678u));
+    CHECK(out[0]==0x12345678u && out[797]==0x12345678u);
+    s_build.world_tag=0;s_frame_level=1;s_frame_zone=7;s_frame_act=1;
     /* Native borrow leaves both actor positions zero before arrival. Do
      * not wrap a phantom rotor ahead of the finite incoming ship. */
     s_build.count=0;word(g_ram,0xA800,0x47BA);word(g_ram,0xB128+0x14,0);word(g_ram,0xB172+0x14,0);
