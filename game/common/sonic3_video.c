@@ -130,7 +130,7 @@ typedef struct {
     GVDP video;
     uint8_t world[0x10000],background[0x10000];
     int width,left,camera,stage_width,native_x,camera_y,knux_x,knux_y;
-    int level,special,bonus,fg_x,fg_y,bg_y,menu;
+    int level,special,bonus,fg_x,fg_y,bg_y,menu,mhz_custom;
     unsigned zone,act,bg_event,tree_reveal;
     int bg_band[2];
     uint32_t rocket_origin;
@@ -213,6 +213,59 @@ static size_t art_kosm(unsigned address,size_t compressed,uint8_t *out,size_t ca
     }
     return n==total?n:0;
 }
+/* MHZ installs its custom layout before three independent decompression
+ * queues finish replacing its chunks, blocks and patterns. RAM in between
+ * is not a drawable world. Own that selected cartridge family atomically;
+ * the installed VDP still owns the original viewport during the upload. */
+#ifndef SONIC3_STANDALONE
+static struct {
+    int attempted,ready;
+    size_t chunks_size,blocks_size;
+    uint8_t chunks[0x980],blocks[0x3F8],tiles[0x25C0];
+} s_mhz_custom;
+static uint8_t s_mhz_custom_patterns[0x10000]; /* current row context scratch */
+static int mhz_custom_load(void)
+{
+    if(s_mhz_custom.attempted)return s_mhz_custom.ready;
+    s_mhz_custom.attempted=1;
+    size_t used=0;
+    s_mhz_custom.chunks_size=art_kos(g_rom+0x1A30E8,0x480,
+        s_mhz_custom.chunks,sizeof s_mhz_custom.chunks,&used);
+    s_mhz_custom.blocks_size=art_kos(g_rom+0x1A1B36,0x380,
+        s_mhz_custom.blocks,sizeof s_mhz_custom.blocks,&used);
+    if(s_mhz_custom.chunks_size!=sizeof s_mhz_custom.chunks ||
+       s_mhz_custom.blocks_size!=sizeof s_mhz_custom.blocks ||
+       art_kosm(0x1A1EB6,0x1232,s_mhz_custom.tiles,sizeof s_mhz_custom.tiles)!=sizeof s_mhz_custom.tiles)return 0;
+    return s_mhz_custom.ready=1;
+}
+static int mhz_custom_pending(const uint8_t *ram)
+{
+    if(ram[0xFE10]!=7 || ram[0xFE11]!=1 ||
+       memcmp(ram+0x8000,g_rom+0xA8044,0x1000))return 0;
+    unsigned count=(((unsigned)ram[0xFF0E]<<8)|ram[0xFF0F])&0x7FFFu;
+    if(count>4)return 0;
+    for(unsigned n=0;n<count;++n) {
+        unsigned p=0xFF40+n*8;
+        unsigned src=((unsigned)ram[p]<<24)|((unsigned)ram[p+1]<<16)|
+            ((unsigned)ram[p+2]<<8)|ram[p+3];p+=4;
+        unsigned dst=((unsigned)ram[p]<<24)|((unsigned)ram[p+1]<<16)|
+            ((unsigned)ram[p+2]<<8)|ram[p+3];
+        if((src>=0x1A30E8u && src<0x1A3568u && dst>=0xFFFF2280u && dst<0xFFFF2C00u) ||
+           (src>=0x1A1B36u && src<0x1A1EB6u && dst>=0xFFFF9B28u && dst<0xFFFF9F20u))return mhz_custom_load();
+    }
+    unsigned src=((unsigned)ram[0xFF64]<<24)|((unsigned)ram[0xFF65]<<16)|
+        ((unsigned)ram[0xFF66]<<8)|ram[0xFF67];
+    return ram[0xFF60] && src>=0x1A1EB8u && src<0x1A30E8u && mhz_custom_load();
+}
+static void mhz_custom_world(uint8_t *ram)
+{
+    memcpy(ram+0x2280,s_mhz_custom.chunks,s_mhz_custom.chunks_size);
+    memcpy(ram+0x9B28,s_mhz_custom.blocks,s_mhz_custom.blocks_size);
+}
+#else
+static int mhz_custom_pending(const uint8_t *ram){(void)ram;return 0;}
+static void mhz_custom_world(uint8_t *ram){(void)ram;}
+#endif
 static void load_aiz_art(void)
 {
     if(s_aiz_art_attempted)return;
@@ -2195,6 +2248,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!hold_level && !retain_bonus) {
             memcpy(s_world_frame,g_ram,sizeof s_world_frame);
             if(s_world_publish)s_world_publish(s_world_frame);
+            s_render->mhz_custom=s_frame_level && mhz_custom_pending(s_world_frame);
+            if(s_render->mhz_custom)mhz_custom_world(s_world_frame);
             s_frame_zone=g_ram[0xFE10];
             s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
             s_frame_tree_reveal=ram16(0xEEC4);
@@ -2240,6 +2295,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     }
     if(competition_scanline(v,line,native,nw,out,width,native_row,native_ctx,palette))return;
     v=&s_video_frame;
+#ifndef SONIC3_STANDALONE
+    if(!line && s_render->mhz_custom) {
+        memcpy(s_mhz_custom_patterns,v->vram,sizeof s_mhz_custom_patterns);
+        memcpy(s_mhz_custom_patterns+0x4440,s_mhz_custom.tiles,sizeof s_mhz_custom.tiles);
+    }
+#endif
     const uint8_t *card_ram=s_interpolating?s_world_frame:g_ram;
     if(s_display && s_display->scene==3 && s_display->bonus_card_valid && !card_ram[0xF711]){
         /* The bonus loading card temporarily retains the level-select
@@ -2696,6 +2757,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
     const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
     const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
+#ifndef SONIC3_STANDALONE
+    if(s_render->mhz_custom)world_patterns=s_mhz_custom_patterns;
+#endif
     int incoming_x=0,incoming_y=0;
     int hcz2_incoming=bg_world && width>320 && s_frame_zone==1 && s_frame_act==1 &&
         s_frame_bg_event<=12 && hcz2_panorama_position(line,&incoming_x,&incoming_y);
@@ -2784,6 +2848,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        if(s_render->mhz_custom && nx>=0 && nx<nw) {
+            int ax=nx-hs_a,ay=line+(fg_scroll&1023);
+            a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
+            b=plane_attr(v,base_b,reference_bx,by);bp=pattern_pixel(v,b,reference_bx,by);
+        }
         if(nx<0 && wx>=0 && wx<icz_snow_edge && !ap) {
             a=icz_snow_attr;ap=pattern_pixel(v,a,wx,wy);
         }

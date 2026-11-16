@@ -4028,6 +4028,58 @@ static void test_row_plane_colors(void)
         CHECK(plane_color_row(&colors,0,1,pixel,palettes[0])==palettes[0][pixel]);
 }
 #include "sonic3_aiz_join_test.inc"
+static void test_mhz_custom_publication(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,before_video;static uint8_t before_ram[65536];
+    uint32_t native[320]={0},out[798];
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(&s_mhz_custom,0,sizeof s_mhz_custom);
+    s_mhz_custom.attempted=s_mhz_custom.ready=1;
+    s_mhz_custom.chunks_size=128;s_mhz_custom.blocks_size=8;
+    for(unsigned n=0;n<64;++n)word(s_mhz_custom.chunks,n*2,0x165);
+    for(unsigned n=0;n<4;++n)word(s_mhz_custom.blocks,n*2,0x222);
+    memset(s_mhz_custom.tiles,0x22,sizeof s_mhz_custom.tiles);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;word(g_ram,0xFE10,0x701);
+    word(g_ram,0xEEC2,16);word(g_ram,0x8000,128);word(g_ram,0x8002,4);
+    for(unsigned row=0;row<32;++row) {
+        word(g_ram,0x8008+row*4,0x8100);word(g_ram,0x800A+row*4,0x8180);
+    }
+    memset(g_ram+0x8100,0x45,128);
+    for(unsigned n=0;n<64;++n)word(g_ram,0x2280+n*2,0x165);
+    for(unsigned n=0;n<4;++n)word(g_ram,0x9B28+n*2,3);
+    memcpy(g_rom+0xA8044,g_ram+0x8000,0x1000);
+    word(g_ram,0xFF0E,0x8001);longword(g_ram,0xFF40,0x1A1B38);longword(g_ram,0xFF44,0xFFFF9B2A);
+    word(g_ram,0xEE78,1024);word(g_ram,0xEE80,1024);word(g_ram,0xEEAA,0xFFF);
+    write32(0xB000,0x1234);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xC000+n*2,1);
+    word(v.vram,0xF000,(uint16_t)-1024);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x702;
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    memcpy(before_ram,g_ram,sizeof g_ram);memcpy(&before_video,&v,sizeof v);
+    out[0]=out[797]=0xDEADBEEF;
+    scanline(&v,0,native,320,out+1,796);
+    CHECK(s_render->mhz_custom && out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==(x>=s_native_x && x<s_native_x+320?0xFFFF0000u:0xFF00FF00u));
+    CHECK(!memcmp(g_ram,before_ram,sizeof g_ram) && !memcmp(&v,&before_video,sizeof v));
+    /* Unrelated module work, another layout/act and a completed queue do
+     * not acquire this bank. The module's own native source is sufficient
+     * after its RAM chunk/block jobs have left the decompression queue. */
+    word(g_ram,0xFF0E,0);g_ram[0xFF60]=0x81;longword(g_ram,0xFF64,0x1A26D8);
+    CHECK(mhz_custom_pending(g_ram));
+    longword(g_ram,0xFF64,0x1B0000);CHECK(!mhz_custom_pending(g_ram));
+    g_ram[0xFF60]=0;CHECK(!mhz_custom_pending(g_ram));
+    word(g_ram,0xFF0E,1);longword(g_ram,0xFF44,0xFFFF9B28);
+    g_ram[0x8009]^=1;CHECK(!mhz_custom_pending(g_ram));g_ram[0x8009]^=1;
+    g_ram[0xFE11]=0;CHECK(!mhz_custom_pending(g_ram));
+    memset(&s_mhz_custom,0,sizeof s_mhz_custom);CHECK(configure("off"));
+#endif
+}
 int main(int argc,char **argv)
 {
     /* Correctness tests retain the complete native-reference comparisons. */
@@ -4042,6 +4094,11 @@ int main(int argc,char **argv)
         load_aiz_art();CHECK(s_aiz_art_ready);
         CHECK(aiz_join_load());
         CHECK(load_aiz_monkey_art());
+#ifndef SONIC3_STANDALONE
+        CHECK(mhz_custom_load());
+        printf("MHZ complete custom chunks/blocks/patterns: %zu/%zu/%zu\n",
+            s_mhz_custom.chunks_size,s_mhz_custom.blocks_size,sizeof s_mhz_custom.tiles);
+#endif
         printf("AIZ joined original-map caches: %zu bytes\n",sizeof s_aiz_join_map+sizeof s_aiz_join_second);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
@@ -4508,6 +4565,7 @@ int main(int argc,char **argv)
     test_ordinary_capture_provider_scope();
 #endif
     test_private_plane_colors();
+    test_mhz_custom_publication();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
     test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
