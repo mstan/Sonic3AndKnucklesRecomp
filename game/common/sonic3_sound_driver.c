@@ -220,7 +220,7 @@ void s3_sound_post_reset(void)
     /* Both cartridge requests must use every kind of replacement, including
      * custom SMPS and the silent entries backing VGM/recorded/CD music. */
     if(s3_music_active(S3_MUSIC_MINIBOSS))
-        memcpy(bank+seq.music_index-0x400000+4*(0x2E-1),bank+seq.music_index-0x400000+4*(0x18-1),4);
+        memcpy(bank+seq.music_index-0x400000+4*(0x2E - 1),bank+seq.music_index-0x400000+4*(0x18 - 1),4);
     s3_sound_music_cache_free(&cache);for(unsigned d=0;d<S3_ROM_DONOR_COUNT;d++)free(owned[d]);
     if(s3_themes_enabled()){
         uint8_t hashes[64];recompui_sha256_compute(bank,stats.bytes,hashes);s3_cd_theme_identity(hashes+32);recompui_sha256_compute(hashes,sizeof hashes,theme_identity);
