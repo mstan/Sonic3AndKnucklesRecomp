@@ -599,7 +599,7 @@ static int load_menu_map(void)
 typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom,slot; } SceneSprite;
 static unsigned sprite_slot(const SceneSprite *s) { return s->slot&255u; }
 enum { IMPORTED_S1_PYLON = 0x7E0170u };
-enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12 };
+enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12, SCENE_MHZ_ROTOR = 13 };
 /* Only render ownership survives the original off-left deletion. Original
  * mappings/art remain in ROM; no guest object or provider pointer is held. */
 typedef struct { int16_t x,y; uint8_t frame,cursor,timer,flip; } AizPlaneObject;
@@ -807,6 +807,43 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
         q->slot=(uint16_t)(s_capture_slot|(native_art_owner(map)<<8));
     }
+}
+
+/* The two native propeller slots use 9-bit screen positions. Before a
+ * native mount arrives, sub_54FEC leaves its position at zero; afterwards
+ * that position wraps in the 512px canvas. Extend only its original pose,
+ * clipped to margins, without activating another actor or touching WRAM. */
+static void extend_mhz_ship_rotor(unsigned o,unsigned map,unsigned frame,unsigned gfx,unsigned flags)
+{
+#ifndef SONIC3_STANDALONE
+    if(!enabled() || s_requested_width<=320 || s_capture_frame->scene!=1 ||
+       ram16(0xFE10)!=0x701 || ram16(0xEEC0)!=16 || map!=0x55908 ||
+       scene_read32(0xFF0000u+o)!=0x5582E || (flags&4) || frame<5 || frame>7)return;
+    int which=o==ram16(0xA80C)?0:o==ram16(0xA80E)?1:-1;
+    if(which<0)return;
+    int end=ram16(0x8000)*128;
+    if(end<=0x4280 || end>32768)return;
+    int ship=ram16(0xA800),bob=ram16(0xEE9C);
+    int anchor=(which?0x45B8:0x46B8)+0x5C-128;
+    int left=-(s_requested_width-320)/2,right=320+(s_requested_width-320+1)/2;
+    int reach=s_requested_width/512+2;
+    for(int n=-reach;n<=reach;++n) {
+        int wx=anchor+n*512;
+        /* These source columns belong to the finite ending bank. A rotor
+         * never initialized by the native routine cannot wrap ahead of the
+         * approaching ship into its otherwise empty foreground. */
+        if(wx<0x4280 || wx>=end || (n>0 && !ram16(o+0x14)) ||
+           wx-ship<left-64 || wx-ship>right+64)continue;
+        unsigned first=s_capture_frame->count;
+        add_mapping(map,frame,gfx,flags&3u,wx-ship,0xD8-bob,SCENE_MHZ_ROTOR,0,256);
+        for(unsigned i=first;i<s_capture_frame->count;++i) {
+            s_capture_frame->sprites[i].x+=ship;
+            s_capture_frame->sprites[i].y+=bob;
+        }
+    }
+#else
+    (void)o;(void)map;(void)frame;(void)gfx;(void)flags;
+#endif
 }
 
 static void extend_hcz_surface(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
@@ -1285,6 +1322,7 @@ static void capture_objects(void)
                     add_mapping(map,g_ram[child+5],gfx,flags,sx,sy,anchor,0,zoom);
                 }
             } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
+            extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
             if(pylon) {
                 unsigned end=s_capture_frame->count;
                 int lo=left-cam,hi=lo+s_requested_width;
@@ -1813,12 +1851,32 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
         unsigned pattern_bytes;
         const uint8_t *patterns=presentation_sprite_patterns(s->size,&pattern_bytes);
         int world=!s->hud && s_display->scene==1;
+        int native_rotor=0;
+#ifndef SONIC3_STANDALONE
+        if(s->hud==2 && s_frame_level && s_frame_zone==7 && s_frame_act==1 &&
+           (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16 &&
+           slot>0 && slot<SCENE_SLOTS && s_display->code[slot]==0x5582E) {
+            unsigned o=0xB000u+(slot-1u)*0x4Au;
+            native_rotor=o==(((unsigned)s_world_frame[0xA80C]<<8)|s_world_frame[0xA80D]) ||
+                         o==(((unsigned)s_world_frame[0xA80E]<<8)|s_world_frame[0xA80F]);
+        }
+#endif
         int dx=0,dy=0;
         if(world && s_interpolating)presentation_object_delta(s,&dx,&dy);
         if(s->hud==5 && s_interpolating)presentation_aiz_plane_delta(&dx,&dy);
         int y=s->y+(world?s_display->camera_y-s_camera_y:0)+dy;
+        int rotor_x=0;
+        if(s->hud==SCENE_MHZ_ROTOR) {
+            unsigned hsbase=(v->reg[13]&63u)<<10;
+            int hs=(int16_t)vram16(v,hsbase),bg=0;
+            presentation_scroll(0,&hs,&bg);
+            int reference=((unsigned)s_world_frame[0xA800]<<8)|s_world_frame[0xA801];
+            rotor_x=unwrap(-hs,reference);
+            reference=((unsigned)s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
+            y-=unwrap((int)presentation_fg_scroll(0,v->vsram[0]),reference);
+        }
         if(line<y || line>=y+drawn_height)continue;
-        int base=s->x+(s->hud==1?0:s->hud>=2?(width-320)/2:origin)+dx;
+        int base=s->x+(s->hud==1?0:s->hud>=2?(width-320)/2:origin)+dx-rotor_x;
         if(s->hud>=6 && s->hud<=8 && slot<SCENE_SLOTS) {
             if(card_slot!=slot) {
                 card_slot=slot;
@@ -1852,7 +1910,11 @@ static void draw_scene_sprites(const GVDP *v,int line,uint32_t *out,int width,
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
                                  x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
-            if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
+            if((s->hud==5 || s->hud==SCENE_MHZ_ROTOR) && x>=(width-320)/2 && x<(width+320)/2)continue;
+            /* The native pose remains authoritative inside320px. Its
+             * stale/wrapped screen position must not ghost over the lifted
+             * presentation of that same rotor in either added margin. */
+            if(native_rotor && (x<(width-320)/2 || x>=(width+320)/2))continue;
             if((s->size&0xD0u)==0x50u && (s_priority[x]&4u))continue;
             int ix=i*256/(int)zoom;
             if(s->size&0x20u)ix=(ix+dx)&31;

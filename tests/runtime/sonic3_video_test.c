@@ -2252,6 +2252,72 @@ static void test_mhz2_ship_cameras(void)
 #else
 static void test_mhz2_ship_cameras(void){}
 #endif
+#ifndef SONIC3_STANDALONE
+static void test_mhz2_rotor_margins(void)
+{
+    static GVDP v;uint32_t out[798],pal[64]={0};uint8_t before[65536];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_capture_frame=&s_build;
+    word(g_ram,0xFE10,0x701);word(g_ram,0xEEC0,16);word(g_ram,0x8000,0x90);
+    word(g_ram,0xA80C,0xB128);word(g_ram,0xA80E,0xB172);
+    word(g_ram,0xA800,0x45BB);word(g_ram,0xEE9C,0x86);
+    write32(0xB128,0x5582E);write32(0xB172,0x5582E);write32(0xB1BC,0x5582E);
+    word(g_ram,0xB128+0x14,210);word(g_ram,0xB172+0x14,210);
+    /* One original mapping cell and live VRAM; no invented ROM/art cache. */
+    word(g_rom,0x55908+5*2,0x20);word(g_rom,0x55928,1);
+    g_rom[0x5592A]=g_rom[0x5592B]=0;word(g_rom,0x5592C,0);word(g_rom,0x5592E,0);
+    memset(v.vram+32,0x11,32);pal[1]=0xFFFF0000u;
+    v.reg[13]=0x3C;word(v.vram,0xF000,(uint16_t)-0x45BB);v.vsram[0]=0x86;
+    memcpy(before,g_ram,sizeof before);
+    s_capture_slot=5;extend_mhz_ship_rotor(0xB128,0x55908,5,1,0);
+    s_capture_slot=6;extend_mhz_ship_rotor(0xB172,0x55908,5,1,0);
+    CHECK(s_build.count>0);
+    for(unsigned i=0;i<s_build.count;++i) {
+        CHECK(s_build.sprites[i].hud==SCENE_MHZ_ROTOR);
+        CHECK(s_build.sprites[i].x>=0x4280 && s_build.sprites[i].x<0x4800);
+    }
+    unsigned count=s_build.count;
+    extend_mhz_ship_rotor(0xB1BC,0x55908,5,1,0);CHECK(s_build.count==count);
+    extend_mhz_ship_rotor(0xB172,0x55908,4,1,0);CHECK(s_build.count==count);
+    extend_mhz_ship_rotor(0xB172,0x55909,5,1,0);CHECK(s_build.count==count);
+    /* Original native cells include a stale wrapped left pose. Only the
+     * native-center original survives alongside the new margin poses. */
+    s_build.code[5]=s_build.code[6]=0x5582E;
+    s_build.sprites[s_build.count++]=(SceneSprite){217,82,1,0,2,256,5};
+    s_build.sprites[s_build.count++]=(SceneSprite){-36,82,1,0,2,256,6};
+    s_display=&s_build;s_frame_level=1;s_frame_zone=7;s_frame_act=1;
+    memcpy(s_world_frame,g_ram,sizeof g_ram);
+    for(unsigned i=0;i<798;++i)out[i]=0x12345678u;
+    memset(s_priority,0,796);draw_scene_sprites(&v,82,out+1,796,238,pal);
+    for(int x=0;x<796;++x) {
+        int red=(x>=199 && x<207)||(x>=455 && x<463)||(x>=711 && x<719);
+        CHECK(out[x+1]==(red?0xFFFF0000u:0x12345678u));
+    }
+    CHECK(out[0]==0x12345678u && out[797]==0x12345678u);
+    /* Installed scroll/bob may advance beyond the captured WRAM. Both
+     * margin copies follow that owner; native-center pixels stay untouched. */
+    word(v.vram,0xF000,(uint16_t)-0x45BC);v.vsram[0]=0x87;
+    for(unsigned i=0;i<798;++i)out[i]=0x12345678u;
+    memset(s_priority,0,796);draw_scene_sprites(&v,81,out+1,796,238,pal);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==(((x>=198 && x<206)||(x>=710 && x<718))?0xFFFF0000u:0x12345678u));
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    /* Native borrow leaves both actor positions zero before arrival. Do
+     * not wrap a phantom rotor ahead of the finite incoming ship. */
+    s_build.count=0;word(g_ram,0xA800,0x47BA);word(g_ram,0xB128+0x14,0);word(g_ram,0xB172+0x14,0);
+    extend_mhz_ship_rotor(0xB128,0x55908,5,1,0);extend_mhz_ship_rotor(0xB172,0x55908,5,1,0);
+    word(v.vram,0xF000,(uint16_t)-0x47BA);v.vsram[0]=0x86;
+    memcpy(s_world_frame,g_ram,sizeof g_ram);
+    for(unsigned i=0;i<798;++i)out[i]=0x12345678u;
+    memset(s_priority,0,796);draw_scene_sprites(&v,82,out+1,796,238,pal);
+    for(unsigned x=0;x<798;++x)CHECK(out[x]==0x12345678u);
+    count=s_build.count;
+    CHECK(configure("off"));extend_mhz_ship_rotor(0xB172,0x55908,5,1,0);CHECK(s_build.count==count);
+    s_display=NULL;
+}
+#else
+static void test_mhz2_rotor_margins(void){}
+#endif
 static void test_act_handoff_framing(void)
 {
     CameraHandoffPreview saved=s_handoff;int interpolating=s_interpolating;
@@ -4299,7 +4365,7 @@ int main(int argc,char **argv)
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
-    test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();
+    test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();test_mhz2_rotor_margins();
     test_private_plane_colors();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
