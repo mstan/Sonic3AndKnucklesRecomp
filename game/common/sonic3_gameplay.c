@@ -34,6 +34,7 @@ void s3_gameplay_load(const char *settings_path,const char *mode)
         if(!standalone_sk&&!strcmp(line,"competition_title_cards=1"))s3_gameplay.competition_title_cards=1;
         if(combined_mode&&!strcmp(line,"original_zone_order=1"))s3_gameplay.original_zone_order=1;
         if(!standalone_s3&&!strcmp(line,"early_zone_names=1"))s3_gameplay.early_zone_names=1;
+        if(!strcmp(line,"no_save_emeralds=1"))s3_gameplay.no_save_emeralds=1;
     }
     fclose(f);
 }
@@ -47,6 +48,7 @@ int s3_gameplay_save(void)
         s3_gameplay.easy_level_select,s3_gameplay.debug_mode,s3_gameplay.checkpoint_bonus,s3_gameplay.shield_transform,s3_gameplay.tails_ring_follow,s3_gameplay.competition_title_cards);
     fprintf(f,"original_zone_order=%d\n",s3_gameplay.original_zone_order);
     fprintf(f,"early_zone_names=%d\n",s3_gameplay.early_zone_names);
+    fprintf(f,"no_save_emeralds=%d\n",s3_gameplay.no_save_emeralds);
     int ok=!ferror(f);if(fclose(f))ok=0;
     if(!ok)goto failed;
 #ifdef _WIN32
@@ -61,7 +63,7 @@ failed:
 int s3_gameplay_netplay_allowed(void)
 { return !s3_gameplay.infinite_lives && !s3_gameplay.infinite_time &&
     !s3_gameplay.easy_level_select && !s3_gameplay.debug_mode &&
-    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards && !s3_gameplay.original_zone_order && !s3_gameplay.early_zone_names; }
+    !s3_gameplay.checkpoint_bonus && !s3_gameplay.shield_transform && !s3_gameplay.tails_ring_follow && !s3_gameplay.competition_title_cards && !s3_gameplay.original_zone_order && !s3_gameplay.early_zone_names && !s3_gameplay.no_save_emeralds; }
 static unsigned word(const uint8_t *ram,unsigned p)
 {return (unsigned)ram[p]<<8|ram[p+1];}
 static void put_word(uint8_t *ram,unsigned p,unsigned value)
@@ -294,6 +296,21 @@ void s3_gameplay_apply(uint8_t ram[65536])
      * menus, bonus stages and Competition. The normal game owns death/retry,
      * score awards, timer progression, checkpoints and act transitions. */
     if(ram[0xF600]!=12 || (ram[0xFE10]>=0x13 && ram[0xFE10]<=0x15))return;
+    /* No Save is represented by a null native Save_pointer, not the zone or
+     * the currently highlighted menu slot. Only change original-campaign
+     * working emeralds; native save slots and their SRAM are never touched. */
+    unsigned save=standalone_s3?0xE6B8u:0xE660u;
+    int native_campaign=ram[0xFE10]<0xEu;
+#ifdef S3_SOUND_COMBINED
+    if(s3_stage_pack_enabled)native_campaign=0;
+#endif
+    if(s3_gameplay.no_save_emeralds && native_campaign &&
+       !word(ram,save) && !word(ram,save+2)) {
+        if(standalone_s3)put_word(ram,0xFFB0,7);
+        else {ram[0xFFB0]=7;ram[0xFFB1]=combined_mode?7:0;}
+        memset(ram+0xFFB2,combined_mode?3:1,7);
+        if(!standalone_s3)ram[0xFFBA]=combined_mode?0xFF:0;
+    }
     /* Native B/A/C placement controls, never placement/result flags. Imported
      * rounds have different object tables; do not expose native debug there. */
     if(s3_gameplay.debug_mode)
@@ -312,8 +329,8 @@ void s3_gameplay_apply(uint8_t ram[65536])
 #include "recomp_launcher.h"
 static const RecompLauncherCModProvider *base;
 static const char package[]="sonic3.gameplay";
-static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","competition-title-cards","s1-checkpoint-bonus","tails-ring-follow","original-zone-order","early-zone-names"};
-static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Competition title cards","Sonic 1 checkpoint bonus stages","Tails giant-ring follow","Original zone order","Mushroom Valley name"};
+static const char *ids[]={"infinite-lives","infinite-time","easy-level-select","debug-mode","shield-transform","competition-title-cards","s1-checkpoint-bonus","tails-ring-follow","original-zone-order","early-zone-names","no-save-emeralds"};
+static const char *names[]={"Infinite lives","Infinite time","Easier level select","Debug mode","Shielded transformation","Competition title cards","Sonic 1 checkpoint bonus stages","Tails giant-ring follow","Original zone order","Mushroom Valley name","All emeralds in No Save"};
 static const char *descriptions[]={
     "Keep at least three lives, including after death and retry. Local play only.",
     "Disable the stage time limit. The clock counts to 99:59, then stays there. The 100,000-point time bonus applies only at 9:59. Local play only.",
@@ -324,9 +341,10 @@ static const char *descriptions[]={
     "Sonic 1 rounds only: collect at least 20 rings and enter the stars above an activated checkpoint to visit a native bonus stage. Local play only.",
     "Sonic 1 end-of-act giant rings: a nearby Tails companion runs and jumps after the leader. Tails enters only if he reaches the ring before the tally; distant or missing companions keep normal behavior. Local play only.",
     "Sonic 3 & Knuckles: visit Flying Battery after Carnival Night, then IceCap, Launch Base, Mushroom Hill and Sandopolis. Sandopolis starts on solid ground. Knuckles leaves Carnival Night with a fade and uses the short IceCap entrance. Uses the complete retail stages; native saves retain their original zone codes. Default off; local play only.",
-    "Use Mushroom Valley, the November 1993 level name, on native title cards and level select. The title lettering is reconstructed from your retail cartridge's font; the prototype's missing card is not claimed as recovered artwork. Default off; restart to apply. Local play only."};
-static int own_features(void){return combined_mode?10:6;}
-static int feature_index(int i){return standalone_sk && i==5?9:i;}
+    "Use Mushroom Valley, the November 1993 level name, on native title cards and level select. The title lettering is reconstructed from your retail cartridge's font; the prototype's missing card is not claimed as recovered artwork. Default off; restart to apply. Local play only.",
+    "Give No Save runs all seven Chaos Emeralds, plus all seven Super Emeralds in Sonic 3 & Knuckles. Saved games keep their earned emeralds. Original campaigns only; default off; local play only."};
+static int own_features(void){return combined_mode?11:7;}
+static int feature_index(int i){return i==own_features()-1?10:standalone_sk && i==5?9:i;}
 #define COPY(d,s) snprintf(d,sizeof(d),"%s",s)
 static int own(const char *p){return p&&!strcmp(p,package);}
 static int index_of(const char *f){for(int i=0;i<own_features();++i)if(f&&!strcmp(f,ids[feature_index(i)]))return feature_index(i);return -1;}
@@ -340,6 +358,7 @@ static int *value(int i){switch(i) {
     case 6:return &s3_gameplay.checkpoint_bonus;
     case 8:return &s3_gameplay.original_zone_order;
     case 9:return &s3_gameplay.early_zone_names;
+    case 10:return &s3_gameplay.no_save_emeralds;
     default:return &s3_gameplay.tails_ring_follow;
 }}
 static int packages(void *c){(void)c;return 1+(base&&base->package_count?base->package_count(base->ctx):0);}

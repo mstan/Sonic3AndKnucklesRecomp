@@ -279,10 +279,10 @@ static void test_provider_composition(void)
     b.feature_get=base_feature;b.feature_enable=base_enable;
     b.feature_option_get=base_option;b.commit_netplay=base_commit;
     const RecompLauncherCModProvider *p=s3_gameplay_mods(&b);
-    CHECK(p->ctx==&base_context && p->package_count(p->ctx)==2 && p->feature_count(p->ctx)==7);
+    CHECK(p->ctx==&base_context && p->package_count(p->ctx)==2 && p->feature_count(p->ctx)==8);
     RecompLauncherCModPackage package;RecompLauncherCModFeature feature;
     CHECK(p->package_get(p->ctx,1,&package)&&!strcmp(package.id,"fixture"));
-    CHECK(p->feature_get(p->ctx,6,&feature)&&!strcmp(feature.id,"base-feature"));
+    CHECK(p->feature_get(p->ctx,7,&feature)&&!strcmp(feature.id,"base-feature"));
     CHECK(p->feature_enable(p->ctx,"fixture","base-feature",1));
     CHECK(p->feature_option_get(p->ctx,"fixture","base-feature",3,NULL));
     CHECK(p->commit_netplay(p->ctx,"owned.bin"));
@@ -306,7 +306,7 @@ static void test_checkpoint_option(void)
         char path[128];snprintf(path,sizeof path,"%s/%s-gameplay.ini",dir,modes[i]);
         s3_gameplay_load("test-gameplay-modes/settings.ini",modes[i]);
         const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
-        CHECK(p->feature_count(p->ctx)==(i==2?10:6));
+        CHECK(p->feature_count(p->ctx)==(i==2?11:7));
         CHECK(!s3_gameplay.checkpoint_bonus && !s3_gameplay.tails_ring_follow && s3_gameplay_netplay_allowed());
         if(i==2) {
             CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","s1-checkpoint-bonus",1));
@@ -479,6 +479,57 @@ static void test_original_order(void)
     }
     CHECK(!REMOVE_DIR("test-original-order"));
 }
+static void test_no_save_emeralds(void)
+{
+    static uint8_t ram[65536],before[65536];
+    const char *modes[]={"sonic3","sandk","sonic3k"};
+    CHECK(!MAKE_DIR("test-no-save-emeralds"));
+    for(unsigned m=0;m<3;m++) {
+        s3_gameplay_load("test-no-save-emeralds/settings.ini",modes[m]);
+        const RecompLauncherCModProvider *p=s3_gameplay_mods(NULL);
+        CHECK(!s3_gameplay.no_save_emeralds && s3_gameplay_netplay_allowed());
+        memset(ram,0,sizeof ram);ram[0xF600]=12;
+        ram[0xFFB1]=2;ram[0xFFB3]=1;
+        memcpy(before,ram,sizeof ram);s3_gameplay_apply(ram);
+        CHECK(!memcmp(before,ram,sizeof ram));
+        CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","no-save-emeralds",1));
+        CHECK(!s3_gameplay_netplay_allowed() && !p->commit_netplay(p->ctx,NULL));
+        unsigned save=m==0?0xE6B8:0xE660;
+        /* Any non-null native save pointer excludes the whole feature. */
+        for(unsigned byte=0;byte<4;byte++) {
+            memcpy(ram,before,sizeof ram);ram[save+byte]=0x20;
+            uint8_t expected[65536];memcpy(expected,ram,sizeof ram);
+            s3_gameplay_apply(ram);CHECK(!memcmp(expected,ram,sizeof ram));
+        }
+        /* Native menus, bonus/special stages, Competition and demos retain
+         * their own emerald state. Test both bytes of their mode words. */
+        const unsigned excluded[]={0xF600,0xFE10,m==0?0xFFF0u:0xFFD0u,
+            m==0?0xFFF1u:0xFFD1u,m==0?0xFFD8u:0xFFE8u,m==0?0xFFD9u:0xFFE9u};
+        const uint8_t values[]={4,0x13,1,1,1,1};
+        for(unsigned i=0;i<sizeof excluded/sizeof *excluded;i++) {
+            memcpy(ram,before,sizeof ram);ram[excluded[i]]=values[i];
+            uint8_t expected[65536];memcpy(expected,ram,sizeof ram);
+            s3_gameplay_apply(ram);CHECK(!memcmp(expected,ram,sizeof ram));
+        }
+        memcpy(ram,before,sizeof ram);s3_gameplay_apply(ram);
+        CHECK(ram[0xFFB0]==(m==0?0:7) && ram[0xFFB1]==(m==1?0:7));
+        for(unsigned i=0;i<7;i++)CHECK(ram[0xFFB2+i]==(m==2?3:1));
+        CHECK(ram[0xFFBA]==(m==2?0xFF:0));
+        /* No native slot, SRAM shadow, ring collection or unrelated RAM is
+         * changed. Only the documented working emerald state may differ. */
+        memcpy(before+0xFFB0,ram+0xFFB0,9);before[0xFFBA]=ram[0xFFBA];
+        CHECK(!memcmp(before,ram,sizeof ram));
+        CHECK(p->commit(p->ctx,NULL));
+        s3_gameplay_load("test-no-save-emeralds/settings.ini",modes[m]);
+        CHECK(s3_gameplay.no_save_emeralds);
+        CHECK(p->feature_enable(p->ctx,"sonic3.gameplay","no-save-emeralds",0));
+        CHECK(s3_gameplay_netplay_allowed());
+        s3_gameplay_apply(ram);CHECK(!memcmp(before,ram,sizeof ram));
+        char file[128];snprintf(file,sizeof file,"test-no-save-emeralds/%s-gameplay.ini",modes[m]);
+        CHECK(!remove(file));
+    }
+    CHECK(!REMOVE_DIR("test-no-save-emeralds"));
+}
 int main(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -542,7 +593,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();test_original_order_entry();test_original_order_knuckles();test_level_select_checkpoint();
+    test_original_order();test_original_order_entry();test_original_order_knuckles();test_level_select_checkpoint();test_no_save_emeralds();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

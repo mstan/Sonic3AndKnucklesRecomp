@@ -31,6 +31,11 @@ prototype palettes, early badnik art and prototype backgrounds. Original zone
 order places Flying Battery before IceCap. These options apply to supported
 original campaigns; imported campaigns retain their own content.
 
+Gameplay options also offer **All emeralds in No Save**, disabled by default.
+It grants seven Chaos Emeralds in the standalone games and all fourteen
+Chaos and Super Emeralds in Sonic 3 & Knuckles. It applies only to original
+campaigns played without a save slot; saved games retain their earned progress.
+
 The music and graphics options require your own **Sonic the Hedgehog 3
 (Nov 3, 1993 prototype)** ROM. Each relevant mod links to the
 [Hidden Palace source documentation](https://hiddenpalace.org/Sonic_the_Hedgehog_3_(Nov_3,_1993_prototype)).
