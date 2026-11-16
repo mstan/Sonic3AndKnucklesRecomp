@@ -2083,27 +2083,32 @@ static unsigned fbz_deform_band(int y,const uint16_t *heights,unsigned count)
     while(band+1<count && y>=heights[band])y-=heights[band++];
     return band;
 }
-static void fbz_entrance_projection(int cx,int cy,int line,int outdoor,int *x,int *y)
+static int fbz_projection_x(int cx,int y,int outdoor)
 {
     static const uint16_t inside_height[]={0x80,0x40,0x20,0x8,0x8,0x8,0x8,0x28,0x30,0x8,0x4,0x4,0xb8,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0x30,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0xb0,0x30,0x28,0x40,0x18,0x30,0x7fff};
     static const uint8_t inside_speed[]={8,9,6,4,3,2,1,7,6,4,3,2,3,9,3,6,3,7,3,6,3,9,3,6,3,7,3,6,3,6,7,4,6,9,8};
     static const uint16_t outside_height[]={0x30,0x20,0x30,0x10,0x10,0x10,0x10,0x10,0x7fff};
     static const uint8_t outside_band[]={7,1,5,3,6,2,4,0,8};
     if(!outdoor) {
-        int half=cy>>1;*y=half-(half>>5)+line;
-        unsigned band=fbz_deform_band(*y,inside_height,sizeof inside_height/sizeof *inside_height);
-        *x=(cx*inside_speed[band])>>4;
-    } else {
-        *y=22+(int16_t)(((unsigned)s_world_frame[0xEEDA]<<8)|s_world_frame[0xEEDB])+line;
-        unsigned band=fbz_deform_band(*y,outside_height,sizeof outside_height/sizeof *outside_height);
-        unsigned n=outside_band[band];
-        uint32_t cloud=((uint32_t)s_world_frame[0xA9FC]<<24)|((uint32_t)s_world_frame[0xA9FD]<<16)|
-            ((unsigned)s_world_frame[0xA9FE]<<8)|s_world_frame[0xA9FF];
-        /* FBZ_Deform advances this accumulator after consuming its old value. */
-        if(((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7])cloud-=0xE00u;
-        uint32_t scroll=((uint32_t)cx<<12)+n*((uint32_t)cx<<11)+(n+1)*cloud;
-        *x=(int16_t)(scroll>>16);
+        unsigned band=fbz_deform_band(y,inside_height,sizeof inside_height/sizeof *inside_height);
+        return (cx*inside_speed[band])>>4;
     }
+    unsigned band=fbz_deform_band(y,outside_height,sizeof outside_height/sizeof *outside_height);
+    unsigned n=outside_band[band];
+    uint32_t cloud=((uint32_t)s_world_frame[0xA9FC]<<24)|((uint32_t)s_world_frame[0xA9FD]<<16)|
+        ((unsigned)s_world_frame[0xA9FE]<<8)|s_world_frame[0xA9FF];
+    /* The native outdoor deformation consumes the old wind phase, then
+     * advances it. The indoor branch leaves its next outdoor phase held. */
+    if(((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7])cloud-=0xE00u;
+    uint32_t scroll=((uint32_t)cx<<12)+n*((uint32_t)cx<<11)+(n+1)*cloud;
+    return (int16_t)(scroll>>16);
+}
+static void fbz_entrance_projection(int cx,int cy,int line,int outdoor,int *x,int *y)
+{
+    int half=cy>>1;
+    *y=outdoor?22+(int16_t)(((unsigned)s_world_frame[0xEEDA]<<8)|s_world_frame[0xEEDB])+line:
+        half-(half>>5)+line;
+    *x=fbz_projection_x(cx,*y,outdoor);
 }
 
 static uint16_t restored_art_color(unsigned color,const GVDP *v)
@@ -2291,26 +2296,38 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
 }
 /* Native deformation follows its 320px camera. At a bounded expanded
  * edge that camera can move inside a stationary physical view. Reproject
- * only the ordinary city/forest bands from the same published phase;
+ * only the ordinary city/forest/factory bands from the same published phase;
  * cutscene canvases and independently moving scenery retain their owners. */
 static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by)
 {
-    int delta=(width-nw)/2-origin,numerator=0,phase=camera;
-    if(width<=nw || !delta || !s_frame_level || s_frame_bg_event)return scroll;
-    if(s_frame_zone==3 && !s_frame_act) {
-        numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
-    }
+    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after;
+    if(width<=nw || !delta || !s_frame_level)return scroll;
 #ifndef SONIC3_STANDALONE
-    else if(s_frame_zone==7 && s_frame_act==1) {
-        numerator=12;
-        phase=(int16_t)(((unsigned)s_world_frame[0xEEB6]<<8)|s_world_frame[0xEEB7])+
-              camera-s_frame_fg_x;
-    }
+    if(s_frame_zone==4 && !s_frame_act) {
+        int outdoor=((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7];
+        /* Mixed doorway rows still use the installed deformation. Do not
+         * switch camera bases when the background redraw event changes. */
+        before=fbz_projection_x(camera,by,outdoor);
+        after=fbz_projection_x(camera+delta,by,outdoor);
+    } else
 #endif
-    if(!numerator)return scroll;
-    int before=phase*numerator,after=(phase+delta)*numerator;
-    before=before>=0?before/32:-((-before+31)/32);
-    after=after>=0?after/32:-((-after+31)/32);
+    {
+        if(s_frame_bg_event)return scroll;
+        if(s_frame_zone==3 && !s_frame_act) {
+            numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
+        }
+#ifndef SONIC3_STANDALONE
+        else if(s_frame_zone==7 && s_frame_act==1) {
+            numerator=12;
+            phase=(int16_t)(((unsigned)s_world_frame[0xEEB6]<<8)|s_world_frame[0xEEB7])+
+                  camera-s_frame_fg_x;
+        }
+#endif
+        if(!numerator)return scroll;
+        before=phase*numerator;after=(phase+delta)*numerator;
+        before=before>=0?before/32:-((-before+31)/32);
+        after=after>=0?after/32:-((-after+31)/32);
+    }
     /* Completed HScroll identifies the native bank. Fractional sampling
      * can round between its two adjacent integer phases. */
     int distance=(-scroll-before+256)&511;distance-=256;
@@ -2946,7 +2963,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 #ifndef SONIC3_STANDALONE
     fbz_entrance=fbz_canvas && !s_frame_act && width>nw && s_left<0x180 && s_camera_y>=0x400;
     if(fbz_entrance)for(unsigned side=0;side<2;++side) {
-        fbz_entrance_projection(s_camera,s_camera_y,line,(int)side,&fbz_x[side],&fbz_y[side]);
+        fbz_entrance_projection(s_left+(width-nw)/2,s_camera_y,line,(int)side,&fbz_x[side],&fbz_y[side]);
         world_art_row_init(&fbz_rows[side],s_background_frame,s_background_frame+0x9000,v->vram,fbz_y[side],1);
         memcpy(fbz_colors[side],palette,sizeof palette);
         for(unsigned color=0;color<8;++color) {

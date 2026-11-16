@@ -2599,10 +2599,13 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    /* Ordinary CNZ1/MHZ2 derive B from A, rather than holding B while A
+    /* Ordinary CNZ1/MHZ2/FBZ1 derive B from A, rather than holding B while A
      * moves. Their real deformation contract is tested separately below. */
     const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
+#ifndef SONIC3_STANDALONE
+        if(zones[z]==0x400)continue; /* Exact factory bands are tested below. */
+#endif
         word(g_ram,0xFE10,zones[z]);int canvas=widths[w];
         word(g_ram,0xEEC2,0);
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
@@ -2670,13 +2673,90 @@ static void test_bounded_parallax_projection(void)
         }
     }
 }
-static int restored_test_x,restored_test_pixels,restored_test_camera;
+static void test_fbz_bounded_camera_and_wind(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];
+    uint32_t native[320],out[796],private_reference[128];
+    /* Six retained native rows: three outdoor left-clamp phases and three
+     * indoor right-clamp phases. Expected eye phases are source-derived,
+     * including the original fixed-point wind carry before truncation. */
+    static const struct { int camera,scroll,by,outdoor,eye_scroll;uint32_t cloud; } samples[]={
+        {19,138,24,1,200,0x10BC00},{99,163,23,1,202,0x110200},
+        {163,183,23,1,204,0x114800},{11923,2235,651,0,2199,0x125200},
+        {11929,2236,651,0,2199,0x125200},{11936,2238,651,0,2199,0x125200},
+        /* Static native camera, eight authored wind updates: motion stays. */
+        {19,142,24,1,203,0x112C00},
+        /* An independent, nonmatching B phase must keep its own movement. */
+        {19,146,24,1,146,0x10BC00}
+    };
+    for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
+    for(unsigned n=0;n<sizeof samples/sizeof *samples;++n)for(unsigned event=0;event<=16;event+=4) {
+        const int camera=samples[n].camera,by=samples[n].by;
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;
+        word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+        word(g_ram,0xEE78,camera);word(g_ram,0xEE80,camera);
+        word(g_ram,0xEE7C,samples[n].outdoor?0:0x540);
+        word(g_ram,0xEE84,samples[n].outdoor?0:0x540);
+        word(g_ram,0xEE90,by);word(g_ram,0xEED6,samples[n].outdoor?0xFF00:0);
+        word(g_ram,0xEEDA,samples[n].outdoor?by-22:0);word(g_ram,0xEEC2,event);
+        write32(0xA9FC,samples[n].cloud);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+        v.vsram[0]=samples[n].outdoor?0:0x140;v.vsram[1]=(uint16_t)by;
+        v.cram[2]=0xE;v.cram[3]=0xE0;
+        memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9010+i*2,2);word(g_ram,0x9018+i*2,3);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2+((cell%64>>1)&1));
+        word(v.vram,0xF000,(uint16_t)-camera);word(v.vram,0xF002,(uint16_t)-samples[n].scroll);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;publish_sprites();
+        s3_video_set_world_cell(edge_parallax_cell);memcpy(before,g_ram,sizeof before);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int source=(x-238+samples[n].eye_scroll)&511;
+            CHECK(out[x]==((source>>4)&1?0xFF00FF00u:0xFFFF0000u));
+        }
+        CHECK(s_left==(samples[n].outdoor?0:0x3000-796));
+        /* A native-width render retains its installed B phase. The direct
+         * reconstruction adapter need not copy an arbitrary supplied row. */
+        CHECK(edge_parallax_scroll(-samples[n].scroll,camera,0,320,320,by)==-samples[n].scroll);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+    /* The extra entrance bank uses the same fixed physical eye. Its
+     * machinery cannot drift as the native camera moves inside that view. */
+    for(unsigned n=0;n<4;++n) {
+        static const int cameras[]={0,145,223,238};int camera=cameras[n];
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;
+        word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+        word(g_ram,0xEE78,camera);word(g_ram,0xEE80,camera);word(g_ram,0xEE7C,0x700);word(g_ram,0xEE84,0x700);
+        word(g_ram,0xEE90,22);word(g_ram,0xEED6,0xFF00);write32(0xA9FC,0xE00);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x300;v.vsram[1]=22;
+        v.cram[2]=0xE;v.cram[3]=0xE0;memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9010+i*2,2);word(g_ram,0x9018+i*2,3);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2+((cell%64>>1)&1));
+        word(v.vram,0xF000,(uint16_t)-camera);word(v.vram,0xF002,(uint16_t)-(camera*9/32));
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;publish_sprites();
+        s3_video_set_world_cell(edge_parallax_cell);scanline(&v,0,native,320,out,796);
+        if(!n)memcpy(private_reference,out+640,sizeof private_reference);
+        else CHECK(!memcmp(private_reference,out+640,sizeof private_reference));
+        s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+#endif
+}
+
+static int restored_test_x,restored_test_pixels,restored_test_camera,restored_test_world_shift;
 static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,
                                     uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
     (void)ram;(void)y;(void)sy;
     if(!attr || !pixel)return 1;
-    CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx);
+    CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx+restored_test_world_shift);
     CHECK(presentation_camera_x==restored_test_camera);
     *attr=0;*pixel=1;*color=0xFFFF;return 1;
 }
@@ -2713,6 +2793,12 @@ static void test_restored_background_edges_and_reload(void)
         word(v.vram,0xF000,(unsigned)-camera);
         restored_test_x=-(canvas-320)/2;restored_test_pixels=0;
         restored_test_camera=view_left(camera,canvas)+(canvas-320)/2;
+        restored_test_world_shift=0;
+#ifndef SONIC3_STANDALONE
+        /* With native B held at zero, only camera0 matches FBZ1's indoor
+         * half-speed identity. Screen offset and world phase are distinct. */
+        if(zones[z]==0x400 && !camera)restored_test_world_shift=((canvas-320)/2)/2;
+#endif
         scanline(&v,0,native,320,out,canvas);
         CHECK(restored_test_pixels==canvas && s_native_x==camera-view_left(camera,canvas));
     }
@@ -4746,6 +4832,10 @@ int main(int argc,char **argv)
      * not choose a complete bank early or repeat the combined layout. */
     for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,n%64<32?1:2);
     g_ram[0xFE10]=4;
+    /* B=1024 aliases native phase zero modulo512 at camera0. This is a
+     * canvas-ownership check; use a coherent camera away from the clamp. */
+    word(g_ram,0xEE78,512);word(g_ram,0xEE80,512);
+    word(v.vram,0xF000,(uint16_t)-512);s_build.camera_x=512;publish_sprites();
     for(unsigned act=0;act<2;++act)for(unsigned event=0;event<=16;event+=4) {
 #ifndef SONIC3_STANDALONE
         if(act && event==16)continue; /* The boss owns the opposite planes. */
@@ -4930,7 +5020,7 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
-    test_bounded_parallax_projection();
+    test_bounded_parallax_projection();test_fbz_bounded_camera_and_wind();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();
