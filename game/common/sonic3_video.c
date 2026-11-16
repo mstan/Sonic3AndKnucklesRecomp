@@ -1987,6 +1987,38 @@ static uint16_t scene_art_color_reference(unsigned color,const GVDP *v,unsigned 
 }
 static uint16_t scene_art_color(unsigned color,const GVDP *v)
 { return scene_art_color_reference(color,v,16); }
+/* The entrance spans two physical spaces while its native doorway redraw
+ * selects one global B canvas. Only extra columns project both authored banks;
+ * the native viewport keeps every installed cell, palette and redraw phase. */
+static unsigned fbz_deform_band(int y,const uint16_t *heights,unsigned count)
+{
+    unsigned band=0;
+    while(band+1<count && y>=heights[band])y-=heights[band++];
+    return band;
+}
+static void fbz_entrance_projection(int cx,int cy,int line,int outdoor,int *x,int *y)
+{
+    static const uint16_t inside_height[]={0x80,0x40,0x20,0x8,0x8,0x8,0x8,0x28,0x30,0x8,0x4,0x4,0xb8,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0x30,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0xb0,0x30,0x28,0x40,0x18,0x30,0x7fff};
+    static const uint8_t inside_speed[]={8,9,6,4,3,2,1,7,6,4,3,2,3,9,3,6,3,7,3,6,3,9,3,6,3,7,3,6,3,6,7,4,6,9,8};
+    static const uint16_t outside_height[]={0x30,0x20,0x30,0x10,0x10,0x10,0x10,0x10,0x7fff};
+    static const uint8_t outside_band[]={7,1,5,3,6,2,4,0,8};
+    if(!outdoor) {
+        int half=cy>>1;*y=half-(half>>5)+line;
+        unsigned band=fbz_deform_band(*y,inside_height,sizeof inside_height/sizeof *inside_height);
+        *x=(cx*inside_speed[band])>>4;
+    } else {
+        *y=22+(int16_t)(((unsigned)s_world_frame[0xEEDA]<<8)|s_world_frame[0xEEDB])+line;
+        unsigned band=fbz_deform_band(*y,outside_height,sizeof outside_height/sizeof *outside_height);
+        unsigned n=outside_band[band];
+        uint32_t cloud=((uint32_t)s_world_frame[0xA9FC]<<24)|((uint32_t)s_world_frame[0xA9FD]<<16)|
+            ((unsigned)s_world_frame[0xA9FE]<<8)|s_world_frame[0xA9FF];
+        /* FBZ_Deform advances this accumulator after consuming its old value. */
+        if(((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7])cloud-=0xE00u;
+        uint32_t scroll=((uint32_t)cx<<12)+n*((uint32_t)cx<<11)+(n+1)*cloud;
+        *x=(int16_t)(scroll>>16);
+    }
+}
+
 static uint16_t restored_art_color(unsigned color,const GVDP *v)
 {
     /* The donor's stage entry 16 can be nonblack (FBZ is $0462), so use
@@ -2780,6 +2812,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             scene_art_color_reference(s_lbz_preview.colors[i-16],v,32),GENESIS_DAC_NORMAL);
     GenesisTileRow fg={0},bg={0},incoming={0};
     WorldArtRow aiz_fg[2],aiz_bg;
+    int fbz_entrance=0,fbz_x[2]={0},fbz_y[2]={0};
+    uint32_t fbz_colors[2][64];
+    WorldArtRow fbz_rows[2];
+#ifndef SONIC3_STANDALONE
+    fbz_entrance=fbz_canvas && !s_frame_act && width>nw && s_left<0x180 && s_camera_y>=0x400;
+    if(fbz_entrance)for(unsigned side=0;side<2;++side) {
+        fbz_entrance_projection(s_camera,s_camera_y,line,(int)side,&fbz_x[side],&fbz_y[side]);
+        world_art_row_init(&fbz_rows[side],s_background_frame,s_background_frame+0x9000,v->vram,fbz_y[side],1);
+        memcpy(fbz_colors[side],palette,sizeof palette);
+        for(unsigned color=0;color<8;++color) {
+            unsigned source=0x52DC0u+side*16+color*2;
+            unsigned value=((unsigned)g_rom[source]<<8)|g_rom[source+1];
+            fbz_colors[side][50+color]=genesis_dac_cram_to_argb(restored_art_color(value,v),GENESIS_DAC_NORMAL);
+        }
+    }
+#endif
+
     if(aiz_banks) {
         world_art_row_init(&aiz_fg[0],s_world_frame,s_aiz_intro.blocks,s_aiz_intro.video.vram,wy,0);
         world_art_row_init(&aiz_fg[1],s_world_frame,s_aiz_main.blocks,s_aiz_main.video.vram,wy,0);
@@ -2873,6 +2922,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
+        }
+        if(fbz_entrance && (nx<0 || nx>=nw)) {
+            unsigned side=wx<0x180 && wy>=0x640;
+            int px=((x-(width-nw)/2+fbz_x[side])&511)+(int)side*512;
+            bp=world_art_row_pixel(&fbz_rows[side],px,&b);bpalette=fbz_colors[side];
         }
         if(hcz2_incoming && nx>=nw && wx>=0xC10){
             /* The extra right view reaches the next room before the native

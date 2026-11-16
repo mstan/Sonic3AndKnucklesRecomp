@@ -1854,6 +1854,58 @@ static void test_private_art_render_translation_count(void)
     memcpy(&s_aiz_intro,&saved[0],sizeof saved[0]);memcpy(&s_aiz_main,&saved[1],sizeof saved[1]);
     s_aiz_art_ready=ready;s_aiz_art_attempted=attempted;
 }
+static int fbz_entrance_cell(const uint8_t *ram,int x,int y,int background,uint16_t *attr)
+{
+    (void)ram;(void)y;*attr=background?(x<512?1:2):0;return 1;
+}
+static void test_fbz_entrance_margin_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];uint32_t native[320]={0},out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;write32(0xB000,0x1234);
+    word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE78,0);word(g_ram,0xEE80,0);word(g_ram,0xEE7C,0x700);word(g_ram,0xEE84,0x700);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.vsram[0]=0x300;v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    s3_video_set_world_cell(fbz_entrance_cell);memcpy(before,g_ram,sizeof before);
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_native_x==0);
+    for(int x=0;x<320;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=320;x<0x180;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=0x180;x<796;++x)CHECK(out[x]==0xFFFF0000u);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    /* The reverse side retains the original outdoor canvas while the
+     * native viewport owns its completed indoor redraw. */
+    word(g_ram,0xEE78,0xD0);word(g_ram,0xEE80,0xD0);word(v.vram,0xF000,(uint16_t)-0xD0);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,1);
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_native_x==0xD0);
+    for(int x=0;x<0xD0;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=0xD0;x<0xD0+320;++x)CHECK(out[x]==0xFFFF0000u);
+    /* FBZ's stage black is nonblack. Private indoor/outdoor colors use
+     * character black and the installed stage white, without a tinted floor. */
+    uint8_t old_colors[4]={g_rom[0x52DC0],g_rom[0x52DC1],g_rom[0x52DD0],g_rom[0x52DD1]};
+    word(g_rom,0x52DC0,0xCE8);word(g_rom,0x52DD0,0xEEC);
+    v.cram[0]=0;v.cram[16]=0x462;v.cram[17]=0xEEE;v.cram[50]=0xE00;
+    memset(v.vram+32,0x22,32);memset(v.vram+64,0x22,32);
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,0x6001);word(g_ram,0x9010+i*2,0x6002);}
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,0x6002);
+    scanline(&v,0,native,320,out,796);
+    CHECK(out[0]==genesis_dac_cram_to_argb(0xEEC,GENESIS_DAC_NORMAL));
+    CHECK(out[700]==genesis_dac_cram_to_argb(0xCE8,GENESIS_DAC_NORMAL));
+    CHECK(out[300]==genesis_dac_cram_to_argb(0xE00,GENESIS_DAC_NORMAL));
+    g_rom[0x52DC0]=old_colors[0];g_rom[0x52DC1]=old_colors[1];
+    g_rom[0x52DD0]=old_colors[2];g_rom[0x52DD1]=old_colors[3];
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+#endif
+}
+
 static void test_aiz_intro_canvas_edge(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];
@@ -4568,7 +4620,7 @@ int main(int argc,char **argv)
     test_mhz_custom_publication();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
-    test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
+    test_fbz_entrance_margin_ownership();test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
     test_interpolation_owned_and_readonly();
