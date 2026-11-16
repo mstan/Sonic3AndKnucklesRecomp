@@ -55,6 +55,14 @@ int main(int argc,char **argv)
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2FCE,g_rom+0xA967C,32));
+            uint8_t *donor=s3_sound_prototype_read();CHECK(donor);
+            CHECK(word(donor+0x1F2F30)==0xEEE);
+            CHECK(word(g_rom+0xA945E)==0x242);
+            CHECK(word(g_rom_ext+0x1F2F30)==word(g_rom+0xA945E));
+            for(unsigned color=0;color<16;++color)if(color!=1)
+                CHECK(!memcmp(g_rom_ext+0x1F2F2E + color*2,
+                              donor+0x1F2F2E + color*2,2));
+            free(donor);
         }
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
         CHECK(background_native(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;

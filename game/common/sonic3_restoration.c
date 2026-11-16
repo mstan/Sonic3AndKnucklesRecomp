@@ -244,6 +244,10 @@ void s3_restoration_post_reset(void)
              * enemies and common object colors while restoring terrain. */
             memcpy(bank+offset+0x1F2F0E,g_rom+0xA943C,32);
             memcpy(bank+offset+0x1F2FCE,g_rom+0xA967C,32);
+            /* Retained retail rock patterns use entry 1 for their deepest
+             * recesses. Keep that dark material slot compatible with the
+             * earlier colors, alongside the shared object palette above. */
+            memcpy(bank+offset+0x1F2F30,g_rom+0xA945E,2);
         }
         g_rom_ext=bank;g_rom_ext_size=offset+0x200000u;donor_address=0x400000u+offset;
         if(active&PROTO_PALETTES)s3_video_set_palette_source(palette_source);
