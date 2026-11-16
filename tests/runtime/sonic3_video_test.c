@@ -2198,6 +2198,60 @@ static void test_aiz2_ship_cameras(void)
     s_interpolating=0;
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
+#ifndef SONIC3_STANDALONE
+static int mhz_ship_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;
+    if(background){CHECK(x>=0 && x<512);*cell=3;return 1;}
+    if(y<0x200) {
+        /* The native ship canvas is on a different 1024px page from the
+         * nearest ordinary-camera unwrap. Sampling its lookalike there
+         * would repeat unrelated hull rows instead of this finite bank. */
+        CHECK(x>=0x46C0 && x<0x4A00);
+        *cell=x>=0x4780?0:1;
+    } else {
+        CHECK(y>=0x280 && y<0x400 && x>=0x44B0 && x<0x47D0);
+        *cell=2;
+    }
+    return 1;
+}
+static void test_mhz2_ship_cameras(void)
+{
+    static GVDP v;uint32_t native[320],out[798];uint8_t before[65536];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xFE10]=7;g_ram[0xFE11]=1;write32(0xB000,0x1234);
+    word(g_ram,0x8000,160);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x45A0);word(g_ram,0xEE84,0x280);
+    word(g_ram,0xEE98,0x39);word(g_ram,0xEE9C,0x83);word(g_ram,0xA800,0x47BA);
+    word(g_ram,0xEEC0,16);word(g_ram,0xEEC2,36);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+    for(unsigned i=0;i<4;i++){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);word(g_ram,0x9018+i*2,3);}
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(mhz_ship_cell);memcpy(before,g_ram,sizeof before);
+    for(unsigned cut=37;cut<=173;cut+=136) {
+        for(unsigned y=0;y<224;y++)word(v.vram,0xF000+y*4,(uint16_t)-(y<cut?0x47BA:0x45A0));
+        v.vsram[0]=0x82;out[0]=out[797]=0xDEADBEEFu;
+        scanline(&v,0,native,320,out+1,796);
+        for(int x=0;x<796;x++)CHECK(out[x+1]==(0x47BA+x-238>=0x4780?0xFF0000FFu:0xFFFF0000u));
+        CHECK(out[0]==0xDEADBEEFu && out[797]==0xDEADBEEFu);
+        /* HInt may occur at any installed row. The immutable frame still
+         * has ship VSRAM, while the real VDP has switched to the ground. */
+        v.vsram[0]=0x280;scanline(&v,(int)cut,native,320,out+1,796);
+        for(int x=0;x<796;x++)CHECK(out[x+1]==0xFF00FF00u);
+        CHECK(s_camera==0x45A0 && s_camera_y==0x280);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+    }
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    for(unsigned x=0;x<320;x++)native[x]=0xFF000000u+x;
+    scanline(&v,0,native,320,out,320);CHECK(!memcmp(native,out,sizeof native));
+}
+#else
+static void test_mhz2_ship_cameras(void){}
+#endif
 static void test_act_handoff_framing(void)
 {
     CameraHandoffPreview saved=s_handoff;int interpolating=s_interpolating;
@@ -4245,7 +4299,7 @@ int main(int argc,char **argv)
     test_screen_actor_priority();
     test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
-    test_aiz2_retired_grove();test_aiz2_ship_cameras();
+    test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();
     test_private_plane_colors();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();

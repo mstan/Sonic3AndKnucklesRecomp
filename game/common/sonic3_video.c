@@ -2409,6 +2409,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * installed scroll identity, not a guessed scanline or frame count. */
     int aiz_ship=level && !s_frame_zone && s_frame_act==1 &&
         ((s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7]);
+    /* MHZ2's ending installs the same native HInt6 split as AIZ2. Its
+     * upper canvas uses the ship scroll from HScroll_table; the ordinary
+     * camera is more than half a VDP page away during the arrival. */
+    int mhz_ship=0;
+#ifndef SONIC3_STANDALONE
+    mhz_ship=level && s_frame_zone==7 && s_frame_act==1 &&
+        (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16;
+#endif
+    int split_ship=aiz_ship || mhz_ship;
     /* MGZ2 clears the arena's layout before its installed tiles fall in
      * independently scrolled columns. Keep the surrounding world attached
      * to the camera, rather than moving it with the first falling column. */
@@ -2419,8 +2428,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int lbz1_columns=level && s_frame_zone==6 && !s_frame_act && (v->reg[11]&4);
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
+    if(mhz_ship)ship_x=((unsigned)s_world_frame[0xA800]<<8)|s_world_frame[0xA801];
     unsigned fg_scroll=fbz_flipped?presentation_column_scroll(1,v->vsram[1]):
-        (aiz_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
+        (split_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
     /* A fractional scroll can lie between two bobbing ship positions.
      * Select the camera from this row's completed HInt identity, then
      * interpolate its position. A fractional value cannot identify a bank. */
@@ -2436,7 +2446,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * rather than requiring exact equality with the next ship position. */
     int ship_distance=abs(unwrap((int)fg_identity,ship_y)-ship_y);
     int ground_distance=abs(unwrap((int)fg_identity,plane_y)-plane_y);
-    int ship_band=aiz_ship && ship_distance<=ground_distance;
+    int ship_band=split_ship && ship_distance<=ground_distance;
     int camera=level?unwrap(-hs_a,ship_band?ship_x:plane_x):ram16(0xEE78);
     int camera_y=(mgz2_collapse || lbz1_columns)?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
@@ -2704,6 +2714,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * The other layout banks are physical moving rooms used only by events
      * 4/8; scrolling the panorama through them substitutes unrelated walls. */
     if(mgz2_panorama)
+        bg_width=512;
+    /* MHZ2's custom boss/ending layout retains other banks after its
+     * first 512px panorama. Native Draw_TileRow streams only that canvas;
+     * widening the period to the full header exposes empty bank columns. */
+    if(bg_world && s_frame_zone==7 && s_frame_act==1 && s_frame_bg_event>=16)
         bg_width=512;
     /* HCZ2's crushing wall is a moving world, not a repeating panorama.
      * Negative coordinates to its left must remain blank. */
