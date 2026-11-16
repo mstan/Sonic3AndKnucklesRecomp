@@ -65,7 +65,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
-       SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13 };
+       SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
+       SPRITE_MHZ_ARENA_COPY = 14 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -900,6 +901,34 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         q->slot=(uint16_t)(s_capture_slot|(native_art_owner(map)<<8));
     }
 }
+/* Screen-loop actors own a512px canvas, although the expanded view can see
+ * both sides at once. Reuse their published pieces, preserving their order
+ * and art, rather than allocating or repositioning native objects. */
+static void repeat_scene_pieces(unsigned first,unsigned end,int lo,int hi,unsigned owner)
+{
+    for(unsigned n=first;n<end;++n) {
+        const SceneSprite source=s_capture_frame->sprites[n];
+        int cw=(((source.size>>2)&3)+1)*8,repeat=source.x;
+        while(repeat+cw>lo)repeat-=512;
+        for(repeat+=512;repeat<hi;repeat+=512)
+            if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
+                SceneSprite fill=source;fill.x=repeat;
+                if(owner)fill.slot=(uint16_t)((fill.slot&255u)|(owner<<8));
+                s_capture_frame->sprites[s_capture_frame->count++]=fill;
+            }
+    }
+}
+static int mhz_arena_object(unsigned object,unsigned map,unsigned code)
+{
+#ifndef SONIC3_STANDALONE
+    if(!enabled() || s_capture_frame->scene!=1 || s_requested_width<=320 || ram16(0xFE10)!=0x701 ||
+       !g_ram[0xEED3] || map!=0x55908 || (code!=0x5576A && code!=0x557C8))return 0;
+    for(unsigned p=0xA808;p<=0xA814;p+=2)if(ram16(p)==object)return 1;
+#else
+    (void)object;(void)map;(void)code;
+#endif
+    return 0;
+}
 
 /* The two native propeller slots use 9-bit screen positions. Before a
  * native mount arrives, sub_54FEC leaves its position at zero; afterwards
@@ -1306,6 +1335,8 @@ static void capture_objects(void)
      * optional background provider for every one of those actors. */
     int mhz_rotors=s_requested_width>320 && s_capture_frame->scene==1 &&
         ram16(0xFE10)==0x701 && ram16(0xEEC0)==16 && enabled();
+    int mhz_arena=s_requested_width>320 && s_capture_frame->scene==1 &&
+        ram16(0xFE10)==0x701 && g_ram[0xEED3] && enabled();
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1420,20 +1451,9 @@ static void capture_objects(void)
                 }
             } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
             if(mhz_rotors)extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
-            if(pylon) {
-                unsigned end=s_capture_frame->count;
-                int lo=left-cam,hi=lo+s_requested_width;
-                for(unsigned n=mapped_first;n<end;++n) {
-                    const SceneSprite source=s_capture_frame->sprites[n];
-                    int cw=(((source.size>>2)&3)+1)*8,repeat=source.x;
-                    while(repeat+cw>lo)repeat-=512;
-                    for(repeat+=512;repeat<hi;repeat+=512)
-                        if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
-                            SceneSprite fill=source;fill.x=repeat;
-                            s_capture_frame->sprites[s_capture_frame->count++]=fill;
-                        }
-                }
-            }
+            int arena=mhz_arena && mhz_arena_object(o,map,s_capture_frame->code[s_capture_slot]);
+            if(pylon || arena)repeat_scene_pieces(mapped_first,s_capture_frame->count,
+                left-cam,left-cam+s_requested_width,arena?SPRITE_MHZ_ARENA_COPY:0);
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
@@ -3639,6 +3659,21 @@ static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy)
     if(b->code[slot]==IMPORTED_S1_PYLON) {
         ax=b->ox[slot]+((ax-b->ox[slot]+256)&511)-256;
         ay=b->oy[slot]+((ay-b->oy[slot]+32)&63)-32;
+    } else if((b->code[slot]==0x5576A || b->code[slot]==0x557C8) &&
+              b->scene==1 && b->world_tag==0x702 && ix_current()->width>320) {
+        /* Original pieces and their margin copies share the same native
+         * slot. Read ownership from this immutable presentation snapshot,
+         * including at the native 512px X wrap; Y does not wrap here. */
+        const uint8_t *world=ix_current()->context.world;
+        unsigned object=0xB000+(slot-1)*0x4A;
+        if(world[0xEED3] && object+15<65536 &&
+           ((unsigned)world[object+12]<<24 | (unsigned)world[object+13]<<16 |
+            (unsigned)world[object+14]<<8 | world[object+15])==0x55908)
+            for(unsigned p=0xA808;p<=0xA814;p+=2)
+                if(((unsigned)world[p]<<8 | world[p+1])==object) {
+                    ax=b->ox[slot]+((ax-b->ox[slot]+256)&511)-256;
+                    break;
+                }
     }
     *dx=interpolation_lerp(ax,b->ox[slot],48)-b->ox[slot];
     *dy=interpolation_lerp(ay,b->oy[slot],48)-b->oy[slot];

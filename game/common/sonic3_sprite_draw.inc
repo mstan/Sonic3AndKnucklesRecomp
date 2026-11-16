@@ -91,7 +91,10 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
          * the rotor's native/margin ownership once for that piece, leaving
          * the ordinary sprite pixel path free of optional rotor work. */
         int first=0,last=drawn_width,center=(width-320)/2;
-        if(s->hud==SCENE_MHZ_ROTOR) {
+        if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY) {
+            if(base<origin) {if(last>origin-base)last=origin-base;}
+            else if(first<origin+320-base)first=origin+320-base;
+        } else if(s->hud==SCENE_MHZ_ROTOR) {
             if(base<center) {if(last>center-base)last=center-base;}
             else if(first<center+320-base)first=center+320-base;
         } else if(native_rotor) {

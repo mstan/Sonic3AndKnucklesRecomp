@@ -4293,6 +4293,92 @@ static void test_mhz_arena_installed_band(void)
     scanline(&v,0,native,320,out,320);CHECK(!memcmp(native,out,sizeof native));
 #endif
 }
+static void test_mhz_arena_canvas_repeats(void)
+{
+#ifndef SONIC3_STANDALONE
+    static SceneFrame frame,original;static GVDP v;static uint8_t before[65536];
+    uint32_t expanded[1595],native[1595],palette[64]={0};
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    s_requested_width=796;s_capture_frame=&frame;frame.scene=1;
+    memset(g_ram,0,sizeof g_ram);word(g_ram,0xFE10,0x701);g_ram[0xEED3]=255;
+    word(g_ram,0xA80A,0xB128);
+    CHECK(mhz_arena_object(0xB128,0x55908,0x557C8));
+    CHECK(!mhz_arena_object(0xB172,0x55908,0x557C8));
+    CHECK(!mhz_arena_object(0xB128,0x5590A,0x557C8));
+    CHECK(!mhz_arena_object(0xB128,0x55908,0x5582E));
+    g_ram[0xEEC5]=255;g_ram[0xEED3]=0;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));g_ram[0xEED3]=255;
+    frame.scene=0;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));frame.scene=1;
+    s_requested_width=320;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));s_requested_width=796;
+    memcpy(before,g_ram,sizeof before);memset(&v,0,sizeof v);
+    memset(v.vram+0x3AF*32,0x11,128);palette[1]=0xFF123456;
+    s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_camera=s_camera_y=0;
+    s_interpolating=0;test_atlas_enabled=test_private_planes=0;test_plane_color_tiles=NULL;
+    if(s_priority_capacity<1593){s_priority=realloc(s_priority,1593);CHECK(s_priority);s_priority_capacity=1593;}
+    const int positions[]={503,-7,3,510},canvases[]={796,1593};
+    for(unsigned c=0;c<2;++c)for(unsigned phase=0;phase<4;++phase) {
+        int canvas=canvases[c],origin=(canvas-320)/2;
+        memset(&frame,0,sizeof frame);frame.scene=1;frame.world_tag=0x702;frame.count=1;
+        frame.sprites[0]=(SceneSprite){positions[phase],0,0x3AF,5,0,256,1};
+        memcpy(&original,&frame,sizeof original);
+        repeat_scene_pieces(0,1,-origin,canvas-origin,SPRITE_MHZ_ARENA_COPY);
+        CHECK(frame.count>1);
+        for(unsigned n=1;n<frame.count;++n) {
+            CHECK((frame.sprites[n].slot>>8)==SPRITE_MHZ_ARENA_COPY);
+            CHECK(frame.sprites[n].y==original.sprites[0].y && frame.sprites[n].attr==original.sprites[0].attr);
+            CHECK((frame.sprites[n].x-original.sprites[0].x)%512==0);
+        }
+        for(int x=0;x<canvas+2;++x)expanded[x]=native[x]=0xDEADBEEF;
+        memset(s_priority,0,(size_t)canvas);s_display=&original;
+        draw_scene_sprites(&v,0,native+1,canvas,origin,palette);
+        memset(s_priority,0,(size_t)canvas);s_display=&frame;
+        draw_scene_sprites(&v,0,expanded+1,canvas,origin,palette);
+        for(int x=0;x<canvas;++x) {
+            if(x>=origin && x<origin+320)CHECK(expanded[x+1]==native[x+1]);
+            else {
+                int distance=(x-origin-positions[phase])%512;if(distance<0)distance+=512;
+                CHECK(expanded[x+1]==(distance<16?palette[1]:0xDEADBEEF));
+            }
+        }
+        CHECK(expanded[0]==0xDEADBEEF && expanded[canvas+1]==0xDEADBEEF);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+    }
+    /* Fractional presentation must use the same 512px lift for the native
+     * slot and every copy. Large-wrap rejection would otherwise stutter. */
+    static SceneFrame saved_a,saved_b;
+    static uint8_t saved_world[65536];
+    SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
+    memcpy(&saved_a,a,sizeof saved_a);memcpy(&saved_b,b,sizeof saved_b);
+    memcpy(saved_world,ix_current()->context.world,sizeof saved_world);
+    int saved_width=ix_current()->width;
+    double saved_phase=s_interpolation_phase;
+    memset(a,0,sizeof *a);memset(b,0,sizeof *b);
+    memset(ix_current()->context.world,0,65536);
+    uint8_t *world=ix_current()->context.world;
+    unsigned slot=1+(0xB128-0xB000)/0x4A;
+    word(world,0xA80A,0xB128);world[0xEED3]=255;
+    longword(world,0xB128+12,0x55908);
+    b->scene=1;b->world_tag=0x702;ix_current()->width=796;
+    s_interpolation_phase=.5;
+    for(unsigned code=0;code<2;++code)for(unsigned reverse=0;reverse<2;++reverse) {
+        a->code[slot]=b->code[slot]=code?0x557C8:0x5576A;
+        a->ox[slot]=reverse?0:506;b->ox[slot]=reverse?506:0;
+        a->oy[slot]=50;b->oy[slot]=54;
+        for(unsigned owner=0;owner<2;++owner) {
+            SceneSprite moving={0,0,0,0,0,256,(uint16_t)(slot|(owner?SPRITE_MHZ_ARENA_COPY<<8:0))};
+            int dx=0,dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==(reverse?3:-3) && dy==-2);
+            ix_current()->width=320;dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==0 && dy==-2);ix_current()->width=796;
+            word(world,0xA80A,0);dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==0 && dy==-2);word(world,0xA80A,0xB128);
+        }
+    }
+    memcpy(a,&saved_a,sizeof *a);memcpy(b,&saved_b,sizeof *b);
+    memcpy(world,saved_world,sizeof saved_world);ix_current()->width=saved_width;
+    s_interpolation_phase=saved_phase;
+    s_display=NULL;s_capture_frame=&s_build;CHECK(configure("off"));
+#endif
+}
 static void test_mhz_custom_publication(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -4361,6 +4447,8 @@ int main(int argc,char **argv)
         CHECK(load_aiz_monkey_art());
 #ifndef SONIC3_STANDALONE
         CHECK(mhz_custom_load());
+        /* Native ST Events_bg+1 selects the arena, not Events_fg_4. */
+        CHECK(scene_read32(0x553AE)==0x50F8EED3u);
         {uint8_t pixel;CHECK(native_art_pixel(5,0x494,0,0,&pixel));}
         printf("MHZ complete custom chunks/blocks/patterns: %zu/%zu/%zu\n",
             s_mhz_custom.chunks_size,s_mhz_custom.blocks_size,sizeof s_mhz_custom.tiles);
@@ -4829,6 +4917,7 @@ int main(int argc,char **argv)
 #endif
     test_private_plane_colors();
     test_mhz_custom_publication();
+    test_mhz_arena_canvas_repeats();
     test_mhz_arena_installed_band();
     test_mhz_capsule_waiting_pose();
     test_hud_object_anchor();
