@@ -96,7 +96,34 @@ Clone_NativeSpeedupTick:
 .done:
 \trts
 
+Clone_SetNativeTempo:
+\tlea SMPS_RAM.variables(a6),a5
+\tbtst #f_1up_playing,SMPS_RAM.variables.bitfield2(a6)
+\tbeq.s .selected
+\tlea SMPS_RAM.variables_backup(a6),a5
+.selected:
+\tmove.b d0,SMPS_RAM_Variables.v_native_speedup(a5)
+\tbclr #f_speedup,SMPS_RAM_Variables.bitfield2(a5)
+\ttst.b d0
+\tbeq.s .done
+\tbset #f_speedup,SMPS_RAM_Variables.bitfield2(a5)
+.done:
+\trts
+
 ''' + text[end:]
+            # Native callers supply the whole extra-update period, not a
+            # boolean shoes switch. Reserve $100..$1FF in the existing word
+            # queue, retaining normal command IDs and the 1-UP backup rule.
+            marker = '\tclr.w\t(a1)+\t\t\t; Clear entry\n'
+            assert text.count(marker) == 1, 'Upstream queue reader changed'
+            text = text.replace(marker, marker + '''\tcmpi.w #$100,d0
+\tblo.s .nativeTempoReady
+\tcmpi.w #$200,d0
+\tbhs.s .nativeTempoReady
+\tbsr.w Clone_SetNativeTempo
+\tbra.w .next_queue
+.nativeTempoReady:
+''', 1)
             text = text.replace('\tbra.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', '\tbsr.w\tPSGUpdateTrack\n.locret:\n    endif\n\trts\n; End of function SMPS_UpdateDriver', 1)
             marker = '\trts\n; End of function SMPS_UpdateDriver'
             assert text.count(marker) == 1, 'Upstream SFX update changed'
@@ -223,6 +250,11 @@ Clone_NativeSpeedupTick:
             start = text.index('; These have been converted to SMPS 68k format:')
             end = text.index('    endif', start)
             text = text[:start] + ''.join(f'ModEnv_{i:02X}: dc.b [128]0\n' for i in range(32)) + text[end:]
+        if name == 'Sound/Engine/Functions.asm':
+            start = text.index('SMPS_QueueSound3:\n')
+            end = text.index('\n\trts', start)
+            text = text[:start] + '''SMPS_QueueSound3:
+\tmove.w d0,(Clone_Driver_RAM+SMPS_RAM.variables.queue.v_playsnd3).l''' + text[end:]
         if name == 'Sound/MegaPCM - DAC Table.asm':
             marker = '\t\t\tdc.w -1'
             assert text.count(marker) == 1, 'Upstream PCM table terminator changed'

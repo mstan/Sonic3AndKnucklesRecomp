@@ -161,7 +161,10 @@ int s3_legacy_song(const S3LegacySource *s,uint8_t *out,size_t capacity,unsigned
         Node *n=&c->nodes[i];unsigned dest=n->output,op=rb(c,n->pc);
         if(op<0xE0){
             unsigned value=op;
-            if(n->kind>=2 && s->donor==S3_DONOR_S1 && !c->pitch[n->kind] && value==0xC6)++value;
+            /* The legacy table's maximum PSG note has period zero; Clone's
+             * expanded S3 table reaches zero one entry later. This also
+             * clocks S2 special-stage noise at its original frequency. */
+            if(n->kind>=2 && !c->pitch[n->kind] && value==0xC6)++value;
             out[dest]=(uint8_t)(n->kind==1&&op>=0x81&&dac_map?dac_map[op&127]:value);continue;
         }
         if(op==0xE7){out[dest]=0xFE;continue;}

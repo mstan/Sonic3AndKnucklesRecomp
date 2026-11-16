@@ -26,7 +26,7 @@ const char *const s3_theme_names[]={
 };
 #undef TRACK
 typedef struct MusicRow {unsigned group,target;const char *section;unsigned choices;} MusicRow;
-enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL,SPECIAL,DATA,SKY};
+enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL,SPECIAL,DATA,SKY,SUPER};
 #define TRACK(symbol,id,label,group,section,target,choices) {group,target,section,choices},
 static const MusicRow rows[]={
 #include "sonic3_music_catalog.inc"
@@ -34,26 +34,27 @@ static const MusicRow rows[]={
 #undef TRACK
 const char *const s3_donor_ids[]={"s1","s2","s2-aug","s2-wai","s3-proto","s3","sk","cd-us"};
 const char *const s3_donor_names[]={"Sonic 1","Sonic 2","Sonic 2 (Aug 21, 1992 prototype)","Sonic 2 (Simon Wai prototype)","Sonic 3 (Nov 3, 1993 prototype)","Sonic 3","Sonic & Knuckles","Sonic CD (US)"};
-static const S3ThemeChoice choices[][7]={
+static const S3ThemeChoice choices[][8]={
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO}},
+    {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3 / Sonic & Knuckles",-1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
-    {{"s3","Retail (Sonic 3)",S3_DONOR_S3},{"s3-proto","Prototype (November 3, 1993)",S3_DONOR_PROTO}},
+    {{"s3","Retail (Sonic 3)",S3_DONOR_S3},{"s3-proto","Prototype (November 3, 1993)",S3_DONOR_PROTO},{"s2","Sonic 2 Options",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai Level Select",S3_DONOR_WAI}},
     {{"s3","Sonic 3 (Retail)",S3_DONOR_S3},{"sk","Sonic & Knuckles (Retail)",S3_DONOR_SK},{"s3-proto","Sonic 3 Prototype",S3_DONOR_PROTO}},
     {{"s3","Sonic 3",S3_DONOR_S3},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI}},
+    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s1","Sonic 1",S3_DONOR_S1}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2","Sonic 2 Options",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai Level Select",S3_DONOR_WAI}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3 (unused)",S3_DONOR_S3}},
+    {{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2","Sonic 2 Super Sonic",S3_DONOR_S2},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
 };
-static const unsigned counts[]={4,3,3,5,7,2,6,7,3,1,2,3,3,7,3,5,2};
+static const unsigned counts[]={4,3,3,5,8,2,6,7,3,1,4,3,3,7,4,5,2,3};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -87,12 +88,14 @@ unsigned s3_music_source(unsigned t,unsigned donor)
     static const unsigned s2[]={23,26,27,25,22,30,18,18,24};
     if(t>=S3_MUSIC_COUNT)return 0;
     if(donor<=S3_DONOR_WAI){
+        if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_WAI?20:donor==S3_DONOR_S2?21:0;
+        if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_S1)return 8;
         if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_S2)return 17;
-        if(t==S3_MUSIC_DATA && donor==S3_DONOR_S2)return 16;
+        if((t==S3_MUSIC_DATA || t==S3_MUSIC_COMPETITION) && donor==S3_DONOR_S2)return 16;
         /* Simon Wai's own playlist: Special Stage $89, Level Select $8A.
          * These entries precede the retail revision's Options/SS slots. */
         if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_WAI)return 8;
-        if(t==S3_MUSIC_DATA && donor==S3_DONOR_WAI)return 9;
+        if((t==S3_MUSIC_DATA || t==S3_MUSIC_COMPETITION) && donor==S3_DONOR_WAI)return 9;
         /* Each revision's native playlist is authoritative: the Wai $93
          * entry is an early EHZ 2P song, while its boss is native $8E. */
         if(t==S3_MUSIC_FINAL)return donor==S3_DONOR_S1?12:donor==S3_DONOR_WAI?11:19;

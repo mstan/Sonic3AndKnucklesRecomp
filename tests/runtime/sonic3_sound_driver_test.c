@@ -18,7 +18,7 @@ static int player_capture;static uint32_t player_seen;
 static unsigned audition_mask;static int audition_enabled;
 void audio_mixer_set_audition(int enabled,unsigned mask){audition_enabled=enabled;audition_mask=mask;}
 static uint8_t *mapped;
-static uint32_t tail,last_queue,last_id,stop_calls;
+static uint32_t tail,last_queue,last_id,stop_calls,music_calls;
 static void (*extra_audio)(int16_t *,size_t,double);
 static int same_cpu(const M68KState *a,const M68KState *b)
 {
@@ -36,6 +36,7 @@ void recomp_call_addr(uint32_t pc)
 {
     if(pc==S3_CLONE_GUARDED_UPDATE && player_capture)player_seen=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(last_id-1))&0xFFFFFEu;
     if(pc==S3_CLONE_STOP_ALL){CHECK(g_cpu.A[6]==S3_CLONE_RAM_ADDRESS);++stop_calls;}
+    if(pc==S3_CLONE_QUEUE_MUSIC)++music_calls;
     if(pc==S3_CLONE_QUEUE_MUSIC || pc==S3_CLONE_QUEUE_SFX || pc==S3_CLONE_QUEUE_EXTRA){last_queue=pc;last_id=g_cpu.D[0];}
     memset(&g_cpu,0xAD,sizeof g_cpu); /* driver calls may clobber any register */
 }
@@ -43,6 +44,8 @@ void recomp_tail_call(uint32_t pc){tail=pc;}
 int genesis_atomic_file_store(const char *p,const void *d,size_t n){(void)p;(void)d;(void)n;return 1;}
 void cmd_send_response(const char *s){(void)s;}
 void audio_set_extra_source(void (*source)(int16_t *,size_t,double)){extra_audio=source;}
+static unsigned player_word(const uint8_t *state,size_t bytes,unsigned index)
+{unsigned value;CHECK(bytes>=40&&index<10);memcpy(&value,state+bytes-40+index*4,4);return value;}
 int main(int argc,char **argv)
 {
     CHECK(argc==3 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(fread(g_rom,1,sizeof g_rom,f)>=0x200000);fclose(f);
@@ -68,6 +71,11 @@ int main(int argc,char **argv)
     CHECK(s3_sound_select(0));CHECK(s3_sound_rb_load(saved,n));CHECK(!s3_sound_netplay_allowed());
     M68KState before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==song);
     g_cpu.D[0]=0x33;CHECK(s3_sound_hook(sfx));before=g_cpu;s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));CHECK(last_queue==S3_CLONE_QUEUE_SFX && last_id==0x40);
+    for(unsigned period=0;period<256;period++){
+        g_cpu.D[0]=period;CHECK(s3_sound_hook(s3?0x164C:0x13C2));before=g_cpu;
+        s3_sound_vblank();CHECK(same_cpu(&g_cpu,&before));
+        CHECK(last_queue==S3_CLONE_QUEUE_EXTRA&&last_id==(0x100u|period));
+    }
     /* The logo cancels a demo fade using the internal driver's A6 contract,
      * while its external bridge preserves every guest CPU register. */
     CHECK(!stop_calls);g_cpu.A[6]=0xFFB000;g_cpu.D[0]=0xFF;
@@ -188,27 +196,75 @@ int main(int argc,char **argv)
             for(unsigned x=0;x<320;++x)CHECK(menu_pixels[x]==0xFF123456u+x);
         }
     }
-    g_ram[0xF600]=4;s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();
+    g_cpu.D[0]=0x25;CHECK(s3_sound_hook(music));s3_sound_vblank();
+    unsigned before_open_music=music_calls,before_open_stop=stop_calls;
+    g_ram[0xF600]=4;s3_sound_player_frame(0x60);s3_sound_vblank();
+    for(unsigned held=0;held<4;held++){s3_sound_player_frame(0x60);s3_sound_vblank();}
+    CHECK(music_calls==before_open_music&&stop_calls==before_open_stop+1);
+    CHECK(s3_sound_rb_save(after,n)==n&&player_word(after,n,0)==1&&player_word(after,n,4)==0&&player_word(after,n,5)==0&&player_word(after,n,7)==1);
+    s3_sound_player_frame(0);s3_sound_vblank();
     CHECK(audition_enabled && audition_mask==0x7FF);
     CHECK(player_draw);uint32_t pixels[320]={0};player_draw(0,pixels,320);CHECK(pixels[0]==0xFF101827);
     s3_sound_player_frame(8);s3_sound_player_frame(0); /* DAC output only */
     CHECK(audition_enabled && audition_mask==64);
-    s3_sound_player_frame(0x10);s3_sound_player_frame(0);player_capture=1;s3_sound_vblank();player_capture=0;
+    s3_sound_player_frame(0x40);s3_sound_player_frame(0);player_capture=1;s3_sound_vblank();player_capture=0;
     CHECK(last_queue==S3_CLONE_QUEUE_MUSIC && last_id==0x2A && player_seen<0x400000+prefix);
     unsigned stopped=stop_calls;
     s3_sound_player_frame(8);s3_sound_player_frame(0);s3_sound_vblank();
     CHECK(stop_calls==stopped && audition_mask==1); /* change output without a restart */
     CHECK(!memcmp(original,g_rom_ext,prefix));
-    s3_sound_player_frame(0x20);s3_sound_player_frame(0);s3_sound_vblank();CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==1);
+    s3_sound_player_frame(0x60);s3_sound_vblank();
+    for(unsigned held=0;held<4;held++){s3_sound_player_frame(0x60);s3_sound_vblank();}
+    s3_sound_player_frame(0);s3_sound_vblank();CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==1&&stop_calls==stopped);
     size_t player_n=s3_sound_rb_save(NULL,0);uint8_t *player_saved=malloc(player_n);CHECK(player_saved && s3_sound_rb_save(player_saved,player_n)==player_n);
     s3_sound_player_frame(8);s3_sound_player_frame(0);s3_sound_vblank();CHECK(audition_mask==2);
     CHECK(s3_sound_rb_load(player_saved,player_n));CHECK(audition_mask==1 && audition_enabled);
     unsigned invalid_solo=11;memcpy(player_saved+player_n-40+12,&invalid_solo,sizeof invalid_solo);
     CHECK(!s3_sound_rb_load(player_saved,player_n));CHECK(audition_mask==1 && !memcmp(original,g_rom_ext,prefix));
-    s3_sound_player_frame(0x80);s3_sound_player_frame(0);s3_sound_vblank();CHECK(!audition_enabled);
+    unsigned before_back_music=music_calls,before_back_stop=stop_calls;
+    s3_sound_player_frame(0x10);s3_sound_vblank();CHECK(!audition_enabled&&last_id==0x25);
+    for(unsigned held=0;held<100;held++){s3_sound_player_frame(0x10);s3_sound_vblank();}
+    CHECK(music_calls==before_back_music+1&&stop_calls==before_back_stop+1);
+    s3_sound_player_frame(0);
     memset(pixels,0,sizeof pixels);player_draw(0,pixels,320);CHECK(!pixels[0]);
     free(original);free(player_saved);
-    puts("PASS music player controls, output selection without restart, immutable song bank, pause and current-state restoration/rejection");
+    /* The retail Super row plays invincibility, while the final extra row
+     * really is Ending. These must remain different queue entries in all
+     * three hosts, rather than relabelling the ending as Super. */
+    g_ram[0xF600]=4;s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();
+    static const unsigned shared_before_super[]={0x2A,0x27,0x28,0x29,0x2C,0x31,0x19,0x18,0x25,0x1C,0x1F,0x2B,0x30};
+    unsigned super_row=0;
+    for(unsigned i=0;i<sizeof shared_before_super/sizeof *shared_before_super;i++)
+        if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(shared_before_super[i]-1)))++super_row;
+    for(unsigned i=0;i<super_row;i++){s3_sound_player_frame(2);s3_sound_player_frame(0);}
+    unsigned before_play=stop_calls;
+    s3_sound_player_frame(0x40);s3_sound_vblank();CHECK(last_id==0x2C&&stop_calls==before_play+1);
+    for(unsigned held=0;held<100;held++){
+        /* The game latch is consumed by the overlay and may not be polled
+         * in every native VBlank. Sealed held input remains stable. */
+        memset(g_ram+0xF604,0,4);s3_sound_player_frame(0x40);s3_sound_vblank();
+        CHECK(stop_calls==before_play+1);
+    }
+    s3_sound_player_frame(0);
+    unsigned before_start=stop_calls;
+    s3_sound_player_frame(0x80);s3_sound_vblank();CHECK(last_id==0x2C&&stop_calls==before_start+1);
+    for(unsigned held=0;held<10;held++){s3_sound_player_frame(0x80);s3_sound_vblank();CHECK(stop_calls==before_start+1);}
+    s3_sound_player_frame(0);
+    s3_sound_player_frame(8);s3_sound_player_frame(0);s3_sound_vblank();CHECK(audition_mask!=0x7FF);
+    s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();CHECK(mapped[S3_CLONE_PAUSE_OFFSET]==1);
+    unsigned before_select=music_calls;
+    s3_sound_player_frame(2);s3_sound_player_frame(0);s3_sound_vblank();
+    CHECK(music_calls==before_select&&audition_mask==0x7FF);
+    CHECK(s3_sound_rb_save(after,n)==n&&player_word(after,n,3)==0&&player_word(after,n,4)==0&&player_word(after,n,5)==0);
+    for(unsigned i=0;i<super_row+2;i++){s3_sound_player_frame(1);s3_sound_player_frame(0);s3_sound_vblank();}
+    CHECK(music_calls==before_select); /* Navigation stays stopped, including wrap. */
+    s3_sound_player_frame(0x40);s3_sound_player_frame(0);s3_sound_vblank();CHECK(last_id==0x32);
+    s3_sound_player_frame(0x20);s3_sound_player_frame(0);s3_sound_vblank();
+    CHECK(s3_sound_rb_save(after,n)==n&&player_word(after,n,0)==1&&player_word(after,n,4)==0&&player_word(after,n,5)==0);
+    s3_sound_player_frame(0x60);s3_sound_player_frame(0);s3_sound_vblank();
+    CHECK(s3_sound_rb_save(after,n)==n&&player_word(after,n,4)==0&&player_word(after,n,5)==0); /* Chord never starts a stopped track. */
+    s3_sound_player_frame(0x10);s3_sound_player_frame(0);s3_sound_vblank();CHECK(!audition_enabled);
+    puts("PASS S2 player controls, swallowed open/held play/back, stop/reset navigation, continuous channel audition, pause chord and current-state restoration/rejection");
     free(disabled);free(saved);free(after);free(g_rom_ext);
     puts("PASS driver RAM/pending queues round-trip; identity/bounds rejection; native queue mapping, registers/CCR, pause and unsupported-mode gates");return 0;
 }

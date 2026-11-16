@@ -29,7 +29,7 @@ static int visible_choice(unsigned t,unsigned c)
     case S3_THEME_OVER:case S3_THEME_CLEAR:retail=!strcmp(id,"s3k");break;
     case S3_MUSIC_BOSS:case S3_MUSIC_COMPETITION:retail=!strcmp(id,"s3");break;
     case S3_MUSIC_FINAL:retail=!strcmp(id,"s3")||!strcmp(id,"sk");break;
-    case S3_MUSIC_KNUCKLES:retail=s3&&!strcmp(id,"s3");break;
+    case S3_MUSIC_KNUCKLES:retail=!strcmp(id,host);break;
     default:break;
     }
     if(!retail)return 1;
@@ -48,7 +48,6 @@ static int track_at(int group,int index)
     const char *const *sections=group==S3_MUSIC_SHARED?common:campaign;
     for(unsigned s=0;s<4;s++)for(unsigned t=0;t<S3_MUSIC_COUNT;t++)
         if(s3_music_group(t)==(unsigned)group&&s3_music_available(t)&&
-           (t!=S3_MUSIC_SUPER||s3_themes[t].enabled)&&
            !strcmp(sections[s],s3_music_section(t))&&index--==0)return (int)t;
     return -1;
 }
@@ -72,7 +71,7 @@ static int package_get(void *c,int i,RecompLauncherCModPackage *o)
     if(i<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,package);COPY(o->name,"Music Customization");COPY(o->version,"0.2.0");
     COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose individual tracks in Shared Themes and this game's campaign section. Matching ROMs are imported once and shared across all choices and games. All tracks default to Base game. With Clone Driver enabled, press A+C at the title or level-select screen for the music player.");
+    COPY(o->description,"Choose individual tracks in Shared Themes and this game's campaign section. Matching ROMs are imported once and shared across all choices and games. All tracks default to Stock. With Clone Driver enabled, press A+C at the title or level-select screen for the music player.");
     o->enabled=s3_themes_enabled();return 1;
 }
 static int features(void *c){(void)c;return group_count()+(base&&base->feature_count?base->feature_count(base->ctx):0);}
@@ -82,11 +81,11 @@ static int feature_get(void *c,int i,RecompLauncherCModFeature *o)
     int g=group_at(i);if(g<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,group_key(g));COPY(o->package_id,package);COPY(o->package_name,"Music Customization");COPY(o->package_version,"0.2.0");
     COPY(o->name,group_name(g));COPY(o->group,"Sound");COPY(o->author,"Sonic3AndKnucklesRecomp contributors");
-    COPY(o->description,"Choose each track independently. Base game leaves it unchanged. Required ROMs are shared automatically. Selecting a ready replacement or importing its ROM enables this section and Clone Driver. Disable to restore normal tracks without losing choices. Restart to apply. With Clone Driver enabled, press A+C at the title or level select for the music player. Local original campaigns only.");
+    COPY(o->description,"Choose each track independently. Stock leaves it unchanged. Required ROMs are shared automatically. Selecting a ready replacement or importing its ROM enables this section and Clone Driver. Disable to restore normal tracks without losing choices. Restart to apply. With Clone Driver enabled, press A+C at the title or level select for the music player. Local original campaigns only.");
     o->enabled=s3_music_group_enabled((unsigned)g);
     while(track_at(g,o->option_count)>=0)++o->option_count;
     int ready=1;for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==(unsigned)g&&s3_music_available(t)&&s3_themes[t].enabled&&!s3_theme_ready(t))ready=0;
-    COPY(o->status,!ready?"Provide the matching ROMs below to enable this section":o->enabled?"Enabled; changes apply after restart":selected(g)?"Ready; enable to use the selected replacements":"All tracks use Base game");
+    COPY(o->status,!ready?"Provide the matching ROMs below to enable this section":o->enabled?"Enabled; changes apply after restart":selected(g)?"Ready; enable to use the selected replacements":"All tracks use Stock");
     COPY(o->source_name,"Donor ROM details and prototype sources");COPY(o->source_url,"https://github.com/mstan/Sonic3AndKnucklesRecomp/blob/main/docs/EVENT_MUSIC.md");
     return 1;
 }
@@ -103,7 +102,7 @@ static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCM
     (void)c;if(!ours(p))return base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o);
     int t=track_at(group_id(f),i);if(t<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,s3_theme_ids[t]);COPY(o->label,s3_theme_names[t]);COPY(o->group,s3_music_section((unsigned)t));
-    COPY(o->description,"Base game keeps the current soundtrack. Matching donor ROMs are shared automatically.");
+    COPY(o->description,"Stock keeps the current soundtrack. Matching donor ROMs are shared automatically.");
     COPY(o->value,s3_themes[t].enabled?s3_theme_choice((unsigned)t,(unsigned)s3_themes[t].choice)->id:"base");COPY(o->default_value,"base");
     o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=1;while(choice_at((unsigned)t,o->choice_count-1)>=0)++o->choice_count;return 1;
 }
@@ -111,8 +110,8 @@ static int choice_get(void *c,const char *p,const char *f,const char *opt,int i,
 {
     (void)c;if(!ours(p))return base&&base->feature_choice_get&&base->feature_choice_get(base->ctx,p,f,opt,i,o);
     int t=track_id(opt),g=group_id(f);if(t<0||g<0||s3_music_group((unsigned)t)!=(unsigned)g||!s3_music_available((unsigned)t)||!o)return 0;
-    memset(o,0,sizeof *o);if(!i){COPY(o->value,"base");COPY(o->label,"Base game");return 1;}
-    int selected_choice=choice_at((unsigned)t,i-1);const S3ThemeChoice *choice=selected_choice<0?NULL:s3_theme_choice((unsigned)t,(unsigned)selected_choice);if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,t==S3_MUSIC_SUPER?"Unused prototype theme":choice->label);return 1;
+    memset(o,0,sizeof *o);if(!i){COPY(o->value,"base");COPY(o->label,"Stock");return 1;}
+    int selected_choice=choice_at((unsigned)t,i-1);const S3ThemeChoice *choice=selected_choice<0?NULL:s3_theme_choice((unsigned)t,(unsigned)selected_choice);if(!choice)return 0;COPY(o->value,choice->id);COPY(o->label,t==S3_MUSIC_SUPER&&!strcmp(choice->id,"s3-proto")?"Unused prototype theme":choice->label);return 1;
 }
 static int set_option(void *c,const char *p,const char *f,const char *opt,const char *v)
 {

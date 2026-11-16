@@ -67,6 +67,20 @@ int main(int argc,char **argv)
         CDClock prior=clock_state;s3_cd_theme_request(0x2A);s3_cd_theme_frame(0,1);CHECK(clock_state.position==prior.position);
         s3_cd_theme_request(0x29);CHECK(clock_state.theme==S3_THEME_CLEAR);
     }
+    /* Both cartridge miniboss IDs start the same CD or custom recording;
+     * another ordinary song still stops it. */
+    for(unsigned custom=0;custom<2;custom++){
+        songs[S3_MUSIC_MINIBOSS].custom=custom;songs[S3_MUSIC_MINIBOSS].native=0x18;
+        songs[S3_MUSIC_MINIBOSS].loop=1;
+        const unsigned aliases[]={0x18,0x2E};
+        for(unsigned i=0;i<2;i++){
+            CHECK(s3_cd_theme_request(aliases[i]));
+            CHECK(clock_state.active&&clock_state.theme==S3_MUSIC_MINIBOSS&&!clock_state.position);
+            memset(out,0,sizeof out);mix(out,6,44100);CHECK(!memcmp(out,expected,sizeof expected));
+            s3_cd_theme_frame(0,0);CHECK(clock_state.position);
+            CHECK(s3_cd_theme_request(1)&&!clock_state.active);
+        }
+    }
     /* Custom stage recordings share the same clock and 1-UP suspension. */
     song(S3_MUSIC_AIZ1);songs[S3_MUSIC_AIZ1].custom=1;songs[S3_MUSIC_AIZ1].native=1;songs[S3_MUSIC_AIZ1].loop=1;
     CHECK(s3_cd_theme_request(1));CHECK(clock_state.active&&clock_state.theme==S3_MUSIC_AIZ1);

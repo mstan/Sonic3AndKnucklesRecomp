@@ -190,6 +190,9 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);
         if(op==0xF5)c->bank[out+2]=(uint8_t)psg_id(c,rb(c,pc+1));
         if(op==0xF4)c->bank[out+2]=(uint8_t)mod_id(c,rb(c,pc+1));
+        /* Retail's absolute key command is biased by $40; Clone stores
+         * the signed transpose directly. Credits changes key repeatedly. */
+        if(op==0xED)c->bank[out+2]=(uint8_t)(rb(c,pc+1)-0x40u);
         if(op==0xEC){unsigned v=rb(c,pc+1);c->bank[out+2]=(uint8_t)(((v<<3)&0x7F)|(v&0x80));}
         if(n->target){
             int target=c->nodes[find_node(c,n->target,n->kind)].output;

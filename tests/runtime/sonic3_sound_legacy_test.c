@@ -27,9 +27,24 @@ static void operator_registers(void)
         unsigned voices=(bank[0]<<8)|bank[1];CHECK(!memcmp(bank+voices,expected,sizeof expected));
     }
 }
+static void percussion_note(void)
+{
+    for(unsigned donor=S3_DONOR_S1;donor<=S3_DONOR_WAI;donor++){
+        uint8_t rom[0x200]={0},bank[0x8000],map[128]={0},drums[128]={0};char error[256];
+        S3LegacySource s={0};s.rom=rom;s.size=sizeof rom;s.source=0x100;s.high=sizeof rom;s.donor=donor;s.little=donor!=S3_DONOR_S1;
+        rom[0x102]=rom[0x103]=rom[0x104]=1;
+        if(s.little){rom[0x106]=0x40;rom[0x107]=1;rom[0x10A]=0x50;rom[0x10B]=1;}
+        else{rom[0x107]=0x40;rom[0x10B]=0x50;}
+        rom[0x140]=0xF2;rom[0x150]=0xC6;rom[0x151]=1;rom[0x152]=0xF2;
+        CHECK(s3_legacy_song(&s,bank,sizeof bank,0,map,drums,error,sizeof error)>0);
+        unsigned root=(bank[12]<<8)|bank[13];CHECK(bank[root]==0xC7&&bank[root+1]==1);
+        CHECK(rom[0x150]==0xC6&&bank[5]==0);
+    }
+}
 int main(int argc,char **argv)
 {
     operator_registers();
+    percussion_note();
     CHECK(argc==3);unsigned donor=(unsigned)atoi(argv[2]);
     FILE *f=fopen(argv[1],"rb");CHECK(f);CHECK(!fseek(f,0,SEEK_END));long size=ftell(f);CHECK(size>0);rewind(f);
     uint8_t *rom=malloc((size_t)size),*bank=malloc(0x8000);CHECK(rom&&bank);CHECK(fread(rom,1,(size_t)size,f)==(size_t)size);fclose(f);
@@ -42,6 +57,13 @@ int main(int argc,char **argv)
         unsigned voices=(bank[0]<<8)|bank[1];CHECK(voices>8 && voices<(unsigned)n);
         printf("PASS donor %u theme %u source %06X bytes %d drums",donor,t,source.source,n);
         for(unsigned i=0;i<128;i++)if(drums[i])printf(" %02X",i+128);puts("");
+    }
+    if(donor==S3_DONOR_S2||donor==S3_DONOR_WAI){
+        S3LegacySource source;uint8_t drums[128]={0},map[128]={0};char error[256]={0};
+        CHECK(s3_legacy_music_source(rom,(size_t)size,donor,donor==S3_DONOR_S2?17:8,&source));
+        CHECK(s3_legacy_song(&source,bank,0x8000,104,map,drums,error,sizeof error)>0);
+        CHECK(bank[3]==3&&bank[5]==0);
+        puts("PASS special-stage PSG graph and original legacy control rules");
     }
     if(donor==S3_DONOR_WAI){
         /* Audited prototype DAC playlist pitches; the three upper toms

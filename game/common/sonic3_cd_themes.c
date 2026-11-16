@@ -188,7 +188,9 @@ int s3_cd_theme_request(unsigned native)
         }
     }
     if(native>=1&&native<=0x33){
-        for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if((cd_event(t)||songs[t].custom)&&native==(songs[t].custom?songs[t].native:events[t])&&(songs[t].pcm||songs[t].vgm)){
+        for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if((cd_event(t)||songs[t].custom)&&
+            (native==(songs[t].custom?songs[t].native:events[t]) || (native==0x2E&&t==S3_MUSIC_MINIBOSS))&&
+            (songs[t].pcm||songs[t].vgm)){
             memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;
             if(songs[t].vgm)s3_vgm_start(t);return 1;
         }

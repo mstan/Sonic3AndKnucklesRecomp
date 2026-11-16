@@ -12,7 +12,7 @@ TRACK(S3_MUSIC_SPECIAL, "special-stage", "Special Stage Theme", 0, "Other music"
 TRACK(S3_MUSIC_KNUCKLES, "knuckles", "Knuckles Theme", 0, "Other music", 0x1F, KNUCKLES)
 TRACK(S3_MUSIC_EMERALD, "emerald", "Emerald Jingle", 0, "Other music", 0x2B, PROTOTYPE)
 TRACK(S3_MUSIC_FINAL, "final-boss", "Final Boss Theme", 0, "Bosses", 0x30, FINAL)
-TRACK(S3_MUSIC_SUPER, "super", "Super Theme", 0, "Other music", 0x32, PROTOTYPE)
+TRACK(S3_MUSIC_SUPER, "super", "Super Theme", 0, "Other music", 0x32, SUPER)
 TRACK(S3_MUSIC_AIZ1, "aiz-1", "Angel Island Act 1", 1, "Zones", 0x01, PROTOTYPE)
 TRACK(S3_MUSIC_AIZ2, "aiz-2", "Angel Island Act 2", 1, "Zones", 0x02, PROTOTYPE)
 TRACK(S3_MUSIC_HCZ1, "hcz-1", "Hydrocity Act 1", 1, "Zones", 0x03, PROTOTYPE)
