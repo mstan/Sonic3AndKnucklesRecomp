@@ -37,7 +37,7 @@ const char *const s3_donor_names[]={"Sonic 1","Sonic 2","Sonic 2 (Aug 21, 1992 p
 static const S3ThemeChoice choices[][8]={
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
-    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2","Sonic 2 (2P Results)",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype (2P Results)",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
@@ -55,7 +55,7 @@ static const S3ThemeChoice choices[][8]={
     {{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2","Sonic 2 Super Sonic",S3_DONOR_S2},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1}},
 };
-static const unsigned counts[]={4,3,3,5,8,2,6,7,3,1,4,3,3,7,4,5,2,3,1};
+static const unsigned counts[]={4,3,5,5,8,2,6,7,3,1,4,3,3,7,4,5,2,3,1};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -88,6 +88,13 @@ unsigned s3_music_source(unsigned t,unsigned donor)
     static const unsigned s1[]={7,14,15,13,6,17,11,11,9};
     static const unsigned s2[]={23,26,27,25,22,30,18,18,24};
     if(t>=S3_MUSIC_COUNT)return 0;
+    if(t==S3_THEME_CONTINUE){
+        /* The existing shared Continue song and the 2P Results songs use
+         * different playlist entries on the same Sonic 2 cartridges. */
+        const S3ThemeChoice *choice=s3_theme_choice(t,(unsigned)s3_themes[t].choice);
+        if(choice && donor==S3_DONOR_S2 && !strcmp(choice->id,"s2"))return 0;
+        if(choice && donor==S3_DONOR_WAI && !strcmp(choice->id,"s2-wai"))return 19;
+    }
     if(donor<=S3_DONOR_WAI){
         if(t==S3_MUSIC_EMERALD)return donor==S3_DONOR_S1?18:donor==S3_DONOR_S2?29:0;
         if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_WAI?20:donor==S3_DONOR_S2?21:0;

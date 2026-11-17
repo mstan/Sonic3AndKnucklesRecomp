@@ -30,6 +30,8 @@ static int visible_choice(unsigned t,unsigned c)
     case S3_MUSIC_BOSS:case S3_MUSIC_COMPETITION:retail=!strcmp(id,"s3");break;
     case S3_MUSIC_FINAL:retail=!strcmp(id,"s3")||!strcmp(id,"sk");break;
     case S3_MUSIC_KNUCKLES:retail=!strcmp(id,host);break;
+    case S3_MUSIC_TITLE:case S3_MUSIC_CREDITS:case S3_MUSIC_MINIBOSS:
+        retail=!strcmp(id,host);break;
     default:break;
     }
     if(!retail)return 1;

@@ -23,6 +23,13 @@ static void value(const RecompLauncherCModProvider *p,const char *group,const ch
     }
     CHECK(0);
 }
+static int offered(const RecompLauncherCModProvider *p,const char *track,const char *id)
+{
+    RecompLauncherCModChoice choice;
+    for(int i=0;p->feature_choice_get(NULL,package,"shared-themes",track,i,&choice);i++)
+        if(!strcmp(choice.value,id))return 1;
+    return 0;
+}
 int main(int argc,char **argv)
 {
     CHECK(argc==3||argc==4);s3_themes_load(argv[1],argv[2]);
@@ -89,6 +96,61 @@ int main(int argc,char **argv)
         RecompLauncherCModChoice c;CHECK(p->feature_choice_get(NULL,package,campaign,"competition-menu",1,&c)&&!strcmp(c.value,"s3"));
     }
     prototype=0;
+    {
+        const char *host=!strcmp(argv[2],"sonic3")?"s3":"sk";
+        const char *other=!strcmp(host,"s3")?"sk":"s3";
+        static const unsigned tracks[]={S3_MUSIC_TITLE,S3_MUSIC_CREDITS,S3_MUSIC_MINIBOSS};
+        for(unsigned i=0;i<sizeof tracks/sizeof *tracks;i++){
+            unsigned t=tracks[i];const char *id=s3_theme_ids[t];
+            /* Stock does not enable a per-track override, so prototype mode
+             * must still expose the explicit retail restoration. */
+            CHECK(!s3_music_active(t)&&!offered(p,id,host)&&offered(p,id,other));
+            prototype=1;CHECK(offered(p,id,host));value(p,"shared-themes",id,"base");
+            CHECK(!s3_music_active(t));CHECK(set(p,"shared-themes",id,host)&&s3_music_active(t));
+            CHECK(s3_music_donor(t)==(!strcmp(host,"s3")?S3_DONOR_S3:S3_DONOR_SK));
+            prototype=0;CHECK(offered(p,id,host));
+            CHECK(p->feature_enable(NULL,package,"shared-themes",0));
+            CHECK(!s3_music_active(t)&&offered(p,id,host));
+            CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+            value(p,"shared-themes",id,host);CHECK(offered(p,id,host));
+            CHECK(set(p,"shared-themes",id,"base")&&!offered(p,id,host));
+        }
+        /* Existing preset indices and IDs are not compacted by UI filtering. */
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_TITLE,0)->id,"s3"));
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_TITLE,1)->id,"sk"));
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_CREDITS,0)->id,"s3"));
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_CREDITS,1)->id,"sk"));
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_MINIBOSS,3)->id,"s3"));
+        CHECK(!strcmp(s3_theme_choice(S3_MUSIC_MINIBOSS,4)->id,"sk"));
+        puts("PASS host-native choices hidden only when redundant, with prototype restoration and saved overrides retained");
+    }
+    {
+        static const char *const ids[]={"s2","s2-wai"};
+        static const unsigned donors[]={S3_DONOR_S2,S3_DONOR_WAI},songs[]={0,19};
+        CHECK(!strcmp(s3_theme_choice(S3_THEME_CONTINUE,0)->id,"s1-s2"));
+        CHECK(!strcmp(s3_theme_choice(S3_THEME_CONTINUE,1)->id,"s3"));
+        CHECK(!strcmp(s3_theme_choice(S3_THEME_CONTINUE,2)->id,"sk"));
+        CHECK(set(p,"shared-themes","continue","s1-s2"));
+        CHECK(s3_music_source(S3_THEME_CONTINUE,S3_DONOR_S1)==15);
+        CHECK(s3_music_source(S3_THEME_CONTINUE,S3_DONOR_S2)==27);
+        for(unsigned i=0;i<2;i++){
+            CHECK(!strcmp(s3_theme_choice(S3_THEME_CONTINUE,3+i)->id,ids[i]));
+            CHECK(offered(p,"continue",ids[i])&&set(p,"shared-themes","continue",ids[i]));
+            CHECK(s3_music_donor(S3_THEME_CONTINUE)==(int)donors[i]);
+            CHECK(s3_music_source(S3_THEME_CONTINUE,donors[i])==songs[i]);
+            CHECK(p->feature_resource_count(NULL,package,"shared-themes")==1);
+            RecompLauncherCModResource resource;
+            CHECK(p->feature_resource_get(NULL,package,"shared-themes",0,&resource));
+            CHECK(!strcmp(resource.id,ids[i]));
+            CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+            value(p,"shared-themes","continue",ids[i]);
+            CHECK(s3_music_source(S3_THEME_CONTINUE,donors[i])==songs[i]);
+            CHECK(s3_music_active(S3_THEME_CONTINUE)==s3_donor_verified(donors[i]));
+        }
+        CHECK(set(p,"shared-themes","continue","base"));
+        puts("PASS 2P Results provider, source queue, donor gating and saved choices; shared Continue is unchanged");
+    }
+    driver=0;
     if(s3_donor_verified(S3_DONOR_PROTO)){
         CHECK(p->feature_resource_set_path(NULL,package,campaign,"s3-proto",s3_donor_path(S3_DONOR_PROTO)));
         CHECK(!s3_themes_enabled());
