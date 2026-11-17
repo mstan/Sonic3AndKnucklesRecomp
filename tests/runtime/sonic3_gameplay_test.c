@@ -39,21 +39,52 @@ static void test_original_order_entry(void)
         memset(ram,0,sizeof ram);ram[0xFE10]=8;ram[0xFF09]=(uint8_t)character;
         ram[0xB014]=ram[0xB05E]=4;ram[0xB04D]=1;
         memcpy(expected,ram,sizeof ram);
-        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram,NULL)&&!memcmp(ram,expected,sizeof ram));
         s3_gameplay.original_zone_order=1;
-        CHECK(!s3_gameplay_zone_entry(0x695C,ram)&&!memcmp(ram,expected,sizeof ram));
+        CHECK(!s3_gameplay_zone_entry(0x695C,ram,NULL)&&!memcmp(ram,expected,sizeof ram));
         ram[0xFFD1]=1;expected[0xFFD1]=1;
-        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram,NULL)&&!memcmp(ram,expected,sizeof ram));
         ram[0xFFD1]=expected[0xFFD1]=0;ram[0xFFE9]=expected[0xFFE9]=1;
-        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram,NULL)&&!memcmp(ram,expected,sizeof ram));
         ram[0xFFE9]=expected[0xFFE9]=0;
         if(m==1){expected[0xB014]=expected[0xB05E]=6;expected[0xB015]=character==2?0x90:0x8C;expected[0xB05F]=0x90;}
-        CHECK(s3_gameplay_zone_entry(0x695A,ram)==(m==1?0x6986u:0u));
+        CHECK(s3_gameplay_zone_entry(0x695A,ram,NULL)==(m==1?0x6986u:0u));
         CHECK(!memcmp(ram,expected,sizeof ram));
         ram[0xFE11]=1;memcpy(expected,ram,sizeof ram);
-        CHECK(!s3_gameplay_zone_entry(0x695A,ram)&&!memcmp(ram,expected,sizeof ram));
+        CHECK(!s3_gameplay_zone_entry(0x695A,ram,NULL)&&!memcmp(ram,expected,sizeof ram));
     }
-    CHECK(!s3_gameplay_zone_entry(0x695A,NULL));
+    CHECK(!s3_gameplay_zone_entry(0x695A,NULL,NULL));
+}
+static void test_original_order_ground_camera(void)
+{
+    static uint8_t ram[65536],expected[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned mode=0;mode<3;++mode)for(unsigned character=0;character<4;++character)
+    for(unsigned blocked=0;blocked<5;++blocked){
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[mode]);
+        s3_gameplay.original_zone_order=1;
+        memset(ram,0,sizeof ram);ram[0xFE10]=8;ram[0xFF09]=(uint8_t)character;
+        ram[0xB014]=4;
+        if(blocked==1)ram[0xFFD1]=1;
+        if(blocked==2)ram[0xFFE9]=1;
+        if(blocked==3)ram[0xFE2A]=1;
+        if(blocked==4)ram[0xFAA8]=1;
+        memcpy(expected,ram,sizeof ram);
+        uint32_t y=0xA55A0400u,expected_y=y;
+        if(mode==1&&!blocked){
+            unsigned ground=character==2?0x690u:0x68Cu;
+            expected[0xB014]=6;expected[0xB015]=(uint8_t)ground;
+            expected_y=(y&0xFFFF0000u)|ground;
+        }
+        CHECK(!s3_gameplay_zone_entry(0x1BEC6,ram,&y));
+        CHECK(y==expected_y&&!memcmp(ram,expected,sizeof ram));
+        /* Native SUBI #$60,D0 then initializes both camera copies before
+         * drawing the first planes; there is no late camera catch-up. */
+        if(mode==1&&!blocked)CHECK((y&65535u)-0x60u==(character==2?0x630u:0x62Cu));
+        s3_gameplay.original_zone_order=0;memcpy(expected,ram,sizeof ram);
+        y=0xA55A0400u;
+        CHECK(!s3_gameplay_zone_entry(0x1BEC6,ram,&y)&&y==0xA55A0400u&&!memcmp(ram,expected,sizeof ram));
+    }
 }
 static void test_level_select_checkpoint(void)
 {
@@ -80,18 +111,18 @@ static void test_original_order_knuckles(void)
     memset(ram,0,sizeof ram);ram[0xFE10]=5;ram[0xFF09]=3;
     ram[0xB010]=0x36;ram[0xB011]=0x40;ram[0xB014]=6;ram[0xB015]=0x60;
     memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!memcmp(before,ram,sizeof ram));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!memcmp(before,ram,sizeof ram));
     s3_gameplay.original_zone_order=1;
     ram[0xFE2A]=1;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!s3_gameplay_zone_entry(0x690A,ram));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));ram[0xFE2A]=0;
     memcpy(before,ram,sizeof ram);
-    CHECK(s3_gameplay_zone_entry(0x53608,ram)==0x53648);
-    CHECK(s3_gameplay_zone_entry(0x1BEC6,ram)==0x1BED8);
+    CHECK(s3_gameplay_zone_entry(0x53608,ram,NULL)==0x53648);
+    CHECK(s3_gameplay_zone_entry(0x1BEC6,ram,NULL)==0x1BED8);
     CHECK(!memcmp(before,ram,sizeof ram));
-    CHECK(s3_gameplay_zone_entry(0x690A,ram)==0x691C&&ram[0xFF09]==3);
+    CHECK(s3_gameplay_zone_entry(0x690A,ram,NULL)==0x691C&&ram[0xFF09]==3);
     ram[0xFF09]=2;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram)&&!s3_gameplay_zone_entry(0x690A,ram));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));
     memset(ram,0,sizeof ram);ram[0xFE10]=3;ram[0xFE11]=1;ram[0xFF09]=3;
     ram[0xB010]=0x4A;ram[0xB011]=0x37;memcpy(before,ram,sizeof ram);
@@ -593,7 +624,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();test_original_order_entry();test_original_order_knuckles();test_level_select_checkpoint();test_no_save_emeralds();
+    test_original_order();test_original_order_entry();test_original_order_ground_camera();test_original_order_knuckles();test_level_select_checkpoint();test_no_save_emeralds();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

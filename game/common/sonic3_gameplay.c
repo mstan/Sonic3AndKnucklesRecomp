@@ -139,11 +139,20 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
     ram[o+0x2E]=0;ram[o+0x2F]=59;
     return 0x76456;
 }
-uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536])
+uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y)
 {
     if(!combined_mode || !s3_gameplay.original_zone_order || !ram ||
        word(ram,0xFFD0) || word(ram,0xFFE8))return 0;
     unsigned zone=word(ram,0xFE10);
+    if(pc==0x1BEC6u && zone==0x800 && start_y && !ram[0xFE2A] && !ram[0xFAA8]){
+        /* Get_LevelSizeStart still owns camera setup and the initial planes.
+         * Move the skipped airship's ground start before its D0 camera input,
+         * rather than moving only the actor after the high camera was drawn. */
+        unsigned y=word(ram,0xFF08)==2?0x690u:0x68Cu;
+        put_word(ram,0xB014,(uint16_t)y);
+        *start_y=(*start_y&0xFFFF0000u)|y;
+        return 0;
+    }
     if(zone==0x500 && word(ram,0xFF08)==3 && !ram[0xFE2A]){
         /* Reuse Tails' complete native start position/camera-limit block;
          * it enters after the snowboard route, rather than at the hilltop. */
