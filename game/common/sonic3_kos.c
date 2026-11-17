@@ -46,10 +46,12 @@ static int native_instruction(void *user,unsigned *cycles)
 int s3_kos_owns(uint32_t pc) { return pc==KOS_ENTRY; }
 int s3_kos_instruction(uint32_t pc)
 {
-    /* Limit the correction to the assessed AIZ gameplay host. Native boot,
-     * other stages and empty queues keep their existing execution path. */
+    /* Use interrupt bookmarks for the assessed gameplay uploads. MHZ2's
+     * EggRobo head can yield partway through its module too; returning from
+     * that VBlank must resume decoding before the module is sent to VRAM. */
     if(pc!=KOS_ENTRY || g_ram[0xF600]!=12 || !g_ram[0xF711] ||
-       g_ram[0xFE10] || g_ram[0xFE11]>1 ||
+       !((g_ram[0xFE10]==0 && g_ram[0xFE11]<=1) ||
+         (g_ram[0xFE10]==7 && g_ram[0xFE11]==1)) ||
        !(((unsigned)g_ram[0xFF0E]<<8|g_ram[0xFF0F])&0x7FFFu))return 0;
     return s3_kos_execute(pc);
 }
