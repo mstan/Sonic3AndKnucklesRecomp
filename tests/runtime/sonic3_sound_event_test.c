@@ -93,6 +93,7 @@ static void individual_tracks(char **argv,const S3SoundLayout *seq,const S3Sound
                               const uint8_t *program,const uint8_t *base,uint32_t base_size,uint8_t *bank)
 {
     static const unsigned cases[][3]={
+        {S3_DONOR_S1,18,0x2B},{S3_DONOR_S2,29,0x2B},
         {S3_DONOR_S1,17,0x31},{S3_DONOR_S2,30,0x31},{S3_DONOR_PROTO,0x31,0x31},
         {S3_DONOR_S1,11,0x19},{S3_DONOR_S2,18,0x19},{S3_DONOR_WAI,13,0x19},
         {S3_DONOR_S1,11,0x18},{S3_DONOR_S2,18,0x18},{S3_DONOR_WAI,13,0x18},

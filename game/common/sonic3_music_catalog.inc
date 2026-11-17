@@ -1,7 +1,7 @@
 /* Symbol, saved ID, label, group, section, native music ID, choice set. */
 TRACK(S3_THEME_LIFE, "extra-life", "1-UP Theme", 0, "Events", 0x2A, LIFE)
 TRACK(S3_THEME_OVER, "game-over", "Game Over Theme", 0, "Events", 0x27, OVER)
-TRACK(S3_THEME_CONTINUE, "continue", "Continue Screen Theme", 0, "Events", 0x28, CONTINUE)
+TRACK(S3_THEME_CONTINUE, "continue", "Continue / 2P Results Theme", 0, "Events", 0x28, CONTINUE)
 TRACK(S3_THEME_CLEAR, "act-clear", "Act Clear Theme", 0, "Events", 0x29, CLEAR)
 TRACK(S3_THEME_INVINCIBLE, "invincibility", "Invincibility Theme", 0, "Events", 0x2C, INVINCIBLE)
 TRACK(S3_MUSIC_DROWN, "drowning", "Drowning Theme", 0, "Events", 0x31, DROWN)
@@ -10,7 +10,7 @@ TRACK(S3_MUSIC_MINIBOSS, "mini-boss", "Mini-boss Theme", 0, "Bosses", 0x18, MINI
 TRACK(S3_MUSIC_TITLE, "title", "Title Screen Theme", 0, "Menus", 0x25, TITLE)
 TRACK(S3_MUSIC_SPECIAL, "special-stage", "Special Stage Theme", 0, "Other music", 0x1C, SPECIAL)
 TRACK(S3_MUSIC_KNUCKLES, "knuckles", "Knuckles Theme", 0, "Other music", 0x1F, KNUCKLES)
-TRACK(S3_MUSIC_EMERALD, "emerald", "Emerald Jingle", 0, "Other music", 0x2B, PROTOTYPE)
+TRACK(S3_MUSIC_EMERALD, "emerald", "Chaos Emerald Jingle", 0, "Events", 0x2B, EMERALD)
 TRACK(S3_MUSIC_FINAL, "final-boss", "Final Boss Theme", 0, "Bosses", 0x30, FINAL)
 TRACK(S3_MUSIC_SUPER, "super", "Super Theme", 0, "Other music", 0x32, SUPER)
 TRACK(S3_MUSIC_AIZ1, "aiz-1", "Angel Island Act 1", 1, "Zones", 0x01, PROTOTYPE)

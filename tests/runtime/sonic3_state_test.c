@@ -48,8 +48,10 @@ int main(void)
     CHECK(!s3_rb_state_save(snapshot,rollback_size-1));
 #ifdef SONIC3_STANDALONE
     const unsigned level=0x4B20,special=0x77E6,pause=0x16C0,loop=0x77D2;
+    const unsigned race=0x4C6E,race_loop=0x4C5A,race_flag=0xFFD8;
 #else
     const unsigned level=0x6520,special=0x84D6,pause=0x143A,loop=0x84C2;
+    const unsigned race=0x668C,race_loop=0x6678,race_flag=0xFFE8;
 #endif
     /* Exact retail call lengths matter: menus use both JSR.l and BSR.w.
      * A restored menu must recreate its wait slot without resetting the
@@ -102,6 +104,19 @@ int main(void)
     g_ram[0xF600]=0x0C;caller(level);CHECK(!s3_state_at_boundary());
     g_ram[0xF711]=1;CHECK(s3_state_at_boundary());
     caller(special);CHECK(!s3_state_at_boundary());
+    caller(race);CHECK(!s3_state_at_boundary());
+    /* A race save must complete at its own Wait_VSync, before its four
+     * internal updates. Never defer it to a later menu or resume LevelLoop. */
+    g_ram[race_flag+1]=1;
+    CHECK(s3_state_at_boundary());
+    CHECK(s3_state_resume_pc(0x0C)==race_loop);
+    caller(level);CHECK(!s3_state_at_boundary());
+    caller(race-4);CHECK(!s3_state_at_boundary());
+    caller(pause);CHECK(s3_state_at_boundary());
+    CHECK(s3_state_resume_pc(0x0C)==race_loop);
+    g_ram[0xF711]=0;caller(race);CHECK(!s3_state_at_boundary());
+    g_ram[0xF711]=1;g_ram[race_flag+1]=0;caller(level);
+    CHECK(s3_state_at_boundary() && s3_state_resume_pc(0x0C)==level-20);
     g_ram[0xF600]=0x34;caller(special);
 #ifndef SONIC3_STANDALONE
     actor_ready=0;CHECK(!s3_state_at_boundary());actor_ready=1;
@@ -112,5 +127,5 @@ int main(void)
     CHECK(s3_state_load(data,size,1) && marker==17);
     CHECK(!s3_state_load(data,size-1,0));
     g_ram[0xF600]=0x48;CHECK(!s3_state_save(data,size));
-    free(data);puts("PASS regular and special-stage native state boundaries");return 0;
+    free(data);puts("PASS regular, competition and special-stage native state boundaries");return 0;
 }

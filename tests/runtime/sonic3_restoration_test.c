@@ -50,7 +50,7 @@ int main(int argc,char **argv)
         CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
         CHECK(palette(0xA945C)==(s3?0xA945Cu:0x5F2F2Eu));
-        CHECK(palette(0xA94BC)==(s3?0xA94BCu:0x5F2F2Eu));
+        CHECK(palette(0xA94BC)==0xA94BCu);
         if(!s3){
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
@@ -148,7 +148,7 @@ int main(int argc,char **argv)
                 CHECK(word(g_rom+direct[i])==opcode[i]);
                 g_cpu.A[1]=season==0?0xA945Cu:season==1?0xA94BCu:0x550FEu;
                 g_cpu.SR=0x2715;g_cpu.D[0]=0x11223344;M68KState expected=g_cpu;
-                if(season<2)expected.A[1]=0x5F2F2E;
+                if(season==0)expected.A[1]=0x5F2F2E;
                 CHECK(s3_restoration_instruction(direct[i]));
                 CHECK(!memcmp(&g_cpu,&expected,sizeof expected));
                 g_cpu.A[1]+=4;expected=g_cpu;

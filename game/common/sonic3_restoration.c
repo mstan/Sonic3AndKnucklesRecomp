@@ -213,8 +213,11 @@ static unsigned palette_source(unsigned address)
     if(!standalone_s3 && (address==0xA909Cu || address==0xA90FCu))return donor_address+0x1E9DD4u;
     /* The unimplemented prototype stages point at a shared placeholder.
      * Their authored early palettes survive in its unused palette table. */
+    /* The donor's two early terrain rows are identical. Reusing that green
+     * row for the direct terrain transition hides the native season change.
+     * Keep the cartridge transition row and its original timing. */
     if(!standalone_s3 && (address==0xA943Cu || address==0xA949Cu))return donor_address+0x1F2F0Eu;
-    if(!standalone_s3 && (address==0xA945Cu || address==0xA94BCu))return donor_address+0x1F2F2Eu;
+    if(!standalone_s3 && address==0xA945Cu)return donor_address+0x1F2F2Eu;
     if(!standalone_s3 && address==0xA967Cu)return donor_address+0x1F2FCEu;
     return address;
 }

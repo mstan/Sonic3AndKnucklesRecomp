@@ -102,7 +102,7 @@ static int option_get(void *c,const char *p,const char *f,int i,RecompLauncherCM
     (void)c;if(!ours(p))return base&&base->feature_option_get&&base->feature_option_get(base->ctx,p,f,i,o);
     int t=track_at(group_id(f),i);if(t<0||!o)return 0;memset(o,0,sizeof *o);
     COPY(o->id,s3_theme_ids[t]);COPY(o->label,s3_theme_names[t]);COPY(o->group,s3_music_section((unsigned)t));
-    COPY(o->description,"Stock keeps the current soundtrack. Matching donor ROMs are shared automatically.");
+    COPY(o->description,t==S3_THEME_CONTINUE?"Changes both the Continue screen and 2P Results music. Stock keeps the current soundtrack. Matching donor ROMs are shared automatically.":"Stock keeps the current soundtrack. Matching donor ROMs are shared automatically.");
     COPY(o->value,s3_themes[t].enabled?s3_theme_choice((unsigned)t,(unsigned)s3_themes[t].choice)->id:"base");COPY(o->default_value,"base");
     o->type=RECOMP_MOD_OPTION_CHOICE;o->choice_count=1;while(choice_at((unsigned)t,o->choice_count-1)>=0)++o->choice_count;return 1;
 }
