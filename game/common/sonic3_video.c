@@ -2959,9 +2959,21 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     WorldArtRow aiz_fg[2],aiz_bg;
     int fbz_entrance=0,fbz_x[2]={0},fbz_y[2]={0};
     uint32_t fbz_colors[2][64];
+    uint32_t fbz_foreground_colors[64];
     WorldArtRow fbz_rows[2];
 #ifndef SONIC3_STANDALONE
     fbz_entrance=fbz_canvas && !s_frame_act && width>nw && s_left<0x180 && s_camera_y>=0x400;
+    if(fbz_entrance) {
+        memcpy(fbz_foreground_colors,palette,sizeof fbz_foreground_colors);
+        /* The approaching shutter uses the character line's grey ramp.
+         * FBZ entry fades only stage lines 1..3 ($20,$2F), since this
+         * shutter is outside the cartridge view. Fade its extra terrain
+         * with the stage; keep native terrain and every actor unchanged. */
+        if(s_world_frame[0xF626]==0x20 && s_world_frame[0xF627]>=0x2F)
+            for(unsigned color=1;color<16;++color)
+                fbz_foreground_colors[color]=genesis_dac_cram_to_argb(
+                    restored_art_color(v->cram[color],v),GENESIS_DAC_NORMAL);
+    }
     if(fbz_entrance)for(unsigned side=0;side<2;++side) {
         fbz_entrance_projection(s_left+(width-nw)/2,s_camera_y,line,(int)side,&fbz_x[side],&fbz_y[side]);
         world_art_row_init(&fbz_rows[side],s_background_frame,s_background_frame+0x9000,v->vram,fbz_y[side],1);
@@ -3069,6 +3081,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             bp=pattern_pixel(v,b,canvas_x,by);
         }
         if(fbz_entrance && (nx<0 || nx>=nw)) {
+            apalette=fbz_foreground_colors;
             unsigned side=wx<0x180 && wy>=0x640;
             int px=((x-(width-nw)/2+fbz_x[side])&511)+(int)side*512;
             bp=world_art_row_pixel(&fbz_rows[side],px,&b);bpalette=fbz_colors[side];
