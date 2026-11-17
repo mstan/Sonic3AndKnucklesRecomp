@@ -213,8 +213,11 @@ static unsigned palette_source(unsigned address)
     if(!standalone_s3 && (address==0xA909Cu || address==0xA90FCu))return donor_address+0x1E9DD4u;
     /* The unimplemented prototype stages point at a shared placeholder.
      * Their authored early palettes survive in its unused palette table. */
-    if(!standalone_s3 && (address==0xA943Cu || address==0xA949Cu))return donor_address+0x1F2F0Eu;
-    if(!standalone_s3 && (address==0xA945Cu || address==0xA94BCu))return donor_address+0x1F2F2Eu;
+    /* The donor has one early MHZ terrain palette, with no winter bank.
+     * Reusing its green summer row for both sources hides the native season
+     * change. Keep the cartridge's winter palette and its original timing. */
+    if(!standalone_s3 && address==0xA943Cu)return donor_address+0x1F2F0Eu;
+    if(!standalone_s3 && address==0xA945Cu)return donor_address+0x1F2F2Eu;
     if(!standalone_s3 && address==0xA967Cu)return donor_address+0x1F2FCEu;
     return address;
 }

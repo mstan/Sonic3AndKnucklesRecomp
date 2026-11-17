@@ -2693,7 +2693,9 @@ static void test_mhz_published_camera_phase(void)
     s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_frame_bg_event=0;
     for(unsigned n=0;n<sizeof rows/sizeof *rows;++n) {
         s_camera=rows[n][1];
-        CHECK(edge_parallax_scroll(rows[n][2],rows[n][0],s_camera,796,320,450)==-89);
+        int eye=INT_MIN;
+        CHECK(edge_parallax_scroll(rows[n][2],rows[n][0],s_camera,796,320,450,&eye)==-89);
+        CHECK(eye==238);
     }
 #endif
 }
@@ -2736,6 +2738,36 @@ static void test_mhz_departure_relocation(void)
     s_build=saved;word(g_ram,0xFE10,0x700);s_build.count=0;
     capture_mhz_departure(15504,640);CHECK(!s_build.count && !s_build.mhz_departure.phase);
     CHECK(configure("off"));
+#endif
+}
+static void test_mhz_animation_dma_projection(void)
+{
+#ifndef SONIC3_STANDALONE
+    static uint8_t saved[0x2800];uint8_t dma[0x400];
+    memcpy(saved,g_rom+0xBA1C0,sizeof saved);
+    for(unsigned n=0;n<sizeof saved;++n)g_rom[0xBA1C0+n]=(uint8_t)((n*37u)^(n>>4));
+    /* Independent native DMA word-count tables, including each wrap split. */
+    static const unsigned words[2][8]={{128,96,64,32},{512,448,384,320,256,192,128,64}};
+    for(unsigned eye=0;eye<1024;++eye)for(unsigned bank=0;bank<2;++bank) {
+        unsigned phase=(bank?eye*5/16:eye/4)-eye*3/8;
+        phase&=bank?63u:31u;
+        unsigned bytes=bank?0x400:0x100,first=bank?0x1D5:0x1B8;
+        unsigned source=(bank?0xBA9C0:0xBA1C0)+(phase&7u)*bytes;
+        unsigned count=words[bank][phase/8]*2,offset=bytes-count;
+        memcpy(dma,g_rom+source+offset,count);memcpy(dma+count,g_rom+source,offset);
+        for(unsigned flip=0;flip<2;++flip)for(unsigned tile=0;tile<bytes/32;++tile)
+            for(unsigned y=0;y<8;++y) {
+                GenesisTileRow row={0};
+                mhz_parallax_art((first+tile)|(flip?0x1000u:0),y,(int)eye,&row);
+                unsigned at=tile*32+(flip?7-y:y)*4;
+                uint32_t expected=(uint32_t)dma[at]<<24|(uint32_t)dma[at+1]<<16|
+                    (uint32_t)dma[at+2]<<8|dma[at+3];
+                CHECK(row.bits==expected);
+            }
+    }
+    GenesisTileRow unrelated={0};unrelated.bits=0x12345678;
+    mhz_parallax_art(0x1C0,0,238,&unrelated);CHECK(unrelated.bits==0x12345678);
+    memcpy(g_rom+0xBA1C0,saved,sizeof saved);
 #endif
 }
 static void test_fbz_bounded_camera_and_wind(void)
@@ -2786,7 +2818,7 @@ static void test_fbz_bounded_camera_and_wind(void)
         CHECK(s_left==(samples[n].outdoor?0:0x3000-796));
         /* A native-width render retains its installed B phase. The direct
          * reconstruction adapter need not copy an arbitrary supplied row. */
-        CHECK(edge_parallax_scroll(-samples[n].scroll,camera,0,320,320,by)==-samples[n].scroll);
+        CHECK(edge_parallax_scroll(-samples[n].scroll,camera,0,320,320,by,NULL)==-samples[n].scroll);
         CHECK(!memcmp(before,g_ram,sizeof before));
         s3_video_set_world_cell(NULL);CHECK(configure("off"));
     }
@@ -5087,6 +5119,7 @@ int main(int argc,char **argv)
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
     test_bounded_parallax_projection();test_mhz_published_camera_phase();
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
+    test_mhz_animation_dma_projection();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();

@@ -34,6 +34,7 @@ static void competition_capture_objects(void)
     f->count=0;f->scene=4;f->title=f->preview_knux=0;
     f->world_tag=(unsigned)ram16(0xFE10)+1u;f->aiz_join=f->aiz_super_pose=0;
     memset(&f->aiz_plane,0,sizeof f->aiz_plane);
+    memset(&f->mhz_departure,0,sizeof f->mhz_departure);
     memset(f->code,0,sizeof f->code);
     f->camera_x=ram16(0xEE80);f->camera_y=ram16(0xEE84);
     f->competition_x=ram16(0xEE68);f->competition_y=ram16(0xEE6C);

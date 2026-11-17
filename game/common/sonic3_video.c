@@ -709,7 +709,7 @@ typedef struct {
 typedef struct {
     unsigned phase,count;uint16_t tick,slot;
     int16_t y_velocity;uint16_t y_fraction;uint8_t swing_down;
-    SceneSprite pieces[64]; /* world coordinates, presentation only */
+    SceneSprite pieces[64]; /* departing screen coordinates, presentation only */
 } MhzDeparture;
 static int mhz_departure_valid(const MhzDeparture *p)
 {
@@ -720,7 +720,7 @@ static int mhz_departure_valid(const MhzDeparture *p)
        (p->slot-0xB000)%0x4A)return 0;
     for(unsigned n=0;n<p->count;++n) {
         const SceneSprite *q=&p->pieces[n];
-        if(q->x<0 || q->x>65535 || q->y<0 || q->y>65535 || q->hud ||
+        if(q->x < -512 || q->x>8192 || q->y < -256 || q->y>512 || q->hud ||
            q->zoom!=256 || q->slot!=(SPRITE_MHZ_DEPARTURE<<8))return 0;
     }
     return 1;
@@ -1276,6 +1276,7 @@ static void append_aiz_plane(void)
 }
 static void capture_mhz_departure(int camera,int camera_y)
 {
+    (void)camera_y;
     MhzDeparture previous=s_capture_frame->mhz_departure,*p=&s_capture_frame->mhz_departure;
     memset(p,0,sizeof *p);
 #ifndef SONIC3_STANDALONE
@@ -1300,7 +1301,6 @@ static void capture_mhz_departure(int camera,int camera_y)
             if(ancestor!=body)continue;
             if(p->count==64){memset(p,0,sizeof *p);return;}
             SceneSprite *piece=&p->pieces[p->count++];*piece=*q;
-            piece->x+=camera;piece->y+=camera_y;
             piece->slot=SPRITE_MHZ_DEPARTURE<<8;piece->zoom=256;
         }
         if(!mhz_departure_valid(p))memset(p,0,sizeof *p);
@@ -1311,6 +1311,9 @@ static void capture_mhz_departure(int camera,int camera_y)
         g_ram[body+5]!=12 || ram16(body+0x10)!=0x4180)))return;
     unsigned delta=(uint16_t)(ram16(0xFE04)-previous.tick);
     if(delta>32767)return;
+    /* The live camera now accelerates into the arena. Finish the outgoing
+     * image's screen exit independently, so that new camera cannot catch
+     * the relocated vehicle's discarded pose and bring it back onscreen. */
     *p=previous;p->phase=2;p->tick=ram16(0xFE04);
     for(unsigned tick=0;tick<delta;++tick) {
         int velocity=p->y_velocity;
@@ -1324,7 +1327,7 @@ static void capture_mhz_departure(int camera,int camera_y)
     }
     int visible=0,origin=camera-view_left(camera,s_requested_width);
     for(unsigned n=0;n<p->count;++n) {
-        SceneSprite piece=p->pieces[n];piece.x-=camera;piece.y-=camera_y;
+        SceneSprite piece=p->pieces[n];
         if(piece.x+origin>=s_requested_width)continue;
         visible=1;
         if(s_capture_frame->count<SCENE_SPRITES)
@@ -2448,8 +2451,9 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
  * edge that camera can move inside a stationary physical view. Reproject
  * only the ordinary city/forest/factory bands from the same published phase;
  * cutscene canvases and independently moving scenery retain their owners. */
-static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by)
+static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by,int *mhz_eye)
 {
+    if(mhz_eye)*mhz_eye=INT_MIN;
     int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after,mhz=0;
     if(width<=nw || !delta || !s_frame_level)return scroll;
 #ifndef SONIC3_STANDALONE
@@ -2488,10 +2492,38 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
      * native tick apart. origin belongs to the latter, so its physical eye
      * must use that same camera rather than the older Plane A scroll. */
     if(mhz) {
+        if(mhz_eye)*mhz_eye=s_camera+delta;
         after=(s_camera+delta)*numerator;
         return after>=0?-(after/32):(-after+31)/32;
     }
     return scroll-(after-before);
+}
+/* AnimateTiles_MHZ bakes the remaining1/4 and5/16 parallax phases into
+ * two DMA pattern banks below the3/8 layer scroll. Reconstruct those same
+ * cartridge rows at the physical eye, without changing native VRAM. */
+static void mhz_parallax_art(unsigned attr,int y,int eye,GenesisTileRow *row)
+{
+#ifndef SONIC3_STANDALONE
+    unsigned tile=attr&2047u,first,bytes,source,phase;
+    int base=eye>=0?eye*6/16:-((-eye*6+15)/16);
+    if(tile>=0x1B8 && tile<0x1C0) {
+        first=0x1B8;bytes=0x100;source=0xBA1C0;
+        int quarter=eye>=0?eye/4:-((-eye+3)/4);
+        phase=(unsigned)(quarter-base)&31u;
+    } else if(tile>=0x1D5 && tile<0x1F5) {
+        first=0x1D5;bytes=0x400;source=0xBA9C0;
+        int five=eye>=0?eye*5/16:-((-eye*5+15)/16);
+        phase=(unsigned)(five-base)&63u;
+    } else return;
+    unsigned fy=(unsigned)y&7u;if(attr&0x1000u)fy^=7u;
+    unsigned rotation=(phase&~7u)*(bytes==0x100?8u:16u);
+    unsigned offset=((tile-first)*32u+fy*4u+rotation)%bytes;
+    unsigned at=source+(phase&7u)*bytes+offset;
+    row->bits=(uint32_t)g_rom[at]<<24|(uint32_t)g_rom[at+1]<<16|
+        (uint32_t)g_rom[at+2]<<8|g_rom[at+3];
+#else
+    (void)attr;(void)y;(void)eye;(void)row;
+#endif
 }
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
@@ -2982,7 +3014,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
-    hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by);
+    int mhz_eye=INT_MIN;
+    hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
@@ -3210,6 +3243,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!bg.remaining) {
             uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,1):plane_attr(v,base_b,bx,by);
             gtile_row_begin(&bg,world_patterns,attr,bg_world?source_bx:bx,by);
+            if(mhz_eye!=INT_MIN)mhz_parallax_art(attr,by,mhz_eye,&bg);
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
