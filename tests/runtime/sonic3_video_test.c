@@ -2848,6 +2848,53 @@ static void test_icz_first_cave_spatial_margins(void)
         s3_video_set_world_cell(NULL);CHECK(configure("off"));
     }
 }
+/* Each edge can divide an eight-pixel source run. A per-pixel oracle
+ * independently decodes the original snow/cave pixel, so shortening a run
+ * must retain its nibble phase, flips, and native-center ownership. */
+static void test_icz_cave_partial_tile_edges(void)
+{
+    static GVDP v;static uint8_t before[65536],saved[4096];
+    uint32_t native[320]={0},out[796];
+    memcpy(saved,g_rom+S3_ART_BANK+0xB8580,sizeof saved);
+    for(unsigned i=0;i<sizeof saved;++i)g_rom[S3_ART_BANK+0xB8580+i]=(uint8_t)((i*37+7)%251);
+    for(unsigned event=8;event<=12;event+=4)for(unsigned bank=0;bank<2;++bank)
+    for(unsigned shift=0;shift<8;++shift)for(unsigned sample=0;sample<3;++sample) {
+        int camera=(bank?0x3A10:0x3930)+(int)shift,line=sample==0?0:sample==1?3:7;
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+        word(g_ram,0xFE10,0x500);word(g_ram,0x8000,128);word(g_ram,0x8002,64);
+        word(g_ram,0x8008,0x8100);word(g_ram,0xEEC2,event);word(g_ram,0xEED2,0xFED2);
+        word(g_ram,0xEE80,camera);word(g_ram,0xEE84,0x68C);word(g_ram,0xEE90,0xFE);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x68C;v.vsram[1]=0xFE;
+        for(unsigned color=0;color<16;++color)v.cram[color]=(uint16_t)(((color&7)<<1)|((color>>3)<<5));
+        memset(v.vram+32,0x11,32);
+        for(unsigned row=0;row<8;++row){v.vram[64+row*4]=0x12;v.vram[65+row*4]=0x34;v.vram[66+row*4]=0x56;v.vram[67+row*4]=0x78;}
+        unsigned snow=2u|((shift&1)?0x800u:0u),cave=0x10Eu|((sample&1)?0x1800u:0u);
+        for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,snow);word(g_ram,0x9018+n*2,cave);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,1);
+        word(v.vram,0xF000,(unsigned)-camera);word(v.vram,0xF002,(unsigned)-(camera-0x1D40));
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;s_build.camera_y=0x68C;publish_sprites();
+        s3_video_set_world_cell(icz_cave_bank_cell);memcpy(before,g_ram,sizeof before);
+        scanline(&v,0,native,320,out,796);if(line)scanline(&v,line,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int nx=x-238,wx=nx+camera;unsigned pixel=1;
+            if(nx<0 || nx>=320) {
+                int snow_pixel=wx<0x3940;
+                int ix=snow_pixel?wx-0x1D40:nx+camera/2-0x1D80;
+                int iy=snow_pixel?0x68C+line-0x460-0x12E:0x68C/2+line;
+                uint16_t attr=world_attr(g_ram,ix,iy,1);GenesisTileRow oracle={0};
+                gtile_row_begin(&oracle,v.vram,attr,ix,iy);
+                if(!snow_pixel)icz_cave_art(attr,iy,camera,0x68C,&oracle);
+                pixel=gtile_row_pixel(&oracle);
+            }
+            CHECK(out[x]==genesis_dac_cram_to_argb(v.cram[pixel],GENESIS_DAC_NORMAL));
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+    memcpy(g_rom+S3_ART_BANK+0xB8580,saved,sizeof saved);
+}
 static void test_aiz_interpolated_background_source_rows(void)
 {
     int saved_interpolating=s_interpolating;double saved_phase=s_interpolation_phase;
@@ -5387,7 +5434,7 @@ int main(int argc,char **argv)
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
-    test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();
+    test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();test_icz_cave_partial_tile_edges();
     test_aiz_interpolated_background_source_rows();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();

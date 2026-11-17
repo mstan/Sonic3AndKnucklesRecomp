@@ -567,15 +567,6 @@ static uint8_t world_art_row_pixel(WorldArtRow *row,int x,uint16_t *attr)
     row->next_x=x+1;*attr=row->tile.attr;
     return gtile_row_pixel(&row->tile);
 }
-static uint8_t icz_cave_bank_pixel(WorldArtRow *row,int x,int camera_x,int camera_y,uint16_t *attr)
-{
-    if(!row->tile.remaining || x!=row->next_x) {
-        uint16_t cell=world_attr_blocks_mask(row->ram,row->blocks,x,row->y,1,row->row_mask);
-        gtile_row_begin(&row->tile,row->patterns,cell,x,row->y);
-        icz_cave_art(cell,row->y,camera_x,camera_y,&row->tile);
-    }
-    row->next_x=x+1;*attr=row->tile.attr;return gtile_row_pixel(&row->tile);
-}
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
 {
     int fx = x & 7, fy = y & 7;
@@ -741,6 +732,7 @@ typedef struct {
     int16_t y_velocity;uint16_t y_fraction;uint8_t swing_down;
     AizPlaneObject object[3]; /* body, propeller, exhaust */
 } AizPlanePose;
+#ifndef SONIC3_STANDALONE
 /* The MHZ introduction relocates its live vehicle to the arena while the
  * last departing pixels can still be visible in an expanded viewport. */
 typedef struct {
@@ -762,6 +754,7 @@ static int mhz_departure_valid(const MhzDeparture *p)
     }
     return 1;
 }
+#endif
 static int aiz_plane_valid(const AizPlanePose *p)
 {
     if(p->phase>2 || p->mask>7 || p->swing_down>1 ||
@@ -793,7 +786,9 @@ typedef struct {
     int preview_knux; /* waiting pose belongs to this completed display list */
     unsigned aiz_super_pose; /* original Super DPLC pose 33/34, or zero */
     AizPlanePose aiz_plane;
+#ifndef SONIC3_STANDALONE
     MhzDeparture mhz_departure;
+#endif
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
     uint8_t competition_sat[640]; /* paired lower-view upload */
     int competition_x,competition_y;
@@ -920,7 +915,9 @@ static void scene_mode_changed(int was_enabled)
         s_display=NULL;s_display_frame.serial=0;
         s_upload_serial=0;
         memset(&s_build.aiz_plane,0,sizeof s_build.aiz_plane);
+#ifndef SONIC3_STANDALONE
         memset(&s_build.mhz_departure,0,sizeof s_build.mhz_departure);
+#endif
         s_frame_menu=MENU_NONE;s_frame_level=0;
         for(unsigned n=0;n<3;++n)s_history[n].serial=0;
     }
@@ -1311,12 +1308,12 @@ static void append_aiz_plane(void)
     }
     if(!visible){s_capture_frame->count=first;memset(p,0,sizeof *p);}
 }
+#ifndef SONIC3_STANDALONE
 static void capture_mhz_departure(int camera,int camera_y)
 {
     (void)camera_y;
     MhzDeparture previous=s_capture_frame->mhz_departure,*p=&s_capture_frame->mhz_departure;
     memset(p,0,sizeof *p);
-#ifndef SONIC3_STANDALONE
     if(s_mode==VIDEO_OFF || s_requested_width<=320 || s_capture_frame->scene!=1 ||
        ram16(0xFE10)!=0x701)return;
     unsigned body=0;
@@ -1371,10 +1368,8 @@ static void capture_mhz_departure(int camera,int camera_y)
             s_capture_frame->sprites[s_capture_frame->count++]=piece;
     }
     if(!visible || !mhz_departure_valid(p))memset(p,0,sizeof *p);
-#else
-    (void)previous;(void)camera;(void)camera_y;
-#endif
 }
+#endif
 static int mgz2_parked_body(unsigned o,unsigned map)
 {
     if(ram16(0xFE10)!=0x201 ||
@@ -1615,7 +1610,9 @@ static void capture_objects(void)
         }
     }
     append_aiz_plane();
+#ifndef SONIC3_STANDALONE
     capture_mhz_departure(cam,cy);
+#endif
 }
 
 static void publish_sprites(void)
@@ -1647,7 +1644,9 @@ static void publish_sprites(void)
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
     dst->aiz_plane=s_build.aiz_plane;
+#ifndef SONIC3_STANDALONE
     dst->mhz_departure=s_build.mhz_departure;
+#endif
     dst->aiz_join=s_build.aiz_join;
     memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
     dst->competition_x=s_build.competition_x;dst->competition_y=s_build.competition_y;
@@ -1830,7 +1829,9 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
         s_display_frame.preview_knux=s_display->preview_knux;s_display_frame.aiz_super_pose=s_display->aiz_super_pose;
         s_display_frame.aiz_plane=s_display->aiz_plane;
+#ifndef SONIC3_STANDALONE
         s_display_frame.mhz_departure=s_display->mhz_departure;
+#endif
         s_display_frame.aiz_join=s_display->aiz_join;
         memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
         s_display_frame.competition_x=s_display->competition_x;s_display_frame.competition_y=s_display->competition_y;
@@ -3098,6 +3099,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
+    /* Retain the finite outgoing snow and incoming cave only in the extra
+     * view. Choose their source in the existing eight-pixel decode below. */
+    int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
+        s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
     int icz_margin_world=bg_world && s_frame_zone==5 && !s_frame_act && s_frame_bg_event==12;
     if(bg_world && s_frame_zone==5 && !s_frame_act &&
        s_frame_bg_event==8) {
@@ -3114,6 +3119,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             icz_margin_world=!replaced;
         }
     }
+    icz_margin_world |= icz_first_cave;
     /* HCZ2's first wipe retires a spatial moving wall. Unreplaced rows
      * only have the native columns in VRAM; use their full wall layout in
      * the margins until the complete incoming 512px row is installed. */
@@ -3270,20 +3276,6 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             world_art_row_init(&aiz_bg,s_background_frame,art->blocks,art->video.vram,by,1);
         }
     }
-    /* The first cave retires a finite snow overlay after its right edge
-     * ($3940) has left the native viewport. Expanded margins can still see
-     * it, and can see the incoming cave before the two native redraw passes.
-     * Both source banks/art are already installed and remain unchanged. */
-    int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
-        s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
-    WorldArtRow icz_snow_bank,icz_cave_bank;
-    if(icz_first_cave) {
-        int fallen=(int16_t)(((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3]);
-        world_art_row_init(&icz_snow_bank,s_background_frame,s_background_frame+0x9000,
-            v->vram,wy-0x460+fallen,1);
-        world_art_row_init(&icz_cave_bank,s_background_frame,s_background_frame+0x9000,
-            v->vram,camera_y/2+line,1);
-    }
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
      * solid snow at that boundary into the extra left view; do not expose
@@ -3339,9 +3331,26 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
         }
         if(!bg.remaining) {
-            uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,1):plane_attr(v,base_b,bx,by);
-            gtile_row_begin(&bg,world_patterns,attr,bg_world?source_bx:bx,by);
-            if(mhz_eye!=INT_MIN)mhz_parallax_art(attr,by,mhz_eye,&bg);
+            if(icz_first_cave && (nx<0 || nx>=nw)) {
+                int snow=wx<0x3940;
+                int fallen=(int16_t)(((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3]);
+                int ix=snow?wx-0x1D40:nx+camera/2-0x1D80;
+                int iy=snow?wy-0x460+fallen:camera_y/2+line;
+                uint16_t attr=world_attr(s_background_frame,ix,iy,1);
+                gtile_row_begin(&bg,v->vram,attr,ix,iy);
+                if(!snow)icz_cave_art(attr,iy,camera,camera_y,&bg);
+            } else {
+                uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,1):plane_attr(v,base_b,bx,by);
+                gtile_row_begin(&bg,world_patterns,attr,bg_world?source_bx:bx,by);
+                if(mhz_eye!=INT_MIN)mhz_parallax_art(attr,by,mhz_eye,&bg);
+            }
+            if(icz_first_cave) {
+                /* A source change can cut a tile run short. remaining is
+                 * independent of its decoded bit shift and traversal step. */
+                if(nx<0 && bg.remaining>-nx)bg.remaining=-nx;
+                else if(nx>=0 && nx<nw && bg.remaining>nw-nx)bg.remaining=nw-nx;
+                if(wx<0x3940 && bg.remaining>0x3940-wx)bg.remaining=0x3940-wx;
+            }
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
@@ -3370,10 +3379,6 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
-        }
-        if(icz_first_cave && (nx<0 || nx>=nw)) {
-            if(wx<0x3940)bp=world_art_row_pixel(&icz_snow_bank,wx-0x1D40,&b);
-            else bp=icz_cave_bank_pixel(&icz_cave_bank,nx+camera/2-0x1D80,camera,camera_y,&b);
         }
         if(fbz_entrance && (nx<0 || nx>=nw)) {
             apalette=fbz_foreground_colors;
@@ -3729,9 +3734,11 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     AizPlanePose plane=frame->aiz_plane;
     s3_state_peek(io,offsetof(SceneFrame,aiz_plane),&plane,sizeof plane);
     if(!aiz_plane_valid(&plane))io->ok=0;
+#ifndef SONIC3_STANDALONE
     MhzDeparture departure=frame->mhz_departure;
     s3_state_peek(io,offsetof(SceneFrame,mhz_departure),&departure,sizeof departure);
     if(!mhz_departure_valid(&departure))io->ok=0;
+#endif
     S3_STATE(io, *frame);
 }
 /* Preserve the selected placement table through rollback: a snapshot can

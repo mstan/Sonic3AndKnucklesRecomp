@@ -19,17 +19,27 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
         s3_state_peek(io,offsetof(SceneFrame,world_tag)-tail,&world,sizeof world);
         AizPlanePose plane={0};
         s3_state_peek(io,offsetof(SceneFrame,aiz_plane)-tail,&plane,sizeof plane);
+#ifndef SONIC3_STANDALONE
         MhzDeparture departure={0};
         s3_state_peek(io,offsetof(SceneFrame,mhz_departure)-tail,&departure,sizeof departure);
+#endif
         if(scene<0 || scene>4 || pose>2 || join>3 || world>0x10000u ||
-           !aiz_plane_valid(&plane) || !mhz_departure_valid(&departure)){io->ok=0;return;}
+           !aiz_plane_valid(&plane)
+#ifndef SONIC3_STANDALONE
+           || !mhz_departure_valid(&departure)
+#endif
+           ){io->ok=0;return;}
     }
     s3_state_bytes(io,&f->count,sizeof *f-tail);
     s3_state_bytes(io,f->sprites,(size_t)count*sizeof f->sprites[0]);
 }
 static void rewind_presentation_state(S3StateIO *io)
 {
+#ifdef SONIC3_STANDALONE
+    unsigned version=9; /* SceneFrame no longer stores unsupported MHZ departure data. */
+#else
     unsigned version=8;
+#endif
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
     int mode=s_mode;double ratio=s_ratio;
