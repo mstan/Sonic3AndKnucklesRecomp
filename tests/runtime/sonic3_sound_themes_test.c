@@ -147,7 +147,7 @@ int main(int argc,char **argv)
             CHECK(s3_music_source(S3_THEME_CONTINUE,donors[i])==songs[i]);
             CHECK(s3_music_active(S3_THEME_CONTINUE)==s3_donor_verified(donors[i]));
         }
-        CHECK(set(p,"shared-themes","continue","base"));
+        CHECK(set(p,"shared-themes","continue","base")&&p->commit(NULL,"unused-rom"));
         puts("PASS 2P Results provider, source queue, donor gating and saved choices; shared Continue is unchanged");
     }
     driver=0;
