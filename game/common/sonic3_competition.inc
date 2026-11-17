@@ -9,9 +9,10 @@ static int competition_world_ready(void)
     unsigned width=(r[0x8000]<<8)|r[0x8001];
     unsigned row=(r[0x8008]<<8)|r[0x8009];
     unsigned mask=(r[0xEEAE]<<8)|r[0xEEAF];
-    /* Pause-B selects the menu before fading the still-installed race.
-     * Its canvas remains owned until the original loader clears active/HUD. */
-    return (mode==4 || mode==8 || mode==12 || mode==0x28 || mode==0x40) && active && zone>=14 && zone<=18 &&
+    /* Menus/results are selected before fading the still-installed race.
+     * Both result handlers fade first, then clear Competition_mode. Keep
+     * the paired canvas until that native clear, including Time Attack. */
+    return (mode==4 || mode==8 || mode==12 || mode==0x28 || mode==0x40 || mode==0x44 || mode==0x50) && active && zone>=14 && zone<=18 &&
         r[0xF711] && width>=3 && width<=256 && row>=0x8088 && row<0x9000 &&
         (mask==4 || mask==12 || mask==28);
 }

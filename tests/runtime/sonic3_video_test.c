@@ -1233,14 +1233,21 @@ static void test_competition_race(void)
     word(v.vram,0xF804,0x8003);word(v.vram,0xF806,128+318);
     scanline(&v,0,native,320,out,796);
     CHECK(out[557]==native[319] && out[558]==0xFF0000FFu && out[564]==0xFFFF0000u);
-    /* Time Attack chooses its menu before the outgoing race fades. Keep
-     * both view scrolls and sprite ownership until the native loader clears. */
-    const unsigned exits[]={0xC0,0x28,4};
+    /* Both race results and Time Attack results select their destination
+     * before Pal_FadeToBlack clears Competition_mode. Their live HBlank
+     * scroll/colour changes still belong to the outgoing paired canvas. */
+    const unsigned exits[]={0xC0,0x28,4,0x44,0x50};
     for(unsigned i=0;i<sizeof exits/sizeof *exits;i++){
         g_ram[0xF600]=(uint8_t)exits[i];memcpy(ram,g_ram,sizeof ram);
         scanline(&v,0,native,320,out,796);
         CHECK(competition_world_ready() && out[558]==0xFF0000FFu);
         CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+        v.vsram[1]=128;v.cram[2]=0x60;
+        before=v;scanline(&v,112,native,320,out,796);
+        CHECK(out[0]==genesis_dac_cram_to_argb(0x60,GENESIS_DAC_NORMAL));
+        CHECK(!memcmp(out+238,native,sizeof native) && !memcmp(g_ram,ram,sizeof ram));
+        CHECK(!memcmp(&v,&before,sizeof v));
+        v.vsram[1]=0;v.cram[2]=0xE0;
     }
     word(g_ram,S3_COMPETITION,0);scanline(&v,0,native,320,out,796);
     CHECK(!competition_world_ready());
