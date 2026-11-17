@@ -111,10 +111,10 @@ static void test_original_order_knuckles(void)
     memset(ram,0,sizeof ram);ram[0xFE10]=5;ram[0xFF09]=3;
     ram[0xB010]=0x36;ram[0xB011]=0x40;ram[0xB014]=6;ram[0xB015]=0x60;
     memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!memcmp(before,ram,sizeof ram));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL)&&!memcmp(before,ram,sizeof ram));
     s3_gameplay.original_zone_order=1;
     ram[0xFE2A]=1;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));ram[0xFE2A]=0;
     memcpy(before,ram,sizeof ram);
     CHECK(s3_gameplay_zone_entry(0x53608,ram,NULL)==0x53648);
@@ -123,9 +123,11 @@ static void test_original_order_knuckles(void)
     CHECK(s3_gameplay_zone_entry(0x690A,ram,NULL)==0x691C&&ram[0xFF09]==3);
     CHECK(s3_gameplay_owns(0x53756));
     CHECK(s3_gameplay_zone_entry(0x53756,ram,NULL)==0x5375C);
+    CHECK(s3_gameplay_owns(0x537B4));
+    CHECK(s3_gameplay_zone_entry(0x537B4,ram,NULL)==0x537B6);
     CHECK(!memcmp(before,ram,sizeof ram));
     ram[0xFF09]=2;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));
     memset(ram,0,sizeof ram);ram[0xFE10]=3;ram[0xFE11]=1;ram[0xFF09]=3;
     ram[0xB010]=0x4A;ram[0xB011]=0x37;memcpy(before,ram,sizeof ram);
