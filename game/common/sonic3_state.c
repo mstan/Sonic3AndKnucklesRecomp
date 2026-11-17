@@ -12,11 +12,19 @@
  * All resume targets are existing discovered labels, not generated-C edits. */
 #ifdef SONIC3_STANDALONE
 enum { LEVEL_LOOP = 0x4B0C, LEVEL_WAIT_RETURN = 0x4B20, PAUSE_WAIT_RETURN = 0x16C0,
-       SPECIAL_LOOP = 0x77D2, SPECIAL_WAIT_RETURN = 0x77E6 };
+       SPECIAL_LOOP = 0x77D2, SPECIAL_WAIT_RETURN = 0x77E6,
+       COMPETITION_LOOP = 0x4C5A, COMPETITION_WAIT_RETURN = 0x4C6E,
+       COMPETITION_FLAG = 0xFFD8 };
 #else
 enum { LEVEL_LOOP = 0x650C, LEVEL_WAIT_RETURN = 0x6520, PAUSE_WAIT_RETURN = 0x143A,
-       SPECIAL_LOOP = 0x84C2, SPECIAL_WAIT_RETURN = 0x84D6 };
+       SPECIAL_LOOP = 0x84C2, SPECIAL_WAIT_RETURN = 0x84D6,
+       COMPETITION_LOOP = 0x6678, COMPETITION_WAIT_RETURN = 0x668C,
+       COMPETITION_FLAG = 0xFFE8 };
 #endif
+static int competition(void)
+{
+    return g_ram[COMPETITION_FLAG] || g_ram[COMPETITION_FLAG+1];
+}
 
 /* A menu resume must preserve the parked guest call, not run its loader.
  * Addresses and instruction lengths match the pinned retail listings. */
@@ -149,7 +157,11 @@ int s3_state_at_boundary(void)
         ((uint32_t)g_ram[sp+2] << 8) | g_ram[sp+3];
     /* SS initialization/fades also wait for VBlank. Only its established
      * per-frame loop (or Pause_Game within it) is safe to restart. */
-    return caller == (g_ram[0xF600] == 0x34 ? SPECIAL_WAIT_RETURN : LEVEL_WAIT_RETURN) ||
+    /* Competition has a separate per-frame loop. Its four internal updates
+     * begin after this wait, so the regular level return cannot identify it. */
+    unsigned wait = g_ram[0xF600] == 0x34 ? SPECIAL_WAIT_RETURN :
+        competition() ? COMPETITION_WAIT_RETURN : LEVEL_WAIT_RETURN;
+    return caller == wait ||
            caller == PAUSE_WAIT_RETURN;
 }
 uint32_t s3_state_resume_pc(uint8_t mode)
@@ -160,7 +172,8 @@ uint32_t s3_state_resume_pc(uint8_t mode)
         menu_resume_sp=g_cpu.A[7]+4;
         return g_cpu.PC;
     }
-    return mode == 0x0C ? LEVEL_LOOP : mode == 0x34 ? SPECIAL_LOOP : 0;
+    return mode == 0x0C ? (competition() ? COMPETITION_LOOP : LEVEL_LOOP) :
+        mode == 0x34 ? SPECIAL_LOOP : 0;
 }
 int s3_state_save(void *data, size_t size)
 {
