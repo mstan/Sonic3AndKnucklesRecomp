@@ -2726,6 +2726,9 @@ static void test_mhz_departure_relocation(void)
     /* Repeating presentation at the same native tick cannot move it. */
     s_build.count=0;capture_mhz_departure(15504,640);
     CHECK(s_build.count==2 && s_build.sprites[0].x==504);
+    /* The new arena camera must not catch the terminal departing image. */
+    word(g_ram,0xFE04,102);s_build.count=0;capture_mhz_departure(15512,640);
+    CHECK(s_build.count==2 && s_build.sprites[0].x==508);
     /* Current-build snapshot round-trip retains the pending departure. */
     S3StateIO measure={0};measure.ok=1;scene_frame_state(&measure,&s_build);
     uint8_t *blob=malloc(measure.pos);CHECK(blob);
@@ -2769,6 +2772,49 @@ static void test_mhz_animation_dma_projection(void)
     mhz_parallax_art(0x1C0,0,238,&unrelated);CHECK(unrelated.bits==0x12345678);
     memcpy(g_rom+0xBA1C0,saved,sizeof saved);
 #endif
+}
+static void test_aiz_interpolated_background_source_rows(void)
+{
+    int saved_interpolating=s_interpolating;double saved_phase=s_interpolation_phase;
+    interpolation_reset();s_ix_front=1;
+    InterpSnapshot *p=ix_previous(),*c=ix_current();
+    memset(p,0,sizeof *p);memset(c,0,sizeof *c);
+    p->context.level=c->context.level=1;p->context.bg_event=c->context.bg_event=8;
+    p->context.video.reg[11]=c->context.video.reg[11]=3;
+    p->context.video.vsram[1]=456;c->context.video.vsram[1]=455;
+    word(p->context.world,0xF646,0x504);word(c->context.world,0xF646,0x504);
+    p->context.fg_y=0x38F;c->context.fg_y=0x38E;
+    /* Consecutive native first-hill rows. The upper/middle boundary moves
+     * from56 to57; screen-row blending invents a24px phase between layers. */
+    for(int y=0;y<224;++y) {
+        p->hs[y][0]=-100;c->hs[y][0]=-108;
+        p->hs[y][1]=(int16_t)(y+456<0x200?-480:y+456<0x220?-432:-384);
+        c->hs[y][1]=(int16_t)(y+455<0x200?-484:y+455<0x220?-435:-387);
+    }
+    int16_t previous[IX_LINES][2],current[IX_LINES][2];
+    memcpy(previous,p->hs,sizeof previous);memcpy(current,c->hs,sizeof current);
+    s_interpolating=1;
+    for(unsigned phase=0;phase<=4;++phase) {
+        s_interpolation_phase=phase/4.0;int by=interpolation_lerp(456,455,128);
+        for(int y=0;y<224;++y) {
+            int a=0,b=0,wy=y+by;
+            presentation_scroll(y,&a,&b);
+            int before=wy<0x200?-480:wy<0x220?-432:-384;
+            int after=wy<0x200?-484:wy<0x220?-435:-387;
+            CHECK(a==interpolation_lerp(-100,-108,128));
+            CHECK(b==interpolation_lerp(before,after,128));
+        }
+    }
+    CHECK(!memcmp(previous,p->hs,sizeof previous) && !memcmp(current,c->hs,sizeof current));
+    /* A different act, water deformation or redraw is not the forest band. */
+    s_interpolation_phase=.5;
+    for(unsigned which=0;which<3;++which) {
+        c->context.act=which==0;c->context.bg_event=which==1?4:8;
+        c->context.fg_y=which==2?0x500:0x38E;
+        int a=0,b=0;presentation_scroll(56,&a,&b);
+        CHECK(b==interpolation_lerp(previous[56][1],current[56][1],128));
+    }
+    interpolation_reset();s_interpolating=saved_interpolating;s_interpolation_phase=saved_phase;
 }
 static void test_desert_snow_bounded_view(void)
 {
@@ -5266,6 +5312,7 @@ int main(int argc,char **argv)
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
+    test_aiz_interpolated_background_source_rows();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_lbz_waiting_actors();test_blue_spheres();

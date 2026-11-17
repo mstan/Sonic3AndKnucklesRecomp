@@ -3919,8 +3919,29 @@ static unsigned presentation_column_scroll(unsigned column,unsigned fallback)
 static void presentation_scroll(int row,int *a,int *b)
 {
     if(s_interpolating && row>=0 && row<IX_LINES) {
-        *a=interpolation_lerp(ix_previous()->hs[row][0],ix_current()->hs[row][0],128);
-        *b=interpolation_lerp(ix_previous()->hs[row][1],ix_current()->hs[row][1],128);
+        const InterpSnapshot *previous=ix_previous(),*current=ix_current();
+        int pr=row,cr=row;
+        /* AIZ's forest bands belong to background coordinates. Vertical
+         * camera movement shifts their screen rows between native frames;
+         * blending the same screen row mixes two different leaf layers.
+         * Match their installed source rows before interpolating the phase.
+         * Water and staged redraws keep their independent native owners. */
+        if(previous->context.level && current->context.level &&
+           !previous->context.zone && !current->context.zone &&
+           !previous->context.act && !current->context.act &&
+           previous->context.bg_event==8 && current->context.bg_event==8 &&
+           (previous->context.video.reg[11]&3)==3 && (current->context.video.reg[11]&3)==3 &&
+           (int)(((unsigned)previous->context.world[0xF646]<<8)|previous->context.world[0xF647])-
+               previous->context.fg_y>=224 &&
+           (int)(((unsigned)current->context.world[0xF646]<<8)|current->context.world[0xF647])-
+               current->context.fg_y>=224) {
+            int py=previous->context.video.vsram[1],cy=current->context.video.vsram[1];
+            int y=interpolation_lerp(py,cy,128);
+            if(abs(cy-py)<=128 && row+y-py>=0 && row+y-py<IX_LINES &&
+               row+y-cy>=0 && row+y-cy<IX_LINES) {pr=row+y-py;cr=row+y-cy;}
+        }
+        *a=interpolation_lerp(previous->hs[row][0],current->hs[row][0],128);
+        *b=interpolation_lerp(previous->hs[pr][1],current->hs[cr][1],128);
     }
 }
 static int presentation_camera(int axis,int fallback)
