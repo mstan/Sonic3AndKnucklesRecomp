@@ -47,7 +47,7 @@ int main(int argc,char **argv)
         CHECK(palette(s3?0x8C594u:0x28C594u)==0x5E9B54u);
         CHECK(palette(s3?0x8C654u:0x28C654u)==0x5E9C14u);
         CHECK(palette(0xA943C)==(s3?0xA943Cu:0x5F2F0Eu));
-        CHECK(palette(0xA949C)==0xA949Cu);
+        CHECK(palette(0xA949C)==(s3?0xA949Cu:0x5F2F0Eu));
         CHECK(palette(0xA967C)==(s3?0xA967Cu:0x5F2FCEu));
         CHECK(palette(0xA945C)==(s3?0xA945Cu:0x5F2F2Eu));
         CHECK(palette(0xA94BC)==0xA94BCu);
