@@ -72,7 +72,7 @@ def main():
         raise ValueError('Invalid Megamix geometry hook block boundaries')
     header='\n'.join(header)+'\n'
     def profile_tokens(text):
-        return list(shlex.shlex(text,posix=True,punctuation_chars=True))
+        return list(shlex.shlex(text,posix=False,punctuation_chars=True))
     if args.check:
         # Later independent hooks need not move when this profile is checked.
         if (not inc.exists() or inc.read_text(encoding='utf-8')!=header or not matches
