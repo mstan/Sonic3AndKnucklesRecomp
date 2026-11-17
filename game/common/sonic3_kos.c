@@ -44,14 +44,39 @@ static int native_instruction(void *user,unsigned *cycles)
     return 1;
 }
 int s3_kos_owns(uint32_t pc) { return pc==KOS_ENTRY; }
+#ifndef SONIC3_STANDALONE
+static unsigned ram_word(unsigned address)
+{ return (unsigned)g_ram[address]<<8|g_ram[address+1]; }
+static unsigned ram_long(unsigned address)
+{ return ram_word(address)<<16|ram_word(address+2); }
+#endif
+static int head_base_pending(void)
+{
+#ifndef SONIC3_STANDALONE
+    if(g_ram[0xF600]==12 && ram_word(0xFE10)==0x701 &&
+       (ram_word(0xFF0E)&0x7FFFu) && ram_long(0xFF40)==0x15FDDEu &&
+       ram_word(0xFF68)==0xA5C0u) {
+        /* The ship PLC and EggRobo head share these 32 patterns. Let the
+         * queued base patterns finish before decoding their overlay;
+         * otherwise the later Nemesis rows replace the hurt/death frames.
+         * Its remaining vehicle patterns do not overlap the head. */
+        for(unsigned slot=0xF680;slot<0xF6E0;slot+=6) {
+            unsigned destination=ram_word(slot+4);
+            if(ram_long(slot) && destination>=0xA5C0u && destination<0xA9C0u)
+                return 1;
+        }
+    }
+#endif
+    return 0;
+}
 int s3_kos_instruction(uint32_t pc)
 {
-    /* Use interrupt bookmarks for the assessed gameplay uploads. MHZ2's
-     * EggRobo head can yield partway through its module too; returning from
-     * that VBlank must resume decoding before the module is sent to VRAM. */
+    /* Returning here leaves both native queues intact for the next frame. */
+    if(pc==KOS_ENTRY && head_base_pending())return 1;
+    /* Limit the correction to the assessed AIZ gameplay host. Native boot,
+     * other stages and empty queues keep their existing execution path. */
     if(pc!=KOS_ENTRY || g_ram[0xF600]!=12 || !g_ram[0xF711] ||
-       !((g_ram[0xFE10]==0 && g_ram[0xFE11]<=1) ||
-         (g_ram[0xFE10]==7 && g_ram[0xFE11]==1)) ||
+       g_ram[0xFE10] || g_ram[0xFE11]>1 ||
        !(((unsigned)g_ram[0xFF0E]<<8|g_ram[0xFF0F])&0x7FFFu))return 0;
     return s3_kos_execute(pc);
 }
