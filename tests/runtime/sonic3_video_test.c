@@ -2652,7 +2652,7 @@ static void test_bounded_parallax_projection(void)
             CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
             memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
             write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
-            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);
+            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
             word(g_ram,0xEE90,y);v.vsram[1]=(uint16_t)y;
             v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
             v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
@@ -2671,12 +2671,21 @@ static void test_bounded_parallax_projection(void)
                 word(v.vram,0xF002,(unsigned)-(camera*speed/32+(z && c==1?1:0)));
                 memset(&s_build,0,sizeof s_build);s_build.scene=1;
                 s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
+                g_ram[0xF62A]=1;s3_video_vblank();g_ram[0xF62A]=0;
                 memcpy(before,g_ram,sizeof before);
                 scanline(&v,0,native,320,out,796);
+                CHECK(s_frame_level);CHECK(out[0]==0xFFFF0000u || out[0]==0xFF00FF00u);
                 if(!c)memcpy(reference,out,sizeof reference);
-                else CHECK(!memcmp(reference,out,sizeof reference));
+                else {
+                    if(memcmp(reference,out,sizeof reference))
+                        fprintf(stderr,"parallax zone=%X band=%u sample=%u camera=%d actor=%d left=%d upload=%u\n",zones[z],band,c,camera,s_camera,s_left,s_upload_serial);
+                    CHECK(!memcmp(reference,out,sizeof reference));
+                }
                 scanline(&v,0,native,320,narrow,320);
-                CHECK(!memcmp(narrow,native,sizeof native));
+                for(int x=0;x<320;++x) {
+                    int source=x-(int16_t)vram16(&v,0xF002);
+                    CHECK(narrow[x]==(((unsigned)source>>4)&1?0xFF00FF00u:0xFFFF0000u));
+                }
                 CHECK(!memcmp(before,g_ram,sizeof before));
             }
             s3_video_set_world_cell(NULL);CHECK(configure("off"));
@@ -2861,7 +2870,7 @@ static void test_desert_snow_bounded_view(void)
                 s3_video_set_world_cell(edge_parallax_cell);memcpy(before,g_ram,sizeof before);
                 scanline(&v,0,native,320,out,796);
                 int eye_scroll=zone?snow[4][band]:238*(int)(4+band)/64;
-                CHECK(edge_parallax_scroll(-native_scroll,camera+(int)heat,camera,796,320,y)==-eye_scroll);
+                CHECK(edge_parallax_scroll(-native_scroll,camera+(int)heat,camera,796,320,y,NULL)==-eye_scroll);
                 for(int x=0;x<796;++x) {
                     unsigned source=(unsigned)(x-238+eye_scroll)&511u;
                     CHECK(out[x]==((source>>4)&1?0xFF00FF00u:0xFFFF0000u));
