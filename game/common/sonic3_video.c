@@ -511,6 +511,34 @@ static uint16_t world_attr_blocks(const uint8_t *ram,const uint8_t *blocks,int w
 }
 static uint16_t world_attr(const uint8_t *ram,int wx,int wy,int background)
 { return world_attr_blocks(ram,ram+0x9000,wx,wy,background); }
+static uint8_t scene_read8(unsigned a);
+static void icz_cave_art(unsigned attr,int y,int camera_x,int camera_y,GenesisTileRow *row)
+{
+    /* AnimateTiles_ICZ normally bakes the quarter-speed crystal phase into
+     * shared VRAM. The extra incoming cave can precede that native phase;
+     * select the identical original DMA row without modifying guest art. */
+    unsigned tile=attr&2047u,fy=(unsigned)y&7u,source,offset;
+    if(attr&0x1000u)fy^=7u;
+    int bx=camera_x/2-0x1D80,by=camera_y/2,dy=by/2;
+    if(tile>=0x10E && tile<0x11E) {
+        int dx=bx>=0?bx/2:-((-bx+1)/2);
+        unsigned phase=(unsigned)(dx-bx)&31u,rotation=(phase&24u)*16u;
+        unsigned at=(tile-0x10Eu)*32u+fy*4u,first=512u-rotation;
+        offset=(phase&7u)*512u+(at<first?rotation+at:at-first);
+        source=S3_ART_BANK+0xB8580u;
+    } else if(tile>=0x122 && tile<0x12A) {
+        source=S3_ART_BANK+0xB9580u;offset=(tile-0x122u)*32u+fy*4u+((unsigned)(dy-by)&63u)*4u;
+    } else if(tile>=0x12A && tile<0x12E) {
+        source=S3_ART_BANK+0xB9780u;offset=(tile-0x12Au)*32u+fy*4u+((unsigned)(dy/2+dy/4-by)&31u)*4u;
+    } else if(tile>=0x12E && tile<0x130) {
+        source=S3_ART_BANK+0xB9880u;offset=(tile-0x12Eu)*32u+fy*4u+((unsigned)(dy/2-by)&15u)*4u;
+    } else if(tile==0x130) {
+        source=S3_ART_BANK+0xB9900u;offset=fy*4u+((unsigned)(dy/4-by)&7u)*4u;
+    } else return;
+    row->bits=(uint32_t)scene_read8(source+offset)<<24|
+        (uint32_t)scene_read8(source+offset+1)<<16|
+        (uint32_t)scene_read8(source+offset+2)<<8|scene_read8(source+offset+3);
+}
 /* One immutable source/bank/vertical identity for this scanline only.
  * Private art overrides use the same eight-pixel decoder as native planes,
  * instead of translating layout/chunk/block and decoding again per pixel. */
@@ -538,6 +566,15 @@ static uint8_t world_art_row_pixel(WorldArtRow *row,int x,uint16_t *attr)
     }
     row->next_x=x+1;*attr=row->tile.attr;
     return gtile_row_pixel(&row->tile);
+}
+static uint8_t icz_cave_bank_pixel(WorldArtRow *row,int x,int camera_x,int camera_y,uint16_t *attr)
+{
+    if(!row->tile.remaining || x!=row->next_x) {
+        uint16_t cell=world_attr_blocks_mask(row->ram,row->blocks,x,row->y,1,row->row_mask);
+        gtile_row_begin(&row->tile,row->patterns,cell,x,row->y);
+        icz_cave_art(cell,row->y,camera_x,camera_y,&row->tile);
+    }
+    row->next_x=x+1;*attr=row->tile.attr;return gtile_row_pixel(&row->tile);
 }
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
 {
@@ -3233,6 +3270,20 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             world_art_row_init(&aiz_bg,s_background_frame,art->blocks,art->video.vram,by,1);
         }
     }
+    /* The first cave retires a finite snow overlay after its right edge
+     * ($3940) has left the native viewport. Expanded margins can still see
+     * it, and can see the incoming cave before the two native redraw passes.
+     * Both source banks/art are already installed and remain unchanged. */
+    int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
+        s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
+    WorldArtRow icz_snow_bank,icz_cave_bank;
+    if(icz_first_cave) {
+        int fallen=(int16_t)(((unsigned)s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3]);
+        world_art_row_init(&icz_snow_bank,s_background_frame,s_background_frame+0x9000,
+            v->vram,wy-0x460+fallen,1);
+        world_art_row_init(&icz_cave_bank,s_background_frame,s_background_frame+0x9000,
+            v->vram,camera_y/2+line,1);
+    }
     /* The snowboard hill begins partway across each wrapped layout row.
      * Its unused leading chunks are empty on the cartridge. Extend the
      * solid snow at that boundary into the extra left view; do not expose
@@ -3319,6 +3370,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
+        }
+        if(icz_first_cave && (nx<0 || nx>=nw)) {
+            if(wx<0x3940)bp=world_art_row_pixel(&icz_snow_bank,wx-0x1D40,&b);
+            else bp=icz_cave_bank_pixel(&icz_cave_bank,nx+camera/2-0x1D80,camera,camera_y,&b);
         }
         if(fbz_entrance && (nx<0 || nx>=nw)) {
             apalette=fbz_foreground_colors;

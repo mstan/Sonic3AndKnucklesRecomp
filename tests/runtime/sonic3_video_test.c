@@ -2782,6 +2782,72 @@ static void test_mhz_animation_dma_projection(void)
     memcpy(g_rom+0xBA1C0,saved,sizeof saved);
 #endif
 }
+static void test_icz_cave_original_dma_rows(void)
+{
+    static const unsigned bases[]={0xB8580,0xB9580,0xB9780,0xB9880,0xB9900};
+    static const unsigned sizes[]={4096,512,256,128,64};
+    static uint8_t saved[5056];unsigned end=0;
+    for(unsigned n=0;n<5;++n) {
+        memcpy(saved+end,g_rom+S3_ART_BANK+bases[n],sizes[n]);
+        for(unsigned i=0;i<sizes[n];++i)g_rom[S3_ART_BANK+bases[n]+i]=(uint8_t)((i+n*17)%251);
+        end+=sizes[n];
+    }
+    /* Native normal-cave phase at camera3930/68C: B=-232/838,
+     * dynamic B=-116/419. These offsets are the original split-DMA and
+     * vertical-loop source addresses, independent of the outgoing VRAM. */
+    static const struct { unsigned tile,bank,offset; } rows[]={
+        {0x10E,0,2304},{0x116,0,2048},{0x122,1,116},
+        {0x12A,2,76},{0x12E,3,44},{0x130,4,8}
+    };
+    for(unsigned n=0;n<sizeof rows/sizeof *rows;++n)for(unsigned flip=0;flip<2;++flip) {
+        GenesisTileRow row={0};row.bits=0x55555555;
+        unsigned attr=rows[n].tile|(flip?0x1000:0),at=S3_ART_BANK+bases[rows[n].bank]+rows[n].offset+(flip?28:0);
+        icz_cave_art(attr,0,0x3930,0x68C,&row);
+        uint32_t expected=(uint32_t)g_rom[at]<<24|(uint32_t)g_rom[at+1]<<16|
+            (uint32_t)g_rom[at+2]<<8|g_rom[at+3];CHECK(row.bits==expected);
+    }
+    GenesisTileRow static_row={0};static_row.bits=0x12345678;
+    icz_cave_art(0x200,0,0x3930,0x68C,&static_row);CHECK(static_row.bits==0x12345678);
+    end=0;for(unsigned n=0;n<5;++n){memcpy(g_rom+S3_ART_BANK+bases[n],saved+end,sizes[n]);end+=sizes[n];}
+}
+static int icz_cave_bank_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;*cell=0;
+    if(background) {
+        if(y<0x200 && x>=0x1880 && x<0x1C00)*cell=2;
+        else if(y>=0x300)*cell=3;
+    }
+    return 1;
+}
+static void test_icz_first_cave_spatial_margins(void)
+{
+    static GVDP v;static uint8_t before[65536];uint32_t native[320]={0},out[796];
+    for(unsigned event=4;event<=16;event+=4) {
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+        word(g_ram,0xFE10,0x500);word(g_ram,0x8000,128);word(g_ram,0x8002,64);
+        word(g_ram,0x8008,0x8100);word(g_ram,0xEEC2,event);word(g_ram,0xEED2,0xFED2);
+        word(g_ram,0xEE80,0x3930);word(g_ram,0xEE84,0x68C);word(g_ram,0xEE90,event==16?0x346:0xFE);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+        v.vsram[0]=0x68C;v.vsram[1]=event==16?0x346:0xFE;
+        v.cram[1]=0xE;v.cram[2]=0xEEE;v.cram[3]=0xE0;
+        memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+        for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,2);word(g_ram,0x9018+n*2,3);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,1);
+        word(v.vram,0xF000,(unsigned)-0x3930);word(v.vram,0xF002,event==16?0xE8:(unsigned)-(0x3930-0x1D40));
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x3930;s_build.camera_y=0x68C;publish_sprites();
+        s3_video_set_world_cell(icz_cave_bank_cell);memcpy(before,g_ram,sizeof before);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<238;++x)CHECK(out[x]==0xFFFFFFFFu);
+        for(int x=558;x<796;++x)CHECK(out[x]==0xFF00FF00u);
+        /* The installed mixed native canvas remains authoritative. */
+        if(event==8 || event==12)for(int x=238;x<558;++x)CHECK(out[x]==0xFFFF0000u);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+}
 static void test_aiz_interpolated_background_source_rows(void)
 {
     int saved_interpolating=s_interpolating;double saved_phase=s_interpolation_phase;
@@ -5321,6 +5387,7 @@ int main(int argc,char **argv)
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
+    test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();
     test_aiz_interpolated_background_source_rows();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
