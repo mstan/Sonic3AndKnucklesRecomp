@@ -130,6 +130,9 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(s_frame_level && !s->hud && (x<origin || x>=origin+320) &&
+                      giant_ring_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
             } else if(world && (s->slot>>8)==SPRITE_LBZ_PILLAR &&
                       (x<origin || x>=origin+320) && lbz_rocket_load()) {
                 p=pattern_pixel(&s_lbz_rocket.video,cell,ix,iy);
@@ -174,6 +177,14 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             int ext=s->hud==5?0:presentation_sprite_line(s->size,cell&2047u,p>>4);
             uint32_t c=ext?genesis_dac_cram_to_argb(presentation_ext_color(line,ext,p&15),GENESIS_DAC_NORMAL):
                 s->hud==SCENE_COMPETITION_CHARACTER?competition_character_color(v,p,s->attr):palette[p];
+            /* The MHZ2 switch scene borrows ring brown for Knuckles' red.
+             * Its original view cannot see the rings beyond the wall.
+             * Those extra rings keep their own brown through stage fades;
+             * the native viewport and Knuckles retain the installed palette. */
+            if(!ext && (s->slot>>8)==SPRITE_WORLD_RING && s_frame_level &&
+               s_frame_zone==7 && s_frame_act==1 && width>320 && p==22 &&
+               (x<origin || x>=origin+320))
+                c=genesis_dac_cram_to_argb(scene_art_color(0x088,v),GENESIS_DAC_NORMAL);
             /* The current's full/half brick pieces borrow palette 2 while
              * the identical backing uses palette 3. A wider view exposes
              * that recoloring sweep over a large stationary wall. Keep the

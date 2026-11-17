@@ -2656,9 +2656,12 @@ static void test_bounded_parallax_projection(void)
             for(unsigned c=0;c<4;++c) {
                 static const int cameras[]={0,145,223,238};
                 int camera=z?(c?cameras[c]:152):cameras[c],lag=c&1?4:0;
-                word(g_ram,0xEE80,camera+lag);word(g_ram,0xEEB6,camera+lag);
+                word(g_ram,0xEE80,camera+lag);
+                /* Native scroll/SAT can precede the next RAM camera copy,
+                 * and Events_fg_1 need not match that newer copy either. */
+                word(g_ram,0xEEB6,camera+lag-(z && c==2?5:0));
                 word(v.vram,0xF000,(unsigned)-camera);
-                word(v.vram,0xF002,(unsigned)-(camera*speed/32));
+                word(v.vram,0xF002,(unsigned)-(camera*speed/32+(z && c==1?1:0)));
                 memset(&s_build,0,sizeof s_build);s_build.scene=1;
                 s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
                 memcpy(before,g_ram,sizeof before);

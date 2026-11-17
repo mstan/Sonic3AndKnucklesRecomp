@@ -66,7 +66,7 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
-       SPRITE_MHZ_ARENA_COPY = 14 };
+       SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -898,7 +898,11 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
         q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
-        q->slot=(uint16_t)(s_capture_slot|(native_art_owner(map)<<8));
+        unsigned owner=native_art_owner(map);
+#ifndef SONIC3_STANDALONE
+        if(map==0x619E0u && frame<12)owner=SPRITE_GIANT_RING+frame;
+#endif
+        q->slot=(uint16_t)(s_capture_slot|(owner<<8));
     }
 }
 /* Screen-loop actors own a512px canvas, although the expanded view can see
@@ -1326,7 +1330,8 @@ static void capture_objects(void)
             if(s_capture_frame->count<SCENE_SPRITES) {
                 SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
                 q->x=x-cam+(int16_t)scene_read16(m+6);q->y=y+(int16_t)scene_read16(m);
-                q->attr=scene_read16(m+4);q->size=(uint8_t)scene_read16(m+2);q->hud=0;q->zoom=256;q->slot=0;
+                q->attr=scene_read16(m+4);q->size=(uint8_t)scene_read16(m+2);q->hud=0;q->zoom=256;
+                q->slot=s_capture_frame->scene==1 && ram16(0xFE10)==0x701?SPRITE_WORLD_RING<<8:0;
             }
         }
     }
@@ -1860,6 +1865,41 @@ static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pi
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
+/* The entry ring shares the explosion reservation. Extra scenery can
+ * replace that VRAM while the ring is still visible in a margin. Decode
+ * the captured ring frame's complete original DPLC instead of reading
+ * another owner's upload. Native viewport pixels and guest queues stay native. */
+static int giant_ring_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
+{
+#ifndef SONIC3_STANDALONE
+    static struct { uint8_t pixels[0x800];unsigned bytes;int attempted,ready; } frames[12];
+    if(owner<SPRITE_GIANT_RING || owner>=SPRITE_GIANT_RING+12)return 0;
+    unsigned frame=owner-SPRITE_GIANT_RING,tile=attr&2047u;
+    if(tile<0x5A0 || tile>=0x5E0)return 0;
+    if(!frames[frame].attempted) {
+        frames[frame].attempted=1;
+        unsigned art=scene_read32(0x619B2u),table=scene_read32(0x619B6u);
+        if(art>=0x400000u || table>=0x400000u-24u)return 0;
+        unsigned entry=table+scene_read16(table+frame*2u);
+        if(entry>=0x400000u-2u)return 0;
+        unsigned count=(unsigned)scene_read16(entry)+1u,used=0;
+        if(count>64 || entry+2u+count*2u>0x400000u)return 0;
+        for(unsigned n=0;n<count;++n) {
+            unsigned plc=scene_read16(entry+2u+n*2u);
+            unsigned source=art+(plc>>4)*32u,bytes=((plc&15u)+1u)*32u;
+            if(source>0x400000u-bytes || bytes>sizeof frames[frame].pixels-used)return 0;
+            memcpy(frames[frame].pixels+used,g_rom+source,bytes);used+=bytes;
+        }
+        frames[frame].bytes=used;frames[frame].ready=1;
+    }
+    unsigned offset=(tile-0x5A0)*32u+(unsigned)y*4u+(unsigned)x/2u;
+    if(!frames[frame].ready || offset>=frames[frame].bytes)return 0;
+    unsigned byte=frames[frame].pixels[offset],p=(x&1)?byte&15u:byte>>4;
+    *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+#else
+    (void)owner;(void)attr;(void)x;(void)y;(void)pixel;return 0;
+#endif
+}
 /* The original boss allocates its stationary capsule only after falling
  * below the native screen. A wider view already sees that authored ledge.
  * Extend the waiting body/button there until their real published sprites
@@ -2300,7 +2340,7 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
  * cutscene canvases and independently moving scenery retain their owners. */
 static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by)
 {
-    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after;
+    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after,mhz=0;
     if(width<=nw || !delta || !s_frame_level)return scroll;
 #ifndef SONIC3_STANDALONE
     if(s_frame_zone==4 && !s_frame_act) {
@@ -2318,9 +2358,11 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
         }
 #ifndef SONIC3_STANDALONE
         else if(s_frame_zone==7 && s_frame_act==1) {
-            numerator=12;
-            phase=(int16_t)(((unsigned)s_world_frame[0xEEB6]<<8)|s_world_frame[0xEEB7])+
-                  camera-s_frame_fg_x;
+            /* The displayed camera already owns this rigid 3/8 phase.
+             * Events_fg_1 in newer RAM can lag a different camera copy.
+             * Project directly from the published physical eye, without
+             * carrying that second copy or a rounded native pixel error. */
+            numerator=12;mhz=1;
         }
 #endif
         if(!numerator)return scroll;
@@ -2332,7 +2374,7 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
      * can round between its two adjacent integer phases. */
     int distance=(-scroll-before+256)&511;distance-=256;
     if(distance < -1 || distance > 1)return scroll;
-    return scroll-(after-before);
+    return mhz?-after:scroll-(after-before);
 }
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
