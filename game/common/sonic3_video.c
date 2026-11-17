@@ -2448,14 +2448,38 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
     row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
         (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
 }
+/* ICZ1_IntroDeform's native fixed-point bands include an accelerating
+ * wind phase. Re-evaluate that same phase at the physical eye instead of
+ * replacing it with a rounded camera ratio or another mutable accumulator. */
+static int icz_intro_scroll(int camera,int by)
+{
+    static const unsigned ends[]={0x44,0x50,0x5B,0x68,0x80,0xD0,0xD2,
+        0xD8,0xE0,0xF0,0x108,0x128,0x150};
+    unsigned band=0;
+    while(band<13 && by>=(int)ends[band])++band;
+    int shake=(int16_t)(((unsigned)s_world_frame[0xEECE]<<8)|s_world_frame[0xEECF]);
+    uint32_t stored=(uint32_t)s_world_frame[0xA81C]<<24|
+        (uint32_t)s_world_frame[0xA81D]<<16|
+        (uint32_t)s_world_frame[0xA81E]<<8|s_world_frame[0xA81F];
+    int64_t wind=(int32_t)(stored-0x800u);
+    int64_t d1=(int64_t)(camera-shake)*2048,d0=d1+(int64_t)shake*65536,d3=0;
+    for(unsigned i=0;i<5;++i) {
+        if(i==band)goto result;
+        d0+=d1;d1+=d3;d3+=0x800;
+    }
+    d0+=d1;d1+=d1>=0?d1/2:-((-d1+1)/2);d3=wind;
+    for(unsigned i=5;i<band;++i){d0+=d1;d1+=d3;d3+=0x800;}
+result:
+    return (int)(d0>=0?d0/65536:-((-d0+65535)/65536));
+}
 /* Native deformation follows its 320px camera. At a bounded expanded
  * edge that camera can move inside a stationary physical view. Reproject
- * only the ordinary city/forest/factory bands from the same published phase;
+ * only the ordinary city/forest/factory, desert and snow bands from the same published phase;
  * cutscene canvases and independently moving scenery retain their owners. */
 static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by,int *mhz_eye)
 {
     if(mhz_eye)*mhz_eye=INT_MIN;
-    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after,mhz=0;
+    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after,mhz=0,divisor=32;
     if(width<=nw || !delta || !s_frame_level)return scroll;
 #ifndef SONIC3_STANDALONE
     if(s_frame_zone==4 && !s_frame_act) {
@@ -2468,7 +2492,18 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
 #endif
     {
         if(s_frame_bg_event)return scroll;
-        if(s_frame_zone==3 && !s_frame_act) {
+        if(s_frame_zone==5 && !s_frame_act) {
+            before=icz_intro_scroll(camera,by);
+            after=icz_intro_scroll(camera+delta,by);
+            goto completed_phase;
+        }
+        if(s_frame_zone==8 && !s_frame_act) {
+            /* SOZ1 has seven bands: 1/16, then five 8px steps to 5/32.
+             * A's independent one-pixel heatwave is not the camera phase. */
+            numerator=by<0x110?4:by<0x138?5+(by-0x110)/8:10;
+            divisor=64;phase=s_camera;
+        }
+        else if(s_frame_zone==3 && !s_frame_act) {
             numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
         }
 #ifndef SONIC3_STANDALONE
@@ -2482,9 +2517,10 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
 #endif
         if(!numerator)return scroll;
         before=phase*numerator;after=(phase+delta)*numerator;
-        before=before>=0?before/32:-((-before+31)/32);
-        after=after>=0?after/32:-((-after+31)/32);
+        before=before>=0?before/divisor:-((-before+divisor-1)/divisor);
+        after=after>=0?after/divisor:-((-after+divisor-1)/divisor);
     }
+completed_phase:;
     /* Completed HScroll identifies the native bank. Fractional sampling
      * can round between its two adjacent integer phases. */
     int distance=(-scroll-before+256)&511;distance-=256;
@@ -2892,9 +2928,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
+    int icz_intro_background=level && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event;
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
-        mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
+        mgz_background || cnz_background || icz_intro_background || s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     if(fbz_flipped){unsigned swap=base_a;base_a=base_b;base_b=swap;}

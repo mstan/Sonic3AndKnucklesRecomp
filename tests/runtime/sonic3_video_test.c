@@ -2606,9 +2606,9 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    /* Ordinary CNZ1/MHZ2/FBZ1 derive B from A, rather than holding B while A
+    /* Ordinary CNZ1/MHZ2/FBZ1/SOZ1 derive B from A, rather than holding B while A
      * moves. Their real deformation contract is tested separately below. */
-    const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
+    const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
 #ifndef SONIC3_STANDALONE
         if(zones[z]==0x400)continue; /* Exact factory bands are tested below. */
@@ -2769,6 +2769,74 @@ static void test_mhz_animation_dma_projection(void)
     mhz_parallax_art(0x1C0,0,238,&unrelated);CHECK(unrelated.bits==0x12345678);
     memcpy(g_rom+0xBA1C0,saved,sizeof saved);
 #endif
+}
+static void test_desert_snow_bounded_view(void)
+{
+    static GVDP v;static uint8_t before[65536];
+    uint32_t native[320],out[796],narrow[320];
+    /* ICZ native source rows retained at wind $20000. The final row is the
+     * physical eye at the left clamp, not another native-camera sample. */
+    static const int cameras[]={0,84,141,182,238};
+    static const int snow[5][14]={
+        {0,0,0,0,0,0,1,3,8,14,23,34,47,62},
+        {2,5,7,10,13,19,23,29,38,48,61,76,92,112},
+        {4,8,13,17,22,31,38,47,58,71,87,104,124,145},
+        {5,11,17,22,28,40,49,60,73,88,105,125,146,170},
+        {7,14,22,29,37,52,64,77,93,111,131,153,177,203}
+    };
+    static const int ys[]={0,0x44,0x50,0x5B,0x68,0x80,0xD0,0xD2,
+        0xD8,0xE0,0xF0,0x108,0x128,0x150};
+    for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
+    for(unsigned zone=0;zone<2;++zone) {
+#ifdef SONIC3_STANDALONE
+        if(!zone)continue;
+#endif
+        unsigned count=zone?14:7;
+        for(unsigned band=0;band<count;++band)for(unsigned heat=0;heat<(zone?1u:2u);++heat) {
+            int y=zone?ys[band]:band?0x110+(int)(band-1)*8:0;
+            for(unsigned c=0;c<5;++c) {
+                int camera=cameras[c];
+                CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+                memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+                write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+                word(g_ram,0xFE10,zone?0x500:0x800);word(g_ram,0x8000,64);
+                word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
+                word(g_ram,0xEE80,camera);word(g_ram,0xEE90,y);write32(0xA81C,0x20800);
+                v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+                v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[1]=(uint16_t)y;
+                v.cram[2]=0xE;v.cram[3]=0xE0;
+                memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+                for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,2);word(g_ram,0x9018+n*2,3);}
+                for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2+((cell%64>>1)&1));
+                int native_scroll=zone?snow[c][band]:camera*(int)(4+band)/64;
+                word(v.vram,0xF000,(unsigned)(-camera-(int)heat));
+                word(v.vram,0xF002,(unsigned)-native_scroll);
+                memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;publish_sprites();
+                s3_video_set_world_cell(edge_parallax_cell);memcpy(before,g_ram,sizeof before);
+                scanline(&v,0,native,320,out,796);
+                int eye_scroll=zone?snow[4][band]:238*(int)(4+band)/64;
+                CHECK(edge_parallax_scroll(-native_scroll,camera+(int)heat,camera,796,320,y)==-eye_scroll);
+                for(int x=0;x<796;++x) {
+                    unsigned source=(unsigned)(x-238+eye_scroll)&511u;
+                    CHECK(out[x]==((source>>4)&1?0xFF00FF00u:0xFFFF0000u));
+                }
+                scanline(&v,0,native,320,narrow,320);
+                CHECK(edge_parallax_scroll(-native_scroll,camera,camera,320,320,y,NULL)==-native_scroll);
+                for(int x=0;x<320;++x) {
+                    unsigned source=(unsigned)(x+native_scroll)&511u;
+                    CHECK(narrow[x]==((source>>4)&1?0xFF00FF00u:0xFFFF0000u));
+                }
+                CHECK(!memcmp(before,g_ram,sizeof before));
+                if(zone)CHECK(icz_intro_scroll(camera,y)==snow[c][band]);
+                s3_video_set_world_cell(NULL);CHECK(configure("off"));
+            }
+        }
+    }
+    /* Authored wind is independent of the camera; it must keep moving. */
+    memset(s_world_frame,0,sizeof s_world_frame);longword(s_world_frame,0xA81C,0x800);
+    CHECK(icz_intro_scroll(238,0x150)==147);
+    longword(s_world_frame,0xA81C,0x40800);
+    CHECK(icz_intro_scroll(238,0x150)==259);
 }
 static void test_fbz_bounded_camera_and_wind(void)
 {
@@ -5197,6 +5265,7 @@ int main(int argc,char **argv)
     test_bounded_parallax_projection();test_mhz_published_camera_phase();
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_mhz_animation_dma_projection();
+    test_desert_snow_bounded_view();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_lbz_waiting_actors();test_blue_spheres();
