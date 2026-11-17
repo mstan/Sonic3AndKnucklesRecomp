@@ -110,6 +110,7 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==7 && x<origin+320)continue;
+            if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
             /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
                                  x-origin+s_camera>=0x980))continue;
@@ -130,6 +131,9 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                 unsigned byte=a<pattern_bytes?patterns[a]:0;
                 p=(uint8_t)(((ix&1)?byte&15:byte>>4)|((cell>>9)&48));
                 if(!(p&15))continue;
+            } else if(world && (s->slot>>8)==SPRITE_MHZ_MUSHROOM &&
+                      (x<origin || x>=origin+320) && mhz_mushroom_pixel(cell,ix&7,iy&7,&p)) {
+                if(!p)continue;
             } else if(s_frame_level && !s->hud && (x<origin || x>=origin+320) &&
                       giant_ring_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
                 if(!p)continue;

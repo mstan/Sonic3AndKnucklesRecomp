@@ -66,7 +66,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
-       SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15, SPRITE_GIANT_RING = 32 };
+       SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
+       SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -703,6 +704,27 @@ typedef struct {
     int16_t y_velocity;uint16_t y_fraction;uint8_t swing_down;
     AizPlaneObject object[3]; /* body, propeller, exhaust */
 } AizPlanePose;
+/* The MHZ introduction relocates its live vehicle to the arena while the
+ * last departing pixels can still be visible in an expanded viewport. */
+typedef struct {
+    unsigned phase,count;uint16_t tick,slot;
+    int16_t y_velocity;uint16_t y_fraction;uint8_t swing_down;
+    SceneSprite pieces[64]; /* world coordinates, presentation only */
+} MhzDeparture;
+static int mhz_departure_valid(const MhzDeparture *p)
+{
+    if(p->phase>2 || p->count>64 || p->swing_down>1 ||
+       p->y_velocity < -0xC0 || p->y_velocity > 0xC0)return 0;
+    if(!p->phase)return !p->count;
+    if(!p->count || p->slot<0xB000 || p->slot>=0xCFCC ||
+       (p->slot-0xB000)%0x4A)return 0;
+    for(unsigned n=0;n<p->count;++n) {
+        const SceneSprite *q=&p->pieces[n];
+        if(q->x<0 || q->x>65535 || q->y<0 || q->y>65535 || q->hud ||
+           q->zoom!=256 || q->slot!=(SPRITE_MHZ_DEPARTURE<<8))return 0;
+    }
+    return 1;
+}
 static int aiz_plane_valid(const AizPlanePose *p)
 {
     if(p->phase>2 || p->mask>7 || p->swing_down>1 ||
@@ -734,6 +756,7 @@ typedef struct {
     int preview_knux; /* waiting pose belongs to this completed display list */
     unsigned aiz_super_pose; /* original Super DPLC pose 33/34, or zero */
     AizPlanePose aiz_plane;
+    MhzDeparture mhz_departure;
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
     uint8_t competition_sat[640]; /* paired lower-view upload */
     int competition_x,competition_y;
@@ -860,6 +883,7 @@ static void scene_mode_changed(int was_enabled)
         s_display=NULL;s_display_frame.serial=0;
         s_upload_serial=0;
         memset(&s_build.aiz_plane,0,sizeof s_build.aiz_plane);
+        memset(&s_build.mhz_departure,0,sizeof s_build.mhz_departure);
         s_frame_menu=MENU_NONE;s_frame_level=0;
         for(unsigned n=0;n<3;++n)s_history[n].serial=0;
     }
@@ -901,6 +925,9 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         unsigned owner=native_art_owner(map);
 #ifndef SONIC3_STANDALONE
         if(map==0x619E0u && frame<12)owner=SPRITE_GIANT_RING+frame;
+        if(map==0x3E1FEu && ((gfx&2047u)==0x369u || (gfx&2047u)==0x399u) &&
+           s_capture_frame->scene==1 && ram16(0xFE10)==0x701)
+            owner=SPRITE_MHZ_MUSHROOM;
 #endif
         q->slot=(uint16_t)(s_capture_slot|(owner<<8));
     }
@@ -1247,6 +1274,67 @@ static void append_aiz_plane(void)
     }
     if(!visible){s_capture_frame->count=first;memset(p,0,sizeof *p);}
 }
+static void capture_mhz_departure(int camera,int camera_y)
+{
+    MhzDeparture previous=s_capture_frame->mhz_departure,*p=&s_capture_frame->mhz_departure;
+    memset(p,0,sizeof *p);
+#ifndef SONIC3_STANDALONE
+    if(s_mode==VIDEO_OFF || s_requested_width<=320 || s_capture_frame->scene!=1 ||
+       ram16(0xFE10)!=0x701)return;
+    unsigned body=0;
+    for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
+        if(scene_read32(0xFF0000u+o)==0x75FD4){body=o;break;}
+    if(body && g_ram[body+5]==10) {
+        p->phase=1;p->slot=(uint16_t)body;p->tick=ram16(0xFE04);
+        p->y_velocity=(int16_t)ram16(body+0x1A);p->y_fraction=ram16(body+0x16);
+        p->swing_down=g_ram[body+0x38]&1u;
+        for(unsigned n=0;n<s_capture_frame->count;++n) {
+            const SceneSprite *q=&s_capture_frame->sprites[n];
+            unsigned slot=sprite_slot(q);if(!slot || slot>=SCENE_SLOTS || q->hud)continue;
+            unsigned o=0xB000u+(slot-1u)*0x4A,ancestor=o;
+            for(unsigned depth=0;ancestor!=body && depth<3;++depth) {
+                unsigned parent=ram16(ancestor+0x46);
+                if(parent<0xB000 || parent>=0xCFCC || (parent-0xB000)%0x4A)break;
+                ancestor=parent;
+            }
+            if(ancestor!=body)continue;
+            if(p->count==64){memset(p,0,sizeof *p);return;}
+            SceneSprite *piece=&p->pieces[p->count++];*piece=*q;
+            piece->x+=camera;piece->y+=camera_y;
+            piece->slot=SPRITE_MHZ_DEPARTURE<<8;piece->zoom=256;
+        }
+        if(!mhz_departure_valid(p))memset(p,0,sizeof *p);
+        return;
+    }
+    if(!previous.phase || !mhz_departure_valid(&previous) ||
+       (previous.phase==1 && (!body || body!=previous.slot ||
+        g_ram[body+5]!=12 || ram16(body+0x10)!=0x4180)))return;
+    unsigned delta=(uint16_t)(ram16(0xFE04)-previous.tick);
+    if(delta>32767)return;
+    *p=previous;p->phase=2;p->tick=ram16(0xFE04);
+    for(unsigned tick=0;tick<delta;++tick) {
+        int velocity=p->y_velocity;
+        if(!p->swing_down){velocity-=0x10;if(velocity<=-0xC0){p->swing_down=1;velocity+=0x10;}}
+        else {velocity+=0x10;if(velocity>=0xC0){p->swing_down=0;velocity-=0x10;}}
+        p->y_velocity=(int16_t)velocity;
+        int movement=velocity*256+(int)p->y_fraction;
+        int dy=movement>=0?movement/65536:-((-movement+65535)/65536);
+        p->y_fraction=(uint16_t)movement;
+        for(unsigned n=0;n<p->count;++n){p->pieces[n].x+=4;p->pieces[n].y+=dy;}
+    }
+    int visible=0,origin=camera-view_left(camera,s_requested_width);
+    for(unsigned n=0;n<p->count;++n) {
+        SceneSprite piece=p->pieces[n];piece.x-=camera;piece.y-=camera_y;
+        if(piece.x+origin>=s_requested_width)continue;
+        visible=1;
+        if(s_capture_frame->count<SCENE_SPRITES)
+            s_capture_frame->sprites[s_capture_frame->count++]=piece;
+    }
+    if(!visible || !mhz_departure_valid(p))memset(p,0,sizeof *p);
+#else
+    (void)previous;(void)camera;(void)camera_y;
+#endif
+}
 static int mgz2_parked_body(unsigned o,unsigned map)
 {
     if(ram16(0xFE10)!=0x201 ||
@@ -1487,6 +1575,7 @@ static void capture_objects(void)
         }
     }
     append_aiz_plane();
+    capture_mhz_departure(cam,cy);
 }
 
 static void publish_sprites(void)
@@ -1518,6 +1607,7 @@ static void publish_sprites(void)
     dst->camera_x=s_build.camera_x;dst->camera_y=s_build.camera_y;
     dst->preview_knux=s_build.preview_knux;dst->aiz_super_pose=s_build.aiz_super_pose;
     dst->aiz_plane=s_build.aiz_plane;
+    dst->mhz_departure=s_build.mhz_departure;
     dst->aiz_join=s_build.aiz_join;
     memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
     dst->competition_x=s_build.competition_x;dst->competition_y=s_build.competition_y;
@@ -1700,6 +1790,7 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.camera_x=s_display->camera_x;s_display_frame.camera_y=s_display->camera_y;
         s_display_frame.preview_knux=s_display->preview_knux;s_display_frame.aiz_super_pose=s_display->aiz_super_pose;
         s_display_frame.aiz_plane=s_display->aiz_plane;
+        s_display_frame.mhz_departure=s_display->mhz_departure;
         s_display_frame.aiz_join=s_display->aiz_join;
         memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
         s_display_frame.competition_x=s_display->competition_x;s_display_frame.competition_y=s_display->competition_y;
@@ -1864,6 +1955,25 @@ static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pi
     unsigned b=s_native_art_cache[owner-1].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+}
+/* Arena spikes replace part of the outgoing mushroom cap's reservation.
+ * Its extra-view pieces still belong to the original scenery sheet. */
+static int mhz_mushroom_pixel(unsigned attr,int x,int y,uint8_t *pixel)
+{
+#ifndef SONIC3_STANDALONE
+    static struct {uint8_t pixels[0x2620];int attempted,ready;} art;
+    unsigned tile=attr&2047u;if(tile<0x347 || tile>=0x478)return 0;
+    if(!art.attempted) {
+        art.attempted=1;
+        art.ready=art_nem(g_rom+0x14E846,0x11B8,art.pixels,sizeof art.pixels)==sizeof art.pixels;
+    }
+    if(!art.ready)return 0;
+    unsigned b=art.pixels[(tile-0x347)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    unsigned p=(x&1)?b&15u:b>>4;
+    *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
+#else
+    (void)attr;(void)x;(void)y;(void)pixel;return 0;
+#endif
 }
 /* The entry ring shares the explosion reservation. Extra scenery can
  * replace that VRAM while the ring is still visible in a margin. Decode
@@ -2374,7 +2484,14 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
      * can round between its two adjacent integer phases. */
     int distance=(-scroll-before+256)&511;distance-=256;
     if(distance < -1 || distance > 1)return scroll;
-    return mhz?-after:scroll-(after-before);
+    /* The foreground upload and the actor/camera publication can be one
+     * native tick apart. origin belongs to the latter, so its physical eye
+     * must use that same camera rather than the older Plane A scroll. */
+    if(mhz) {
+        after=(s_camera+delta)*numerator;
+        return after>=0?-(after/32):(-after+31)/32;
+    }
+    return scroll-(after-before);
 }
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
@@ -3470,6 +3587,9 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
     AizPlanePose plane=frame->aiz_plane;
     s3_state_peek(io,offsetof(SceneFrame,aiz_plane),&plane,sizeof plane);
     if(!aiz_plane_valid(&plane))io->ok=0;
+    MhzDeparture departure=frame->mhz_departure;
+    s3_state_peek(io,offsetof(SceneFrame,mhz_departure),&departure,sizeof departure);
+    if(!mhz_departure_valid(&departure))io->ok=0;
     S3_STATE(io, *frame);
 }
 /* Preserve the selected placement table through rollback: a snapshot can

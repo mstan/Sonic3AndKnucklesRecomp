@@ -2676,6 +2676,61 @@ static void test_bounded_parallax_projection(void)
         }
     }
 }
+static void test_mhz_published_camera_phase(void)
+{
+#ifndef SONIC3_STANDALONE
+    /* Retained native uploads: Plane A and the completed actor camera
+     * need not belong to the same tick. The expanded eye remains at238. */
+    const int rows[][3]={{156,159,-58},{171,175,-64},{187,187,-70},
+                         {204,204,-76},{221,226,-82}};
+    s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_frame_bg_event=0;
+    for(unsigned n=0;n<sizeof rows/sizeof *rows;++n) {
+        s_camera=rows[n][1];
+        CHECK(edge_parallax_scroll(rows[n][2],rows[n][0],s_camera,796,320,450)==-89);
+    }
+#endif
+}
+static void test_mhz_departure_relocation(void)
+{
+#ifndef SONIC3_STANDALONE
+    static uint8_t before[65536];static SceneFrame saved;
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&s_build,0,sizeof s_build);
+    s_capture_frame=&s_build;s_build.scene=1;s_build.count=2;
+    s_build.sprites[0]=(SceneSprite){500,80,0x52E,5,0,256,12};
+    s_build.sprites[1]=(SceneSprite){520,90,0x3EC,5,0,256,13};
+    const unsigned body=0xB32E,child=0xB378;
+    word(g_ram,0xFE10,0x701);word(g_ram,0xFE04,100);word(g_ram,0x8000,160);
+    write32(body,0x75FD4);g_ram[body+5]=10;
+    word(g_ram,child+0x46,body);word(g_ram,body+0x10,16004);
+    memcpy(before,g_ram,sizeof before);
+    capture_mhz_departure(15504,640);
+    CHECK(s_build.mhz_departure.phase==1 && s_build.mhz_departure.count==2);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    g_ram[body+5]=12;word(g_ram,body+0x10,0x4180);word(g_ram,0xFE04,101);
+    s_build.count=0;memcpy(before,g_ram,sizeof before);
+    capture_mhz_departure(15504,640);
+    CHECK(s_build.mhz_departure.phase==2 && s_build.count==2);
+    CHECK(s_build.sprites[0].x==504 && s_build.sprites[1].x==524);
+    CHECK(s_build.sprites[0].slot==(SPRITE_MHZ_DEPARTURE<<8));
+    CHECK(!memcmp(before,g_ram,sizeof before));saved=s_build;
+    /* Repeating presentation at the same native tick cannot move it. */
+    s_build.count=0;capture_mhz_departure(15504,640);
+    CHECK(s_build.count==2 && s_build.sprites[0].x==504);
+    /* Current-build snapshot round-trip retains the pending departure. */
+    S3StateIO measure={0};measure.ok=1;scene_frame_state(&measure,&s_build);
+    uint8_t *blob=malloc(measure.pos);CHECK(blob);
+    S3StateIO io={blob,measure.pos,0,0,1};scene_frame_state(&io,&s_build);CHECK(io.ok);
+    memset(&s_build,0,sizeof s_build);io=(S3StateIO){blob,measure.pos,0,2,1};
+    scene_frame_state(&io,&s_build);CHECK(io.ok);free(blob);
+    CHECK(s_build.mhz_departure.phase==2 && s_build.mhz_departure.count==2);
+    word(g_ram,0xFE04,120);s_build.count=0;capture_mhz_departure(15504,640);
+    CHECK(!s_build.count && !s_build.mhz_departure.phase);
+    s_build=saved;word(g_ram,0xFE10,0x700);s_build.count=0;
+    capture_mhz_departure(15504,640);CHECK(!s_build.count && !s_build.mhz_departure.phase);
+    CHECK(configure("off"));
+#endif
+}
 static void test_fbz_bounded_camera_and_wind(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -5023,7 +5078,8 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
-    test_bounded_parallax_projection();test_fbz_bounded_camera_and_wind();
+    test_bounded_parallax_projection();test_mhz_published_camera_phase();
+    test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();
