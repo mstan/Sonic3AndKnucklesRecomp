@@ -61,8 +61,9 @@ static int head_base_pending(void)
          * otherwise the later Nemesis rows replace the hurt/death frames.
          * Its remaining vehicle patterns do not overlap the head. */
         for(unsigned slot=0xF680;slot<0xF6E0;slot+=6) {
+            if(!ram_long(slot))break;
             unsigned destination=ram_word(slot+4);
-            if(ram_long(slot) && destination>=0xA5C0u && destination<0xA9C0u)
+            if(destination>=0xA5C0u && destination<0xA9C0u)
                 return 1;
         }
     }
