@@ -2978,7 +2978,9 @@ static void test_streamed_background_sources(void)
         {0x201,4,0,2},{0x201,4,12,2},{0x201,4,4,0},{0x201,4,8,0},
         {0x201,8,0,1},{0x201,8,8,0},
         {0x500,0,0,1},{0x500,4,0,0},{0x500,8,0,1},
-        {0x500,16,0,0},{0x501,4,0,1}
+        {0x500,16,0,0},{0x501,4,0,1},
+        {0x601,0,0,1},{0x601,4,0,1},{0x601,8,0,1},
+        {0x601,12,0,1},{0x601,16,0,1},{0x601,20,0,1}
     };
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));
@@ -3144,7 +3146,7 @@ static void test_lbz_incoming_margin(void)
     memset(&s_lbz_preview,0,sizeof s_lbz_preview);CHECK(configure("off"));
 }
 static int lbz_rocket_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
-{(void)x;(void)y;*cell=background?0:ram==s_lbz_rocket.world?2:1;return 1;}
+{(void)x;(void)y;*cell=background?0:(ram==s_lbz_rocket.world || ram==s_lbz_preview.world)?2:1;return 1;}
 static void test_lbz_rocket_margin(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
@@ -3167,6 +3169,32 @@ static void test_lbz_rocket_margin(void)
         for(int x=0;x<796;++x)CHECK(out[x]==(event==8 && x>=s_native_x+320?0xFF00FF00u:0xFFFF0000u));
         CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
     }
+    /* The native rocket reload has replaced stage chunks/patterns, while
+     * the final outgoing platform is still in the physical left margin.
+     * Original stage ownership must survive there, with no guest writes
+     * and no replacement inside the native viewport. */
+    CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);memset(&s_lbz_preview,0,sizeof s_lbz_preview);
+    s_lbz_preview.attempted=s_lbz_preview.ready=1;
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(s_lbz_preview.world,0x9010+i*2,2);}
+    memset(v.vram+32,0x11,32);memset(s_lbz_preview.video.vram+64,0x22,32);
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);write32(0xB000,0x1234);
+    word(g_ram,0x8000,154);word(g_ram,0x8002,4);word(g_ram,0xEEAE,0x7C);
+    word(g_ram,0x8008,0x8100);word(g_ram,0x800A,0x8120);
+    word(g_ram,0xEE80,0x3C00);word(g_ram,0xEE84,0x5A0);word(g_ram,0xEEC2,8);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x5A0;
+    v.cram[1]=0xE;v.cram[2]=0xE0;word(v.vram,0xF000,(unsigned)-0x3C00);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x3C00;s_build.camera_y=0x5A0;
+    s_visible_count=0;publish_sprites();s3_video_set_world_cell(lbz_rocket_cell);
+    memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
+    for(int x=0;x<796;++x) {
+        uint32_t expected=x<s_native_x?0xFF00FF00u:x<s_native_x+320?0xFFFF0000u:0xFF00FF00u;
+        if(out[x]!=expected)fprintf(stderr,"LBZ outgoing x%d native%d color%08X expected%08X\n",x,s_native_x,out[x],expected);
+        CHECK(out[x]==expected);
+    }
+    CHECK(!memcmp(before,g_ram,sizeof before));s3_video_set_world_cell(NULL);
+    memset(&s_lbz_preview,0,sizeof s_lbz_preview);
     /* Pillars keep their authored art in the margins while the same VRAM
      * reservation still contains the preceding object's pixels. */
 #ifdef SONIC3_STANDALONE
@@ -3186,6 +3214,51 @@ static void test_lbz_rocket_margin(void)
 }
 static int rocket_motion_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
 {(void)ram;(void)x;*cell=background?0:(y&16)?2:1;return 1;}
+static void test_lbz_waiting_actors(void)
+{
+    static SceneFrame scene;static uint8_t before[65536];
+    uint32_t out[796],pal[64]={0};memset(g_ram,0,sizeof g_ram);memset(&scene,0,sizeof scene);
+    scene.scene=1;scene.world_tag=0x602;scene.camera_x=0x3A20;
+    g_ram[0xF600]=12;word(g_ram,0xFE10,0x601);
+    write32(0xB128,S3_LBZ_END_BOSS);g_ram[0xB12D]=2;
+    /* Actual camera $3A20 / stable dispatcher / routine2 still precedes
+     * the running actor's first published pieces. Allocation alone does
+     * not retire either waiting pose. The initial range-check entry also
+     * remains eligible if its publication reaches the boundary first. */
+    CHECK(lbz_waiting_needed(g_ram,&scene)==3);
+    write32(0xB128,S3_LBZ_END_BOSS - 10u);g_ram[0xB12D]=0;
+    CHECK(lbz_waiting_needed(g_ram,&scene)==3);
+    write32(0xB128,S3_LBZ_END_BOSS);g_ram[0xB12D]=2;
+    scene.count=1;scene.sprites[0].slot=2;scene.code[2]=S3_LBZ_EMPTY_SHIP;
+    CHECK(lbz_waiting_needed(g_ram,&scene)==2);
+    scene.count=2;scene.sprites[1].slot=3;scene.code[3]=S3_LBZ_RUN;
+    CHECK(!lbz_waiting_needed(g_ram,&scene));
+    scene.count=0;g_ram[0xB12D]=6;CHECK(!lbz_waiting_needed(g_ram,&scene));
+    g_ram[0xB12D]=2;g_ram[0xB038]=2;CHECK(!lbz_waiting_needed(g_ram,&scene));
+    g_ram[0xB038]=0;g_ram[0xB02E]=0x83;CHECK(!lbz_waiting_needed(g_ram,&scene));
+    g_ram[0xB02E]=0;scene.world_tag=0x601;CHECK(!lbz_waiting_needed(g_ram,&scene));
+    scene.world_tag=0x602;s_display=&scene;s_frame_level=1;s_frame_zone=6;s_frame_act=1;
+    s_camera=0x3A20;s_camera_y=0x5A0;
+    for(unsigned actor=0;actor<2;++actor) {
+        unsigned map=S3_ART_BANK+(actor?0x1601CAu:0x160058u),frame=actor?0:10;
+        word(g_rom,map+frame*2,64);word(g_rom,map+64,1);
+        word(g_rom,map+66,0);word(g_rom,map+68,0);word(g_rom,map+70,0);
+        s_lbz_waiting_art[actor].attempted=s_lbz_waiting_art[actor].ready=1;
+        memset(s_lbz_waiting_art[actor].pixels,0x11,sizeof s_lbz_waiting_art[actor].pixels);
+    }
+    pal[1]=0xFF123456;memcpy(before,g_ram,sizeof before);memcpy(s_world_frame,g_ram,sizeof g_ram);
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    lbz_waiting_scanline(0x40,out,796,238,pal);
+    CHECK(out[238+S3_LBZ_RUN_X-0x3A20]==pal[1]);
+    for(int x=238;x<558;++x)CHECK(!out[x]);
+    memset(out,0,sizeof out);memset(s_priority,0,796);
+    lbz_waiting_scanline(0xB4,out,796,238,pal);
+    CHECK(out[238 + 0x3BDE - 0x3A20 - 8]==pal[1]);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    memset(out,0,sizeof out);lbz_waiting_scanline(0x40,out,320,0,pal);
+    for(unsigned x=0;x<320;++x)CHECK(!out[x]);
+    memset(s_lbz_waiting_art,0,sizeof s_lbz_waiting_art);s_display=NULL;
+}
 static void test_rocket_motion(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],paused[796];uint8_t before[65536];
@@ -3243,6 +3316,9 @@ static void test_s3_ending_margin_ownership(void)
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
         v.cram[1]=0xE;v.cram[2]=0xE00;v.cram[3]=0xE0;v.cram[4]=0xEEE;v.cram[5]=0xEE;
         for(unsigned j=1;j<=5;++j)memset(v.vram+j*32,j*17,32);
+        /* The ending retains a complete installed B canvas while A and
+         * world actors retire. Its synthetic native rows own tile2 too. */
+        for(unsigned j=0;j<64*32;++j)word(v.vram,0xE000+j*2,2);
         word(v.vram,0xF000,(unsigned)-512);
         memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=512;s_build.count=3;
         s_build.sprites[0]=(SceneSprite){-40,0,3,0,0,256,1};
@@ -4627,6 +4703,7 @@ int main(int argc,char **argv)
         s_menu_map_ready=0;
         load_aiz_art();CHECK(s_aiz_art_ready);
         CHECK(aiz_join_load());
+        CHECK(lbz_waiting_load(0));CHECK(lbz_waiting_load(1));
         CHECK(load_aiz_monkey_art());
 #ifndef SONIC3_STANDALONE
         CHECK(mhz_custom_load());
@@ -5122,7 +5199,7 @@ int main(int argc,char **argv)
     test_mhz_animation_dma_projection();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
-    test_blue_spheres();
+    test_lbz_waiting_actors();test_blue_spheres();
     test_aiz_join();
     test_native_placement_residency();
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");

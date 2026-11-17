@@ -1982,6 +1982,7 @@ static int mhz_mushroom_pixel(unsigned attr,int x,int y,uint8_t *pixel)
  * replace that VRAM while the ring is still visible in a margin. Decode
  * the captured ring frame's complete original DPLC instead of reading
  * another owner's upload. Native viewport pixels and guest queues stay native. */
+#include "sonic3_lbz_waiting.inc"
 static int giant_ring_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
 #ifndef SONIC3_STANDALONE
@@ -2996,6 +2997,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * pass the uploaded rows retain the outgoing composition. */
     int aiz2_canvas=bg_world && !s_frame_zone && s_frame_act==1 && s_frame_bg_event==16;
     int mgz2_canvas=mgz2_panorama && s_frame_bg_event==8;
+    /* LBZ2 streams complete 512px B rows from X=0. Its rocket reload
+     * replaces shared chunks before the installed bush/cloud rows retire;
+     * those live name-table cells, patterns and scroll bands still own B. */
+    int lbz2_canvas=bg_world && s_frame_zone==6 && s_frame_act==1;
     /* MHZ2's arena borrows the first48 rows of both installed planes.
      * loc_55380 installs A from $4000/$180; loc_553B6 replaces B from
      * $200/$80. sub_5550C shears that complete512px canvas, not the
@@ -3008,7 +3013,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 #endif
     int mhz_arena_fg=mhz_arena_band && s_world_frame[0xEED2];
     int mhz_arena_bg=mhz_arena_band && s_world_frame[0xEED3];
-    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || mhz_arena_bg;
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || lbz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
@@ -3143,6 +3148,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         lbz_preview_load();
     int lbz_rocket=level && width>320 && s_frame_zone==6 && s_frame_act==1 &&
         s_frame_bg_event<=8 && camera>=0x3A00 && plane_y>=0x500 && lbz_rocket_load();
+    /* The rocket PLC replaces the old stage's chunks and patterns at
+     * camera $3BC0. Its last platform can still be inside the extra left
+     * view. Keep that finite outgoing terrain until it physically leaves. */
+    int lbz_outgoing=level && width>320 && s_frame_zone==6 && s_frame_act==1 &&
+        camera>=0x3BC0 && camera-origin<0x3C00 && plane_y>=0x500 && lbz_preview_load();
     uint32_t lbz_palette[64];
     if(lbz_incoming)for(unsigned i=0;i<64;++i)
         lbz_palette[i]=i<16?palette[i]:genesis_dac_cram_to_argb(
@@ -3374,6 +3384,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ap=pattern_pixel(&s_lbz_rocket.video,a,wx,wy);
             joined=1;apalette=palette;
         }
+        if(lbz_outgoing && nx<0 && wx>=0x3800 && wx<0x3C00) {
+            a=world_attr(s_lbz_preview.world,wx,wy,0);
+            ap=pattern_pixel(&s_lbz_preview.video,a,wx,wy);
+            joined=1;apalette=palette;
+        }
         if(rocket_offset && nx<0 && wx>=0x3C00 && wx<0x4380) {
             a=world_attr(s_world_frame,wx,wy+rocket_offset,0);
             ap=rocket_offset>=512?0:pattern_pixel(v,a,wx,wy+rocket_offset);
@@ -3528,6 +3543,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
         mhz_capsule_preview_scanline(line,out,width,origin,palette);
+        lbz_waiting_scanline(line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
