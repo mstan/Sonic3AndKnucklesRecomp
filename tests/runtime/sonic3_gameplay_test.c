@@ -137,9 +137,18 @@ static void test_original_order_knuckles(void)
     ram[0xFAA8]=0;ram[0xFF09]=1;memcpy(before,ram,sizeof ram);
     CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
     ram[0xFF09]=3;
+    memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFAAA]=255;ram[0xEEC1]=4;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xEEC1]=8;ram[0xFAA8]=1;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFAA8]=0;ram[0xB010]=0x49;ram[0xB011]=0;
+    ram[0xB018]=ram[0xB01A]=ram[0xB01C]=1;
     CHECK(s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE)==0x76456);
     CHECK(ram[0xB0DE]==0&&ram[0xB0DF]==7&&ram[0xB0E0]==0x64&&ram[0xB0E1]==0x56);
     CHECK(ram[0xB10C]==0&&ram[0xB10D]==59&&ram[0xB02E]==0x81);
+    CHECK(!ram[0xB018]&&!ram[0xB01A]&&!ram[0xB01C]);
 }
 static void test_extended_timer(void)
 {

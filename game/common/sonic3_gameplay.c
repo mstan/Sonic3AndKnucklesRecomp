@@ -124,10 +124,11 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
        actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
     unsigned zone=word(ram,0xFE10);
     if(pc==0x522A0u && zone==0x301 && word(ram,0xFF08)==3){
-        unsigned x=word(ram,0xB010);
-        /* Use the teleporter's actual entry threshold. The native capsule,
-         * tally and camera release still happen before reaching this point. */
-        if(x<0x4A38 || ((ram[0xB02A]&2) && x<0x4A40))return 0;
+        /* The native capsule resets the end flag. Results set it again only
+         * after the tally and cards finish; the screen event then restores
+         * player control and advances to8. Depart there without requiring
+         * contact with the omitted portal at the far end of the arena. */
+        if(!ram[0xFAAA] || word(ram,0xEEC0)!=8)return 0;
         put_word(ram,0xB018,0);put_word(ram,0xB01A,0);put_word(ram,0xB01C,0);
         ram[0xB02E]=0x81;
     }else if(pc!=0x76270u || zone!=0x701)return 0;
