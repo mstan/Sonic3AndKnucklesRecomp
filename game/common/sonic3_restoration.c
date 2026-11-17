@@ -22,7 +22,7 @@ static char settings_file[1200],error[256];
 typedef struct {uint8_t *pixels;unsigned width,height;uint16_t colors[64],water[64];} Background;
 static Background backgrounds[3];
 static int prepare_backgrounds(const uint8_t *rom);
-static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_t *attr,uint8_t *pixel,uint16_t *color);
+static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,uint16_t *attr,uint8_t *pixel,uint16_t *color);
 int s3_restoration_select(unsigned component,int on)
 {
     *error=0;
@@ -129,7 +129,7 @@ static int prepare_backgrounds(const uint8_t *rom)
     }ok=1;
 done:free(scratch);return ok;
 }
-static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_t *attr,uint8_t *pixel,uint16_t *color)
+static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
     if(!(active&PROTO_BACKGROUNDS) || (ram[0xF600]&127)!=12 || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
@@ -149,14 +149,14 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,uint16_
         /* The prototype's Level_Deform ($341EA) uses one-eighth X/Y scroll.
          * Retail FBZ selects unrelated indoor/outdoor canvases, so feeding
          * its VScroll into this donor layout can select an empty region. */
-        x=sx+((int16_t)bg_word(ram+0xEE80)>>3);
+        x=sx+(presentation_camera_x>>3);
         y=sy+((int16_t)bg_word(ram+0xEE84)>>3);
     }else{
         /* Hz_1_Deform uses a different vertical origin and 3/16 scroll
          * from retail. Apply the donor camera to its own layout, retaining
          * arithmetic-floor rounding below the $610 origin. */
         int dy=3*((int16_t)(bg_word(ram+0xEE84)-0x610));
-        x=sx+((int16_t)bg_word(ram+0xEE80)>>1);
+        x=sx+(presentation_camera_x>>1);
         y=sy+0x110+(dy>=0?dy/16:-((-dy+15)/16));
     }
     x%=(int)bg->width;y%=(int)bg->height;if(x<0)x+=(int)bg->width;if(y<0)y+=(int)bg->height;
@@ -244,6 +244,10 @@ void s3_restoration_post_reset(void)
              * enemies and common object colors while restoring terrain. */
             memcpy(bank+offset+0x1F2F0E,g_rom+0xA943C,32);
             memcpy(bank+offset+0x1F2FCE,g_rom+0xA967C,32);
+            /* Retained retail rock patterns use entry 1 for their deepest
+             * recesses. Keep that dark material slot compatible with the
+             * earlier colors, alongside the shared object palette above. */
+            memcpy(bank+offset+0x1F2F30,g_rom+0xA945E,2);
         }
         g_rom_ext=bank;g_rom_ext_size=offset+0x200000u;donor_address=0x400000u+offset;
         if(active&PROTO_PALETTES)s3_video_set_palette_source(palette_source);

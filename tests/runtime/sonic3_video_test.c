@@ -257,9 +257,10 @@ static void test_native_placement_residency(void)
     CHECK(configure("32:9"));width(796,224,320,224);
     g_ram[0xF600]=12;g_ram[0xF711]=1;write32(0xB000,1);
     word(g_ram,0xFE10,0x701);word(g_ram,0x8000,256);word(g_ram,0x8008,0x8100);
-    write16(0xEE78,0x400);write16(0xEE7C,0x700);write16(0xB010,0x485);
-    /* The real MHZ2 entry's placement fields; the fixture supplies only its
-     * dispatch marker, leaving native respawn and slot ownership observable. */
+    write16(0xEE78,0x200);write16(0xEE7C,0x700);write16(0xB010,0x485);
+    /* The real MHZ2 entry's placement fields, beyond the original preload
+     * interval at this camera. The fixture supplies only its dispatch marker,
+     * leaving native respawn and slot ownership observable. */
     longword(g_rom,S3_PLACEMENTS+7*8+4,0x100000);
     word(g_rom,0x100000,0x4E8);word(g_rom,0x100002,0x7EC);
     g_rom[0x100004]=0x82;g_rom[0x100005]=0x20;word(g_rom,0x100006,65535);
@@ -297,6 +298,24 @@ static void test_native_placement_residency(void)
     CHECK(ram16(0xCB2A)==0xEB00 && g_ram[0xEB00]==0x80);
     g_ram[0xEB00]=0;spawn_scene();
     CHECK(s_pool_pressure==1 && !g_ram[0xEB00] && !scene_read32(0xFFB0DE));
+    /* Within the original 128px-aligned preload interval, only the ROM
+     * cursor may admit a placement. Fragment creation intentionally clears
+     * its bit without moving that cursor; a stationary scan must not reload
+     * the parent. Keep the native front/back pointers and coarse cells too. */
+    memset(g_ram+0xB128,0,0xCAE2+0x4A-0xB128);
+    write16(0xEE78,0x400);g_ram[0xF76C]=4;
+    write16(0xF76E,0x400);write16(0xF770,0x700);
+    write32(0xF772,0x100006);write32(0xF776,0x100000);
+    write16(0xF77A,0xEB01);write16(0xF77C,0xEB00);
+    write16(0xF7DA,0x380);write16(0xEF64,0x680);
+    uint8_t cursor[18];memcpy(cursor,g_ram+0xF76C,sizeof cursor);
+    for(unsigned tick=0;tick<128;++tick) {
+        int handled=s3_video_hook(S3_LOAD_UPDATE);
+        CHECK(!g_ram[0xEB00] && !scene_read32(0xFFB128));
+        CHECK(!handled);
+        CHECK(!memcmp(cursor,g_ram+0xF76C,sizeof cursor));
+        CHECK(ram16(0xF7DA)==0x380 && ram16(0xEF64)==0x680);
+    }
     CHECK(configure("off"));
 }
 static void test_fbz_title_card_ownership(void)
@@ -1854,6 +1873,92 @@ static void test_private_art_render_translation_count(void)
     memcpy(&s_aiz_intro,&saved[0],sizeof saved[0]);memcpy(&s_aiz_main,&saved[1],sizeof saved[1]);
     s_aiz_art_ready=ready;s_aiz_art_attempted=attempted;
 }
+static int fbz_entrance_cell(const uint8_t *ram,int x,int y,int background,uint16_t *attr)
+{
+    (void)ram;(void)y;*attr=background?(x<512?1:2):0;return 1;
+}
+static void test_fbz_entrance_margin_ownership(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];uint32_t native[320]={0},out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;write32(0xB000,0x1234);
+    word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE78,0);word(g_ram,0xEE80,0);word(g_ram,0xEE7C,0x700);word(g_ram,0xEE84,0x700);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.vsram[0]=0x300;v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(g_ram,0x9010+i*2,2);}
+    s3_video_set_world_cell(fbz_entrance_cell);memcpy(before,g_ram,sizeof before);
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_native_x==0);
+    for(int x=0;x<320;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=320;x<0x180;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=0x180;x<796;++x)CHECK(out[x]==0xFFFF0000u);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    /* The reverse side retains the original outdoor canvas while the
+     * native viewport owns its completed indoor redraw. */
+    word(g_ram,0xEE78,0xD0);word(g_ram,0xEE80,0xD0);word(v.vram,0xF000,(uint16_t)-0xD0);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,1);
+    scanline(&v,0,native,320,out,796);
+    CHECK(s_native_x==0xD0);
+    for(int x=0;x<0xD0;++x)CHECK(out[x]==0xFF00FF00u);
+    for(int x=0xD0;x<0xD0+320;++x)CHECK(out[x]==0xFFFF0000u);
+    /* FBZ's stage black is nonblack. Private indoor/outdoor colors use
+     * character black and the installed stage white, without a tinted floor. */
+    uint8_t old_colors[4]={g_rom[0x52DC0],g_rom[0x52DC1],g_rom[0x52DD0],g_rom[0x52DD1]};
+    word(g_rom,0x52DC0,0xCE8);word(g_rom,0x52DD0,0xEEC);
+    v.cram[0]=0;v.cram[16]=0x462;v.cram[17]=0xEEE;v.cram[50]=0xE00;
+    memset(v.vram+32,0x22,32);memset(v.vram+64,0x22,32);
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,0x6001);word(g_ram,0x9010+i*2,0x6002);}
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,0x6002);
+    scanline(&v,0,native,320,out,796);
+    CHECK(out[0]==genesis_dac_cram_to_argb(0xEEC,GENESIS_DAC_NORMAL));
+    CHECK(out[700]==genesis_dac_cram_to_argb(0xCE8,GENESIS_DAC_NORMAL));
+    CHECK(out[300]==genesis_dac_cram_to_argb(0xE00,GENESIS_DAC_NORMAL));
+    g_rom[0x52DC0]=old_colors[0];g_rom[0x52DC1]=old_colors[1];
+    g_rom[0x52DD0]=old_colors[2];g_rom[0x52DD1]=old_colors[3];
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+#endif
+}
+
+static int fbz_template_storage_cell(const uint8_t *ram,int x,int y,int background,uint16_t *block)
+{
+    (void)ram;(void)y;*block=background?1:x>=0x3000?3:0;return 1;
+}
+static void test_fbz_physical_stage_edge(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];uint32_t native[320]={0},out[796];
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;write32(0xB000,0x1234);
+    word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE78,0x2E60);word(g_ram,0xEE80,0x2E60);
+    word(g_ram,0xEE7C,0x540);word(g_ram,0xEE84,0x540);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.vsram[0]=0x140;word(v.vram,0xF000,(uint16_t)-0x2E60);
+    v.cram[1]=0xE;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+    for(unsigned i=0;i<4;++i){word(g_ram,0x9008+i*2,1);word(g_ram,0x9018+i*2,3);}
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,1);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    s3_video_set_world_cell(fbz_template_storage_cell);memcpy(before,g_ram,sizeof before);
+    scanline(&v,0,native,320,out,796);
+    /* Blue storage-only cells must never enter the viewport. The original
+     * camera, guest map and native scene retain their identities. */
+    for(int x=0;x<796;++x)CHECK(out[x]==0xFFFF0000u);
+    CHECK(s_left+796==0x3000 && stage_width()==0x3000);
+    CHECK(!memcmp(before,g_ram,sizeof before));
+    g_ram[0xFE11]=1;CHECK(stage_width()==0x4400);
+    g_ram[0xFE10]=7;g_ram[0xFE11]=0;CHECK(stage_width()==0x4400);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+#endif
+}
+
 static void test_aiz_intro_canvas_edge(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796];
@@ -2335,10 +2440,10 @@ static void test_mhz2_ship_cameras(void){}
 #endif
 #ifndef SONIC3_STANDALONE
 static unsigned ordinary_capture_queries;
-static int ordinary_capture_background(const uint8_t *ram,int x,int y,int sx,int sy,
+static int ordinary_capture_background(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,
                                        uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
-    (void)ram;(void)x;(void)y;(void)sx;(void)sy;(void)attr;(void)pixel;(void)color;
+    (void)ram;(void)x;(void)y;(void)sx;(void)sy;(void)presentation_camera_x;(void)attr;(void)pixel;(void)color;
     ++ordinary_capture_queries;return 0;
 }
 static void test_ordinary_capture_provider_scope(void)
@@ -2494,9 +2599,15 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    const unsigned zones[]={0,0x100,0x200,0x201,0x300,0x400,0x700,0x701,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
+    /* Ordinary CNZ1/MHZ2/FBZ1 derive B from A, rather than holding B while A
+     * moves. Their real deformation contract is tested separately below. */
+    const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x800,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
+#ifndef SONIC3_STANDALONE
+        if(zones[z]==0x400)continue; /* Exact factory bands are tested below. */
+#endif
         word(g_ram,0xFE10,zones[z]);int canvas=widths[w];
+        word(g_ram,0xEEC2,0);
         word(v.vram,0xF002,0); /* fixed game background: only foreground camera moves */
         for(unsigned c=0;c<sizeof cameras/sizeof cameras[0];c++) {
             int camera=cameras[c];word(g_ram,0xEE80,camera);word(v.vram,0xF000,(unsigned)-camera);
@@ -2513,13 +2624,140 @@ static void test_campaign_background_edges(void)
     }
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
 }
-static int restored_test_x,restored_test_pixels;
-static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,
+static int edge_parallax_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)y;*cell=background?(uint16_t)(2+((x>>4)&1)):0;return 1;
+}
+static void test_bounded_parallax_projection(void)
+{
+    static GVDP v;uint32_t native[320]={0},out[796],reference[796],narrow[320];
+    static uint8_t before[65536];
+    const unsigned zones[]={0x300,0x701};
+    for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
+    for(unsigned z=0;z<2;++z) {
+#ifdef SONIC3_STANDALONE
+        if(z)continue;
+#endif
+        for(unsigned band=0;band<(z?1u:5u);++band) {
+            static const int ys[]={0,0x80,0xB0,0x110,0x1D0};
+            static const int speeds[]={1,4,8,14,16};
+            int y=z?0:ys[band],speed=z?12:speeds[band];
+            CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+            memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+            write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);
+            word(g_ram,0xEE90,y);v.vsram[1]=(uint16_t)y;
+            v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+            v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+            v.cram[2]=0xE;v.cram[3]=0xE0;
+            memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+            for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,2);word(g_ram,0x9018+n*2,3);}
+            s3_video_set_world_cell(edge_parallax_cell);
+            for(unsigned c=0;c<4;++c) {
+                static const int cameras[]={0,145,223,238};
+                int camera=z?(c?cameras[c]:152):cameras[c],lag=c&1?4:0;
+                word(g_ram,0xEE80,camera+lag);word(g_ram,0xEEB6,camera+lag);
+                word(v.vram,0xF000,(unsigned)-camera);
+                word(v.vram,0xF002,(unsigned)-(camera*speed/32));
+                memset(&s_build,0,sizeof s_build);s_build.scene=1;
+                s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
+                memcpy(before,g_ram,sizeof before);
+                scanline(&v,0,native,320,out,796);
+                if(!c)memcpy(reference,out,sizeof reference);
+                else CHECK(!memcmp(reference,out,sizeof reference));
+                scanline(&v,0,native,320,narrow,320);
+                CHECK(!memcmp(narrow,native,sizeof native));
+                CHECK(!memcmp(before,g_ram,sizeof before));
+            }
+            s3_video_set_world_cell(NULL);CHECK(configure("off"));
+        }
+    }
+}
+static void test_fbz_bounded_camera_and_wind(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v;static uint8_t before[65536];
+    uint32_t native[320],out[796],private_reference[128];
+    /* Six retained native rows: three outdoor left-clamp phases and three
+     * indoor right-clamp phases. Expected eye phases are source-derived,
+     * including the original fixed-point wind carry before truncation. */
+    static const struct { int camera,scroll,by,outdoor,eye_scroll;uint32_t cloud; } samples[]={
+        {19,138,24,1,200,0x10BC00},{99,163,23,1,202,0x110200},
+        {163,183,23,1,204,0x114800},{11923,2235,651,0,2199,0x125200},
+        {11929,2236,651,0,2199,0x125200},{11936,2238,651,0,2199,0x125200},
+        /* Static native camera, eight authored wind updates: motion stays. */
+        {19,142,24,1,203,0x112C00},
+        /* An independent, nonmatching B phase must keep its own movement. */
+        {19,146,24,1,146,0x10BC00}
+    };
+    for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
+    for(unsigned n=0;n<sizeof samples/sizeof *samples;++n)for(unsigned event=0;event<=16;event+=4) {
+        const int camera=samples[n].camera,by=samples[n].by;
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;
+        word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+        word(g_ram,0xEE78,camera);word(g_ram,0xEE80,camera);
+        word(g_ram,0xEE7C,samples[n].outdoor?0:0x540);
+        word(g_ram,0xEE84,samples[n].outdoor?0:0x540);
+        word(g_ram,0xEE90,by);word(g_ram,0xEED6,samples[n].outdoor?0xFF00:0);
+        word(g_ram,0xEEDA,samples[n].outdoor?by-22:0);word(g_ram,0xEEC2,event);
+        write32(0xA9FC,samples[n].cloud);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+        v.vsram[0]=samples[n].outdoor?0:0x140;v.vsram[1]=(uint16_t)by;
+        v.cram[2]=0xE;v.cram[3]=0xE0;
+        memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9010+i*2,2);word(g_ram,0x9018+i*2,3);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2+((cell%64>>1)&1));
+        word(v.vram,0xF000,(uint16_t)-camera);word(v.vram,0xF002,(uint16_t)-samples[n].scroll);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;publish_sprites();
+        s3_video_set_world_cell(edge_parallax_cell);memcpy(before,g_ram,sizeof before);
+        scanline(&v,0,native,320,out,796);
+        for(int x=0;x<796;++x) {
+            int source=(x-238+samples[n].eye_scroll)&511;
+            CHECK(out[x]==((source>>4)&1?0xFF00FF00u:0xFFFF0000u));
+        }
+        CHECK(s_left==(samples[n].outdoor?0:0x3000-796));
+        /* A native-width render retains its installed B phase. The direct
+         * reconstruction adapter need not copy an arbitrary supplied row. */
+        CHECK(edge_parallax_scroll(-samples[n].scroll,camera,0,320,320,by)==-samples[n].scroll);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+        s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+    /* The extra entrance bank uses the same fixed physical eye. Its
+     * machinery cannot drift as the native camera moves inside that view. */
+    for(unsigned n=0;n<4;++n) {
+        static const int cameras[]={0,145,223,238};int camera=cameras[n];
+        CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+        memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+        write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=4;
+        word(g_ram,0x8000,0x88);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+        word(g_ram,0xEE78,camera);word(g_ram,0xEE80,camera);word(g_ram,0xEE7C,0x700);word(g_ram,0xEE84,0x700);
+        word(g_ram,0xEE90,22);word(g_ram,0xEED6,0xFF00);write32(0xA9FC,0xE00);
+        v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+        v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.vsram[0]=0x300;v.vsram[1]=22;
+        v.cram[2]=0xE;v.cram[3]=0xE0;memset(v.vram+64,0x22,32);memset(v.vram+96,0x33,32);
+        for(unsigned i=0;i<4;++i){word(g_ram,0x9010+i*2,2);word(g_ram,0x9018+i*2,3);}
+        for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2+((cell%64>>1)&1));
+        word(v.vram,0xF000,(uint16_t)-camera);word(v.vram,0xF002,(uint16_t)-(camera*9/32));
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=camera;publish_sprites();
+        s3_video_set_world_cell(edge_parallax_cell);scanline(&v,0,native,320,out,796);
+        if(!n)memcpy(private_reference,out+640,sizeof private_reference);
+        else CHECK(!memcmp(private_reference,out+640,sizeof private_reference));
+        s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    }
+#endif
+}
+
+static int restored_test_x,restored_test_pixels,restored_test_camera,restored_test_world_shift;
+static int restored_test_background(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,
                                     uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
     (void)ram;(void)y;(void)sy;
     if(!attr || !pixel)return 1;
-    CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx);
+    CHECK(sx==restored_test_x+restored_test_pixels++ && x==sx+restored_test_world_shift);
+    CHECK(presentation_camera_x==restored_test_camera);
     *attr=0;*pixel=1;*color=0xFFFF;return 1;
 }
 static void test_restored_background_edges_and_reload(void)
@@ -2554,6 +2792,13 @@ static void test_restored_background_edges_and_reload(void)
         word(g_ram,0xFE10,zones[z]);word(g_ram,0xEE80,camera);
         word(v.vram,0xF000,(unsigned)-camera);
         restored_test_x=-(canvas-320)/2;restored_test_pixels=0;
+        restored_test_camera=view_left(camera,canvas)+(canvas-320)/2;
+        restored_test_world_shift=0;
+#ifndef SONIC3_STANDALONE
+        /* With native B held at zero, only camera0 matches FBZ1's indoor
+         * half-speed identity. Screen offset and world phase are distinct. */
+        if(zones[z]==0x400 && !camera)restored_test_world_shift=((canvas-320)/2)/2;
+#endif
         scanline(&v,0,native,320,out,canvas);
         CHECK(restored_test_pixels==canvas && s_native_x==camera-view_left(camera,canvas));
     }
@@ -4028,6 +4273,250 @@ static void test_row_plane_colors(void)
         CHECK(plane_color_row(&colors,0,1,pixel,palettes[0])==palettes[0][pixel]);
 }
 #include "sonic3_aiz_join_test.inc"
+static void test_mhz_capsule_waiting_pose(void)
+{
+#ifndef SONIC3_STANDALONE
+    static SceneFrame scene;static uint8_t before[65536];
+    uint32_t out[798],palette[64]={0};
+    memset(&scene,0,sizeof scene);scene.scene=1;scene.world_tag=0x702;
+    memset(s_world_frame,0,sizeof s_world_frame);s_world_frame[0xFE10]=7;s_world_frame[0xFE11]=1;
+    longword(s_world_frame,0xB128,0x76164);
+    s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_display=&scene;
+    s_camera=0x4420;s_camera_y=0x280;
+    word(g_rom,S3_CAPSULE_MAP,24);word(g_rom,S3_CAPSULE_MAP+10,32);
+    word(g_rom,S3_CAPSULE_MAP+24,1);g_rom[S3_CAPSULE_MAP+26]=252;
+    g_rom[S3_CAPSULE_MAP+27]=0;word(g_rom,S3_CAPSULE_MAP+28,0);word(g_rom,S3_CAPSULE_MAP+30,65532);
+    word(g_rom,S3_CAPSULE_MAP+32,1);g_rom[S3_CAPSULE_MAP+34]=0;
+    g_rom[S3_CAPSULE_MAP+35]=0;word(g_rom,S3_CAPSULE_MAP+36,1);word(g_rom,S3_CAPSULE_MAP+38,65532);
+    memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);
+    s_native_art_cache[4].attempted=s_native_art_cache[4].ready=1;
+    memset(s_native_art_cache[4].pixels,0x11,32);memset(s_native_art_cache[4].pixels+32,0x22,32);
+    palette[1]=0xFFFF0000;palette[2]=0xFF00FF00;
+    if(s_priority_capacity<796){s_priority=realloc(s_priority,796);CHECK(s_priority);s_priority_capacity=796;}
+    memcpy(before,s_world_frame,sizeof before);
+    for(unsigned test=0;test<5;++test) {
+        for(unsigned x=0;x<798;++x)out[x]=0xDEADBEEF;
+        memset(s_priority,0,796);
+        s_camera=test==2?0x45C0:test==3?0x46C0:0x4420;
+        if(test==4)memset(s_priority,2,796); /* real sprites keep priority */
+        int line=test==1?124:156;
+        mhz_capsule_preview_scanline(line,out+1,796,238,palette);
+        int px=238+0x4640-s_camera-4;
+        for(int x=0;x<796;++x) {
+            int drawn=test!=2 && test!=4 && x>=px && x<px+8 && (x<238 || x>=558);
+            CHECK(out[x+1]==(drawn?palette[test==1?2:1]:0xDEADBEEF));
+        }
+        CHECK(out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+        CHECK(!memcmp(before,s_world_frame,sizeof before));
+    }
+    CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
+    scene.count=1;scene.sprites[0].slot=5u<<8;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));scene.count=0;
+    longword(s_world_frame,0xB128,0x75FD4);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x85668);longword(s_world_frame,0xB15C,0x761B2);CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB15C,0x761B0);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x761E8);s_world_frame[0xFE11]=0;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);s_display=NULL;
+#endif
+}
+#ifndef SONIC3_STANDALONE
+static unsigned mhz_band_foreground;
+static int mhz_band_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)ram;(void)x;(void)y;*cell=background?2:mhz_band_foreground;return 1;
+}
+#endif
+static void test_mhz_arena_installed_band(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,untouched;static uint8_t before[65536];
+    uint32_t native[320],out[798];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;word(g_ram,0xFE10,0x701);write32(0xB000,0x1234);
+    word(g_ram,0x8000,160);word(g_ram,0x8002,8);word(g_ram,0x8008,0x8100);
+    word(g_ram,0xEE80,0x4180);word(g_ram,0xEE84,0x280);word(g_ram,0xEE90,0x180);
+    word(g_ram,0xEEC0,8);word(g_ram,0xEEC2,24);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[11]=3;v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.vsram[0]=0x280;v.vsram[1]=0x180;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    memset(v.vram+96,0x33,32);memset(v.vram+128,0x44,32);memset(v.vram+160,0x55,32);
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;v.cram[4]=0xEEE;v.cram[5]=0xEE0;
+    for(unsigned n=0;n<4;++n){word(g_ram,0x9008+n*2,2);word(g_ram,0x9010+n*2,3);}
+    for(unsigned n=0;n<64*32;++n){word(v.vram,0xC000+n*2,1);word(v.vram,0xE000+n*2,(n&1)?4:5);}
+    for(unsigned y=0;y<224;++y){word(v.vram,0xF000+y*4,(uint16_t)-3);word(v.vram,0xF002+y*4,(uint16_t)-5);}
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
+    memcpy(v.vram+0xF800,g_ram+0xF800,640);s3_video_set_world_cell(mhz_band_cell);
+    for(unsigned fg=0;fg<2;++fg)for(unsigned active=0;active<4;++active) {
+        mhz_band_foreground=fg;
+        g_ram[0xEED2]=(active&1)?255:0;g_ram[0xEED3]=(active&2)?255:0;
+        memcpy(before,g_ram,sizeof before);memcpy(&untouched,&v,sizeof v);
+        for(unsigned row=0;row<3;++row) {
+            int line=row==0?0:row==1?47:48;
+            out[0]=out[797]=0xDEADBEEF;scanline(&v,line,native,320,out+1,796);
+            for(int x=0;x<796;++x) {
+                int a=line<48 && (active&1);
+                int b=line<48 && (active&2);
+                int bx=x-238+5;
+                uint32_t expected=a?0xFFFF0000u:fg?0xFF00FF00u:
+                    b?(((bx>>3)&1)?0xFFFFFFFFu:0xFF00FFFFu):0xFF0000FFu;
+                CHECK(out[x+1]==expected);
+            }
+            CHECK(out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+        }
+        CHECK(!memcmp(before,g_ram,sizeof before) && !memcmp(&untouched,&v,sizeof v));
+    }
+    /* Retirement and other acts keep their ordinary world, even if an
+     * unrelated event happens to leave these scratch bytes nonzero. */
+    mhz_band_foreground=1;g_ram[0xEED2]=g_ram[0xEED3]=255;
+    word(g_ram,0xEEC2,36);scanline(&v,0,native,320,out+1,796);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==0xFF00FF00u);
+    word(g_ram,0xEEC2,24);word(g_ram,0xFE10,0x700);
+    scanline(&v,0,native,320,out+1,796);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==0xFF00FF00u);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    for(unsigned x=0;x<320;++x)native[x]=0xFF000000u+x;
+    scanline(&v,0,native,320,out,320);CHECK(!memcmp(native,out,sizeof native));
+#endif
+}
+static void test_mhz_arena_canvas_repeats(void)
+{
+#ifndef SONIC3_STANDALONE
+    static SceneFrame frame,original;static GVDP v;static uint8_t before[65536];
+    uint32_t expanded[1595],native[1595],palette[64]={0};
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    s_requested_width=796;s_capture_frame=&frame;frame.scene=1;
+    memset(g_ram,0,sizeof g_ram);word(g_ram,0xFE10,0x701);g_ram[0xEED3]=255;
+    word(g_ram,0xA80A,0xB128);
+    CHECK(mhz_arena_object(0xB128,0x55908,0x557C8));
+    CHECK(!mhz_arena_object(0xB172,0x55908,0x557C8));
+    CHECK(!mhz_arena_object(0xB128,0x5590A,0x557C8));
+    CHECK(!mhz_arena_object(0xB128,0x55908,0x5582E));
+    g_ram[0xEEC5]=255;g_ram[0xEED3]=0;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));g_ram[0xEED3]=255;
+    frame.scene=0;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));frame.scene=1;
+    s_requested_width=320;CHECK(!mhz_arena_object(0xB128,0x55908,0x557C8));s_requested_width=796;
+    memcpy(before,g_ram,sizeof before);memset(&v,0,sizeof v);
+    memset(v.vram+0x3AF*32,0x11,128);palette[1]=0xFF123456;
+    s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_camera=s_camera_y=0;
+    s_interpolating=0;test_atlas_enabled=test_private_planes=0;test_plane_color_tiles=NULL;
+    if(s_priority_capacity<1593){s_priority=realloc(s_priority,1593);CHECK(s_priority);s_priority_capacity=1593;}
+    const int positions[]={503,-7,3,510},canvases[]={796,1593};
+    for(unsigned c=0;c<2;++c)for(unsigned phase=0;phase<4;++phase) {
+        int canvas=canvases[c],origin=(canvas-320)/2;
+        memset(&frame,0,sizeof frame);frame.scene=1;frame.world_tag=0x702;frame.count=1;
+        frame.sprites[0]=(SceneSprite){positions[phase],0,0x3AF,5,0,256,1};
+        memcpy(&original,&frame,sizeof original);
+        repeat_scene_pieces(0,1,-origin,canvas-origin,SPRITE_MHZ_ARENA_COPY);
+        CHECK(frame.count>1);
+        for(unsigned n=1;n<frame.count;++n) {
+            CHECK((frame.sprites[n].slot>>8)==SPRITE_MHZ_ARENA_COPY);
+            CHECK(frame.sprites[n].y==original.sprites[0].y && frame.sprites[n].attr==original.sprites[0].attr);
+            CHECK((frame.sprites[n].x-original.sprites[0].x)%512==0);
+        }
+        for(int x=0;x<canvas+2;++x)expanded[x]=native[x]=0xDEADBEEF;
+        memset(s_priority,0,(size_t)canvas);s_display=&original;
+        draw_scene_sprites(&v,0,native+1,canvas,origin,palette);
+        memset(s_priority,0,(size_t)canvas);s_display=&frame;
+        draw_scene_sprites(&v,0,expanded+1,canvas,origin,palette);
+        for(int x=0;x<canvas;++x) {
+            if(x>=origin && x<origin+320)CHECK(expanded[x+1]==native[x+1]);
+            else {
+                int distance=(x-origin-positions[phase])%512;if(distance<0)distance+=512;
+                CHECK(expanded[x+1]==(distance<16?palette[1]:0xDEADBEEF));
+            }
+        }
+        CHECK(expanded[0]==0xDEADBEEF && expanded[canvas+1]==0xDEADBEEF);
+        CHECK(!memcmp(before,g_ram,sizeof before));
+    }
+    /* Fractional presentation must use the same 512px lift for the native
+     * slot and every copy. Large-wrap rejection would otherwise stutter. */
+    static SceneFrame saved_a,saved_b;
+    static uint8_t saved_world[65536];
+    SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
+    memcpy(&saved_a,a,sizeof saved_a);memcpy(&saved_b,b,sizeof saved_b);
+    memcpy(saved_world,ix_current()->context.world,sizeof saved_world);
+    int saved_width=ix_current()->width;
+    double saved_phase=s_interpolation_phase;
+    memset(a,0,sizeof *a);memset(b,0,sizeof *b);
+    memset(ix_current()->context.world,0,65536);
+    uint8_t *world=ix_current()->context.world;
+    unsigned slot=1+(0xB128-0xB000)/0x4A;
+    word(world,0xA80A,0xB128);world[0xEED3]=255;
+    longword(world,0xB128+12,0x55908);
+    b->scene=1;b->world_tag=0x702;ix_current()->width=796;
+    s_interpolation_phase=.5;
+    for(unsigned code=0;code<2;++code)for(unsigned reverse=0;reverse<2;++reverse) {
+        a->code[slot]=b->code[slot]=code?0x557C8:0x5576A;
+        a->ox[slot]=reverse?0:506;b->ox[slot]=reverse?506:0;
+        a->oy[slot]=50;b->oy[slot]=54;
+        for(unsigned owner=0;owner<2;++owner) {
+            SceneSprite moving={0,0,0,0,0,256,(uint16_t)(slot|(owner?SPRITE_MHZ_ARENA_COPY<<8:0))};
+            int dx=0,dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==(reverse?3:-3) && dy==-2);
+            ix_current()->width=320;dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==0 && dy==-2);ix_current()->width=796;
+            word(world,0xA80A,0);dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+            CHECK(dx==0 && dy==-2);word(world,0xA80A,0xB128);
+        }
+    }
+    memcpy(a,&saved_a,sizeof *a);memcpy(b,&saved_b,sizeof *b);
+    memcpy(world,saved_world,sizeof saved_world);ix_current()->width=saved_width;
+    s_interpolation_phase=saved_phase;
+    s_display=NULL;s_capture_frame=&s_build;CHECK(configure("off"));
+#endif
+}
+static void test_mhz_custom_publication(void)
+{
+#ifndef SONIC3_STANDALONE
+    static GVDP v,before_video;static uint8_t before_ram[65536];
+    uint32_t native[320]={0},out[798];
+    CHECK(configure("off"));CHECK(configure("32:9"));
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(&s_mhz_custom,0,sizeof s_mhz_custom);
+    s_mhz_custom.attempted=s_mhz_custom.ready=1;
+    s_mhz_custom.chunks_size=128;s_mhz_custom.blocks_size=8;
+    for(unsigned n=0;n<64;++n)word(s_mhz_custom.chunks,n*2,0x165);
+    for(unsigned n=0;n<4;++n)word(s_mhz_custom.blocks,n*2,0x222);
+    memset(s_mhz_custom.tiles,0x22,sizeof s_mhz_custom.tiles);
+    g_ram[0xF600]=12;g_ram[0xF711]=1;word(g_ram,0xFE10,0x701);
+    word(g_ram,0xEEC2,16);word(g_ram,0x8000,128);word(g_ram,0x8002,4);
+    for(unsigned row=0;row<32;++row) {
+        word(g_ram,0x8008+row*4,0x8100);word(g_ram,0x800A+row*4,0x8180);
+    }
+    memset(g_ram+0x8100,0x45,128);
+    for(unsigned n=0;n<64;++n)word(g_ram,0x2280+n*2,0x165);
+    for(unsigned n=0;n<4;++n)word(g_ram,0x9B28+n*2,3);
+    memcpy(g_rom+0xA8044,g_ram+0x8000,0x1000);
+    word(g_ram,0xFF0E,0x8001);longword(g_ram,0xFF40,0x1A1B38);longword(g_ram,0xFF44,0xFFFF9B2A);
+    word(g_ram,0xEE78,1024);word(g_ram,0xEE80,1024);word(g_ram,0xEEAA,0xFFF);
+    write32(0xB000,0x1234);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;v.cram[3]=0xE00;
+    memset(v.vram+32,0x11,32);memset(v.vram+96,0x33,32);
+    for(unsigned n=0;n<64*32;++n)word(v.vram,0xC000+n*2,1);
+    word(v.vram,0xF000,(uint16_t)-1024);
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.world_tag=0x702;
+    publish_sprites();memcpy(v.vram+0xF800,g_ram+0xF800,640);
+    memcpy(before_ram,g_ram,sizeof g_ram);memcpy(&before_video,&v,sizeof v);
+    out[0]=out[797]=0xDEADBEEF;
+    scanline(&v,0,native,320,out+1,796);
+    CHECK(s_render->mhz_custom && out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
+    for(int x=0;x<796;++x)CHECK(out[x+1]==(x>=s_native_x && x<s_native_x+320?0xFFFF0000u:0xFF00FF00u));
+    CHECK(!memcmp(g_ram,before_ram,sizeof g_ram) && !memcmp(&v,&before_video,sizeof v));
+    /* Unrelated module work, another layout/act and a completed queue do
+     * not acquire this bank. The module's own native source is sufficient
+     * after its RAM chunk/block jobs have left the decompression queue. */
+    word(g_ram,0xFF0E,0);g_ram[0xFF60]=0x81;longword(g_ram,0xFF64,0x1A26D8);
+    CHECK(mhz_custom_pending(g_ram));
+    longword(g_ram,0xFF64,0x1B0000);CHECK(!mhz_custom_pending(g_ram));
+    g_ram[0xFF60]=0;CHECK(!mhz_custom_pending(g_ram));
+    word(g_ram,0xFF0E,1);longword(g_ram,0xFF44,0xFFFF9B28);
+    g_ram[0x8009]^=1;CHECK(!mhz_custom_pending(g_ram));g_ram[0x8009]^=1;
+    g_ram[0xFE11]=0;CHECK(!mhz_custom_pending(g_ram));
+    memset(&s_mhz_custom,0,sizeof s_mhz_custom);CHECK(configure("off"));
+#endif
+}
 int main(int argc,char **argv)
 {
     /* Correctness tests retain the complete native-reference comparisons. */
@@ -4042,6 +4531,14 @@ int main(int argc,char **argv)
         load_aiz_art();CHECK(s_aiz_art_ready);
         CHECK(aiz_join_load());
         CHECK(load_aiz_monkey_art());
+#ifndef SONIC3_STANDALONE
+        CHECK(mhz_custom_load());
+        /* Native ST Events_bg+1 selects the arena, not Events_fg_4. */
+        CHECK(scene_read32(0x553AE)==0x50F8EED3u);
+        {uint8_t pixel;CHECK(native_art_pixel(5,0x494,0,0,&pixel));}
+        printf("MHZ complete custom chunks/blocks/patterns: %zu/%zu/%zu\n",
+            s_mhz_custom.chunks_size,s_mhz_custom.blocks_size,sizeof s_mhz_custom.tiles);
+#endif
         printf("AIZ joined original-map caches: %zu bytes\n",sizeof s_aiz_join_map+sizeof s_aiz_join_second);
         const uint8_t *sources[]={s_aiz_intro.blocks,s_aiz_main.blocks,s_aiz_intro.video.vram,s_aiz_main.video.vram};
         const unsigned sizes[]={0x1800,0x1800,0x10000,0x10000};
@@ -4104,9 +4601,9 @@ int main(int argc,char **argv)
     g_rom[0x10000A]=2;word(g_rom,0x10000C,65535);
     write32(0xEF5A,0x110000);longword(g_rom,0x110004,0x123456);longword(g_rom,0x110008,0x234567);
     longword(g_rom,0x5CC9A,0x123456);longword(g_rom,0x5CC9E,0x234567);
-    CHECK(configure("10:7"));width(1,1,320,224);
-    s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,1);
-    CHECK(s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
+    CHECK(configure("20:9"));width(1,1,320,224);
+    s3_video_hook(S3_LOAD_INIT);g_ram[0xF76C]=4;write16(0xEE78,128);
+    CHECK(!s3_video_hook(S3_LOAD_UPDATE));CHECK(!ram16(0xB0DE));
     /* Cross a real activation cell, then replay it with restored WRAM and
      * placement-table identity. No future host residency latch may hide it. */
     static uint8_t loader_ram[65536],loaded_ram[65536];
@@ -4115,7 +4612,7 @@ int main(int argc,char **argv)
     S3StateIO loader_io={loader_blob,sizeof loader_blob,0,0,1};
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
     size_t loader_bytes=loader_io.pos;
-    write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    write16(0xEE78,0);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
     CHECK(!scene_read32(0xFFB0DE));
     CHECK(scene_read32(0xFFB128)==0x123456 && ram16(0xB138)==640 && ram16(0xB170)==0xEB00);
     memcpy(loaded_ram,g_ram,sizeof loaded_ram);
@@ -4125,7 +4622,7 @@ int main(int argc,char **argv)
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
     loader_io=(S3StateIO){loader_blob,loader_bytes,0,2,1};
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok && !memcmp(g_ram,loader_ram,sizeof loader_ram));
-    presentation_reset();write16(0xEE78,128);CHECK(s3_video_hook(S3_LOAD_UPDATE));
+    presentation_reset();write16(0xEE78,0);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
     CHECK(!memcmp(loaded_ram,g_ram,sizeof loaded_ram));
     g_cpu.D[0]=640-ram16(0xF7DA);s3_video_hook(0x1B594);CHECK((uint16_t)g_cpu.D[0]<=640);
     CHECK(configure("32:9"));width(1,1,320,224);s3_video_hook(S3_LOAD_UPDATE);
@@ -4143,9 +4640,8 @@ int main(int argc,char **argv)
         word(g_ram,0x8000,256);s_placement_count=0;g_ram[0xEB02]=0;
         write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
         CHECK(!(g_ram[0xEB02]&128));
-        write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
-        CHECK(g_ram[0xEB02]&128);
-        CHECK(scene_read32(0xFFB1BC)==hcz_scripted[i]);write32(0xB1BC,0);
+        write16(0xEE78,0x2E00);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+        CHECK(!(g_ram[0xEB02]&128)); /* Handed to the native cursor, not duplicated. */
     }
     g_ram[0xEB02]=0;
     longword(g_rom,0x11000C,S3_AIZ_MINIBOSS_CUTSCENE);
@@ -4154,9 +4650,8 @@ int main(int argc,char **argv)
     s_placement_count=0;
     write16(0xEE78,0x2D80);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!(g_ram[0xEB02]&128));
-    write16(0xEE78,0x2E00);s3_video_hook(S3_LOAD_UPDATE);
-    CHECK(g_ram[0xEB02]&128);
-    CHECK(scene_read32(0xFFB1BC)==S3_AIZ_MINIBOSS_CUTSCENE);
+    write16(0xEE78,0x2E00);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!(g_ram[0xEB02]&128));
     /* A placed capsule must survive an approach/backtrack before the boss
      * locks the camera. Native deletion intentionally keeps its loaded bit. */
     word(g_rom,0x100012,0x4560);word(g_rom,0x100014,0x8060);g_rom[0x100016]=4;
@@ -4167,9 +4662,8 @@ int main(int argc,char **argv)
     CHECK(!(g_ram[0xEB03]&128));
     write16(0xEE78,16886);s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!(g_ram[0xEB03]&128));
-    write16(0xEE78,0x4390);s3_video_hook(S3_LOAD_UPDATE);
-    CHECK(g_ram[0xEB03]&128);
-    CHECK(scene_read32(0xFFB206)==S3_EGG_CAPSULE);
+    write16(0xEE78,0x4390);CHECK(!s3_video_hook(S3_LOAD_UPDATE));
+    CHECK(!(g_ram[0xEB03]&128));
     /* Both object loaders must leave HCZ1's fixed splash slot free. Fill
      * the two earlier slots and verify a real placement goes past it. */
     write32(0xB172,0);write32(0xB1BC,0);
@@ -4177,7 +4671,7 @@ int main(int argc,char **argv)
     word(g_rom,0x100000,640);word(g_rom,0x100002,0x8060);
     word(g_rom,0x100006,65535);
     g_rom[0x100004]=1;g_ram[0xEB00]=0;
-    word(g_ram,0xFE10,0x100);write16(0xEE78,128);s_placement_count=0;
+    word(g_ram,0xFE10,0x100);write16(0xEE78,0);s_placement_count=0;
     s3_video_hook(S3_LOAD_UPDATE);
     CHECK(!scene_read32(0xFFB172));
     CHECK(scene_read32(0xFFB1BC)==0x123456);
@@ -4338,6 +4832,10 @@ int main(int argc,char **argv)
      * not choose a complete bank early or repeat the combined layout. */
     for(unsigned n=0;n<64*32;++n)word(v.vram,0xE000+n*2,n%64<32?1:2);
     g_ram[0xFE10]=4;
+    /* B=1024 aliases native phase zero modulo512 at camera0. This is a
+     * canvas-ownership check; use a coherent camera away from the clamp. */
+    word(g_ram,0xEE78,512);word(g_ram,0xEE80,512);
+    word(v.vram,0xF000,(uint16_t)-512);s_build.camera_x=512;publish_sprites();
     for(unsigned act=0;act<2;++act)for(unsigned event=0;event<=16;event+=4) {
 #ifndef SONIC3_STANDALONE
         if(act && event==16)continue; /* The boss owns the opposite planes. */
@@ -4508,9 +5006,13 @@ int main(int argc,char **argv)
     test_ordinary_capture_provider_scope();
 #endif
     test_private_plane_colors();
+    test_mhz_custom_publication();
+    test_mhz_arena_canvas_repeats();
+    test_mhz_arena_installed_band();
+    test_mhz_capsule_waiting_pose();
     test_hud_object_anchor();
     test_bonus_hud_position();test_native_bonus();test_bonus_margins();test_gumball_authored_extent();test_bonus_authored_planes();test_glowing_ring_ownership();test_slots_complete_board();test_bonus_entry_publication();test_native_demo_publication();
-    test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
+    test_fbz_entrance_margin_ownership();test_fbz_physical_stage_edge();test_title_card_edges();test_fbz_title_card_ownership();test_fbz_boss_plane_ownership();test_fbz_preboss_art_ownership();
     test_knux_preview_publication();
     test_knux_preview_installed_scroll();
     test_interpolation_owned_and_readonly();
@@ -4518,6 +5020,7 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
+    test_bounded_parallax_projection();test_fbz_bounded_camera_and_wind();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
     test_blue_spheres();

@@ -27,6 +27,10 @@ uint8_t *s3_sound_prototype_read(void)
 const char *s3_sound_error(void){return "test donor not selected";}
 void s3_video_set_title_card_name_map(unsigned map){title_map=map;}
 static unsigned word(const uint8_t *p){return (unsigned)p[0]<<8|p[1];}
+static int background_native(const uint8_t *ram,int x,int y,int sx,int sy,
+                             uint16_t *attr,uint8_t *pixel,uint16_t *color)
+{ return background(ram,x,y,sx,sy,(int16_t)word(ram+0xEE80),attr,pixel,color); }
+
 int main(int argc,char **argv)
 {
     CHECK(argc==2 || argc==4);FILE *f=fopen(argv[1],"rb");CHECK(f);
@@ -51,10 +55,18 @@ int main(int argc,char **argv)
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA943C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2F0E,g_rom+0xA949C,32));
             CHECK(!memcmp(g_rom_ext+0x1F2FCE,g_rom+0xA967C,32));
+            uint8_t *donor=s3_sound_prototype_read();CHECK(donor);
+            CHECK(word(donor+0x1F2F30)==0xEEE);
+            CHECK(word(g_rom+0xA945E)==0x242);
+            CHECK(word(g_rom_ext+0x1F2F30)==word(g_rom+0xA945E));
+            for(unsigned color=0;color<16;++color)if(color!=1)
+                CHECK(!memcmp(g_rom_ext+0x1F2F2E + color*2,
+                              donor+0x1F2F2E + color*2,2));
+            free(donor);
         }
         CHECK(background);g_ram[0xF600]=12;g_ram[0xF711]=1;g_ram[0xFE10]=(uint8_t)(sk?4:1);
-        CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;
-        CHECK(background(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
+        CHECK(background_native(g_ram,0,0,0,0,NULL,NULL,NULL));uint16_t attr=0x274,color=0;uint8_t pixel=0;
+        CHECK(background_native(g_ram,-1,0,-1,0,&attr,&pixel,&color));CHECK(pixel<64);
         if(!sk) {
             /* Actual first-tunnel publication: water=$500 above camera=$526,
              * but VInt uses normal colors and HInt=$FF never switches onscreen.
@@ -76,7 +88,7 @@ int main(int argc,char **argv)
                 uint8_t before[65536];memcpy(before,g_ram,sizeof before);
                 for(int x=0;x<512;x+=7) {
                     attr=0;color=0;pixel=0;
-                    CHECK(background(g_ram,0,0,x,cases[c].row,&attr,&pixel,&color));
+                    CHECK(background_native(g_ram,0,0,x,cases[c].row,&attr,&pixel,&color));
                     if(pixel<16)continue;
                     unsigned dry=word(g_rom_ext+0x1E9B54+(pixel-16)*2);
                     unsigned wet=word(g_rom_ext+0x1E9C14+pixel*2);
@@ -95,8 +107,8 @@ int main(int argc,char **argv)
              * columns, without selecting Act 2's blank layout banks. */
             for(int y=0;y<512;y+=17)for(int x=0;x<512;x+=13) {
                 uint16_t a0=0x274,c0,a1=0x274,c1;uint8_t p0,p1;
-                CHECK(background(g_ram,0,0,x,y,&a0,&p0,&c0));
-                CHECK(background(g_ram,0,0,x-512,y+512,&a1,&p1,&c1));
+                CHECK(background_native(g_ram,0,0,x,y,&a0,&p0,&c0));
+                CHECK(background_native(g_ram,0,0,x-512,y+512,&a1,&p1,&c1));
                 CHECK(a0==a1 && p0==p1 && c0==c1);
             }
             g_ram[0xFE11]=0;
@@ -105,23 +117,23 @@ int main(int argc,char **argv)
              * canvas flag and native redraw routine have already changed. */
             for(unsigned outdoors=0;outdoors<2;outdoors++)for(unsigned event=0;event<=16;event+=4){
                 g_ram[0xEED6]=outdoors?0xFF:0;g_ram[0xEEC3]=(uint8_t)event;
-                CHECK(background(g_ram,0,0,0,0,NULL,NULL,NULL));
+                CHECK(background_native(g_ram,0,0,0,0,NULL,NULL,NULL));
                 const unsigned indoor[]={0x3E,0x8E,0x274,0x2D0};
                 for(unsigned i=0;i<4;i++){
                     attr=(uint16_t)(indoor[i]|0xE800u);
-                    CHECK(background(g_ram,0,0,0,0,&attr,&pixel,&color));
+                    CHECK(background_native(g_ram,0,0,0,0,&attr,&pixel,&color));
                 }
                 const unsigned outdoor[]={0,0x240,0x263,0x273,0x2D1};
                 for(unsigned i=0;i<5;i++){
                     attr=(uint16_t)outdoor[i];pixel=7;color=0xFFFF;
-                    CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));
+                    CHECK(!background_native(g_ram,0,0,0,0,&attr,&pixel,&color));
                     CHECK(attr==outdoor[i]&&pixel==7&&color==0xFFFF);
                 }
             }
             g_ram[0xEED6]=0;
             g_ram[0xEEC3]=0;
         }
-        g_ram[0xF664]=1;CHECK(!background(g_ram,0,0,0,0,&attr,&pixel,&color));g_ram[0xF664]=0;
+        g_ram[0xF664]=1;CHECK(!background_native(g_ram,0,0,0,0,&attr,&pixel,&color));g_ram[0xF664]=0;
         const unsigned hooks[]={s3?0x3500u:0x3DCAu,s3?0x351Cu:0x3DE6u,s3?0x3534u:0x3DFEu,s3?0x3550u:0x3E1Au};
         for(unsigned i=0;i<4;i++){
             CHECK(word(g_rom+hooks[i])==0x3659); /* MOVEA.W (A1)+,A3 */

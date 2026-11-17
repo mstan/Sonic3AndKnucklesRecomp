@@ -65,7 +65,8 @@ enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0
 
 enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
-       SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13 };
+       SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
+       SPRITE_MHZ_ARENA_COPY = 14 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -130,7 +131,7 @@ typedef struct {
     GVDP video;
     uint8_t world[0x10000],background[0x10000];
     int width,left,camera,stage_width,native_x,camera_y,knux_x,knux_y;
-    int level,special,bonus,fg_x,fg_y,bg_y,menu;
+    int level,special,bonus,fg_x,fg_y,bg_y,menu,mhz_custom;
     unsigned zone,act,bg_event,tree_reveal;
     int bg_band[2];
     uint32_t rocket_origin;
@@ -213,6 +214,59 @@ static size_t art_kosm(unsigned address,size_t compressed,uint8_t *out,size_t ca
     }
     return n==total?n:0;
 }
+/* MHZ installs its custom layout before three independent decompression
+ * queues finish replacing its chunks, blocks and patterns. RAM in between
+ * is not a drawable world. Own that selected cartridge family atomically;
+ * the installed VDP still owns the original viewport during the upload. */
+#ifndef SONIC3_STANDALONE
+static struct {
+    int attempted,ready;
+    size_t chunks_size,blocks_size;
+    uint8_t chunks[0x980],blocks[0x3F8],tiles[0x25C0];
+} s_mhz_custom;
+static uint8_t s_mhz_custom_patterns[0x10000]; /* current row context scratch */
+static int mhz_custom_load(void)
+{
+    if(s_mhz_custom.attempted)return s_mhz_custom.ready;
+    s_mhz_custom.attempted=1;
+    size_t used=0;
+    s_mhz_custom.chunks_size=art_kos(g_rom+0x1A30E8,0x480,
+        s_mhz_custom.chunks,sizeof s_mhz_custom.chunks,&used);
+    s_mhz_custom.blocks_size=art_kos(g_rom+0x1A1B36,0x380,
+        s_mhz_custom.blocks,sizeof s_mhz_custom.blocks,&used);
+    if(s_mhz_custom.chunks_size!=sizeof s_mhz_custom.chunks ||
+       s_mhz_custom.blocks_size!=sizeof s_mhz_custom.blocks ||
+       art_kosm(0x1A1EB6,0x1232,s_mhz_custom.tiles,sizeof s_mhz_custom.tiles)!=sizeof s_mhz_custom.tiles)return 0;
+    return s_mhz_custom.ready=1;
+}
+static int mhz_custom_pending(const uint8_t *ram)
+{
+    if(ram[0xFE10]!=7 || ram[0xFE11]!=1 ||
+       memcmp(ram+0x8000,g_rom+0xA8044,0x1000))return 0;
+    unsigned count=(((unsigned)ram[0xFF0E]<<8)|ram[0xFF0F])&0x7FFFu;
+    if(count>4)return 0;
+    for(unsigned n=0;n<count;++n) {
+        unsigned p=0xFF40+n*8;
+        unsigned src=((unsigned)ram[p]<<24)|((unsigned)ram[p+1]<<16)|
+            ((unsigned)ram[p+2]<<8)|ram[p+3];p+=4;
+        unsigned dst=((unsigned)ram[p]<<24)|((unsigned)ram[p+1]<<16)|
+            ((unsigned)ram[p+2]<<8)|ram[p+3];
+        if((src>=0x1A30E8u && src<0x1A3568u && dst>=0xFFFF2280u && dst<0xFFFF2C00u) ||
+           (src>=0x1A1B36u && src<0x1A1EB6u && dst>=0xFFFF9B28u && dst<0xFFFF9F20u))return mhz_custom_load();
+    }
+    unsigned src=((unsigned)ram[0xFF64]<<24)|((unsigned)ram[0xFF65]<<16)|
+        ((unsigned)ram[0xFF66]<<8)|ram[0xFF67];
+    return ram[0xFF60] && src>=0x1A1EB8u && src<0x1A30E8u && mhz_custom_load();
+}
+static void mhz_custom_world(uint8_t *ram)
+{
+    memcpy(ram+0x2280,s_mhz_custom.chunks,s_mhz_custom.chunks_size);
+    memcpy(ram+0x9B28,s_mhz_custom.blocks,s_mhz_custom.blocks_size);
+}
+#else
+static int mhz_custom_pending(const uint8_t *ram){(void)ram;return 0;}
+static void mhz_custom_world(uint8_t *ram){(void)ram;}
+#endif
 static void load_aiz_art(void)
 {
     if(s_aiz_art_attempted)return;
@@ -317,10 +371,22 @@ static int demo_level_exit(void)
     return native_demo() && (g_ram[0xF600]&127)==4 && s_frame_level &&
         s_frame_zone==g_ram[0xFE10] && s_frame_act==g_ram[0xFE11];
 }
+static int stage_map_width(unsigned chunks,unsigned zone,unsigned act)
+{
+    int w=(int)chunks*128;
+#ifndef SONIC3_STANDALONE
+    /* FBZ1 stores alternate room layouts at X=$3000 and beyond. Its
+     * native screen events copy those templates into the playable map;
+     * the $4400-wide storage header is not a visible stage boundary. */
+    if(zone==4 && !act && chunks==0x88)w=0x3000;
+#else
+    (void)zone;(void)act;
+#endif
+    return w>=320 && w<=32768?w:320;
+}
 static int stage_width(void)
 {
-    int w=ram16(0x8000)*128;
-    return w>=320 && w<=32768?w:320;
+    return stage_map_width(ram16(0x8000),g_ram[0xFE10],g_ram[0xFE11]);
 }
 static int level_ready(void)
 {
@@ -353,7 +419,7 @@ static int configure(const char *mode)
 }
 static int expanded_world(void) { return s_mode != VIDEO_OFF || (s_object_zoom && s_object_zoom(0)); }
 static int enabled(void) { return expanded_world() ||
-    (s_background_override && s_background_override(g_ram,0,0,0,0,NULL,NULL,NULL)); }
+    (s_background_override && s_background_override(g_ram,0,0,0,0,(int16_t)ram16(0xEE80),NULL,NULL,NULL)); }
 unsigned s3_video_main_cpu_divisor(void)
 {
     /* LevelLoop ($650C) still waits for the real V-int every tick.
@@ -797,8 +863,7 @@ static void scene_mode_changed(int was_enabled)
         s_frame_menu=MENU_NONE;s_frame_level=0;
         for(unsigned n=0;n<3;++n)s_history[n].serial=0;
     }
-    /* Once adopted, the host loader also maintains a native-width window
-     * on opt-out until the next level init, preserving existing object state. */
+    /* The native cursor remains authoritative when expanded admission ends. */
 }
 static int zoom_offset(int offset, unsigned zoom)
 {
@@ -835,6 +900,34 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
         q->slot=(uint16_t)(s_capture_slot|(native_art_owner(map)<<8));
     }
+}
+/* Screen-loop actors own a512px canvas, although the expanded view can see
+ * both sides at once. Reuse their published pieces, preserving their order
+ * and art, rather than allocating or repositioning native objects. */
+static void repeat_scene_pieces(unsigned first,unsigned end,int lo,int hi,unsigned owner)
+{
+    for(unsigned n=first;n<end;++n) {
+        const SceneSprite source=s_capture_frame->sprites[n];
+        int cw=(((source.size>>2)&3)+1)*8,repeat=source.x;
+        while(repeat+cw>lo)repeat-=512;
+        for(repeat+=512;repeat<hi;repeat+=512)
+            if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
+                SceneSprite fill=source;fill.x=repeat;
+                if(owner)fill.slot=(uint16_t)((fill.slot&255u)|(owner<<8));
+                s_capture_frame->sprites[s_capture_frame->count++]=fill;
+            }
+    }
+}
+static int mhz_arena_object(unsigned object,unsigned map,unsigned code)
+{
+#ifndef SONIC3_STANDALONE
+    if(!enabled() || s_capture_frame->scene!=1 || s_requested_width<=320 || ram16(0xFE10)!=0x701 ||
+       !g_ram[0xEED3] || map!=0x55908 || (code!=0x5576A && code!=0x557C8))return 0;
+    for(unsigned p=0xA808;p<=0xA814;p+=2)if(ram16(p)==object)return 1;
+#else
+    (void)object;(void)map;(void)code;
+#endif
+    return 0;
 }
 
 /* The two native propeller slots use 9-bit screen positions. Before a
@@ -981,6 +1074,13 @@ static void spawn_scene(void)
         int best=-1,distance=INT_MAX;
         for(unsigned i=0;i<s_placement_count;++i) {
             Placement *p=&s_placements[i];
+            /* The cartridge cursor owns its complete preload interval, not
+             * just the visible 320px. A collapsing actor deliberately clears
+             * its respawn bit while its cursor stays past that placement.
+             * Rechecking that cell each tick would resurrect it immediately.
+             * Only admit additional cells outside the original interval. */
+            if((int)p->x>=((camera-128)&~127) &&
+               (int)p->x<(camera&~127)+640)continue;
             /* Native clears bit 7 for live placements before a bonus/act
              * reload. A separate host-loaded latch outlives that clear and
              * suppresses valid incoming actors. Keep native respawn state
@@ -1031,13 +1131,6 @@ static void spawn_scene(void)
         write32(o,placement_code(p));
         ++s_spawned;
     }
-    unsigned r=0,l=0;
-    while(r<s_placement_count && s_placements[r].x<(unsigned)((camera&~127)+640))++r;
-    while(l<s_placement_count && (int)s_placements[l].x<((camera-128)&~127))++l;
-    write32(0xF772,s_placement_base+r*6);write32(0xF776,s_placement_base+l*6);
-    write16(0xF77A,0xEB00+r);write16(0xF77C,0xEB00+l);
-    write16(0xF76E,camera&0xFF80);write16(0xF770,cy&0xFF80);
-    write16(0xF7DA,(camera-128)&0xFF80);write16(0xEF64,(cy-128)&0xFF80);
 }
 static S3VideoRingLayout s_ring_layout;
 void s3_video_set_ring_layout(S3VideoRingLayout fn) { s_ring_layout = fn; }
@@ -1242,6 +1335,8 @@ static void capture_objects(void)
      * optional background provider for every one of those actors. */
     int mhz_rotors=s_requested_width>320 && s_capture_frame->scene==1 &&
         ram16(0xFE10)==0x701 && ram16(0xEEC0)==16 && enabled();
+    int mhz_arena=s_requested_width>320 && s_capture_frame->scene==1 &&
+        ram16(0xFE10)==0x701 && g_ram[0xEED3] && enabled();
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1356,20 +1451,9 @@ static void capture_objects(void)
                 }
             } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
             if(mhz_rotors)extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
-            if(pylon) {
-                unsigned end=s_capture_frame->count;
-                int lo=left-cam,hi=lo+s_requested_width;
-                for(unsigned n=mapped_first;n<end;++n) {
-                    const SceneSprite source=s_capture_frame->sprites[n];
-                    int cw=(((source.size>>2)&3)+1)*8,repeat=source.x;
-                    while(repeat+cw>lo)repeat-=512;
-                    for(repeat+=512;repeat<hi;repeat+=512)
-                        if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
-                            SceneSprite fill=source;fill.x=repeat;
-                            s_capture_frame->sprites[s_capture_frame->count++]=fill;
-                        }
-                }
-            }
+            int arena=mhz_arena && mhz_arena_object(o,map,s_capture_frame->code[s_capture_slot]);
+            if(pylon || arena)repeat_scene_pieces(mapped_first,s_capture_frame->count,
+                left-cam,left-cam+s_requested_width,arena?SPRITE_MHZ_ARENA_COPY:0);
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
@@ -1523,7 +1607,7 @@ int s3_video_hook(uint32_t pc)
     /* A background replacement needs host composition, while native-size
      * gameplay keeps the cartridge's loader, ring ranges and culling. */
     if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active) && g_ram[0xFE10]<19) {
-        spawn_scene();return 1;
+        spawn_scene();return 0;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
     switch(pc) {
@@ -1776,6 +1860,62 @@ static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pi
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
+/* The original boss allocates its stationary capsule only after falling
+ * below the native screen. A wider view already sees that authored ledge.
+ * Extend the waiting body/button there until their real published sprites
+ * take over; native allocation, collision and the camera pan are untouched. */
+static int mhz_capsule_preview_needed(const uint8_t *ram,const SceneFrame *scene)
+{
+#ifndef SONIC3_STANDALONE
+    if(!scene || scene->scene!=1 || scene->world_tag!=0x702 ||
+       ram[0xFE10]!=7 || ram[0xFE11]!=1 || ram[0xB038]>2)return 0;
+    for(unsigned n=0;n<scene->count;++n)
+        if((scene->sprites[n].slot>>8)==5)return 0;
+    for(unsigned o=0xB000;o<=0xCAE2;o+=0x4A) {
+        unsigned code=((unsigned)ram[o]<<24)|((unsigned)ram[o+1]<<16)|
+            ((unsigned)ram[o+2]<<8)|ram[o+3];
+        unsigned callback=((unsigned)ram[o+0x34]<<24)|((unsigned)ram[o+0x35]<<16)|
+            ((unsigned)ram[o+0x36]<<8)|ram[o+0x37];
+        if(code==0x76164 || code==0x761E8 || code==0x7623C ||
+           (code==0x85668 && callback==0x761B2))return 1;
+    }
+#else
+    (void)ram;(void)scene;
+#endif
+    return 0;
+}
+static void mhz_capsule_preview_scanline(int line,uint32_t *out,int width,
+                                         int origin,const uint32_t *palette)
+{
+    int y=0x320-s_camera_y;
+    if(width<=320 || !s_frame_level || s_frame_zone!=7 || s_frame_act!=1 ||
+       line<y-44 || line>=y+32 ||
+       !mhz_capsule_preview_needed(s_world_frame,s_display))return;
+    for(unsigned part=0;part<2;++part) {
+        unsigned frame=part?5:0;
+        unsigned p=S3_CAPSULE_MAP+(int16_t)scene_read16(S3_CAPSULE_MAP+frame*2);
+        unsigned count=scene_read16(p);p+=2;if(count>32)return;
+        for(unsigned n=0;n<count;++n,p+=6) {
+            unsigned size=scene_read8(p+1);if(size>15)return;
+            int cw=((size>>2)&3)+1,ch=(size&3)+1;
+            int py=y-(part?0x24:0)+(int8_t)scene_read8(p),iy=line-py;
+            if(iy<0 || iy>=ch*8)continue;
+            int px=origin+0x4640-s_camera+(int16_t)scene_read16(p+4);
+            unsigned attr=(scene_read16(p+2)+0x8494u)&65535u;
+            if(attr&0x1000u)iy=ch*8-1-iy;
+            for(int dx=0;dx<cw*8;++dx) {
+                int x=px+dx;
+                if(x<0 || x>=width || (x>=origin && x<origin+320) || (s_priority[x]&2u))continue;
+                int ix=attr&0x800u?cw*8-1-dx:dx;
+                unsigned tile=(attr&0xF800u)|((attr+ix/8*ch+iy/8)&2047u);
+                uint8_t pixel=0;
+                if(!native_art_pixel(5,tile,ix&7,iy&7,&pixel) || !pixel)continue;
+                if((attr&0x8000u) || !(s_priority[x]&1u))out[x]=palette[pixel];
+                s_priority[x]|=2u;
+            }
+        }
+    }
+}
 /* FBZ reloads these reservations only after its returning title card leaves.
  * The expanded presentation owns original patterns, rather than borrowing
  * whichever glyph currently occupies the same native VRAM tile number. */
@@ -1934,6 +2074,43 @@ static uint16_t scene_art_color_reference(unsigned color,const GVDP *v,unsigned 
 }
 static uint16_t scene_art_color(unsigned color,const GVDP *v)
 { return scene_art_color_reference(color,v,16); }
+/* The entrance spans two physical spaces while its native doorway redraw
+ * selects one global B canvas. Only extra columns project both authored banks;
+ * the native viewport keeps every installed cell, palette and redraw phase. */
+static unsigned fbz_deform_band(int y,const uint16_t *heights,unsigned count)
+{
+    unsigned band=0;
+    while(band+1<count && y>=heights[band])y-=heights[band++];
+    return band;
+}
+static int fbz_projection_x(int cx,int y,int outdoor)
+{
+    static const uint16_t inside_height[]={0x80,0x40,0x20,0x8,0x8,0x8,0x8,0x28,0x30,0x8,0x4,0x4,0xb8,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0x30,0x30,0x10,0x10,0x30,0x28,0x18,0x10,0xb0,0x30,0x28,0x40,0x18,0x30,0x7fff};
+    static const uint8_t inside_speed[]={8,9,6,4,3,2,1,7,6,4,3,2,3,9,3,6,3,7,3,6,3,9,3,6,3,7,3,6,3,6,7,4,6,9,8};
+    static const uint16_t outside_height[]={0x30,0x20,0x30,0x10,0x10,0x10,0x10,0x10,0x7fff};
+    static const uint8_t outside_band[]={7,1,5,3,6,2,4,0,8};
+    if(!outdoor) {
+        unsigned band=fbz_deform_band(y,inside_height,sizeof inside_height/sizeof *inside_height);
+        return (cx*inside_speed[band])>>4;
+    }
+    unsigned band=fbz_deform_band(y,outside_height,sizeof outside_height/sizeof *outside_height);
+    unsigned n=outside_band[band];
+    uint32_t cloud=((uint32_t)s_world_frame[0xA9FC]<<24)|((uint32_t)s_world_frame[0xA9FD]<<16)|
+        ((unsigned)s_world_frame[0xA9FE]<<8)|s_world_frame[0xA9FF];
+    /* The native outdoor deformation consumes the old wind phase, then
+     * advances it. The indoor branch leaves its next outdoor phase held. */
+    if(((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7])cloud-=0xE00u;
+    uint32_t scroll=((uint32_t)cx<<12)+n*((uint32_t)cx<<11)+(n+1)*cloud;
+    return (int16_t)(scroll>>16);
+}
+static void fbz_entrance_projection(int cx,int cy,int line,int outdoor,int *x,int *y)
+{
+    int half=cy>>1;
+    *y=outdoor?22+(int16_t)(((unsigned)s_world_frame[0xEEDA]<<8)|s_world_frame[0xEEDB])+line:
+        half-(half>>5)+line;
+    *x=fbz_projection_x(cx,*y,outdoor);
+}
+
 static uint16_t restored_art_color(unsigned color,const GVDP *v)
 {
     /* The donor's stage entry 16 can be nonblack (FBZ is $0462), so use
@@ -2117,6 +2294,46 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
     row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
         (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
 }
+/* Native deformation follows its 320px camera. At a bounded expanded
+ * edge that camera can move inside a stationary physical view. Reproject
+ * only the ordinary city/forest/factory bands from the same published phase;
+ * cutscene canvases and independently moving scenery retain their owners. */
+static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by)
+{
+    int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after;
+    if(width<=nw || !delta || !s_frame_level)return scroll;
+#ifndef SONIC3_STANDALONE
+    if(s_frame_zone==4 && !s_frame_act) {
+        int outdoor=((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7];
+        /* Mixed doorway rows still use the installed deformation. Do not
+         * switch camera bases when the background redraw event changes. */
+        before=fbz_projection_x(camera,by,outdoor);
+        after=fbz_projection_x(camera+delta,by,outdoor);
+    } else
+#endif
+    {
+        if(s_frame_bg_event)return scroll;
+        if(s_frame_zone==3 && !s_frame_act) {
+            numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
+        }
+#ifndef SONIC3_STANDALONE
+        else if(s_frame_zone==7 && s_frame_act==1) {
+            numerator=12;
+            phase=(int16_t)(((unsigned)s_world_frame[0xEEB6]<<8)|s_world_frame[0xEEB7])+
+                  camera-s_frame_fg_x;
+        }
+#endif
+        if(!numerator)return scroll;
+        before=phase*numerator;after=(phase+delta)*numerator;
+        before=before>=0?before/32:-((-before+31)/32);
+        after=after>=0?after/32:-((-after+31)/32);
+    }
+    /* Completed HScroll identifies the native bank. Fractional sampling
+     * can round between its two adjacent integer phases. */
+    int distance=(-scroll-before+256)&511;distance-=256;
+    if(distance < -1 || distance > 1)return scroll;
+    return scroll-(after-before);
+}
 static void render_scanline_base(const GVDP *v, int line, const uint32_t *native, int nw,
                             uint32_t *out, int width,
                             GameVideoNativeRow native_row, void *native_ctx,
@@ -2195,6 +2412,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!hold_level && !retain_bonus) {
             memcpy(s_world_frame,g_ram,sizeof s_world_frame);
             if(s_world_publish)s_world_publish(s_world_frame);
+            s_render->mhz_custom=s_frame_level && mhz_custom_pending(s_world_frame);
+            if(s_render->mhz_custom)mhz_custom_world(s_world_frame);
             s_frame_zone=g_ram[0xFE10];
             s_frame_act=g_ram[0xFE11];s_frame_bg_event=ram16(0xEEC2);
             s_frame_tree_reveal=ram16(0xEEC4);
@@ -2240,6 +2459,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     }
     if(competition_scanline(v,line,native,nw,out,width,native_row,native_ctx,palette))return;
     v=&s_video_frame;
+#ifndef SONIC3_STANDALONE
+    if(!line && s_render->mhz_custom) {
+        memcpy(s_mhz_custom_patterns,v->vram,sizeof s_mhz_custom_patterns);
+        memcpy(s_mhz_custom_patterns+0x4440,s_mhz_custom.tiles,sizeof s_mhz_custom.tiles);
+    }
+#endif
     const uint8_t *card_ram=s_interpolating?s_world_frame:g_ram;
     if(s_display && s_display->scene==3 && s_display->bonus_card_valid && !card_ram[0xF711]){
         /* The bonus loading card temporarily retains the level-select
@@ -2402,8 +2627,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int camera_y=(mgz2_collapse || lbz1_columns)?plane_y:unwrap((int)fg_scroll,ship_band?ship_y:plane_y);
     if(line==0) {
         if(level) {
-            int stage=((s_world_frame[0x8000]<<8)|s_world_frame[0x8001])*128;
-            s_stage_width=stage>=320 && stage<=32768?stage:320;
+            unsigned chunks=((unsigned)s_world_frame[0x8000]<<8)|s_world_frame[0x8001];
+            s_stage_width=stage_map_width(chunks,s_frame_zone,s_frame_act);
         }
         /* HScroll/VScroll include heat and underwater deformation. Those
          * offsets belong to the planes, never to the object camera or the
@@ -2474,7 +2699,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
     int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
     int restored_canvas=level && s_background_override &&
-        s_background_override(s_world_frame,0,0,0,0,NULL,NULL,NULL);
+        s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
         mgz_background || cnz_background || s_frame_zone==7 || restored_canvas);
@@ -2580,12 +2805,25 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * pass the uploaded rows retain the outgoing composition. */
     int aiz2_canvas=bg_world && !s_frame_zone && s_frame_act==1 && s_frame_bg_event==16;
     int mgz2_canvas=mgz2_panorama && s_frame_bg_event==8;
-    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas;
+    /* MHZ2's arena borrows the first48 rows of both installed planes.
+     * loc_55380 installs A from $4000/$180; loc_553B6 replaces B from
+     * $200/$80. sub_5550C shears that complete512px canvas, not the
+     * ordinary forest layout at the current background Y. Retain each
+     * native plane through its independent installation/retirement. */
+    int mhz_arena_band=0;
+#ifndef SONIC3_STANDALONE
+    mhz_arena_band=bg_world && s_frame_zone==7 && s_frame_act==1 &&
+        s_frame_bg_event>=16 && s_frame_bg_event<=32 && !mhz_ship && line<48;
+#endif
+    int mhz_arena_fg=mhz_arena_band && s_world_frame[0xEED2];
+    int mhz_arena_bg=mhz_arena_band && s_world_frame[0xEED3];
+    int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by);
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
@@ -2696,6 +2934,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
     const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
     const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
+#ifndef SONIC3_STANDALONE
+    if(s_render->mhz_custom)world_patterns=s_mhz_custom_patterns;
+#endif
     int incoming_x=0,incoming_y=0;
     int hcz2_incoming=bg_world && width>320 && s_frame_zone==1 && s_frame_act==1 &&
         s_frame_bg_event<=12 && hcz2_panorama_position(line,&incoming_x,&incoming_y);
@@ -2716,6 +2957,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             scene_art_color_reference(s_lbz_preview.colors[i-16],v,32),GENESIS_DAC_NORMAL);
     GenesisTileRow fg={0},bg={0},incoming={0};
     WorldArtRow aiz_fg[2],aiz_bg;
+    int fbz_entrance=0,fbz_x[2]={0},fbz_y[2]={0};
+    uint32_t fbz_colors[2][64];
+    WorldArtRow fbz_rows[2];
+#ifndef SONIC3_STANDALONE
+    fbz_entrance=fbz_canvas && !s_frame_act && width>nw && s_left<0x180 && s_camera_y>=0x400;
+    if(fbz_entrance)for(unsigned side=0;side<2;++side) {
+        fbz_entrance_projection(s_left+(width-nw)/2,s_camera_y,line,(int)side,&fbz_x[side],&fbz_y[side]);
+        world_art_row_init(&fbz_rows[side],s_background_frame,s_background_frame+0x9000,v->vram,fbz_y[side],1);
+        memcpy(fbz_colors[side],palette,sizeof palette);
+        for(unsigned color=0;color<8;++color) {
+            unsigned source=0x52DC0u+side*16+color*2;
+            unsigned value=((unsigned)g_rom[source]<<8)|g_rom[source+1];
+            fbz_colors[side][50+color]=genesis_dac_cram_to_argb(restored_art_color(value,v),GENESIS_DAC_NORMAL);
+        }
+    }
+#endif
+
     if(aiz_banks) {
         world_art_row_init(&aiz_fg[0],s_world_frame,s_aiz_intro.blocks,s_aiz_intro.video.vram,wy,0);
         world_art_row_init(&aiz_fg[1],s_world_frame,s_aiz_main.blocks,s_aiz_main.video.vram,wy,0);
@@ -2784,6 +3042,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        if(s_render->mhz_custom && nx>=0 && nx<nw) {
+            int ax=nx-hs_a,ay=line+(fg_scroll&1023);
+            a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
+            b=plane_attr(v,base_b,reference_bx,by);bp=pattern_pixel(v,b,reference_bx,by);
+        }
         if(nx<0 && wx>=0 && wx<icz_snow_edge && !ap) {
             a=icz_snow_attr;ap=pattern_pixel(v,a,wx,wy);
         }
@@ -2804,6 +3067,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
+        }
+        if(fbz_entrance && (nx<0 || nx>=nw)) {
+            unsigned side=wx<0x180 && wy>=0x640;
+            int px=((x-(width-nw)/2+fbz_x[side])&511)+(int)side*512;
+            bp=world_art_row_pixel(&fbz_rows[side],px,&b);bpalette=fbz_colors[side];
         }
         if(hcz2_incoming && nx>=nw && wx>=0xC10){
             /* The extra right view reaches the next room before the native
@@ -2834,9 +3102,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * in unused columns. Its incoming right margin is authored flat
          * ground, not another copy of that ledge. */
         int incoming_chase=aiz_loop_fg && nx>=nw && wx>=0x4200 && wx<0x4440;
-        if(aiz_fire_fg || (aiz_loop_fg && !incoming_chase) ||
+        if(mhz_arena_fg || aiz_fire_fg || (aiz_loop_fg && !incoming_chase) ||
            (aiz_grove_fg && wx>=0x4380 && wx<0x4640)) {
-            int ay=line+(((aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
+            int ay=line+(((mhz_arena_fg || aiz_loop_fg || aiz_grove_fg)?fg_scroll:v->vsram[0])&1023);
             a=plane_attr(v,base_a,nx-hs_a,ay);
             ap=pattern_pixel(v,a,nx-hs_a,ay);
         }
@@ -2927,7 +3195,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
         uint16_t restored_color=0xFFFF;
         int restored_background=level && s_background_override &&
-            s_background_override(s_world_frame,bx,by,x-bg_origin,line,&b,&bp,&restored_color);
+            s_background_override(s_world_frame,bx,by,x-bg_origin,line,
+                width>nw?s_left+(width-nw)/2:s_frame_fg_x,&b,&bp,&restored_color);
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
         if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
            wx>=0x360 && wx<0x980) {
@@ -3052,6 +3321,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         *hud_origin=0;
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
+        mhz_capsule_preview_scanline(line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
             s_actor_overlay(v,line,out,width,origin,palette,s_priority,s_camera,s_camera_y);
@@ -3406,6 +3676,21 @@ static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy)
     if(b->code[slot]==IMPORTED_S1_PYLON) {
         ax=b->ox[slot]+((ax-b->ox[slot]+256)&511)-256;
         ay=b->oy[slot]+((ay-b->oy[slot]+32)&63)-32;
+    } else if((b->code[slot]==0x5576A || b->code[slot]==0x557C8) &&
+              b->scene==1 && b->world_tag==0x702 && ix_current()->width>320) {
+        /* Original pieces and their margin copies share the same native
+         * slot. Read ownership from this immutable presentation snapshot,
+         * including at the native 512px X wrap; Y does not wrap here. */
+        const uint8_t *world=ix_current()->context.world;
+        unsigned object=0xB000+(slot-1)*0x4A;
+        if(world[0xEED3] && object+15<65536 &&
+           ((unsigned)world[object+12]<<24 | (unsigned)world[object+13]<<16 |
+            (unsigned)world[object+14]<<8 | world[object+15])==0x55908)
+            for(unsigned p=0xA808;p<=0xA814;p+=2)
+                if(((unsigned)world[p]<<8 | world[p+1])==object) {
+                    ax=b->ox[slot]+((ax-b->ox[slot]+256)&511)-256;
+                    break;
+                }
     }
     *dx=interpolation_lerp(ax,b->ox[slot],48)-b->ox[slot];
     *dy=interpolation_lerp(ay,b->oy[slot],48)-b->oy[slot];
