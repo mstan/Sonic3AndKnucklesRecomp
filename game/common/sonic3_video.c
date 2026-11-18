@@ -2330,6 +2330,24 @@ static uint16_t restored_art_color(unsigned color,const GVDP *v)
     }
     return (uint16_t)faded;
 }
+
+#ifdef SONIC3_STANDALONE
+/* Standalone IceCap exposes the incoming cave while its live plane still
+ * uses the outdoor palette. Read the eleven replacement colors from the
+ * original ICZ1_SetIndoorPal writes. */
+static int icz_cave_preview_palette(const GVDP *v,const uint32_t *live,uint32_t *preview)
+{
+    unsigned writes=0x3DED6u;
+    if(scene_read16(writes)!=0x22FC || scene_read16(writes+30)!=0x32BC)return 0;
+    memcpy(preview,live,64*sizeof *preview);
+    for(unsigned i=0;i<11;++i) {
+        unsigned source=writes+(i/2)*6+2+(i%2)*2;
+        uint16_t color=scene_read16(source);
+        preview[49+i]=genesis_dac_cram_to_argb(restored_art_color(color,v),GENESIS_DAC_NORMAL);
+    }
+    return 1;
+}
+#endif
 static int aiz_tree_color(int wx,int wy,int nx,int nw,uint8_t pixel)
 {
     /* Native AIZ1_Resize changes this entry from $0004 to sky $0C02 at
@@ -3103,6 +3121,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * view. Choose their source in the existing eight-pixel decode below. */
     int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
         s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
+#ifdef SONIC3_STANDALONE
+    uint32_t icz_cave_palette[64];
+    int icz_cave_preview=icz_first_cave && icz_cave_preview_palette(v,palette,icz_cave_palette);
+#endif
     int icz_margin_world=bg_world && s_frame_zone==5 && !s_frame_act && s_frame_bg_event==12;
     if(bg_world && s_frame_zone==5 && !s_frame_act &&
        s_frame_bg_event==8) {
@@ -3302,6 +3324,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         aiz_join_near(s_display->aiz_join,s_camera);
     int retired_tree_pixels=level && aiz_retired_tree_near();
     PlaneColorRow plane_colors;plane_color_row_init(&plane_colors);
+#ifdef SONIC3_STANDALONE
+    const uint32_t *background_palette=handoff_loading?s_handoff_art.colors[line]:palette;
+    const uint32_t *background_run_palette=background_palette;
+#endif
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -3347,6 +3373,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(icz_first_cave) {
                 /* A source change can cut a tile run short. remaining is
                  * independent of its decoded bit shift and traversal step. */
+#ifdef SONIC3_STANDALONE
+                background_run_palette=icz_cave_preview && nx>=nw && wx>=0x3940?
+                    icz_cave_palette:background_palette;
+#endif
                 if(nx<0 && bg.remaining>-nx)bg.remaining=-nx;
                 else if(nx>=0 && nx<nw && bg.remaining>nw-nx)bg.remaining=nw-nx;
                 if(wx<0x3940 && bg.remaining>0x3940-wx)bg.remaining=0x3940-wx;
@@ -3374,7 +3404,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* Primary foreground colors remain native; only the retired
          * secondary background palette needs to outlive its bank. */
         const uint32_t *apalette=palette;
+#ifdef SONIC3_STANDALONE
+        const uint32_t *bpalette=background_run_palette;
+#else
         const uint32_t *bpalette=handoff_loading?s_handoff_art.colors[line]:palette;
+#endif
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);

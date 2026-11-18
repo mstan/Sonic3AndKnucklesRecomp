@@ -863,8 +863,8 @@ void s3_army_vblank(void)
     /* The SAT built with this capture is uploaded by this V-int. */
     shown = published;
     s3_video_set_actor_interpolation_blocked(shown.count!=0);
-    s3_title_vblank(&g_machine.vdp, title_enabled());
-    gvdp_set_host_sprites(shown.count || (title_enabled() && s3_title_active()) ? host_sprites : NULL, NULL);
+    int draw_title = s3_title_vblank(&g_machine.vdp, title_enabled());
+    gvdp_set_host_sprites(shown.count || draw_title ? host_sprites : NULL, NULL);
     /* Lag telemetry, sampled at the IRQ like the family renderer's. */
     unsigned tick = rd16(LEVEL_FRAME);
     /* Running gameplay only: loading ($8C), pause and Player 1's own death
