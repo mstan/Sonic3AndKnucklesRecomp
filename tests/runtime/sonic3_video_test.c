@@ -1272,6 +1272,9 @@ static void test_competition_pre_cull(void)
     g_ram[0x7880+600]=42;g_ram[0x7D80+600]=92;g_ram[0xEF3E]=255;
     CHECK(competition_object_x(-864,12,1023)==160);
     CHECK(competition_object_x(-162,12,511)==-162 && competition_object_x(350,12,511)==350);
+    CHECK(competition_object_x(-504,8,1023)==520);
+    CHECK(competition_object_x(-512,8,1023)==512);
+    CHECK(competition_object_x(-520,8,1023)==504);
     memcpy(before,g_ram,sizeof before);s3_video_hook(S3_CAPTURE);
     CHECK(s_build.scene==4 && s_build.count==3 && !memcmp(g_ram,before,sizeof before));
     s3_video_hook(S3_COMP_PUBLISH);s3_video_vblank();

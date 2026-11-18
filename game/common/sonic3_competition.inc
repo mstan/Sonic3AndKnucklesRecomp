@@ -19,10 +19,12 @@ static int competition_world_ready(void)
 static int competition_object_x(int raw,int radius,int mask)
 {
     int x=((raw+radius)&mask)-radius,period=mask+1;
-    /* Keep every hardware-visible alias. Outside that viewport, prefer the
-     * adjacent signed world position instead of wrapping it to the far side. */
+    /* Keep hardware-visible aliases and adjacent positions already visible
+     * in the margin. Otherwise choose the wrap nearest the viewport center:
+     * a fixed half-period cutoff can switch aliases inside the wide view. */
     if(x+radius>=0 && x-radius<320)return x;
-    if(raw>=-period/2 && raw<320+period/2)return raw;
+    int left=(320-s_requested_width)/2,right=left+s_requested_width;
+    if(raw+radius>=left && raw-radius<right)return raw;
     return x>(period+320)/2?x-period:x;
 }
 /* Capture the original priority queues before either hardware view culls
