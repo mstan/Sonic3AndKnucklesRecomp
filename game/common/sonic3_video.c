@@ -2626,7 +2626,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* Publish one immutable art/scroll snapshot per frame. Palettes and the
      * scripted foreground VSRAM switch remain live across native HBlank. */
     unsigned live_fg_scroll=presentation_fg_scroll(line,v->vsram[0]);
-    uint32_t palette[64],shadow[64],intro_palette[64],forest_palette[64];
+    uint32_t palette[64],shadow[64];
+    union {
+        struct { uint32_t intro[64],forest[64]; } aiz;
+        uint32_t icecap[64];
+    } scene_palette;
     int uniform_palette=1;
     for(int i=0;i<64;++i) {
         palette[i]=genesis_dac_cram_to_argb(presentation_cram(line,i,v->cram[i]),GENESIS_DAC_NORMAL);
@@ -3107,7 +3111,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || lbz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
-    if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
+    if(aiz_banks){aiz_palette(&s_aiz_intro,v,scene_palette.aiz.intro);aiz_palette(&s_aiz_main,v,scene_palette.aiz.forest);}
     int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
     int mhz_eye=INT_MIN;
@@ -3119,8 +3123,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * view. Choose their source in the existing eight-pixel decode below. */
     int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
         s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
-    uint32_t icz_cave_palette[64];
-    int icz_cave_preview=icz_first_cave && icz_cave_preview_palette(v,palette,icz_cave_palette);
+    int icz_cave_preview=icz_first_cave && icz_cave_preview_palette(v,palette,scene_palette.icecap);
     int icz_margin_world=bg_world && s_frame_zone==5 && !s_frame_act && s_frame_bg_event==12;
     if(bg_world && s_frame_zone==5 && !s_frame_act &&
        s_frame_bg_event==8) {
@@ -3320,6 +3323,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         aiz_join_near(s_display->aiz_join,s_camera);
     int retired_tree_pixels=level && aiz_retired_tree_near();
     PlaneColorRow plane_colors;plane_color_row_init(&plane_colors);
+    const uint32_t *background_palette=handoff_loading?s_handoff_art.colors[line]:palette;
+    const uint32_t *background_run_palette=background_palette;
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -3365,6 +3370,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(icz_first_cave) {
                 /* A source change can cut a tile run short. remaining is
                  * independent of its decoded bit shift and traversal step. */
+                background_run_palette=icz_cave_preview && nx>=nw && wx>=0x3940?
+                    scene_palette.icecap:background_palette;
                 if(nx<0 && bg.remaining>-nx)bg.remaining=-nx;
                 else if(nx>=0 && nx<nw && bg.remaining>nw-nx)bg.remaining=nw-nx;
                 if(wx<0x3940 && bg.remaining>0x3940-wx)bg.remaining=0x3940-wx;
@@ -3392,8 +3399,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* Primary foreground colors remain native; only the retired
          * secondary background palette needs to outlive its bank. */
         const uint32_t *apalette=palette;
-        const uint32_t *bpalette=handoff_loading?s_handoff_art.colors[line]:palette;
-        if(icz_cave_preview && nx>=nw && wx>=0x3940)bpalette=icz_cave_palette;
+        const uint32_t *bpalette=background_run_palette;
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
@@ -3472,11 +3478,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int intro=wx<0x1300;
             if(intro || s_frame_bg_event<8) {
                 ap=world_art_row_pixel(&aiz_fg[intro?0:1],wx,&a);
-                apalette=intro?intro_palette:forest_palette;
+                apalette=intro?scene_palette.aiz.intro:scene_palette.aiz.forest;
             }
             if(s_frame_bg_event==0) {
                 bp=world_art_row_pixel(&aiz_bg,source_bx,&b);
-                bpalette=by>=0x380?intro_palette:forest_palette;
+                bpalette=by>=0x380?scene_palette.aiz.intro:scene_palette.aiz.forest;
             }
         }
         int joined=join_pixels && (nx<0 || nx>=320) &&
