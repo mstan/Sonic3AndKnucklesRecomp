@@ -120,9 +120,20 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
 {
     actor&=0xFFFFFFu;
     if(!combined_mode || !s3_gameplay.original_zone_order || !ram ||
-       word(ram,0xFFD0) || word(ram,0xFFE8) || ram[0xFAA8] ||
+       word(ram,0xFFD0) || word(ram,0xFFE8) ||
        actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
     unsigned zone=word(ram,0xFE10);
+    unsigned o=actor&65535u;
+    if(pc==0x2DCD6u) {
+        /* The tally and native save have finished. Begin the existing timed
+         * exit before the ACT CLEAR sprites slide away. Level starts its
+         * palette fade before rebuilding the SAT for the destination. */
+        if((zone!=0x701 && (zone!=0x301 || word(ram,0xFF08)!=3)) ||
+           ram[0xF600]!=0x0C || !ram[0xFAA8] || ram[o+5]!=6 ||
+           word(ram,o+0x2E) || !word(ram,o+0x30) || word(ram,o+0x32))return 0;
+        return 0x76456;
+    }
+    if(ram[0xFAA8])return 0;
     if(pc==0x522A0u && zone==0x301 && word(ram,0xFF08)==3){
         /* The native capsule resets the end flag. Results set it again only
          * after the tally and cards finish; the screen event then restores
@@ -135,7 +146,6 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
     /* Retain the capsule/results prerequisites and the native timed exit.
      * Mushroom Hill omits airship boarding; Carnival Night omits its portal.
      * StartNewLevel still supplies the normal fade and next-stage setup. */
-    unsigned o=actor&65535u;
     ram[o]=0;ram[o+1]=7;ram[o+2]=0x64;ram[o+3]=0x56;
     ram[o+0x2E]=0;ram[o+0x2F]=59;
     return 0x76456;
