@@ -22,6 +22,7 @@
 
 enum {
     GAME_MODE = 0xF600, TITLE_MODE = 0x04,
+    VINT_ROUTINE = 0xF62A, PALETTE_FADE_VINT = 0x12,
     SK_BANNER = 0xB0DE,              /* Obj_SKTitle_Banner's slot (first dynamic) */
     S3K_AND_KNUCKLES = 0xB206,       /* Obj_TitleANDKnuckles' slot */
     S3K_BANNER = 0xB000, S3K_FINGER = 0xB128, S3K_WINK = 0xB172,
@@ -125,11 +126,21 @@ static unsigned rgb_distance(uint16_t a, uint16_t b)
     return (unsigned)(dr * dr * 3 + dg * dg * 4 + db * db * 2);
 }
 
-void s3_title_vblank(const GVDP *v, int enabled)
+int s3_title_vblank(const GVDP *v, int enabled)
 {
     memset(&building, 0, sizeof building);
     if (!enabled || !v || !s3_title_active()) {
-        tick = 0; shown = building; gvdp_set_host_palette(NULL, 0); return;
+        /* The destination mode starts its fade with the title's SAT and
+         * patterns still loaded. Keep the same composition and palette
+         * indices until the guest finishes that fade and clears the slots. */
+        if (enabled && v && shown.active && g_ram[VINT_ROUTINE] == PALETTE_FADE_VINT &&
+            (shown.sk ? rd32(SK_BANNER + 0xC) == ARMY_MAP_SK_BANNER :
+                        rd32(S3K_AND_KNUCKLES + 0xC) == ARMY_MAP_AND_KNUCKLES))
+            return 1;
+        tick = 0;
+        shown = building;
+        gvdp_set_host_palette(NULL, 0);
+        return 0;
     }
     building.active = 1; building.sk = sk_title();
     building.tick = tick++;
@@ -173,6 +184,7 @@ void s3_title_vblank(const GVDP *v, int enabled)
             add_pieces(rd32(o + 0xC), g_ram[o + 0x22], rd16(o + 0xA), x, y + n * 18, 0, 255, 0, 0);
     }
     shown = building;
+    return 1;
 }
 
 /* One S3K-format mapping piece row from VRAM patterns. */
