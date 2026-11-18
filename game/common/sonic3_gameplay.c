@@ -166,9 +166,6 @@ uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y
          * releases that lock on Jump; the portal route normally skips this
          * object for Knuckles, so follow the full intro path here too. */
         if(pc==0x53756u)return 0x5375C;
-        /* Keep advancing the same snow fall until that native jump handler
-         * can release control; retail's portal path skips it for Knuckles. */
-        if(pc==0x537B4u)return 0x537B6;
     }
     if(pc!=0x695Au || zone!=0x800)return 0;
     /* SpawnLevelMainSprites has initialized the actors but has not installed
@@ -177,6 +174,16 @@ uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y
     ram[0xB014]=6;ram[0xB015]=word(ram,0xFF08)==2?0x90:0x8C;
     if(word(ram,0xB04A)||word(ram,0xB04C)){ram[0xB05E]=6;ram[0xB05F]=0x90;}
     return 0x6986;
+}
+void s3_gameplay_snowfall_hook(uint32_t pc,const uint8_t ram[65536],uint16_t *sr)
+{
+    /* Let the original BEQ fall through to ICZ1_BigSnowFall. The reused
+     * entrance needs its ordinary snow updates until the native Jump unlock;
+     * no extra continuation root, object state or guest RAM is required. */
+    if(pc==0x537B4u && sr && combined_mode && s3_gameplay.original_zone_order &&
+       ram && !word(ram,0xFFD0) && !word(ram,0xFFE8) &&
+       word(ram,0xFE10)==0x500 && word(ram,0xFF08)==3 && !ram[0xFE2A])
+        *sr&=(uint16_t)~4u;
 }
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):

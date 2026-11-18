@@ -26,6 +26,7 @@ static int s3k_instruction(uint32_t pc)
         uint32_t card=s3_gameplay_title_card(pc,g_ram,g_cpu.A[0]);
         if(card){recomp_tail_call(card);return 1;}
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
+        s3_gameplay_snowfall_hook(pc,g_ram,&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);
         s3_gameplay_hud_reset(pc,g_ram);
