@@ -111,18 +111,21 @@ static void test_original_order_knuckles(void)
     memset(ram,0,sizeof ram);ram[0xFE10]=5;ram[0xFF09]=3;
     ram[0xB010]=0x36;ram[0xB011]=0x40;ram[0xB014]=6;ram[0xB015]=0x60;
     memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!memcmp(before,ram,sizeof ram));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL)&&!memcmp(before,ram,sizeof ram));
     s3_gameplay.original_zone_order=1;
     ram[0xFE2A]=1;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));ram[0xFE2A]=0;
     memcpy(before,ram,sizeof ram);
     CHECK(s3_gameplay_zone_entry(0x53608,ram,NULL)==0x53648);
     CHECK(s3_gameplay_zone_entry(0x1BEC6,ram,NULL)==0x1BED8);
     CHECK(!memcmp(before,ram,sizeof ram));
     CHECK(s3_gameplay_zone_entry(0x690A,ram,NULL)==0x691C&&ram[0xFF09]==3);
+    CHECK(s3_gameplay_zone_entry(0x53756,ram,NULL)==0x5375C);
+    CHECK(!s3_gameplay_zone_entry(0x537B4,ram,NULL));
+    CHECK(!memcmp(before,ram,sizeof ram));
     ram[0xFF09]=2;memcpy(before,ram,sizeof ram);
-    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL));
+    CHECK(!s3_gameplay_zone_entry(0x53608,ram,NULL)&&!s3_gameplay_zone_entry(0x690A,ram,NULL)&&!s3_gameplay_zone_entry(0x53756,ram,NULL)&&!s3_gameplay_zone_entry(0x537B4,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));
     memset(ram,0,sizeof ram);ram[0xFE10]=3;ram[0xFE11]=1;ram[0xFF09]=3;
     ram[0xB010]=0x4A;ram[0xB011]=0x37;memcpy(before,ram,sizeof ram);
@@ -134,9 +137,50 @@ static void test_original_order_knuckles(void)
     ram[0xFAA8]=0;ram[0xFF09]=1;memcpy(before,ram,sizeof ram);
     CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
     ram[0xFF09]=3;
+    memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFAAA]=255;ram[0xEEC1]=4;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xEEC1]=8;ram[0xFAA8]=1;memcpy(before,ram,sizeof ram);
+    CHECK(!s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE));CHECK(!memcmp(before,ram,sizeof ram));
+    ram[0xFAA8]=0;ram[0xB010]=0x49;ram[0xB011]=0;
+    ram[0xB018]=ram[0xB01A]=ram[0xB01C]=1;
     CHECK(s3_gameplay_zone_departure(0x522A0,ram,0xFFB0DE)==0x76456);
     CHECK(ram[0xB0DE]==0&&ram[0xB0DF]==7&&ram[0xB0E0]==0x64&&ram[0xB0E1]==0x56);
     CHECK(ram[0xB10C]==0&&ram[0xB10D]==59&&ram[0xB02E]==0x81);
+    CHECK(!ram[0xB018]&&!ram[0xB01A]&&!ram[0xB01C]);
+}
+static void test_original_order_snowfall_flags(void)
+{
+    static uint8_t ram[65536],before[65536];
+    const char *modes[]={"sonic3","sonic3k","sandk"};
+    for(unsigned m=0;m<3;m++) {
+        s3_gameplay_load("unwritten-gameplay-fixture/settings.ini",modes[m]);
+        s3_gameplay.original_zone_order=1;
+        memset(ram,0,sizeof ram);ram[0xFE10]=5;ram[0xFF09]=3;
+        memcpy(before,ram,sizeof ram);
+        for(unsigned ccr=0;ccr<32;ccr++) {
+            uint16_t sr=(uint16_t)(0xA700u|ccr);
+            s3_gameplay_snowfall_hook(0x537B4,ram,&sr);
+            CHECK(sr==(uint16_t)((0xA700u|ccr)&(m==1?~4u:~0u)));
+            CHECK(!memcmp(before,ram,sizeof ram));
+        }
+        if(m!=1)continue;
+        /* Every original eligibility boundary leaves all flags and RAM alone. */
+        const unsigned fields[]={0xFFD0,0xFFD1,0xFFE8,0xFFE9,0xFE10,0xFE11,0xFF08,0xFF09,0xFE2A};
+        for(unsigned i=0;i<sizeof fields/sizeof fields[0];i++) {
+            unsigned p=fields[i];uint8_t old=ram[p];ram[p]^=1;
+            memcpy(before,ram,sizeof ram);uint16_t sr=0xA71F;
+            s3_gameplay_snowfall_hook(0x537B4,ram,&sr);
+            CHECK(sr==0xA71F&&!memcmp(before,ram,sizeof ram));ram[p]=old;
+        }
+        s3_gameplay.original_zone_order=0;uint16_t sr=0xA71F;
+        s3_gameplay_snowfall_hook(0x537B4,ram,&sr);CHECK(sr==0xA71F);
+        s3_gameplay.original_zone_order=1;
+        s3_gameplay_snowfall_hook(0x537B6,ram,&sr);CHECK(sr==0xA71F);
+        s3_gameplay_snowfall_hook(0x537B4,NULL,&sr);CHECK(sr==0xA71F);
+        s3_gameplay_snowfall_hook(0x537B4,ram,NULL);
+    }
 }
 static void test_extended_timer(void)
 {
@@ -624,7 +668,7 @@ int main(void)
         s3_gameplay_allocation_hook(variant?0x1A0E0u:0x1BB10u,ram,0xFFFFB172,&flags);CHECK(flags==0xA714);
     }
     test_competition_title_cards();
-    test_original_order();test_original_order_entry();test_original_order_ground_camera();test_original_order_knuckles();test_level_select_checkpoint();test_no_save_emeralds();
+    test_original_order();test_original_order_entry();test_original_order_ground_camera();test_original_order_knuckles();test_original_order_snowfall_flags();test_level_select_checkpoint();test_no_save_emeralds();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

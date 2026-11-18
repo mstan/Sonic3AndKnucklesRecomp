@@ -124,10 +124,11 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
        actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
     unsigned zone=word(ram,0xFE10);
     if(pc==0x522A0u && zone==0x301 && word(ram,0xFF08)==3){
-        unsigned x=word(ram,0xB010);
-        /* Use the teleporter's actual entry threshold. The native capsule,
-         * tally and camera release still happen before reaching this point. */
-        if(x<0x4A38 || ((ram[0xB02A]&2) && x<0x4A40))return 0;
+        /* The native capsule resets the end flag. Results set it again only
+         * after the tally and cards finish; the screen event then restores
+         * player control and advances to8. Depart there without requiring
+         * contact with the omitted portal at the far end of the arena. */
+        if(!ram[0xFAAA] || word(ram,0xEEC0)!=8)return 0;
         put_word(ram,0xB018,0);put_word(ram,0xB01A,0);put_word(ram,0xB01C,0);
         ram[0xB02E]=0x81;
     }else if(pc!=0x76270u || zone!=0x701)return 0;
@@ -161,6 +162,10 @@ uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y
          * plane refresh, then install the real Tails entrance controller. */
         if(pc==0x53608u)return 0x53648;
         if(pc==0x690Au)return 0x691C;
+        /* The reused intro locks input for the impact. Its native snowpile
+         * releases that lock on Jump; the portal route normally skips this
+         * object for Knuckles, so follow the full intro path here too. */
+        if(pc==0x53756u)return 0x5375C;
     }
     if(pc!=0x695Au || zone!=0x800)return 0;
     /* SpawnLevelMainSprites has initialized the actors but has not installed
@@ -169,6 +174,16 @@ uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y
     ram[0xB014]=6;ram[0xB015]=word(ram,0xFF08)==2?0x90:0x8C;
     if(word(ram,0xB04A)||word(ram,0xB04C)){ram[0xB05E]=6;ram[0xB05F]=0x90;}
     return 0x6986;
+}
+void s3_gameplay_snowfall_hook(uint32_t pc,const uint8_t ram[65536],uint16_t *sr)
+{
+    /* Let the original BEQ fall through to ICZ1_BigSnowFall. The reused
+     * entrance needs its ordinary snow updates until the native Jump unlock;
+     * no extra continuation root, object state or guest RAM is required. */
+    if(pc==0x537B4u && sr && combined_mode && s3_gameplay.original_zone_order &&
+       ram && !word(ram,0xFFD0) && !word(ram,0xFFE8) &&
+       word(ram,0xFE10)==0x500 && word(ram,0xFF08)==3 && !ram[0xFE2A])
+        *sr&=(uint16_t)~4u;
 }
 static int allocation_site(uint32_t pc)
 {return standalone_s3?(pc==0x1A0E0u || pc==0x1A0BCu):

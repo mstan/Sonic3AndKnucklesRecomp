@@ -237,6 +237,7 @@ static int gameplay_instruction(uint32_t pc)
         ((g_ram[0xF600]&0x7F)==12 && !g_ram[0xF711] &&
          sandk_read16(0xFE10)==0x700 && sandk_read16(0xFF08)==3)))
         return s3_kos_execute(pc);
+    if(s3_kos_owns(pc))return s3_kos_instruction(pc);
     if(s3_gameplay_owns(pc)) {
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);

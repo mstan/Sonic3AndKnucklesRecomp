@@ -37,6 +37,9 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
 /* Optional campaign entry; return a native continuation when replaced. */
 /* start_y is Get_LevelSizeStart D0; other entry sites may pass NULL. */
 uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y);
+/* Original ICZ snowfall BEQ: clear only CCR.Z for the optional fresh Knuckles
+ * entrance, then execute the normal native branch and snow updates. */
+void s3_gameplay_snowfall_hook(uint32_t pc,const uint8_t ram[65536],uint16_t *sr);
 /* Audited timer branch/formatter sites; only their consumed CCR bits or
  * display argument change. Native timer/result/death routines still execute. */
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t ram[65536],

@@ -59,6 +59,19 @@ int main(int argc,char **argv)
         for(unsigned i=0;i<128;i++)if(drums[i])printf(" %02X",i+128);puts("");
     }
     if(donor==S3_DONOR_S2||donor==S3_DONOR_WAI){
+        /* Native 2P Menu/Results queues are $81 (retail) and $94 (Wai),
+         * rather than the shared Continue queue $9C. Convert both graphs
+         * to ensure the results choices are usable and remain distinct. */
+        S3LegacySource results,cont;uint8_t results_bank[0x8000],drums[128]={0},map[128]={0};char error[256]={0};
+        CHECK(s3_legacy_music_source(rom,(size_t)size,donor,donor==S3_DONOR_S2?0:19,&results));
+        int results_size=s3_legacy_song(&results,results_bank,sizeof results_bank,104,map,drums,error,sizeof error);
+        CHECK(results_size>100 && results_bank[5]==0);
+        CHECK(s3_legacy_music_source(rom,(size_t)size,donor,27,&cont));
+        int continue_size=s3_legacy_song(&cont,bank,0x8000,104,map,drums,error,sizeof error);
+        CHECK(continue_size>0 && (continue_size!=results_size || memcmp(bank,results_bank,(size_t)results_size)));
+        printf("PASS native 2P Results graph distinct from Continue: donor %u bytes %d/%d\n",donor,results_size,continue_size);
+    }
+    if(donor==S3_DONOR_S2||donor==S3_DONOR_WAI){
         S3LegacySource source;uint8_t drums[128]={0},map[128]={0};char error[256]={0};
         CHECK(s3_legacy_music_source(rom,(size_t)size,donor,donor==S3_DONOR_S2?17:8,&source));
         CHECK(s3_legacy_song(&source,bank,0x8000,104,map,drums,error,sizeof error)>0);

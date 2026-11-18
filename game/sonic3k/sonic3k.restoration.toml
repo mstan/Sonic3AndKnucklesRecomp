@@ -1,4 +1,4 @@
 # Native continuations used by optional restoration hooks: title-card timer
-# initialization, Tails' ICZ entrance controller and its position/camera setup.
+# initialization, the complete ICZ entrance and its position/camera setup.
 [functions]
 extra = [0x02D756, 0x00691C, 0x01BED8]
