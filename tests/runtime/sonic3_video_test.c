@@ -2848,6 +2848,40 @@ static void test_icz_first_cave_spatial_margins(void)
         s3_video_set_world_cell(NULL);CHECK(configure("off"));
     }
 }
+
+static void test_icz_cave_preview_owns_its_palette(void)
+{
+    static GVDP v;
+    uint32_t native[320]={0},out[796];
+    uint8_t saved[34];
+    unsigned writes=S3_ART_BANK+0x3DED6u;
+    memcpy(saved,g_rom+writes,sizeof saved);
+    word(g_rom,writes,0x22FC);
+    word(g_rom,writes+2,0x00E0);
+    word(g_rom,writes+30,0x32BC);
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0xFE10,0x500);word(g_ram,0x8000,128);word(g_ram,0x8002,64);
+    word(g_ram,0x8008,0x8100);word(g_ram,0xEEC2,8);word(g_ram,0xEED2,0xFED2);
+    word(g_ram,0xEE80,0x3960);word(g_ram,0xEE84,0x68C);word(g_ram,0xEE90,0xFE);
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[17]=0x0EEE;v.cram[49]=0x000E;
+    v.vsram[0]=0x68C;v.vsram[1]=0xFE;
+    memset(v.vram+32,0x11,32);
+    for(unsigned n=0;n<4;++n){word(g_ram,0x9010+n*2,0x6001);word(g_ram,0x9018+n*2,0x6001);}
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,0x6001);
+    word(v.vram,0xF000,(unsigned)-0x3960);word(v.vram,0xF002,(unsigned)-(0x3960-0x1D40));
+    memset(&s_build,0,sizeof s_build);s_build.scene=1;s_build.camera_x=0x3960;s_build.camera_y=0x68C;publish_sprites();
+    s3_video_set_world_cell(icz_cave_bank_cell);
+    scanline(&v,0,native,320,out,796);
+    for(int x=0;x<558;++x)CHECK(out[x]==0xFFFF0000u);
+    for(int x=558;x<796;++x)CHECK(out[x]==0xFF00FF00u);
+    CHECK(v.cram[49]==0x000E);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+    memcpy(g_rom+writes,saved,sizeof saved);
+}
 /* Each edge can divide an eight-pixel source run. A per-pixel oracle
  * independently decodes the original snow/cave pixel, so shortening a run
  * must retain its nibble phase, flips, and native-center ownership. */
@@ -5435,6 +5469,7 @@ int main(int argc,char **argv)
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
     test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();test_icz_cave_partial_tile_edges();
+    test_icz_cave_preview_owns_its_palette();
     test_aiz_interpolated_background_source_rows();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
