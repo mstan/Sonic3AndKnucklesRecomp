@@ -129,7 +129,7 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
          * exit before the ACT CLEAR sprites slide away. Level starts its
          * palette fade before rebuilding the SAT for the destination. */
         if((zone!=0x701 && (zone!=0x301 || word(ram,0xFF08)!=3)) ||
-           ram[0xF600]!=0x0C || !ram[0xFAA8] || ram[o+5]!=6 ||
+           ram[0xF600]!=0x0C || word(ram,o)!=2 || word(ram,o+2)!=0xDAD0 || ram[o+5]!=6 ||
            word(ram,o+0x2E) || !word(ram,o+0x30) || word(ram,o+0x32))return 0;
         return 0x76456;
     }
