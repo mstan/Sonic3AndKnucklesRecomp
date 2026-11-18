@@ -21,16 +21,16 @@ int trilogy_instruction(uint32_t pc)
 int s3_state_menu_instruction(uint32_t pc){(void)pc;return 0;}
 int s3_kos_owns(uint32_t pc){(void)pc;return 0;}
 int s3_kos_instruction(uint32_t pc){(void)pc;return 0;}
-int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C || pc==0x695A || pc==0x690A || pc==0x53608 || pc==0x522A0 || pc==0x1BEC6 || pc==0x537B4;}
+int s3_gameplay_owns(uint32_t pc){return pc==0x2D6A6 || pc==0xDE9C || pc==0x695A || pc==0x690A || pc==0x53608 || pc==0x522A0 || pc==0x1BEC6;}
 uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t *ram,uint32_t *start_y)
-{CHECK(ram==g_ram && start_y==&g_cpu.D[0]);return !entry_active?0:pc==0x695A?0x6986:pc==0x690A?0x691C:pc==0x53608?0x53648:pc==0x1BEC6?0x1BED8:0;}
+{CHECK(ram==g_ram && start_y==&g_cpu.D[0]);return !entry_active?0:pc==0x695A?0x6986:pc==0x690A?0x691C:pc==0x53608?0x53648:pc==0x53756?0x5375C:pc==0x1BEC6?0x1BED8:0;}
 uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)ram;(void)actor;return pc==0x522A0 && departure_active?0x76456:0;}
 uint32_t s3_gameplay_title_card(uint32_t pc,uint8_t *ram,uint32_t actor)
 {(void)ram;(void)actor;return restoration && pc==0x2D6A6?0x2D756:0;}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t *ram,uint32_t p,uint16_t *sr){(void)pc;(void)ram;(void)p;(void)sr;}
 void s3_gameplay_snowfall_hook(uint32_t pc,const uint8_t *ram,uint16_t *sr)
-{CHECK(ram==g_ram&&sr==&g_cpu.SR);if(pc==0x537B4)*sr&=(uint16_t)~4u;}
+{CHECK(pc==0x537B4&&ram==g_ram&&sr==&g_cpu.SR);*sr&=(uint16_t)~4u;}
 void s3_gameplay_nemesis_pop(uint32_t pc,uint8_t *ram,uint16_t *sr){(void)pc;(void)ram;(void)sr;}
 void s3_gameplay_palette_reset(uint32_t pc,uint8_t *ram){(void)pc;(void)ram;}
 void s3_gameplay_hud_reset(uint32_t pc,uint8_t *ram)
@@ -62,6 +62,7 @@ int main(void)
     CHECK(card_tail==0x6986 && !renderer_calls && g_cpu.D[0]==0x1234);
     CHECK(s3k_instruction(0x690A)&&card_tail==0x691C&&!renderer_calls);
     CHECK(s3k_instruction(0x53608)&&card_tail==0x53648&&!renderer_calls);
+    CHECK(s3k_instruction(0x53756)&&card_tail==0x5375C&&!renderer_calls);
     CHECK(s3k_instruction(0x1BEC6)&&card_tail==0x1BED8&&!renderer_calls);
     CHECK(!s3k_instruction(0x522A0)&&!renderer_calls);
     departure_active=1;CHECK(s3k_instruction(0x522A0)&&card_tail==0x76456&&!renderer_calls);

@@ -17,6 +17,17 @@ static int s3k_instruction(uint32_t pc)
     if(s3_restoration_instruction(pc))return 0;
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
+    /* These entrance-only sites do not belong in the recurring gameplay
+     * chain used by timers, palette updates and decompression. */
+    if(pc==0x53756u){
+        uint32_t entry=s3_gameplay_zone_entry(pc,g_ram,&g_cpu.D[0]);
+        if(entry){recomp_tail_call(entry);return 1;}
+        return 0;
+    }
+    if(pc==0x537B4u){
+        s3_gameplay_snowfall_hook(pc,g_ram,&g_cpu.SR);
+        return 0;
+    }
     if(s3_gameplay_title_card_sprite(pc,g_ram,g_cpu.A[0]))return 1;
     if(s3_gameplay_owns(pc)) {
         uint32_t entry=s3_gameplay_zone_entry(pc,g_ram,&g_cpu.D[0]);
@@ -26,7 +37,6 @@ static int s3k_instruction(uint32_t pc)
         uint32_t card=s3_gameplay_title_card(pc,g_ram,g_cpu.A[0]);
         if(card){recomp_tail_call(card);return 1;}
         s3_gameplay_allocation_hook(pc,g_ram,g_cpu.A[1],&g_cpu.SR);
-        s3_gameplay_snowfall_hook(pc,g_ram,&g_cpu.SR);
         s3_gameplay_nemesis_pop(pc,g_ram,&g_cpu.SR);
         s3_gameplay_palette_reset(pc,g_ram);
         s3_gameplay_hud_reset(pc,g_ram);

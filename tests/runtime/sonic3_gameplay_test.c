@@ -121,9 +121,7 @@ static void test_original_order_knuckles(void)
     CHECK(s3_gameplay_zone_entry(0x1BEC6,ram,NULL)==0x1BED8);
     CHECK(!memcmp(before,ram,sizeof ram));
     CHECK(s3_gameplay_zone_entry(0x690A,ram,NULL)==0x691C&&ram[0xFF09]==3);
-    CHECK(s3_gameplay_owns(0x53756));
     CHECK(s3_gameplay_zone_entry(0x53756,ram,NULL)==0x5375C);
-    CHECK(s3_gameplay_owns(0x537B4));
     CHECK(!s3_gameplay_zone_entry(0x537B4,ram,NULL));
     CHECK(!memcmp(before,ram,sizeof ram));
     ram[0xFF09]=2;memcpy(before,ram,sizeof ram);

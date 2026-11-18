@@ -219,7 +219,7 @@ int s3_gameplay_owns(uint32_t pc)
 {return shield_site(pc) || timer_site(pc) || nemesis_pop_site(pc) || palette_reset_site(pc) ||
         pc==(standalone_s3?0xEC10u:0xDE9Cu) ||
         (combined_mode && (pc==0x85E3Au || pc==0xC452u || pc==0x76270u || pc==0x695Au ||
-                          pc==0x690Au || pc==0x53608u || pc==0x53756u || pc==0x537B4u || pc==0x522A0u || pc==0x1BEC6u)) ||
+                          pc==0x690Au || pc==0x53608u || pc==0x522A0u || pc==0x1BEC6u)) ||
         allocation_site(pc) || title_card_site(pc) || (standalone_s3 && (pc==0x19240u || pc==0x6AD0u));}
 void s3_gameplay_allocation_hook(uint32_t pc,const uint8_t ram[65536],
                                  uint32_t candidate,uint16_t *sr)
