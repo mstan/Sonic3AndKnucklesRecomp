@@ -28,11 +28,6 @@ static int s3k_instruction(uint32_t pc)
         s3_gameplay_snowfall_hook(pc,g_ram,&g_cpu.SR);
         return 0;
     }
-    if(pc==0x2DCD6u){
-        uint32_t departure=s3_gameplay_zone_departure(pc,g_ram,g_cpu.A[0]);
-        if(departure){recomp_tail_call(departure);return 1;}
-        return 0;
-    }
     if(s3_gameplay_title_card_sprite(pc,g_ram,g_cpu.A[0]))return 1;
     if(s3_gameplay_owns(pc)) {
         uint32_t entry=s3_gameplay_zone_entry(pc,g_ram,&g_cpu.D[0]);

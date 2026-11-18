@@ -120,34 +120,38 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
 {
     actor&=0xFFFFFFu;
     if(!combined_mode || !s3_gameplay.original_zone_order || !ram ||
+       (pc!=0x522A0u && pc!=0x76270u) ||
        word(ram,0xFFD0) || word(ram,0xFFE8) ||
        actor<0xFFB0DEu || actor>=0xFFCAE2u || (actor-0xFFB000u)%0x4Au)return 0;
     unsigned zone=word(ram,0xFE10);
-    unsigned o=actor&65535u;
-    if(pc==0x2DCD6u) {
-        /* The tally and native save have finished. Begin the existing timed
-         * exit before the ACT CLEAR sprites slide away. Level starts its
-         * palette fade before rebuilding the SAT for the destination. */
-        if((zone!=0x701 && (zone!=0x301 || word(ram,0xFF08)!=3)) ||
-           ram[0xF600]!=0x0C || word(ram,o)!=2 || word(ram,o+2)!=0xDAD0 || ram[o+5]!=6 ||
-           word(ram,o+0x2E) || !word(ram,o+0x30) || word(ram,o+0x32))return 0;
-        return 0x76456;
+    int carnival=pc==0x522A0u;
+    if(carnival ? zone!=0x301 || word(ram,0xFF08)!=3 : zone!=0x701)return 0;
+
+    unsigned delay=59;
+    if(ram[0xF600]==0x0C && (carnival ? word(ram,0xEEC0)==4 : ram[0xFAA8])) {
+        /* The exit actor is already waiting during the results. Once the
+         * native tally and save finish, keep its completed SAT for the fade. */
+        for(unsigned result=0xB0DE;result<0xCAE2;result+=0x4A) {
+            if(word(ram,result)!=2 || word(ram,result+2)!=0xDAD0 || ram[result+5]!=6 ||
+               word(ram,result+0x2E) || !word(ram,result+0x30) || word(ram,result+0x32))continue;
+            delay=0;
+            break;
+        }
     }
-    if(ram[0xFAA8])return 0;
-    if(pc==0x522A0u && zone==0x301 && word(ram,0xFF08)==3){
-        /* The native capsule resets the end flag. Results set it again only
-         * after the tally and cards finish; the screen event then restores
-         * player control and advances to8. Depart there without requiring
-         * contact with the omitted portal at the far end of the arena. */
-        if(!ram[0xFAAA] || word(ram,0xEEC0)!=8)return 0;
+    if(delay && ram[0xFAA8])return 0;
+    if(carnival) {
+        /* If the results already cleared, the screen event must finish
+         * restoring player control before using the delayed exit. */
+        if(delay && (!ram[0xFAAA] || word(ram,0xEEC0)!=8))return 0;
         put_word(ram,0xB018,0);put_word(ram,0xB01A,0);put_word(ram,0xB01C,0);
         ram[0xB02E]=0x81;
-    }else if(pc!=0x76270u || zone!=0x701)return 0;
+    }
     /* Retain the capsule/results prerequisites and the native timed exit.
      * Mushroom Hill omits airship boarding; Carnival Night omits its portal.
      * StartNewLevel still supplies the normal fade and next-stage setup. */
+    unsigned o=actor&65535u;
     ram[o]=0;ram[o+1]=7;ram[o+2]=0x64;ram[o+3]=0x56;
-    ram[o+0x2E]=0;ram[o+0x2F]=59;
+    put_word(ram,o+0x2E,(uint16_t)delay);
     return 0x76456;
 }
 uint32_t s3_gameplay_zone_entry(uint32_t pc,uint8_t ram[65536],uint32_t *start_y)

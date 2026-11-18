@@ -1182,9 +1182,6 @@ kind = "game_hook"
 addr = 0x76270
 kind = "game_hook"
 [[widescreen_site]]
-addr = 0x2DCD6
-kind = "game_hook"
-[[widescreen_site]]
 addr = 0x695A
 kind = "game_hook"
 [[widescreen_site]]
