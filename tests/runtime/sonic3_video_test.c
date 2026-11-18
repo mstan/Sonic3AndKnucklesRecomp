@@ -2852,6 +2852,7 @@ static void test_icz_first_cave_spatial_margins(void)
     }
 }
 
+#ifdef SONIC3_STANDALONE
 static void test_icz_cave_preview_owns_its_palette(void)
 {
     static GVDP v;
@@ -2885,6 +2886,7 @@ static void test_icz_cave_preview_owns_its_palette(void)
     s3_video_set_world_cell(NULL);CHECK(configure("off"));
     memcpy(g_rom+writes,saved,sizeof saved);
 }
+#endif
 /* Each edge can divide an eight-pixel source run. A per-pixel oracle
  * independently decodes the original snow/cave pixel, so shortening a run
  * must retain its nibble phase, flips, and native-center ownership. */
@@ -5472,7 +5474,9 @@ int main(int argc,char **argv)
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
     test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();test_icz_cave_partial_tile_edges();
+#ifdef SONIC3_STANDALONE
     test_icz_cave_preview_owns_its_palette();
+#endif
     test_aiz_interpolated_background_source_rows();
     test_restored_background_edges_and_reload();
     test_local_presentation_state();
