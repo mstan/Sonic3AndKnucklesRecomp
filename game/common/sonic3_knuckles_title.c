@@ -88,7 +88,11 @@ int s3_title_hook(uint32_t pc, int enabled)
                 g_ram[(g_cpu.A[1] + i) & 0xFFFF] = 0;
             return 1;
         }
-        if (pc == ARMY_PC_DRAW && s3k_title()) {
+        /* The first sprite pass reaches Sonic's animated pieces before
+         * Obj_TitleANDKnuckles has initialized its mapping. Suppress those
+         * pieces from the first frame of the replacement title. */
+        if (pc == ARMY_PC_DRAW &&
+            (s3k_title() || rd32(S3K_AND_KNUCKLES) == ARMY_OBJ_AND_KNUCKLES)) {
             unsigned o = g_cpu.A[0] & 0xFFFF;
             if (o == S3K_BANNER || o == S3K_FINGER || o == S3K_WINK) return 1;
         }

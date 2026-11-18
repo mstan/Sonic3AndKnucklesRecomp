@@ -24,6 +24,7 @@
 #define ARMY_PC_SK_TITLE_FRAMES  0x0051A4u /* lea (ArtKos_SKTitle_SonKnuxHand).l,a1 */
 #define ARMY_MAP_SK_BANNER       0x0CB994u /* Map_SKTitle_Banner */
 #define ARMY_MAP_AND_KNUCKLES    0x0049AEu /* Map_TitleANDKnuckles */
+#define ARMY_OBJ_AND_KNUCKLES    0x00496Au /* Obj_TitleANDKnuckles */
 #define ARMY_PAL_KNUCKLES        0x0A8AFCu /* Pal_Knuckles */
 #define ARMY_PC_TITLE_LOAD       0x00440Cu /* TitleSonic_LoadFrame */
 #define ARMY_PC_TITLE_ITERATE    0x0043D4u /* Iterate_TitleSonicFrame */
