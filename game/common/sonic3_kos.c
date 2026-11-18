@@ -70,26 +70,10 @@ static int head_base_pending(void)
 #endif
     return 0;
 }
-static void retire_no_work_instruction(unsigned cycles)
-{
-    ++g_native_insn_count;
-    g_cycle_accumulator+=cycles;
-    g_audio_cycle_counter+=cycles;
-    if(g_cycle_accumulator>=g_vblank_threshold)glue_check_vblank();
-    GEN_COSIM_TICK(cycles);
-}
 int s3_kos_instruction(uint32_t pc)
 {
-    if(pc==KOS_ENTRY && head_base_pending()) {
-        /* Defer like the native no-work TST/BEQ path, without changing either
-         * queue. Retire each instruction at its original interrupt boundary;
-         * the existing compiled RTS owns its cycles and split-stack handling. */
-        g_cpu.SR=(uint16_t)((g_cpu.SR&~0x0Fu)|0x04u);
-        retire_no_work_instruction(12);
-        retire_no_work_instruction(10);
-        recomp_tail_call(0x001CFAu);
-        return 1;
-    }
+    /* Returning here leaves both native queues intact for the next frame. */
+    if(pc==KOS_ENTRY && head_base_pending())return 1;
     /* Limit the correction to the assessed AIZ gameplay host. Native boot,
      * other stages and empty queues keep their existing execution path. */
     if(pc!=KOS_ENTRY || g_ram[0xF600]!=12 || !g_ram[0xF711] ||
