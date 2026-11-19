@@ -2542,9 +2542,8 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
     row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
         (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
 }
-/* ICZ1_IntroDeform's native fixed-point bands include an accelerating
- * wind phase. Re-evaluate that same phase at the physical eye instead of
- * replacing it with a rounded camera ratio or another mutable accumulator. */
+/* Re-evaluate the native intro bands at the physical eye. The lock-on
+ * version adds wind acceleration to the original fixed-point slopes. */
 static int icz_intro_scroll(int camera,int by)
 {
     static const unsigned ends[]={0x44,0x50,0x5B,0x68,0x80,0xD0,0xD2,
@@ -2552,11 +2551,18 @@ static int icz_intro_scroll(int camera,int by)
     unsigned band=0;
     while(band<13 && by>=(int)ends[band])++band;
     int shake=(int16_t)(((unsigned)s_world_frame[0xEECE]<<8)|s_world_frame[0xEECF]);
+    int64_t d1=(int64_t)(camera-shake)*2048,d0=d1+(int64_t)shake*65536;
+#ifdef SONIC3_STANDALONE
+    /* Standalone sub_3DDF6 advances only the camera slope, without the
+     * accumulator or the per-band wind acceleration. */
+    if(band<5)d0+=band*d1;
+    else d0+=6*d1+(band-5)*(d1+d1/2);
+#else
     uint32_t stored=(uint32_t)s_world_frame[0xA81C]<<24|
         (uint32_t)s_world_frame[0xA81D]<<16|
         (uint32_t)s_world_frame[0xA81E]<<8|s_world_frame[0xA81F];
     int64_t wind=(int32_t)(stored-0x800u);
-    int64_t d1=(int64_t)(camera-shake)*2048,d0=d1+(int64_t)shake*65536,d3=0;
+    int64_t d3=0;
     for(unsigned i=0;i<5;++i) {
         if(i==band)goto result;
         d0+=d1;d1+=d3;d3+=0x800;
@@ -2564,6 +2570,7 @@ static int icz_intro_scroll(int camera,int by)
     d0+=d1;d1+=d1>=0?d1/2:-((-d1+1)/2);d3=wind;
     for(unsigned i=5;i<band;++i){d0+=d1;d1+=d3;d3+=0x800;}
 result:
+#endif
     return (int)(d0>=0?d0/65536:-((-d0+65535)/65536));
 }
 /* Native deformation follows its 320px camera. At a bounded expanded
