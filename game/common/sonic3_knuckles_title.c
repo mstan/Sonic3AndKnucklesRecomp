@@ -52,8 +52,6 @@ static int s3k_title(void)
 {
     return g_ram[GAME_MODE] == TITLE_MODE && rd32(S3K_AND_KNUCKLES + 0xC) == ARMY_MAP_AND_KNUCKLES;
 }
-int s3_title_active(void) { return sk_title() || s3k_title(); }
-
 /* Face-to-face: the Knuckles columns (20-39) mirrored onto Sonic's (0-19). */
 static void mirror_pose_frames(void)
 {
@@ -114,6 +112,8 @@ typedef struct {
 static TitleFrame building, shown;
 static unsigned tick;
 
+int s3_title_published(void) { return shown.active; }
+
 static void add_pieces(uint32_t map, unsigned frame, unsigned art, int x, int y,
                        unsigned first, unsigned count, int dx, int dy)
 {
@@ -133,7 +133,7 @@ static unsigned rgb_distance(uint16_t a, uint16_t b)
 int s3_title_vblank(const GVDP *v, int enabled)
 {
     memset(&building, 0, sizeof building);
-    if (!enabled || !v || !s3_title_active()) {
+    if (!enabled || !v || (!sk_title() && !s3k_title())) {
         /* The destination mode starts its fade with the title's SAT and
          * patterns still loaded. Keep the same composition and palette
          * indices until the guest finishes that fade and clears the slots. */

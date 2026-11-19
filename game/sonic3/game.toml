@@ -237,6 +237,10 @@ addr = 0x19DD0 # Opt-in object streaming
 kind = "game_hook"
 
 [[widescreen_site]]
+addr = 0x1E490 # Keep collapsed IceCap platforms retired across the wide loading interval
+kind = "game_hook"
+
+[[widescreen_site]]
 addr = 0x1938E # Capture queued object mappings
 kind = "game_hook"
 
