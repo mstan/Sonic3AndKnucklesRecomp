@@ -970,7 +970,7 @@ void s3_army_draw_wide(const GVDP *v, int line, uint32_t *out, int width, int or
                        const uint32_t *palette, uint8_t *priority, int camera_x, int camera_y)
 {
     (void)v;
-    int title = s3_title_active();
+    int title = s3_title_published();
     if (!shown.count && !title) return;
     enum { MAXW = 4096 };
     static uint8_t index[MAXW], opaque[MAXW], high[MAXW], before[MAXW];

@@ -2642,20 +2642,22 @@ static void test_bounded_parallax_projection(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],reference[796],narrow[320];
     static uint8_t before[65536];
-    const unsigned zones[]={0x300,0x701};
+    const unsigned zones[]={0x300,0x301,0x701};
     for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
-    for(unsigned z=0;z<2;++z) {
+    for(unsigned z=0;z<sizeof zones/sizeof zones[0];++z) {
+        int forest=zones[z]==0x701,right=zones[z]==0x301;
 #ifdef SONIC3_STANDALONE
-        if(z)continue;
+        if(forest)continue;
 #endif
-        for(unsigned band=0;band<(z?1u:5u);++band) {
+        for(unsigned band=0;band<(forest?1u:5u);++band) {
             static const int ys[]={0,0x80,0xB0,0x110,0x1D0};
             static const int speeds[]={1,4,8,14,16};
-            int y=z?0:ys[band],speed=z?12:speeds[band];
+            int y=forest?0:ys[band],speed=forest?12:speeds[band];
             CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
             memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
             write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
-            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,right?152:64);word(g_ram,0x8008,0x8100);
+            if(right)word(g_ram,0xEEC2,8);
             word(g_ram,0xEE90,y);v.vsram[1]=(uint16_t)y;
             v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
             v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
@@ -2665,13 +2667,15 @@ static void test_bounded_parallax_projection(void)
             s3_video_set_world_cell(edge_parallax_cell);
             for(unsigned c=0;c<4;++c) {
                 static const int cameras[]={0,145,223,238};
-                int camera=z?(c?cameras[c]:152):cameras[c],lag=c&1?4:0;
+                int camera=right?0x49D2+cameras[c]/2:
+                    forest?(c?cameras[c]:152):cameras[c];
+                int lag=c&1?4:0;
                 word(g_ram,0xEE80,camera+lag);
                 /* Native scroll/SAT can precede the next RAM camera copy,
                  * and Events_fg_1 need not match that newer copy either. */
-                word(g_ram,0xEEB6,camera+lag-(z && c==2?5:0));
+                word(g_ram,0xEEB6,camera+lag-(forest && c==2?5:0));
                 word(v.vram,0xF000,(unsigned)-camera);
-                word(v.vram,0xF002,(unsigned)-(camera*speed/32+(z && c==1?1:0)));
+                word(v.vram,0xF002,(unsigned)-(camera*speed/32+(forest && c==1?1:0)));
                 memset(&s_build,0,sizeof s_build);s_build.scene=1;
                 s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
                 g_ram[0xF62A]=1;s3_video_vblank();g_ram[0xF62A]=0;
@@ -2981,9 +2985,18 @@ static void test_desert_snow_bounded_view(void)
 {
     static GVDP v;static uint8_t before[65536];
     uint32_t native[320],out[796],narrow[320];
-    /* ICZ native source rows retained at wind $20000. The final row is the
-     * physical eye at the left clamp, not another native-camera sample. */
+    /* ICZ source rows. The final row places the physical eye at the left
+     * clamp. Only the combined game advances the wind accumulator. */
     static const int cameras[]={0,84,141,182,238};
+#ifdef SONIC3_STANDALONE
+    static const int snow[5][14]={
+        {0,0,0,0,0,0,0,0,0,0,0,0,0,0},
+        {2,5,7,10,13,18,22,26,30,34,38,42,45,49},
+        {4,8,13,17,22,30,37,44,50,57,63,70,77,83},
+        {5,11,17,22,28,39,48,56,65,73,82,91,99,108},
+        {7,14,22,29,37,52,63,74,85,96,107,119,130,141}
+    };
+#else
     static const int snow[5][14]={
         {0,0,0,0,0,0,1,3,8,14,23,34,47,62},
         {2,5,7,10,13,19,23,29,38,48,61,76,92,112},
@@ -2991,6 +3004,7 @@ static void test_desert_snow_bounded_view(void)
         {5,11,17,22,28,40,49,60,73,88,105,125,146,170},
         {7,14,22,29,37,52,64,77,93,111,131,153,177,203}
     };
+#endif
     static const int ys[]={0,0x44,0x50,0x5B,0x68,0x80,0xD0,0xD2,
         0xD8,0xE0,0xF0,0x108,0x128,0x150};
     for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
@@ -3041,9 +3055,15 @@ static void test_desert_snow_bounded_view(void)
     }
     /* Authored wind is independent of the camera; it must keep moving. */
     memset(s_world_frame,0,sizeof s_world_frame);longword(s_world_frame,0xA81C,0x800);
+#ifdef SONIC3_STANDALONE
+    CHECK(icz_intro_scroll(238,0x150)==141);
+    longword(s_world_frame,0xA81C,0x40800);
+    CHECK(icz_intro_scroll(238,0x150)==141);
+#else
     CHECK(icz_intro_scroll(238,0x150)==147);
     longword(s_world_frame,0xA81C,0x40800);
     CHECK(icz_intro_scroll(238,0x150)==259);
+#endif
 }
 static void test_fbz_bounded_camera_and_wind(void)
 {
@@ -5056,7 +5076,7 @@ int main(int argc,char **argv)
     /* Cross a real activation cell, then replay it with restored WRAM and
      * placement-table identity. No future host residency latch may hide it. */
     static uint8_t loader_ram[65536],loaded_ram[65536];
-    static uint8_t loader_blob[sizeof s_placements+3*sizeof(unsigned)];
+    static uint8_t loader_blob[sizeof s_placements+sizeof s_collapsed_platforms+4*sizeof(unsigned)];
     memcpy(loader_ram,g_ram,sizeof loader_ram);
     S3StateIO loader_io={loader_blob,sizeof loader_blob,0,0,1};
     s3_video_rb_state(&loader_io);CHECK(loader_io.ok);
@@ -5226,9 +5246,9 @@ int main(int argc,char **argv)
         word(g_ram,0xEEC2,canvases[c][2]);
         scanline(&v,0,native,320,out,796);
         for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
-        /* At SOZ's clamped edge B deliberately keeps its centered native
-         * parallax; a column under A's displaced viewport is not its oracle. */
-        if(c<2)CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
+        /* At the bounded desert and city edges B keeps its centered
+         * parallax. Check that the diagnostic skips displaced columns. */
+        if(c<3)CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
         else CHECK(s_bg_checks>0 && s_bg_errors==0);
     }
     /* LBZ1 draws its lower band from X=0 (HScroll_table+$004), while the

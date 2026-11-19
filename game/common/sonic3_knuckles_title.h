@@ -3,12 +3,13 @@
 #include <stdint.h>
 #include "video/genesis_vdp.h"
 
-int  s3_title_active(void);
 void s3_title_init(void);
 /* Instruction hook share: returns 1 to replace the routine at pc. */
 int  s3_title_hook(uint32_t pc, int enabled);
 /* Latch this frame's title composition before the SAT upload and report whether to draw it. */
 int s3_title_vblank(const GVDP *v, int enabled);
+/* The same published title frame owns the native center and wide margins. */
+int s3_title_published(void);
 /* Host sprite layer: draw the latched composition. */
 void s3_title_draw(const GVDP *v, const GVDPSpriteLayer *layer, const void *knuckles_art);
 /* Extend the same parade into the custom canvas; caller masks the center. */

@@ -23,6 +23,7 @@
 enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x5E198,
        S3_HUD_MAP=0xE932, S3_RING_MAP=0xF87E,
        S3_LOAD_INIT=0x19CF2, S3_LOAD_UPDATE=0x19DD0,
+       S3_PLATFORM_COLLAPSED=0x1E490,
        S3_CAPTURE=0x1938E, S3_PUBLISH=0x194B8, S3_COMP_PUBLISH=0x19A4C,
        S3_TITLE_PLANE_MAP=0x4620, S3_FILE_SELECT_MAP=0xBD68,
        S3_TITLE_CARD_MAP=0x2D90C, S3_HCZ_SURFACE_MAP=0x1CF2E, S3_HCZ_RUSH_MAP=0x2E60C,
@@ -44,6 +45,7 @@ enum { S3_COMPETITION=0xFFD8, S3_DEMO=0xFFF0, S3_PLACEMENTS=0x5E0D8, S3_RINGS=0x
 enum { S3_COMPETITION=0xFFE8, S3_DEMO=0xFFD0, S3_PLACEMENTS=0x1E3D98, S3_RINGS=0x1E3E58,
        S3_HUD_MAP=0xDBB6, S3_RING_MAP=0xEBEE,
        S3_LOAD_INIT=0x1B690, S3_LOAD_UPDATE=0x1B7F2,
+       S3_PLATFORM_COLLAPSED=0x20CAA,
        S3_CAPTURE=0x1AD20, S3_PUBLISH=0x1AE56, S3_COMP_PUBLISH=0x1B3EA,
        S3_TITLE_PLANE_MAP=0x4FE8, S3_FILE_SELECT_MAP=0xCE0E,
        S3_TITLE_CARD_MAP=0x2EE10, S3_HCZ_SURFACE_MAP=0x1F2CE, S3_HCZ_RUSH_MAP=0x22E60C,
@@ -857,6 +859,8 @@ typedef struct { unsigned address; uint16_t x, y; uint8_t id, subtype; uint16_t 
 static Placement s_placements[SCENE_PLACEMENTS];
 static unsigned s_placement_count, s_placement_base;
 static int s_loader_active;
+static uint16_t s_collapsed_platforms[SCENE_PLACEMENTS];
+static unsigned s_collapsed_count;
 
 static uint8_t scene_read8(unsigned a)
 {
@@ -1111,6 +1115,8 @@ static void load_placements(void)
     unsigned base=scene_read32(S3_PLACEMENTS+index);
     if(base==s_placement_base && s_placement_count)return;
     s_placement_base=base;s_placement_count=0;
+    if(s_collapsed_count)memset(s_collapsed_platforms,0,sizeof s_collapsed_platforms);
+    s_collapsed_count=0;
     if(base>=0x400000u)return;
     for(unsigned p=base;p+6<=0x400000u && s_placement_count<768;p+=6) {
         unsigned x=scene_read16(p);if(x==65535u)break;
@@ -1128,11 +1134,39 @@ static unsigned placement_code(const Placement *p)
     return scene_read32(scene_read32(0xFFEF5Au)+p->id*4u);
 #endif
 }
+static void hold_collapsed_platform(void)
+{
+    if(ram16(0xFE10)!=0x500 || !expanded_world() || !gameplay() || native_demo())return;
+    unsigned state=ram16(g_cpu.A[0]+0x48);
+    if(state<0xEB00u || state>=0xEB00u+s_placement_count ||
+       s_collapsed_count>=SCENE_PLACEMENTS)return;
+    unsigned placement=state-0xEB00u;
+    if(s_placements[placement].x!=ram16(g_cpu.A[0]+0x10))return;
+
+    /* The native collapse just cleared the loaded bit. Its cursor stays
+     * past the platform, but the wide loader can still reach it. Keep the
+     * bit set until the platform leaves the expanded loading interval. */
+    s_collapsed_platforms[s_collapsed_count++]=(uint16_t)placement;
+    write8(state,g_ram[state]|128);
+}
+
 static void spawn_scene(void)
 {
     load_placements();s_loader_active=1;
     int camera=ram16(0xEE78),cy=ram16(0xEE7C),w=enabled()?s_requested_width:320;
     int lo,hi;activation_bounds(camera,w,&lo,&hi);
+    for(unsigned i=0;i<s_collapsed_count;) {
+        unsigned placement=s_collapsed_platforms[i];
+        unsigned x=s_placements[placement].x;
+        if(expanded_world() && (int)x>=lo && (int)x<hi) {
+            ++i;
+        } else {
+            unsigned state=0xEB00u+placement;
+            write8(state,g_ram[state]&127);
+            s_collapsed_platforms[i]=s_collapsed_platforms[--s_collapsed_count];
+            s_collapsed_platforms[s_collapsed_count]=0;
+        }
+    }
     int player=ram16(0xB010);s_pool_pressure=0;
     int ylo=(cy&~127)-128,yhi=(cy&~127)+512;
     for(unsigned pass=0;pass<s_placement_count;++pass) {
@@ -1733,6 +1767,12 @@ int s3_video_hook(uint32_t pc)
     }
     if(pc==S3_LOAD_INIT && !g_ram[0xF76C]) {
         s_placement_base=s_placement_count=0;s_loader_active=0;
+        if(s_collapsed_count)memset(s_collapsed_platforms,0,sizeof s_collapsed_platforms);
+        s_collapsed_count=0;
+    }
+    if(pc==S3_PLATFORM_COLLAPSED) {
+        hold_collapsed_platform();
+        return 0;
     }
     /* Earlier activation changes age-based platform phases and the recorded
      * demo's collisions. Keep native loading/rings/culling while continuing
@@ -2331,13 +2371,12 @@ static uint16_t restored_art_color(unsigned color,const GVDP *v)
     return (uint16_t)faded;
 }
 
-#ifdef SONIC3_STANDALONE
-/* Standalone IceCap exposes the incoming cave while its live plane still
+/* IceCap exposes the incoming cave while its live plane still
  * uses the outdoor palette. Read the eleven replacement colors from the
- * original ICZ1_SetIndoorPal writes. */
+ * original ICZ1_SetIndoorPal writes in the Sonic 3 bank. */
 static int icz_cave_preview_palette(const GVDP *v,const uint32_t *live,uint32_t *preview)
 {
-    unsigned writes=0x3DED6u;
+    unsigned writes=S3_ART_BANK+0x3DED6u;
     if(scene_read16(writes)!=0x22FC || scene_read16(writes+30)!=0x32BC)return 0;
     memcpy(preview,live,64*sizeof *preview);
     for(unsigned i=0;i<11;++i) {
@@ -2347,7 +2386,6 @@ static int icz_cave_preview_palette(const GVDP *v,const uint32_t *live,uint32_t 
     }
     return 1;
 }
-#endif
 static int aiz_tree_color(int wx,int wy,int nx,int nw,uint8_t pixel)
 {
     /* Native AIZ1_Resize changes this entry from $0004 to sky $0C02 at
@@ -2504,9 +2542,8 @@ static void hcz2_panorama_art(unsigned attr,int y,GenesisTileRow *row)
     row->bits=(uint32_t)scene_read8(at)<<24|(uint32_t)scene_read8(at+1)<<16|
         (uint32_t)scene_read8(at+2)<<8|scene_read8(at+3);
 }
-/* ICZ1_IntroDeform's native fixed-point bands include an accelerating
- * wind phase. Re-evaluate that same phase at the physical eye instead of
- * replacing it with a rounded camera ratio or another mutable accumulator. */
+/* Re-evaluate the native intro bands at the physical eye. The lock-on
+ * version adds wind acceleration to the original fixed-point slopes. */
 static int icz_intro_scroll(int camera,int by)
 {
     static const unsigned ends[]={0x44,0x50,0x5B,0x68,0x80,0xD0,0xD2,
@@ -2514,11 +2551,18 @@ static int icz_intro_scroll(int camera,int by)
     unsigned band=0;
     while(band<13 && by>=(int)ends[band])++band;
     int shake=(int16_t)(((unsigned)s_world_frame[0xEECE]<<8)|s_world_frame[0xEECF]);
+    int64_t d1=(int64_t)(camera-shake)*2048,d0=d1+(int64_t)shake*65536;
+#ifdef SONIC3_STANDALONE
+    /* Standalone sub_3DDF6 advances only the camera slope, without the
+     * accumulator or the per-band wind acceleration. */
+    if(band<5)d0+=band*d1;
+    else d0+=6*d1+(band-5)*(d1+d1/2);
+#else
     uint32_t stored=(uint32_t)s_world_frame[0xA81C]<<24|
         (uint32_t)s_world_frame[0xA81D]<<16|
         (uint32_t)s_world_frame[0xA81E]<<8|s_world_frame[0xA81F];
     int64_t wind=(int32_t)(stored-0x800u);
-    int64_t d1=(int64_t)(camera-shake)*2048,d0=d1+(int64_t)shake*65536,d3=0;
+    int64_t d3=0;
     for(unsigned i=0;i<5;++i) {
         if(i==band)goto result;
         d0+=d1;d1+=d3;d3+=0x800;
@@ -2526,7 +2570,13 @@ static int icz_intro_scroll(int camera,int by)
     d0+=d1;d1+=d1>=0?d1/2:-((-d1+1)/2);d3=wind;
     for(unsigned i=5;i<band;++i){d0+=d1;d1+=d3;d3+=0x800;}
 result:
+#endif
     return (int)(d0>=0?d0/65536:-((-d0+65535)/65536));
+}
+static int cnz_parallax_active(void)
+{
+    /* Both acts use CNZ1_Deform after their normal backdrop is installed. */
+    return s_frame_zone==3 && s_frame_bg_event==(s_frame_act?8:0);
 }
 /* Native deformation follows its 320px camera. At a bounded expanded
  * edge that camera can move inside a stationary physical view. Reproject
@@ -2547,7 +2597,7 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
     } else
 #endif
     {
-        if(s_frame_bg_event)return scroll;
+        if(s_frame_bg_event && !cnz_parallax_active())return scroll;
         if(s_frame_zone==5 && !s_frame_act) {
             before=icz_intro_scroll(camera,by);
             after=icz_intro_scroll(camera+delta,by);
@@ -2559,7 +2609,7 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
             numerator=by<0x110?4:by<0x138?5+(by-0x110)/8:10;
             divisor=64;phase=s_camera;
         }
-        else if(s_frame_zone==3 && !s_frame_act) {
+        else if(cnz_parallax_active()) {
             numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
         }
 #ifndef SONIC3_STANDALONE
@@ -2981,7 +3031,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int mgz2_panorama=level && s_frame_zone==2 && s_frame_act==1 &&
         (mgz2_bank==0 || mgz2_bank==12);
     int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
-    int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
+    int cnz_background=level && cnz_parallax_active();
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
     int icz_intro_background=level && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event;
@@ -3121,10 +3171,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * view. Choose their source in the existing eight-pixel decode below. */
     int icz_first_cave=bg_world && width>nw && s_frame_zone==5 && !s_frame_act &&
         s_frame_bg_event>=4 && s_frame_bg_event<=16 && camera>=0x3700 && camera-origin<0x3940;
-#ifdef SONIC3_STANDALONE
     uint32_t icz_cave_palette[64];
     int icz_cave_preview=icz_first_cave && icz_cave_preview_palette(v,palette,icz_cave_palette);
-#endif
     int icz_margin_world=bg_world && s_frame_zone==5 && !s_frame_act && s_frame_bg_event==12;
     if(bg_world && s_frame_zone==5 && !s_frame_act &&
        s_frame_bg_event==8) {
@@ -3324,10 +3372,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         aiz_join_near(s_display->aiz_join,s_camera);
     int retired_tree_pixels=level && aiz_retired_tree_near();
     PlaneColorRow plane_colors;plane_color_row_init(&plane_colors);
-#ifdef SONIC3_STANDALONE
     const uint32_t *background_palette=handoff_loading?s_handoff_art.colors[line]:palette;
     const uint32_t *background_run_palette=background_palette;
-#endif
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -3373,10 +3419,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(icz_first_cave) {
                 /* A source change can cut a tile run short. remaining is
                  * independent of its decoded bit shift and traversal step. */
-#ifdef SONIC3_STANDALONE
                 background_run_palette=icz_cave_preview && nx>=nw && wx>=0x3940?
                     icz_cave_palette:background_palette;
-#endif
                 if(nx<0 && bg.remaining>-nx)bg.remaining=-nx;
                 else if(nx>=0 && nx<nw && bg.remaining>nw-nx)bg.remaining=nw-nx;
                 if(wx<0x3940 && bg.remaining>0x3940-wx)bg.remaining=0x3940-wx;
@@ -3404,11 +3448,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* Primary foreground colors remain native; only the retired
          * secondary background palette needs to outlive its bank. */
         const uint32_t *apalette=palette;
-#ifdef SONIC3_STANDALONE
         const uint32_t *bpalette=background_run_palette;
-#else
-        const uint32_t *bpalette=handoff_loading?s_handoff_art.colors[line]:palette;
-#endif
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
@@ -3777,6 +3817,19 @@ static void scene_frame_state(S3StateIO *io, SceneFrame *frame)
 }
 /* Preserve the selected placement table through rollback: a snapshot can
  * precede a zone's cache replacement. Residency itself belongs to WRAM. */
+static void collapsed_platform_state(S3StateIO *io,unsigned placements)
+{
+    unsigned count=s3_state_peek_unsigned(io,s_collapsed_count);
+    if(count>placements || count>SCENE_PLACEMENTS)io->ok=0;
+    S3_STATE(io,s_collapsed_count);
+    if(io->mode && io->ok)for(unsigned i=0;i<count;++i) {
+        uint16_t index;
+        s3_state_peek(io,i*sizeof index,&index,sizeof index);
+        if(index>=placements)io->ok=0;
+    }
+    S3_STATE(io,s_collapsed_platforms);
+}
+
 void s3_video_rb_state(S3StateIO *io)
 {
     unsigned count=s3_state_peek_unsigned(io,s_placement_count);
@@ -3788,6 +3841,7 @@ void s3_video_rb_state(S3StateIO *io)
     if(s3_state_peek_unsigned(io,(unsigned)s_loader_active)>1)io->ok=0;
     S3_STATE(io,s_loader_active);
     S3_STATE(io,s_placements);
+    collapsed_platform_state(io,count);
 }
 void s3_video_state(S3StateIO *io)
 {
@@ -3816,8 +3870,10 @@ void s3_video_state(S3StateIO *io)
     S3_STATE(io, s_tick_samples); S3_STATE(io, s_tick_updates);
     S3_STATE(io, s_tick_lag); S3_STATE(io, s_tick_multi); S3_STATE(io, s_publication_lag);
     S3_STATE(io, s_placements);
-    if (s3_state_peek_unsigned(io, s_placement_count) > SCENE_PLACEMENTS) io->ok = 0;
+    unsigned placements=s3_state_peek_unsigned(io,s_placement_count);
+    if(placements>SCENE_PLACEMENTS)io->ok=0;
     S3_STATE(io, s_placement_count); S3_STATE(io, s_placement_base);
+    collapsed_platform_state(io,placements);
     S3_STATE(io, s_loader_active); S3_STATE(io, s_visible_objects);
     if (s3_state_peek_unsigned(io, s_visible_count) > 144) io->ok = 0;
     S3_STATE(io, s_visible_count); S3_STATE(io, s_background_frame);
