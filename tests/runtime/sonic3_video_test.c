@@ -5246,9 +5246,9 @@ int main(int argc,char **argv)
         word(g_ram,0xEEC2,canvases[c][2]);
         scanline(&v,0,native,320,out,796);
         for(unsigned x=0;x<796;++x)CHECK(out[x]==0xFFFF0000);
-        /* At SOZ's clamped edge B deliberately keeps its centered native
-         * parallax; a column under A's displaced viewport is not its oracle. */
-        if(c<2)CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
+        /* At the bounded desert and city edges B keeps its centered
+         * parallax. Check that the diagnostic skips displaced columns. */
+        if(c<3)CHECK(s_bg_unstreamed>0 && s_bg_errors==0);
         else CHECK(s_bg_checks>0 && s_bg_errors==0);
     }
     /* LBZ1 draws its lower band from X=0 (HScroll_table+$004), while the
