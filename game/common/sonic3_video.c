@@ -2573,6 +2573,11 @@ result:
 #endif
     return (int)(d0>=0?d0/65536:-((-d0+65535)/65536));
 }
+static int cnz_parallax_active(void)
+{
+    /* Both acts use CNZ1_Deform after their normal backdrop is installed. */
+    return s_frame_zone==3 && s_frame_bg_event==(s_frame_act?8:0);
+}
 /* Native deformation follows its 320px camera. At a bounded expanded
  * edge that camera can move inside a stationary physical view. Reproject
  * only the ordinary city/forest/factory, desert and snow bands from the same published phase;
@@ -2592,7 +2597,7 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
     } else
 #endif
     {
-        if(s_frame_bg_event)return scroll;
+        if(s_frame_bg_event && !cnz_parallax_active())return scroll;
         if(s_frame_zone==5 && !s_frame_act) {
             before=icz_intro_scroll(camera,by);
             after=icz_intro_scroll(camera+delta,by);
@@ -2604,7 +2609,7 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
             numerator=by<0x110?4:by<0x138?5+(by-0x110)/8:10;
             divisor=64;phase=s_camera;
         }
-        else if(s_frame_zone==3 && !s_frame_act) {
+        else if(cnz_parallax_active()) {
             numerator=by<0x80?1:by<0xB0?4:by<0x110?8:by<0x1D0?14:16;
         }
 #ifndef SONIC3_STANDALONE
@@ -3026,7 +3031,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int mgz2_panorama=level && s_frame_zone==2 && s_frame_act==1 &&
         (mgz2_bank==0 || mgz2_bank==12);
     int mgz_background=level && s_frame_zone==2 && (!s_frame_act || mgz2_panorama);
-    int cnz_background=level && s_frame_zone==3 && !s_frame_act && !s_frame_bg_event;
+    int cnz_background=level && cnz_parallax_active();
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
     int icz_intro_background=level && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event;

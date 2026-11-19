@@ -2642,20 +2642,22 @@ static void test_bounded_parallax_projection(void)
 {
     static GVDP v;uint32_t native[320]={0},out[796],reference[796],narrow[320];
     static uint8_t before[65536];
-    const unsigned zones[]={0x300,0x701};
+    const unsigned zones[]={0x300,0x301,0x701};
     for(unsigned x=0;x<320;++x)native[x]=0xFF102030u+x;
-    for(unsigned z=0;z<2;++z) {
+    for(unsigned z=0;z<sizeof zones/sizeof zones[0];++z) {
+        int forest=zones[z]==0x701,right=zones[z]==0x301;
 #ifdef SONIC3_STANDALONE
-        if(z)continue;
+        if(forest)continue;
 #endif
-        for(unsigned band=0;band<(z?1u:5u);++band) {
+        for(unsigned band=0;band<(forest?1u:5u);++band) {
             static const int ys[]={0,0x80,0xB0,0x110,0x1D0};
             static const int speeds[]={1,4,8,14,16};
-            int y=z?0:ys[band],speed=z?12:speeds[band];
+            int y=forest?0:ys[band],speed=forest?12:speeds[band];
             CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
             memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
             write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
-            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,64);word(g_ram,0x8008,0x8100);
+            word(g_ram,0xFE10,zones[z]);word(g_ram,0x8000,right?152:64);word(g_ram,0x8008,0x8100);
+            if(right)word(g_ram,0xEEC2,8);
             word(g_ram,0xEE90,y);v.vsram[1]=(uint16_t)y;
             v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
             v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
@@ -2665,13 +2667,15 @@ static void test_bounded_parallax_projection(void)
             s3_video_set_world_cell(edge_parallax_cell);
             for(unsigned c=0;c<4;++c) {
                 static const int cameras[]={0,145,223,238};
-                int camera=z?(c?cameras[c]:152):cameras[c],lag=c&1?4:0;
+                int camera=right?0x49D2+cameras[c]/2:
+                    forest?(c?cameras[c]:152):cameras[c];
+                int lag=c&1?4:0;
                 word(g_ram,0xEE80,camera+lag);
                 /* Native scroll/SAT can precede the next RAM camera copy,
                  * and Events_fg_1 need not match that newer copy either. */
-                word(g_ram,0xEEB6,camera+lag-(z && c==2?5:0));
+                word(g_ram,0xEEB6,camera+lag-(forest && c==2?5:0));
                 word(v.vram,0xF000,(unsigned)-camera);
-                word(v.vram,0xF002,(unsigned)-(camera*speed/32+(z && c==1?1:0)));
+                word(v.vram,0xF002,(unsigned)-(camera*speed/32+(forest && c==1?1:0)));
                 memset(&s_build,0,sizeof s_build);s_build.scene=1;
                 s_build.camera_x=camera;s_build.camera_y=0;publish_sprites();
                 g_ram[0xF62A]=1;s3_video_vblank();g_ram[0xF62A]=0;
