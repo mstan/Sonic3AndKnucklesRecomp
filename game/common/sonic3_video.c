@@ -3853,7 +3853,7 @@ void s3_video_state(S3StateIO *io)
         if (mode != s_mode || ratio != s_ratio) io->ok = 0;
     }
     S3_STATE(io, mode); S3_STATE(io, ratio);
-    handoff_state(io);
+    handoff_state(io,0);
     /* Published scene frames and loader ownership affect future frames.
      * Scanline scratch and decoded ROM caches are rebuilt on demand. */
     scene_frame_state(io, &s_build);
