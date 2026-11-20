@@ -3064,7 +3064,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* The HCZ1 boss borrows palette 1 after locking its native arena.
      * The wider left view still contains stage bricks using that line;
      * retain their dry/wet stage colours instead of the boss damage flash. */
-    int hcz_boss=level && s_frame_zone==1 && !s_frame_act && s_frame_fg_x>=0x3680;
+    int hcz_boss=level && s_frame_zone==1 && !s_frame_act &&
+        s_frame_fg_x>=0x3680 && s_frame_fg_y>=0x638;
     uint32_t hcz_boss_colors[16];
     if(hcz_boss) {
         unsigned water=((unsigned)s_world_frame[0xF646]<<8)|s_world_frame[0xF647];
@@ -3540,7 +3541,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int handoff_bg=0;
         if(handoff_pixels && wx<0) {
             if(handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap)) {
-                joined=1;apalette=palette;
+                joined=1;
+                /* Hydrocity's old bricks still use the outgoing raster
+                 * palette while the incoming act slides into view. */
+                apalette=s_frame_zone==1?s_handoff_art.colors[line]:palette;
             }
             if(s_frame_zone==1)
                 handoff_bg=handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
