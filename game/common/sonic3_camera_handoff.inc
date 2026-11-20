@@ -85,7 +85,7 @@ static int handoff_art_background(unsigned zone,unsigned act,int wx,int x,int li
     *attr=world_attr(world,bx,by,1);*pixel=pattern_pixel(v,*attr,bx,by);
     return 1;
 }
-static void handoff_art_state(S3StateIO *io)
+static void handoff_art_state(S3StateIO *io,int sparse)
 {
     int valid=s_handoff_art.valid,zone=s_handoff_art.zone;
     unsigned tick=s_handoff_art.tick;
@@ -95,10 +95,12 @@ static void handoff_art_state(S3StateIO *io)
     if(valid<0 || valid>1 || zone<0 || zone>255 || tick>65535)io->ok=0;
     S3_STATE(io,s_handoff_art.valid);S3_STATE(io,s_handoff_art.zone);
     S3_STATE(io,s_handoff_art.tick);
+    if(io->mode==2)s_handoff_palette_capture=0;
+    /* Ordinary rewind frames have no outgoing art to retain. */
+    if(sparse && !valid)return;
     S3_STATE(io,s_handoff_art.world);S3_STATE(io,s_handoff_art.video.vram);
     S3_STATE(io,s_handoff_art.video.vsram);S3_STATE(io,s_handoff_art.video.reg);
     S3_STATE(io,s_handoff_art.colors);
-    if(io->mode==2)s_handoff_palette_capture=0;
 }
 
 static int handoff_origin(int camera,int desired,int width,int map_width,
@@ -179,7 +181,7 @@ static void handoff_dip(uint32_t *out,int width)
         out[x]=v;
     }
 }
-static void handoff_state(S3StateIO *io)
+static void handoff_state(S3StateIO *io,int sparse_art)
 {
     int expected=handoff_mode(),stored=expected;
     s3_state_peek(io,0,&stored,sizeof stored);
@@ -192,5 +194,5 @@ static void handoff_state(S3StateIO *io)
        saved.desired<-65536 || saved.desired>65536 || saved.value<-65536 || saved.value>65536 ||
        saved.alpha<0 || saved.alpha>255 || saved.fade_in<0 || saved.fade_in>1)io->ok=0;
     S3_STATE(io,stored);S3_STATE(io,s_handoff);
-    handoff_art_state(io);
+    handoff_art_state(io,sparse_art);
 }

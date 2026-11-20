@@ -150,6 +150,37 @@ static void test_original_order_knuckles(void)
     CHECK(ram[0xB10C]==0&&ram[0xB10D]==59&&ram[0xB02E]==0x81);
     CHECK(!ram[0xB018]&&!ram[0xB01A]&&!ram[0xB01C]);
 }
+static void test_original_order_fade_hold(void)
+{
+    static uint8_t ram[65536],before[65536];
+    const unsigned hooks[]={0x522A0,0x76270};
+    const unsigned zones[]={3,7};
+    const unsigned actors[]={0xB0DE,0xB128};
+    s3_gameplay_load("unwritten-gameplay-fixture/settings.ini","sonic3k");
+    for(unsigned i=0;i<2;++i) {
+        unsigned actor=actors[i],result=actors[1-i];
+        memset(ram,0,sizeof ram);
+        ram[0xF600]=12;ram[0xFAA8]=255;
+        ram[0xFE10]=(uint8_t)zones[i];ram[0xFE11]=1;
+        ram[0xFF09]=3;ram[0xEEC1]=4;
+        ram[result+1]=2;ram[result+2]=0xDA;ram[result+3]=0xD0;
+        ram[result+5]=6;ram[result+0x31]=1;
+        s3_gameplay.original_zone_order=0;
+        memcpy(before,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_departure(hooks[i],ram,0xFF0000u+actor));
+        CHECK(!memcmp(before,ram,sizeof ram));
+        s3_gameplay.original_zone_order=1;
+        ram[result+0x2F]=1;memcpy(before,ram,sizeof ram);
+        CHECK(!s3_gameplay_zone_departure(hooks[i],ram,0xFF0000u+actor));
+        CHECK(!memcmp(before,ram,sizeof ram));
+        ram[result+0x2F]=0;memcpy(before,ram,sizeof ram);
+        CHECK(s3_gameplay_zone_departure(hooks[i],ram,0xFF0000u+actor)==0x76456);
+        before[actor+1]=7;before[actor+2]=0x64;before[actor+3]=0x56;
+        before[actor+0x2F]=90;before[result+0x2F]=91;
+        if(i==0)before[0xB02E]=0x81;
+        CHECK(!memcmp(before,ram,sizeof ram));
+    }
+}
 static void test_original_order_snowfall_flags(void)
 {
     static uint8_t ram[65536],before[65536];
@@ -669,6 +700,7 @@ int main(void)
     }
     test_competition_title_cards();
     test_original_order();test_original_order_entry();test_original_order_ground_camera();test_original_order_knuckles();test_original_order_snowfall_flags();test_level_select_checkpoint();test_no_save_emeralds();
+    test_original_order_fade_hold();
     puts("Gameplay defaults, persistence, lives/time, three-variant native access, demo/Competition scope and provider composition PASS");
     return 0;
 }

@@ -2856,6 +2856,53 @@ static void test_icz_first_cave_spatial_margins(void)
     }
 }
 
+static int icz_handoff_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)x;(void)y;
+    *cell=background?(ram[0xFE11]?2:1):0;
+    return 1;
+}
+
+static void test_icz_outgoing_cave_background(void)
+{
+    static GVDP v;
+    uint32_t native[320]={0},out[796];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(&s_handoff,0,sizeof s_handoff);s_handoff_art.valid=0;
+    write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0xFE10,0x500);word(g_ram,0x8000,216);word(g_ram,0x8002,56);
+    word(g_ram,0x8008,0x8100);
+    for(unsigned n=0;n<4;++n) {
+        word(g_ram,0x9008+n*2,1);word(g_ram,0x9010+n*2,2);
+    }
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2);
+    s3_video_set_world_cell(icz_handoff_cell);
+    const int cameras[]={0x68EE,0x690A,0x8A};
+    const int events[]={16,20,8};
+    for(unsigned i=0;i<3;++i) {
+        int camera=cameras[i],y=i==2?0x36D:0x26D;
+        word(g_ram,0xFE04,i+20);g_ram[0xFE11]=i==2;
+        word(g_ram,0xEEC2,events[i]);word(g_ram,0xEE80,camera);word(g_ram,0xEE84,y);
+        v.vsram[0]=(uint16_t)y;
+        word(v.vram,0xF000,(unsigned)-camera);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;
+        s_build.camera_x=camera;s_build.camera_y=y;publish_sprites();
+        if(i==2)memset(v.vram+32,0,32);
+        scanline(&v,0,native,320,out,796);
+        CHECK(s_handoff_art.valid && s_handoff_art.zone==5);
+    }
+    int seam=s_native_x-cameras[2];
+    CHECK(seam>0 && seam<s_native_x);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<seam?0xFFFF0000u:0xFF00FF00u));
+    s_handoff_art.valid=0;memset(&s_handoff,0,sizeof s_handoff);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
+
 #ifdef SONIC3_STANDALONE
 static void test_icz_cave_preview_owns_its_palette(void)
 {
@@ -3349,7 +3396,9 @@ static void test_icz_outdoor_snow_edge(void)
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
     /* Do not turn empty sky before the bank into a rectangular snow wall.
      * Once the native left edge is within snow, retain its outer fill. */
-    const unsigned cases[][4]={{0x500,0,0x300,0},{0x500,0,0x440,1},{0x500,4,0x300,0},{0x501,0,0x300,0},{0x100,0,0x300,0}};
+    const unsigned cases[][6]={{0x500,0,0x300,0,0,0},{0x500,0,0x440,1,0,0},
+        {0x500,0,0x440,1,6,0},{0x500,0,0x440,1,6,1},
+        {0x500,4,0x300,0,0,0},{0x501,0,0x300,0,0,0},{0x100,0,0x300,0,0,0}};
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);s3_video_set_world_cell(NULL);
@@ -3357,8 +3406,16 @@ static void test_icz_outdoor_snow_edge(void)
         word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
         word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x3C);
         word(g_ram,0xEE80,cases[n][2]);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
+        if(cases[n][4])g_ram[0x8100+cases[n][4]]=1;
         for(unsigned i=0;i<64;++i)word(g_ram,128+i*2,1);
         for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x4002);
+        if(cases[n][5]) {
+            /* A decorative block at the camera must not open a gap at
+             * the flat bank edge several tiles behind it. */
+            word(g_ram,128+8,2);
+            for(unsigned i=0;i<4;++i)word(g_ram,0x9010+i*2,0x4150);
+            memset(v.vram+0x150*32,0x11,32);
+        }
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[33]=0xEEE;
         memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-cases[n][2]);
@@ -3366,7 +3423,9 @@ static void test_icz_outdoor_snow_edge(void)
         memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
             int nx=x-s_native_x,wx=nx+(int)cases[n][2];
-            int snow=(wx>=0x400 && wx<0x480) || (cases[n][3] && nx<0 && wx>=0);
+            int snow=(wx>=0x400 && wx<0x480) ||
+                (cases[n][4] && wx>=0x300 && wx<0x380) ||
+                (cases[n][3] && nx<0 && wx>=(cases[n][4]?0x380:0));
             CHECK(out[x]==(snow?0xFFFFFFFFu:0xFF000000u));
         }
         CHECK(!memcmp(before,g_ram,sizeof before));
@@ -5000,6 +5059,24 @@ int main(int argc,char **argv)
         CHECK(aiz_join_load());
         CHECK(lbz_waiting_load(0));CHECK(lbz_waiting_load(1));
         CHECK(load_aiz_monkey_art());
+        /* The miniboss can overwrite both reservations in live VRAM. The
+         * expanded view must resolve them from the same original stage art. */
+        CHECK(hcz1_secondary_tiles_ready());
+        unsigned hcz_terrain=2166136261u;
+        for(unsigned n=(HCZ1_STATIC_TERRAIN_TILE-HCZ1_SECONDARY_TILE)*32u;
+            n<sizeof s_hcz1_secondary_tiles;++n)
+            hcz_terrain=(hcz_terrain^s_hcz1_secondary_tiles[n])*16777619u;
+        CHECK(hcz_terrain==0xF2149BF7u);
+        unsigned hcz_base=native_art_owner(S3_ART_BANK+0x2E76Cu);
+        CHECK(hcz_base==SPRITE_HCZ_FAN_BASE);
+        unsigned hcz_pixels=2166136261u;
+        for(unsigned tile=0x3D4;tile<0x3E4;++tile)
+            for(int y=0;y<8;++y)for(int x=0;x<8;++x) {
+                uint8_t pixel;
+                CHECK(native_art_pixel(hcz_base,0x4000u|tile,x,y,&pixel));
+                hcz_pixels=(hcz_pixels^pixel)*16777619u;
+            }
+        CHECK(hcz_pixels==0x4FF6C80Au);
 #ifndef SONIC3_STANDALONE
         CHECK(mhz_custom_load());
         /* Native ST Events_bg+1 selects the arena, not Events_fg_4. */
@@ -5494,6 +5571,7 @@ int main(int argc,char **argv)
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
     test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();test_icz_cave_partial_tile_edges();
+    test_icz_outgoing_cave_background();
 #ifdef SONIC3_STANDALONE
     test_icz_cave_preview_owns_its_palette();
 #endif

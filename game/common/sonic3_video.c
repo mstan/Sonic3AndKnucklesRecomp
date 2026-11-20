@@ -69,7 +69,8 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
-       SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17, SPRITE_GIANT_RING = 32 };
+       SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
+       SPRITE_HCZ_FAN_BASE = 18, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -91,6 +92,7 @@ static unsigned native_art_owner(unsigned map)
     if(map==0x53518u)return SPRITE_FBZ_PREBOSS;
 #endif
     if(map==S3_ART_BANK+0x161212u)return SPRITE_TURBO_SPIKER;
+    if(map==S3_ART_BANK+0x2E76Cu)return SPRITE_HCZ_FAN_BASE;
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
@@ -216,6 +218,21 @@ static size_t art_kosm(unsigned address,size_t compressed,uint8_t *out,size_t ca
         n+=got;pos+=used;pos=2+((pos-2+15)&~(size_t)15);
     }
     return n==total?n:0;
+}
+/* HCZ1's miniboss loads at tile $304, over the secondary stage bank.
+ * The cartridge no longer needs the old terrain once the camera moves
+ * into the shaft, but the wider left view still exposes those blocks.
+ * The water animation owns tiles through $32F. Restore the static
+ * terrain from $330 onward. */
+enum { HCZ1_SECONDARY_TILE=0x11B, HCZ1_STATIC_TERRAIN_TILE=0x330 };
+static uint8_t s_hcz1_secondary_tiles[0x4760];
+static int hcz1_secondary_tiles_ready(void)
+{
+    static int loaded;
+    if(!loaded)
+        loaded=art_kosm(S3_ART_BANK+0x1BAE7A,0x2252,s_hcz1_secondary_tiles,
+            sizeof s_hcz1_secondary_tiles)==sizeof s_hcz1_secondary_tiles?1:-1;
+    return loaded>0;
 }
 /* MHZ installs its custom layout before three independent decompression
  * queues finish replacing its chunks, blocks and patterns. RAM in between
@@ -2012,28 +2029,34 @@ static int turbo_art_pixel(unsigned attr,int x,int y,uint8_t *pixel)
  * Bind only these known mappings to their original ROM patterns. The guest
  * PLC queues, object lifetimes, palettes and private atlases stay authoritative. */
 typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
+enum { HCZ_FAN_BASE_ART = 5 };
 static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
     {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
     {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1},
     {S3_SPRING_ART,0x2EF,0x600,0x494,0},
-    {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0}
+    {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0},
+    /* The miniboss also overwrites the small fan's moving base. */
+    [HCZ_FAN_BASE_ART]={S3_ART_BANK+0x18FD88u,0x5BF,0xB80,0x3CA,0}
 };
-static struct { uint8_t pixels[0x8C0];int attempted,ready; } s_native_art_cache[5];
+static struct { uint8_t pixels[0xB80];int attempted,ready; }
+    s_native_art_cache[sizeof s_native_art/sizeof *s_native_art];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
-    if(!owner || owner>sizeof s_native_art/sizeof *s_native_art)return 0;
-    const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
+    unsigned index=owner-1;
+    if(owner==SPRITE_HCZ_FAN_BASE)index=HCZ_FAN_BASE_ART;
+    else if(index>=HCZ_FAN_BASE_ART)return 0;
+    const NativeArt *a=&s_native_art[index];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
-    if(!s_native_art_cache[owner-1].attempted) {
-        s_native_art_cache[owner-1].attempted=1;
-        uint8_t *dst=s_native_art_cache[owner-1].pixels;
+    if(!s_native_art_cache[index].attempted) {
+        s_native_art_cache[index].attempted=1;
+        uint8_t *dst=s_native_art_cache[index].pixels;
         size_t bytes=a->kosm?art_kosm(a->address,a->compressed,dst,a->bytes):
             art_nem(g_rom+a->address,a->compressed,dst,a->bytes);
-        s_native_art_cache[owner-1].ready=bytes==a->bytes;
+        s_native_art_cache[index].ready=bytes==a->bytes;
     }
-    if(!s_native_art_cache[owner-1].ready)return 0;
-    unsigned b=s_native_art_cache[owner-1].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    if(!s_native_art_cache[index].ready)return 0;
+    unsigned b=s_native_art_cache[index].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
@@ -2092,6 +2115,7 @@ static int giant_ring_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t
     (void)owner;(void)attr;(void)x;(void)y;(void)pixel;return 0;
 #endif
 }
+#include "sonic3_margin_pose.inc"
 /* The original boss allocates its stationary capsule only after falling
  * below the native screen. A wider view already sees that authored ledge.
  * Extend the waiting body/button there until their real published sprites
@@ -2124,28 +2148,9 @@ static void mhz_capsule_preview_scanline(int line,uint32_t *out,int width,
        line<y-44 || line>=y+32 ||
        !mhz_capsule_preview_needed(s_world_frame,s_display))return;
     for(unsigned part=0;part<2;++part) {
-        unsigned frame=part?5:0;
-        unsigned p=S3_CAPSULE_MAP+(int16_t)scene_read16(S3_CAPSULE_MAP+frame*2);
-        unsigned count=scene_read16(p);p+=2;if(count>32)return;
-        for(unsigned n=0;n<count;++n,p+=6) {
-            unsigned size=scene_read8(p+1);if(size>15)return;
-            int cw=((size>>2)&3)+1,ch=(size&3)+1;
-            int py=y-(part?0x24:0)+(int8_t)scene_read8(p),iy=line-py;
-            if(iy<0 || iy>=ch*8)continue;
-            int px=origin+0x4640-s_camera+(int16_t)scene_read16(p+4);
-            unsigned attr=(scene_read16(p+2)+0x8494u)&65535u;
-            if(attr&0x1000u)iy=ch*8-1-iy;
-            for(int dx=0;dx<cw*8;++dx) {
-                int x=px+dx;
-                if(x<0 || x>=width || (x>=origin && x<origin+320) || (s_priority[x]&2u))continue;
-                int ix=attr&0x800u?cw*8-1-dx:dx;
-                unsigned tile=(attr&0xF800u)|((attr+ix/8*ch+iy/8)&2047u);
-                uint8_t pixel=0;
-                if(!native_art_pixel(5,tile,ix&7,iy&7,&pixel) || !pixel)continue;
-                if((attr&0x8000u) || !(s_priority[x]&1u))out[x]=palette[pixel];
-                s_priority[x]|=2u;
-            }
-        }
+        const MarginPose pose={S3_CAPSULE_MAP,part?5u:0u,0x8494,
+            origin+0x4640-s_camera,y-(part?0x24:0),NULL,0,0};
+        margin_pose_scanline(&pose,line,out,width,origin,palette);
     }
 }
 /* FBZ reloads these reservations only after its returning title card leaves.
@@ -3064,7 +3069,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* The HCZ1 boss borrows palette 1 after locking its native arena.
      * The wider left view still contains stage bricks using that line;
      * retain their dry/wet stage colours instead of the boss damage flash. */
-    int hcz_boss=level && s_frame_zone==1 && !s_frame_act && s_frame_fg_x>=0x3680;
+    int hcz_boss=level && s_frame_zone==1 && !s_frame_act &&
+        s_frame_fg_x>=0x3680 && s_frame_fg_y>=0x638;
+    int hcz1_behind_arena=level && s_frame_zone==1 && !s_frame_act &&
+        width>nw && s_frame_fg_x>=0x3500 && s_frame_fg_y>=0x300;
     uint32_t hcz_boss_colors[16];
     if(hcz_boss) {
         unsigned water=((unsigned)s_world_frame[0xF646]<<8)|s_world_frame[0xF647];
@@ -3278,6 +3286,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * here instead of rediscovering an inactive handoff for every pixel. */
     int handoff_pixels=level && width>320 && s_handoff_art.valid &&
         s_handoff_art.zone==(int)s_frame_zone && s_frame_act==1;
+    int icz_outgoing=handoff_pixels && s_frame_zone==5 && camera-origin<0;
+    int icz_outgoing_x=0;
+    WorldArtRow icz_outgoing_bg;
+    if(icz_outgoing) {
+        /* IceCap moves the player and camera into the next layout before
+         * the first boss. Keep the outgoing cave's half-speed scroll where
+         * the wide viewport still sees behind the rebase. */
+        icz_outgoing_x=(camera+0x6880)/2-0x1D80;
+        int old_y=(camera_y-0x100)>>1;
+        world_art_row_init(&icz_outgoing_bg,s_handoff_art.world,s_handoff_art.world+0x9000,
+                           s_handoff_art.video.vram,old_y+line,1);
+    }
     const uint8_t *fg_world=handoff_loading?s_handoff_art.world:s_world_frame;
     const uint8_t *bg_world_data=handoff_loading?s_handoff_art.world:s_background_frame;
     const uint8_t *world_patterns=handoff_loading?s_handoff_art.video.vram:v->vram;
@@ -3346,24 +3366,26 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             world_art_row_init(&aiz_bg,s_background_frame,art->blocks,art->video.vram,by,1);
         }
     }
-    /* The snowboard hill begins partway across each wrapped layout row.
-     * Its unused leading chunks are empty on the cartridge. Extend the
-     * solid snow at that boundary into the extra left view; do not expose
-     * rectangular holes behind the hill, or change its native geometry. */
-    int icz_snow_edge=0;
-    uint16_t icz_snow_attr=0;
-    if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event) {
+    /* Vertical wrapping can put several disconnected snowboard slopes on
+     * one layout row. Extend the snow bank at the native left edge into
+     * its immediately preceding gap, while retaining earlier terrain. */
+    int icz_snow_first=0,icz_snow_edge=0;
+    if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event &&
+       s_left<camera && camera>=0 && camera<s_stage_width) {
         unsigned p=0x8008u+(((unsigned)wy>>5)&0x3Cu);
         unsigned row=((unsigned)s_world_frame[p]<<8)|s_world_frame[p+1];
-        if(row>=0x8088 && row+16<=0x9000)for(unsigned i=0;i<16;++i) {
-            if(!s_world_frame[row+i])continue;
-            uint16_t attr=world_attr(s_world_frame,(int)i*128,wy,0);
-            /* A bank ahead of the camera does not cover the sky behind it.
-             * Extend only a solid snow row already at the native left edge. */
-            if(attr==0x4002 && world_attr(s_world_frame,camera,wy,0)==0x4002){
-                icz_snow_edge=(int)i*128;icz_snow_attr=attr;
+        unsigned left=s_left>0?(unsigned)s_left/128:0;
+        unsigned bank=(unsigned)camera/128;
+        if(row>=0x8088 && row<0x9000 && bank<0x9000u-row && s_world_frame[row+bank]) {
+            while(bank>left && s_world_frame[row+bank-1])--bank;
+            /* A decorative tile under the camera does not change the
+             * solid snow at the bank's trailing edge. */
+            if(bank>left && (world_attr(s_world_frame,(int)bank*128,wy,0)&0x67FFu)==0x4002) {
+                unsigned gap=bank-1;
+                while(gap>left && !s_world_frame[row+gap-1])--gap;
+                icz_snow_first=(int)gap*128;
+                icz_snow_edge=(int)bank*128;
             }
-            break;
         }
     }
     /* Select optional scenery providers once, using this row's immutable
@@ -3400,7 +3422,17 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 
         if(!fg.remaining) {
             uint16_t attr=level?world_attr(fg_world,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
-            gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+            unsigned tile=attr&2047u;
+            if(hcz1_behind_arena && nx<0 && wx<0x3500 && tile>=HCZ1_STATIC_TERRAIN_TILE &&
+               tile<HCZ1_SECONDARY_TILE+sizeof s_hcz1_secondary_tiles/32 &&
+               hcz1_secondary_tiles_ready()) {
+                gtile_row_begin(&fg,s_hcz1_secondary_tiles,
+                    (uint16_t)(attr-HCZ1_SECONDARY_TILE),wx,wy);
+                fg.attr=attr;
+                if(fg.remaining>-nx)fg.remaining=-nx;
+            } else {
+                gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+            }
         }
         if(!bg.remaining) {
             if(icz_first_cave && (nx<0 || nx>=nw)) {
@@ -3433,8 +3465,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
             b=plane_attr(v,base_b,reference_bx,by);bp=pattern_pixel(v,b,reference_bx,by);
         }
-        if(nx<0 && wx>=0 && wx<icz_snow_edge && !ap) {
-            a=icz_snow_attr;ap=pattern_pixel(v,a,wx,wy);
+        if(nx<0 && wx>=icz_snow_first && wx<icz_snow_edge && !ap) {
+            a=0x4002;ap=pattern_pixel(v,a,wx,wy);
         }
         if(file_select) {
             /* Keep one portrait, extending only its edge colours. Mirroring
@@ -3540,10 +3572,17 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int handoff_bg=0;
         if(handoff_pixels && wx<0) {
             if(handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap)) {
-                joined=1;apalette=palette;
+                joined=1;
+                /* Hydrocity's old bricks still use the outgoing raster
+                 * palette while the incoming act slides into view. */
+                apalette=s_frame_zone==1?s_handoff_art.colors[line]:palette;
             }
             if(s_frame_zone==1)
                 handoff_bg=handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
+            else if(icz_outgoing && nx<0) {
+                bp=world_art_row_pixel(&icz_outgoing_bg,nx+icz_outgoing_x,&b);
+                handoff_bg=1;
+            }
             if(handoff_bg)bpalette=s_handoff_art.colors[line];
         }
         if(lbz_incoming && nx>=nw && wx+lbz_rebase>=0x3FE0) {
@@ -3714,6 +3753,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
         mhz_capsule_preview_scanline(line,out,width,origin,palette);
+#ifndef SONIC3_STANDALONE
+        cnz_waiting_scanline(line,out,width,origin,palette);
+#endif
         lbz_waiting_scanline(line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
@@ -3853,7 +3895,7 @@ void s3_video_state(S3StateIO *io)
         if (mode != s_mode || ratio != s_ratio) io->ok = 0;
     }
     S3_STATE(io, mode); S3_STATE(io, ratio);
-    handoff_state(io);
+    handoff_state(io,0);
     /* Published scene frames and loader ownership affect future frames.
      * Scanline scratch and decoded ROM caches are rebuilt on demand. */
     scene_frame_state(io, &s_build);

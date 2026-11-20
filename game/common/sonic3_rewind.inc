@@ -36,9 +36,9 @@ static void rewind_scene(S3StateIO *io,SceneFrame *f)
 static void rewind_presentation_state(S3StateIO *io)
 {
 #ifdef SONIC3_STANDALONE
-    unsigned version=9; /* SceneFrame no longer stores unsupported MHZ departure data. */
+    unsigned version=10;
 #else
-    unsigned version=8;
+    unsigned version=9;
 #endif
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);
@@ -92,6 +92,9 @@ static void rewind_presentation_state(S3StateIO *io)
         s3_state_bytes(io,ss_state+SS_EXTRA,SS_KINDS*8);
         s3_state_bytes(io,ss_state+SS_BOARD,sizeof ss_board);
     }
+    /* The local rewind path restores the completed renderer separately
+     * from guest state. Resume the pan with the same camera and art bank. */
+    handoff_state(io,1);
     rocket_motion_state(io);
     if(io->mode==2 && io->ok) {
         interpolation_reset();s_render=&s_real_context;

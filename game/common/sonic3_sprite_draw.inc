@@ -156,7 +156,9 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                 /* The future clouds/pillar can enter the extra view before
                  * the subboss PLC owns their native tile reservation. */
                 if(!p)continue;
-            } else if(s_frame_level && !s->hud && (s->slot>>8) && native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
+            } else if(s_frame_level && !s->hud && (s->slot>>8) &&
+                      ((s->slot>>8)!=SPRITE_HCZ_FAN_BASE || x<origin || x>=origin+320) &&
+                      native_art_pixel(s->slot>>8,cell,ix&7,iy&7,&p)) {
                 if(!p)continue;
             } else if(s_frame_level && !s_frame_zone && !s->hud &&
                       (s->size&0xD0u)==SPRITE_MONKEY_ART &&
