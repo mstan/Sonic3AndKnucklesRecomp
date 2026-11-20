@@ -3349,8 +3349,9 @@ static void test_icz_outdoor_snow_edge(void)
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
     /* Do not turn empty sky before the bank into a rectangular snow wall.
      * Once the native left edge is within snow, retain its outer fill. */
-    const unsigned cases[][5]={{0x500,0,0x300,0,0},{0x500,0,0x440,1,0},
-        {0x500,0,0x440,1,6},{0x500,4,0x300,0,0},{0x501,0,0x300,0,0},{0x100,0,0x300,0,0}};
+    const unsigned cases[][6]={{0x500,0,0x300,0,0,0},{0x500,0,0x440,1,0,0},
+        {0x500,0,0x440,1,6,0},{0x500,0,0x440,1,6,1},
+        {0x500,4,0x300,0,0,0},{0x501,0,0x300,0,0,0},{0x100,0,0x300,0,0,0}};
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);s3_video_set_world_cell(NULL);
@@ -3361,6 +3362,13 @@ static void test_icz_outdoor_snow_edge(void)
         if(cases[n][4])g_ram[0x8100+cases[n][4]]=1;
         for(unsigned i=0;i<64;++i)word(g_ram,128+i*2,1);
         for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x4002);
+        if(cases[n][5]) {
+            /* A decorative block at the camera must not open a gap at
+             * the flat bank edge several tiles behind it. */
+            word(g_ram,128+8,2);
+            for(unsigned i=0;i<4;++i)word(g_ram,0x9010+i*2,0x4150);
+            memset(v.vram+0x150*32,0x11,32);
+        }
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
         v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;v.cram[33]=0xEEE;
         memset(v.vram+64,0x11,32);word(v.vram,0xF000,(unsigned)-cases[n][2]);

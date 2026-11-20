@@ -3334,14 +3334,16 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * its immediately preceding gap, while retaining earlier terrain. */
     int icz_snow_first=0,icz_snow_edge=0;
     if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event &&
-       s_left<camera && world_attr(s_world_frame,camera,wy,0)==0x4002) {
+       s_left<camera && camera>=0 && camera<s_stage_width) {
         unsigned p=0x8008u+(((unsigned)wy>>5)&0x3Cu);
         unsigned row=((unsigned)s_world_frame[p]<<8)|s_world_frame[p+1];
         unsigned left=s_left>0?(unsigned)s_left/128:0;
         unsigned bank=(unsigned)camera/128;
         if(row>=0x8088 && row<0x9000 && bank<0x9000u-row && s_world_frame[row+bank]) {
             while(bank>left && s_world_frame[row+bank-1])--bank;
-            if(bank>left && world_attr(s_world_frame,(int)bank*128,wy,0)==0x4002) {
+            /* A decorative tile under the camera does not change the
+             * solid snow at the bank's trailing edge. */
+            if(bank>left && (world_attr(s_world_frame,(int)bank*128,wy,0)&0x67FFu)==0x4002) {
                 unsigned gap=bank-1;
                 while(gap>left && !s_world_frame[row+gap-1])--gap;
                 icz_snow_first=(int)gap*128;
