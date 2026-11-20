@@ -2856,6 +2856,53 @@ static void test_icz_first_cave_spatial_margins(void)
     }
 }
 
+static int icz_handoff_cell(const uint8_t *ram,int x,int y,int background,uint16_t *cell)
+{
+    (void)x;(void)y;
+    *cell=background?(ram[0xFE11]?2:1):0;
+    return 1;
+}
+
+static void test_icz_outgoing_cave_background(void)
+{
+    static GVDP v;
+    uint32_t native[320]={0},out[796];
+    CHECK(configure("off"));CHECK(configure("32:9"));width(796,224,320,224);
+    memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);
+    memset(&s_handoff,0,sizeof s_handoff);s_handoff_art.valid=0;
+    write32(0xB000,0x1234);g_ram[0xF600]=12;g_ram[0xF711]=1;
+    word(g_ram,0xFE10,0x500);word(g_ram,0x8000,216);word(g_ram,0x8002,56);
+    word(g_ram,0x8008,0x8100);
+    for(unsigned n=0;n<4;++n) {
+        word(g_ram,0x9008+n*2,1);word(g_ram,0x9010+n*2,2);
+    }
+    v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
+    v.reg[12]=1;v.reg[13]=0x3C;v.reg[16]=1;
+    v.cram[1]=0xE;v.cram[2]=0xE0;
+    memset(v.vram+32,0x11,32);memset(v.vram+64,0x22,32);
+    for(unsigned cell=0;cell<64*32;++cell)word(v.vram,0xE000+cell*2,2);
+    s3_video_set_world_cell(icz_handoff_cell);
+    const int cameras[]={0x68EE,0x690A,0x8A};
+    const int events[]={16,20,8};
+    for(unsigned i=0;i<3;++i) {
+        int camera=cameras[i],y=i==2?0x36D:0x26D;
+        word(g_ram,0xFE04,i+20);g_ram[0xFE11]=i==2;
+        word(g_ram,0xEEC2,events[i]);word(g_ram,0xEE80,camera);word(g_ram,0xEE84,y);
+        v.vsram[0]=(uint16_t)y;
+        word(v.vram,0xF000,(unsigned)-camera);
+        memset(&s_build,0,sizeof s_build);s_build.scene=1;
+        s_build.camera_x=camera;s_build.camera_y=y;publish_sprites();
+        if(i==2)memset(v.vram+32,0,32);
+        scanline(&v,0,native,320,out,796);
+        CHECK(s_handoff_art.valid && s_handoff_art.zone==5);
+    }
+    int seam=s_native_x-cameras[2];
+    CHECK(seam>0 && seam<s_native_x);
+    for(int x=0;x<796;++x)CHECK(out[x]==(x<seam?0xFFFF0000u:0xFF00FF00u));
+    s_handoff_art.valid=0;memset(&s_handoff,0,sizeof s_handoff);
+    s3_video_set_world_cell(NULL);CHECK(configure("off"));
+}
+
 #ifdef SONIC3_STANDALONE
 static void test_icz_cave_preview_owns_its_palette(void)
 {
@@ -5524,6 +5571,7 @@ int main(int argc,char **argv)
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();
     test_icz_cave_original_dma_rows();test_icz_first_cave_spatial_margins();test_icz_cave_partial_tile_edges();
+    test_icz_outgoing_cave_background();
 #ifdef SONIC3_STANDALONE
     test_icz_cave_preview_owns_its_palette();
 #endif
