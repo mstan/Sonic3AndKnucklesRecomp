@@ -127,24 +127,31 @@ uint32_t s3_gameplay_zone_departure(uint32_t pc,uint8_t ram[65536],uint32_t acto
     int carnival=pc==0x522A0u;
     if(carnival ? zone!=0x301 || word(ram,0xFF08)!=3 : zone!=0x701)return 0;
 
-    unsigned delay=59;
+    unsigned completed_result=0;
     if(ram[0xF600]==0x0C && (carnival ? word(ram,0xEEC0)==4 : ram[0xFAA8])) {
-        /* The exit actor is already waiting during the results. Once the
-         * native tally and save finish, keep its completed SAT for the fade. */
+        /* Find the completed native result before its card begins to move. */
         for(unsigned result=0xB0DE;result<0xCAE2;result+=0x4A) {
             if(word(ram,result)!=2 || word(ram,result+2)!=0xDAD0 || ram[result+5]!=6 ||
                word(ram,result+0x2E) || !word(ram,result+0x30) || word(ram,result+0x32))continue;
-            delay=0;
+            completed_result=result;
             break;
         }
     }
-    if(delay && ram[0xFAA8])return 0;
+    if(!completed_result && ram[0xFAA8])return 0;
     if(carnival) {
         /* If the results already cleared, the screen event must finish
          * restoring player control before using the delayed exit. */
-        if(delay && (!ram[0xFAAA] || word(ram,0xEEC0)!=8))return 0;
+        if(!completed_result && (!ram[0xFAAA] || word(ram,0xEEC0)!=8))return 0;
         put_word(ram,0xB018,0);put_word(ram,0xB01A,0);put_word(ram,0xB01C,0);
         ram[0xB02E]=0x81;
+    }
+    unsigned delay=59;
+    if(completed_result) {
+        /* The native card already held for 90 ticks. Match the 180-tick
+         * hold in Sonic 1 and 2, keeping the card in place until the fade
+         * even when the result object runs before the exit on that frame. */
+        delay=90;
+        put_word(ram,completed_result+0x2E,(uint16_t)(delay+1));
     }
     /* Retain the capsule/results prerequisites and the native timed exit.
      * Mushroom Hill omits airship boarding; Carnival Night omits its portal.
