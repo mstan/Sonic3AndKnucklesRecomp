@@ -120,4 +120,3 @@ static void cnz_waiting_scanline(int line,uint32_t *out,int width,
     }
 }
 #endif
-
