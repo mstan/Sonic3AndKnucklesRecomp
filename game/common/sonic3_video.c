@@ -2092,6 +2092,7 @@ static int giant_ring_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t
     (void)owner;(void)attr;(void)x;(void)y;(void)pixel;return 0;
 #endif
 }
+#include "sonic3_margin_pose.inc"
 /* The original boss allocates its stationary capsule only after falling
  * below the native screen. A wider view already sees that authored ledge.
  * Extend the waiting body/button there until their real published sprites
@@ -2124,28 +2125,9 @@ static void mhz_capsule_preview_scanline(int line,uint32_t *out,int width,
        line<y-44 || line>=y+32 ||
        !mhz_capsule_preview_needed(s_world_frame,s_display))return;
     for(unsigned part=0;part<2;++part) {
-        unsigned frame=part?5:0;
-        unsigned p=S3_CAPSULE_MAP+(int16_t)scene_read16(S3_CAPSULE_MAP+frame*2);
-        unsigned count=scene_read16(p);p+=2;if(count>32)return;
-        for(unsigned n=0;n<count;++n,p+=6) {
-            unsigned size=scene_read8(p+1);if(size>15)return;
-            int cw=((size>>2)&3)+1,ch=(size&3)+1;
-            int py=y-(part?0x24:0)+(int8_t)scene_read8(p),iy=line-py;
-            if(iy<0 || iy>=ch*8)continue;
-            int px=origin+0x4640-s_camera+(int16_t)scene_read16(p+4);
-            unsigned attr=(scene_read16(p+2)+0x8494u)&65535u;
-            if(attr&0x1000u)iy=ch*8-1-iy;
-            for(int dx=0;dx<cw*8;++dx) {
-                int x=px+dx;
-                if(x<0 || x>=width || (x>=origin && x<origin+320) || (s_priority[x]&2u))continue;
-                int ix=attr&0x800u?cw*8-1-dx:dx;
-                unsigned tile=(attr&0xF800u)|((attr+ix/8*ch+iy/8)&2047u);
-                uint8_t pixel=0;
-                if(!native_art_pixel(5,tile,ix&7,iy&7,&pixel) || !pixel)continue;
-                if((attr&0x8000u) || !(s_priority[x]&1u))out[x]=palette[pixel];
-                s_priority[x]|=2u;
-            }
-        }
+        const MarginPose pose={S3_CAPSULE_MAP,part?5u:0u,0x8494,
+            origin+0x4640-s_camera,y-(part?0x24:0),NULL,0,0};
+        margin_pose_scanline(&pose,line,out,width,origin,palette);
     }
 }
 /* FBZ reloads these reservations only after its returning title card leaves.
@@ -3718,6 +3700,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
         mhz_capsule_preview_scanline(line,out,width,origin,palette);
+#ifndef SONIC3_STANDALONE
+        cnz_waiting_scanline(line,out,width,origin,palette);
+#endif
         lbz_waiting_scanline(line,out,width,origin,palette);
         if(s_actor_overlay && !s_interpolating) {
             presentation_overlay_begin(width);
