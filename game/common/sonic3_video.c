@@ -69,7 +69,8 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_ENDING_POSE = 8, SPRITE_LBZ_PILLAR = 9, SPRITE_TURBO_SPIKER = 10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
-       SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17, SPRITE_GIANT_RING = 32 };
+       SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
+       SPRITE_HCZ_FAN_BASE = 18, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -91,6 +92,7 @@ static unsigned native_art_owner(unsigned map)
     if(map==0x53518u)return SPRITE_FBZ_PREBOSS;
 #endif
     if(map==S3_ART_BANK+0x161212u)return SPRITE_TURBO_SPIKER;
+    if(map==S3_ART_BANK+0x2E76Cu)return SPRITE_HCZ_FAN_BASE;
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
@@ -216,6 +218,21 @@ static size_t art_kosm(unsigned address,size_t compressed,uint8_t *out,size_t ca
         n+=got;pos+=used;pos=2+((pos-2+15)&~(size_t)15);
     }
     return n==total?n:0;
+}
+/* HCZ1's miniboss loads at tile $304, over the secondary stage bank.
+ * The cartridge no longer needs the old terrain once the camera moves
+ * into the shaft, but the wider left view still exposes those blocks.
+ * The water animation owns tiles through $32F. Restore the static
+ * terrain from $330 onward. */
+enum { HCZ1_SECONDARY_TILE=0x11B, HCZ1_STATIC_TERRAIN_TILE=0x330 };
+static uint8_t s_hcz1_secondary_tiles[0x4760];
+static int hcz1_secondary_tiles_ready(void)
+{
+    static int loaded;
+    if(!loaded)
+        loaded=art_kosm(S3_ART_BANK+0x1BAE7A,0x2252,s_hcz1_secondary_tiles,
+            sizeof s_hcz1_secondary_tiles)==sizeof s_hcz1_secondary_tiles?1:-1;
+    return loaded>0;
 }
 /* MHZ installs its custom layout before three independent decompression
  * queues finish replacing its chunks, blocks and patterns. RAM in between
@@ -2012,28 +2029,34 @@ static int turbo_art_pixel(unsigned attr,int x,int y,uint8_t *pixel)
  * Bind only these known mappings to their original ROM patterns. The guest
  * PLC queues, object lifetimes, palettes and private atlases stay authoritative. */
 typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
+enum { HCZ_FAN_BASE_ART = 5 };
 static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
     {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
     {S3_ART_BANK+0x17060Eu,0xA2,0x160,0x574,1},
     {S3_SPRING_ART,0x2EF,0x600,0x494,0},
-    {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0}
+    {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0},
+    /* The miniboss also overwrites the small fan's moving base. */
+    [HCZ_FAN_BASE_ART]={S3_ART_BANK+0x18FD88u,0x5BF,0xB80,0x3CA,0}
 };
-static struct { uint8_t pixels[0x8C0];int attempted,ready; } s_native_art_cache[5];
+static struct { uint8_t pixels[0xB80];int attempted,ready; }
+    s_native_art_cache[sizeof s_native_art/sizeof *s_native_art];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
-    if(!owner || owner>sizeof s_native_art/sizeof *s_native_art)return 0;
-    const NativeArt *a=&s_native_art[owner-1];unsigned tile=attr&2047u;
+    unsigned index=owner-1;
+    if(owner==SPRITE_HCZ_FAN_BASE)index=HCZ_FAN_BASE_ART;
+    else if(index>=HCZ_FAN_BASE_ART)return 0;
+    const NativeArt *a=&s_native_art[index];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
-    if(!s_native_art_cache[owner-1].attempted) {
-        s_native_art_cache[owner-1].attempted=1;
-        uint8_t *dst=s_native_art_cache[owner-1].pixels;
+    if(!s_native_art_cache[index].attempted) {
+        s_native_art_cache[index].attempted=1;
+        uint8_t *dst=s_native_art_cache[index].pixels;
         size_t bytes=a->kosm?art_kosm(a->address,a->compressed,dst,a->bytes):
             art_nem(g_rom+a->address,a->compressed,dst,a->bytes);
-        s_native_art_cache[owner-1].ready=bytes==a->bytes;
+        s_native_art_cache[index].ready=bytes==a->bytes;
     }
-    if(!s_native_art_cache[owner-1].ready)return 0;
-    unsigned b=s_native_art_cache[owner-1].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
+    if(!s_native_art_cache[index].ready)return 0;
+    unsigned b=s_native_art_cache[index].pixels[(tile-a->tile)*32u+(unsigned)y*4u+(unsigned)x/2u];
     unsigned p=(x&1)?b&15u:b>>4;
     *pixel=p?(uint8_t)(p|((attr>>9)&48u)):0;return 1;
 }
@@ -3048,6 +3071,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * retain their dry/wet stage colours instead of the boss damage flash. */
     int hcz_boss=level && s_frame_zone==1 && !s_frame_act &&
         s_frame_fg_x>=0x3680 && s_frame_fg_y>=0x638;
+    int hcz1_behind_arena=level && s_frame_zone==1 && !s_frame_act &&
+        width>nw && s_frame_fg_x>=0x3500 && s_frame_fg_y>=0x300;
     uint32_t hcz_boss_colors[16];
     if(hcz_boss) {
         unsigned water=((unsigned)s_world_frame[0xF646]<<8)|s_world_frame[0xF647];
@@ -3385,7 +3410,17 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 
         if(!fg.remaining) {
             uint16_t attr=level?world_attr(fg_world,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
-            gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+            unsigned tile=attr&2047u;
+            if(hcz1_behind_arena && nx<0 && wx<0x3500 && tile>=HCZ1_STATIC_TERRAIN_TILE &&
+               tile<HCZ1_SECONDARY_TILE+sizeof s_hcz1_secondary_tiles/32 &&
+               hcz1_secondary_tiles_ready()) {
+                gtile_row_begin(&fg,s_hcz1_secondary_tiles,
+                    (uint16_t)(attr-HCZ1_SECONDARY_TILE),wx,wy);
+                fg.attr=attr;
+                if(fg.remaining>-nx)fg.remaining=-nx;
+            } else {
+                gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+            }
         }
         if(!bg.remaining) {
             if(icz_first_cave && (nx<0 || nx>=nw)) {

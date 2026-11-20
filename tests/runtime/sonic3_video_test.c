@@ -5012,6 +5012,24 @@ int main(int argc,char **argv)
         CHECK(aiz_join_load());
         CHECK(lbz_waiting_load(0));CHECK(lbz_waiting_load(1));
         CHECK(load_aiz_monkey_art());
+        /* The miniboss can overwrite both reservations in live VRAM. The
+         * expanded view must resolve them from the same original stage art. */
+        CHECK(hcz1_secondary_tiles_ready());
+        unsigned hcz_terrain=2166136261u;
+        for(unsigned n=(HCZ1_STATIC_TERRAIN_TILE-HCZ1_SECONDARY_TILE)*32u;
+            n<sizeof s_hcz1_secondary_tiles;++n)
+            hcz_terrain=(hcz_terrain^s_hcz1_secondary_tiles[n])*16777619u;
+        CHECK(hcz_terrain==0xF2149BF7u);
+        unsigned hcz_base=native_art_owner(S3_ART_BANK+0x2E76Cu);
+        CHECK(hcz_base==SPRITE_HCZ_FAN_BASE);
+        unsigned hcz_pixels=2166136261u;
+        for(unsigned tile=0x3D4;tile<0x3E4;++tile)
+            for(int y=0;y<8;++y)for(int x=0;x<8;++x) {
+                uint8_t pixel;
+                CHECK(native_art_pixel(hcz_base,0x4000u|tile,x,y,&pixel));
+                hcz_pixels=(hcz_pixels^pixel)*16777619u;
+            }
+        CHECK(hcz_pixels==0x4FF6C80Au);
 #ifndef SONIC3_STANDALONE
         CHECK(mhz_custom_load());
         /* Native ST Events_bg+1 selects the arena, not Events_fg_4. */
