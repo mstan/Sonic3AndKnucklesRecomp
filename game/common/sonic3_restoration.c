@@ -131,7 +131,10 @@ done:free(scratch);return ok;
 }
 static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,int presentation_camera_x,uint16_t *attr,uint8_t *pixel,uint16_t *color)
 {
-    if(!(active&PROTO_BACKGROUNDS) || (ram[0xF600]&127)!=12 || !ram[0xF711] || ram[0xF664])return 0;
+    unsigned mode=ram[0xF600]&127;
+    /* Mode 8 is the native attract-mode level. Use the same stage artwork
+     * for recorded and player-controlled traversal of the loaded level. */
+    if(!(active&PROTO_BACKGROUNDS) || (mode!=8 && mode!=12) || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
     if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && bg_word(ram+0xEE80)<0x3680)which=0;
     else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA])which=1+ram[0xFE11];
