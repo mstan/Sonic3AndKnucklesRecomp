@@ -3349,7 +3349,8 @@ static void test_icz_outdoor_snow_edge(void)
     static GVDP v;uint32_t native[320]={0},out[796];uint8_t before[65536];
     /* Do not turn empty sky before the bank into a rectangular snow wall.
      * Once the native left edge is within snow, retain its outer fill. */
-    const unsigned cases[][4]={{0x500,0,0x300,0},{0x500,0,0x440,1},{0x500,4,0x300,0},{0x501,0,0x300,0},{0x100,0,0x300,0}};
+    const unsigned cases[][5]={{0x500,0,0x300,0,0},{0x500,0,0x440,1,0},
+        {0x500,0,0x440,1,6},{0x500,4,0x300,0,0},{0x501,0,0x300,0,0},{0x100,0,0x300,0,0}};
     for(unsigned n=0;n<sizeof cases/sizeof *cases;++n) {
         CHECK(configure("off"));CHECK(configure("32:9"));presentation_reset();
         memset(g_ram,0,sizeof g_ram);memset(&v,0,sizeof v);s3_video_set_world_cell(NULL);
@@ -3357,6 +3358,7 @@ static void test_icz_outdoor_snow_edge(void)
         word(g_ram,0x8000,64);word(g_ram,0x8002,4);word(g_ram,0x8008,0x8100);
         word(g_ram,0x800A,0x8120);word(g_ram,0xEEAE,0x3C);
         word(g_ram,0xEE80,cases[n][2]);word(g_ram,0xEEC2,cases[n][1]);g_ram[0x8108]=1;
+        if(cases[n][4])g_ram[0x8100+cases[n][4]]=1;
         for(unsigned i=0;i<64;++i)word(g_ram,128+i*2,1);
         for(unsigned i=0;i<4;++i)word(g_ram,0x9008+i*2,0x4002);
         v.reg[1]=64;v.reg[2]=0x30;v.reg[4]=7;v.reg[5]=0x7C;
@@ -3366,7 +3368,9 @@ static void test_icz_outdoor_snow_edge(void)
         memcpy(before,g_ram,sizeof before);scanline(&v,0,native,320,out,796);
         for(int x=0;x<796;++x) {
             int nx=x-s_native_x,wx=nx+(int)cases[n][2];
-            int snow=(wx>=0x400 && wx<0x480) || (cases[n][3] && nx<0 && wx>=0);
+            int snow=(wx>=0x400 && wx<0x480) ||
+                (cases[n][4] && wx>=0x300 && wx<0x380) ||
+                (cases[n][3] && nx<0 && wx>=(cases[n][4]?0x380:0));
             CHECK(out[x]==(snow?0xFFFFFFFFu:0xFF000000u));
         }
         CHECK(!memcmp(before,g_ram,sizeof before));

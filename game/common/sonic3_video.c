@@ -3329,24 +3329,24 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             world_art_row_init(&aiz_bg,s_background_frame,art->blocks,art->video.vram,by,1);
         }
     }
-    /* The snowboard hill begins partway across each wrapped layout row.
-     * Its unused leading chunks are empty on the cartridge. Extend the
-     * solid snow at that boundary into the extra left view; do not expose
-     * rectangular holes behind the hill, or change its native geometry. */
-    int icz_snow_edge=0;
-    uint16_t icz_snow_attr=0;
-    if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event) {
+    /* Vertical wrapping can put several disconnected snowboard slopes on
+     * one layout row. Extend the snow bank at the native left edge into
+     * its immediately preceding gap, while retaining earlier terrain. */
+    int icz_snow_first=0,icz_snow_edge=0;
+    if(bg_world && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event &&
+       s_left<camera && world_attr(s_world_frame,camera,wy,0)==0x4002) {
         unsigned p=0x8008u+(((unsigned)wy>>5)&0x3Cu);
         unsigned row=((unsigned)s_world_frame[p]<<8)|s_world_frame[p+1];
-        if(row>=0x8088 && row+16<=0x9000)for(unsigned i=0;i<16;++i) {
-            if(!s_world_frame[row+i])continue;
-            uint16_t attr=world_attr(s_world_frame,(int)i*128,wy,0);
-            /* A bank ahead of the camera does not cover the sky behind it.
-             * Extend only a solid snow row already at the native left edge. */
-            if(attr==0x4002 && world_attr(s_world_frame,camera,wy,0)==0x4002){
-                icz_snow_edge=(int)i*128;icz_snow_attr=attr;
+        unsigned left=s_left>0?(unsigned)s_left/128:0;
+        unsigned bank=(unsigned)camera/128;
+        if(row>=0x8088 && row<0x9000 && bank<0x9000u-row && s_world_frame[row+bank]) {
+            while(bank>left && s_world_frame[row+bank-1])--bank;
+            if(bank>left && world_attr(s_world_frame,(int)bank*128,wy,0)==0x4002) {
+                unsigned gap=bank-1;
+                while(gap>left && !s_world_frame[row+gap-1])--gap;
+                icz_snow_first=(int)gap*128;
+                icz_snow_edge=(int)bank*128;
             }
-            break;
         }
     }
     /* Select optional scenery providers once, using this row's immutable
@@ -3416,8 +3416,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
             b=plane_attr(v,base_b,reference_bx,by);bp=pattern_pixel(v,b,reference_bx,by);
         }
-        if(nx<0 && wx>=0 && wx<icz_snow_edge && !ap) {
-            a=icz_snow_attr;ap=pattern_pixel(v,a,wx,wy);
+        if(nx<0 && wx>=icz_snow_first && wx<icz_snow_edge && !ap) {
+            a=0x4002;ap=pattern_pixel(v,a,wx,wy);
         }
         if(file_select) {
             /* Keep one portrait, extending only its edge colours. Mirroring
