@@ -3099,8 +3099,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int wy=camera_y+line;
     /* The top of DEZ3's Plane B holds a fixed 320-column Earth image.
      * Its separately scrolled rows start at Y=$E0 and own the runway. */
-    int dez3_earth=dez3_flipped && width>nw && !hs_a &&
-        ((fg_scroll&1023)+line)<0xE0;
+    int dez3_row=(fg_scroll&1023)+line;
+    int dez3_earth=dez3_flipped && width>nw && !hs_a && dez3_row<0xE0;
+    int dez3_floor_front=0;
+    /* The collapse controller advances the real front by one $20px
+     * block. The hardware ring repeats its holes every 512px, but the
+     * floor's authored strip repeats only on intact world columns. */
+    if(dez3_flipped && width>nw && dez3_row>=0xE0 && dez3_row<0x100 &&
+       s_frame_bg_event>=8)
+        dez3_floor_front=(s_world_frame[0xEEE8]<<8)|s_world_frame[0xEEE9];
     /* HCZ1_Resize restores three shared colors at camera X=$900, Y=$500.
      * Only the extra left view still contains the retired current tunnel.
      * Keep its original colors there, following the native scene fade; the
@@ -3532,6 +3539,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(ay<0)ay=0;
             a=plane_attr(v,base_a,ax,ay);
             ap=pattern_pixel(v,a,ax,ay);
+        }
+        if(dez3_floor_front>0x2C0 && (nx<0 || nx>=nw) &&
+           wx>=0 && wx<s_stage_width && (wx<0x2C0 || wx>=dez3_floor_front)) {
+            /* Column 3 supplies intact floor outside the actual collapse.
+             * The holes keep their installed terrain and cutout colors. */
+            int ax=wx<0x180?wx:0x180+(wx&0x7F);
+            a=world_attr(s_world_frame,ax,dez3_row,1);
+            ap=pattern_pixel(v,a,ax,dez3_row);
         }
         if(s_render->mhz_custom && nx>=0 && nx<nw) {
             int ax=nx-hs_a,ay=line+(fg_scroll&1023);
