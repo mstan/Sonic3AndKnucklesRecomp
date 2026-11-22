@@ -233,6 +233,25 @@ static const GameDebugCommand s3k_commands[] = {
 };
 
 static void gameplay_frame(uint64_t frame) { (void)frame; s3_gameplay_apply(g_ram); }
+static int s3k_game_instruction(uint32_t pc)
+{
+    if (pc == 0x30706) {
+        /* The small fan shares its on-screen flag with its audible range.
+         * Keep the original horizontal range during the Hydrocity Act 1 drop. */
+        if (s3_video_canvas_width() > 320 && s3k_read16(0xFFFE10) == 0x0100) {
+            uint32_t fan = 0xFF0000 | (g_cpu.A[0] & 0xFFFF);
+            int x = (int16_t)(s3k_read16(fan + S3K_OBJ_X_POS) - s3k_read16(0xFFEE80));
+            int radius = s3k_read8(fan + 7);
+            if (x + radius < 0 || x - radius >= 320) {
+                recomp_tail_call(0x3070C);
+                return 1;
+            }
+        }
+        return 0;
+    }
+    return s3k_instruction(pc);
+}
+
 static int sound_dispatch(uint32_t pc) { return s3_sound_dispatch_miss(pc) || trilogy_dispatch(pc); }
 const GameSpec g_game_spec = {
     .state_build_id         = SONIC3_STATE_BUILD_ID,
@@ -246,7 +265,7 @@ const GameSpec g_game_spec = {
     .save_resume_pc         = s3_state_resume_pc,
     .video                  = &sonic3_video,
     .video_default          = "fit",
-    .instruction_hook       = s3k_instruction,
+    .instruction_hook       = s3k_game_instruction,
     .main_cpu_divisor       = s3_sk_main_cpu_divisor,
     /* Seats 2-4 can take over the first Knuckles & Knuckles extras; seat 2
      * still drives native Tails in Sonic & Tails games. */

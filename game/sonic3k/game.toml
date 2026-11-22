@@ -1207,6 +1207,11 @@ kind = "game_hook"
 addr = 0x1BEC6
 kind = "game_hook"
 
+# Hydrocity small fan sound uses the cartridge viewport.
+[[widescreen_site]]
+addr = 0x30706
+kind = "game_hook"
+
 # Optional Mushroom Valley font reconstruction and native menu text.
 [[widescreen_site]]
 addr = 0x7B40
