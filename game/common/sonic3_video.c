@@ -1172,6 +1172,10 @@ static void spawn_scene(void)
     load_placements();s_loader_active=1;
     int camera=ram16(0xEE78),cy=ram16(0xEE7C),w=enabled()?s_requested_width:320;
     int lo,hi;activation_bounds(camera,w,&lo,&hi);
+    int native_lo=(camera-128)&~127,native_hi=(camera&~127)+640;
+#ifndef SONIC3_STANDALONE
+    int doomsday=ram16(0xFE10)==0xC00;
+#endif
     for(unsigned i=0;i<s_collapsed_count;) {
         unsigned placement=s_collapsed_platforms[i];
         unsigned x=s_placements[placement].x;
@@ -1195,8 +1199,7 @@ static void spawn_scene(void)
              * its respawn bit while its cursor stays past that placement.
              * Rechecking that cell each tick would resurrect it immediately.
              * Only admit additional cells outside the original interval. */
-            if((int)p->x>=((camera-128)&~127) &&
-               (int)p->x<(camera&~127)+640)continue;
+            if((int)p->x>=native_lo && (int)p->x<native_hi)continue;
             /* Native clears bit 7 for live placements before a bonus/act
              * reload. A separate host-loaded latch outlives that clear and
              * suppresses valid incoming actors. Keep native respawn state
@@ -1215,9 +1218,14 @@ static void spawn_scene(void)
              * leaving no capsule after victory. HCZ's gate and large fan
              * also change the global current inhibit/palette on activation.
              * Preserve the native timing of these scripted operations. */
-            if(((int)p->x<((camera-128)&~127) || (int)p->x>=(camera&~127)+640) &&
-                (code==S3_AIZ_MINIBOSS_CUTSCENE || code==S3_EGG_CAPSULE ||
-                 code==S3_HCZ_LARGE_FAN || code==S3_HCZ_WATER_RUSH))continue;
+            if(code==S3_AIZ_MINIBOSS_CUTSCENE || code==S3_EGG_CAPSULE ||
+               code==S3_HCZ_LARGE_FAN || code==S3_HCZ_WATER_RUSH)continue;
+#ifndef SONIC3_STANDALONE
+            /* DDZ asteroids drift away from their authored spawn cell.
+             * The native cursor has already passed rear cells; revisiting
+             * those cells can respawn a rock directly in the left margin. */
+            if(doomsday && (int)p->x<native_lo && code==0x821DE)continue;
+#endif
             int y=p->y&4095;
             if(!(p->y&0x8000)) {
                 if((int16_t)ram16(0xEE18)<0) {
