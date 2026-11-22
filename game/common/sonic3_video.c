@@ -2635,6 +2635,18 @@ static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int n
             after=icz_intro_scroll(camera+delta,by);
             goto completed_phase;
         }
+        if(s_frame_zone==6 && !s_frame_act && delta>0) {
+            /* LBZ1_Deform uses 1/16 above $D0 and four finer water bands.
+             * Use the same slopes and offsets at the bounded viewport so
+             * the opening backdrop only pans once the view can move. */
+            int band=by<0xD0?0:by<0xE8?1:by<0xF0?2:by<0xF8?3:4;
+            static const int slopes[]={8,16,17,18,19};
+            static const int offsets[]={10,4,-2,7,0};
+            before=camera*slopes[band]/128+offsets[band];
+            int distance=((-scroll-before+256)&511)-256;
+            if(distance < -1 || distance > 1)return scroll;
+            return -((s_camera+delta)*slopes[band]/128+offsets[band]);
+        }
         if(s_frame_zone==8 && !s_frame_act) {
             /* SOZ1 has seven bands: 1/16, then five 8px steps to 5/32.
              * A's independent one-pixel heatwave is not the camera phase. */
