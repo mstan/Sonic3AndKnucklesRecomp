@@ -3201,6 +3201,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * live Plane B canvas edited by the boss, independent of its layout. */
     int ssz_canvas=bg_world && s_frame_zone==10 && !s_frame_act && s_frame_bg_event;
     int dez3_canvas=bg_world && dez3_flipped;
+    int dez3_boss_side=(s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3];
     /* HCZ2 replaces its moving wall in two bottom-up passes before the
      * normal panorama is installed. Preserve those mixed uploaded rows. */
     int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
@@ -3535,6 +3536,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        /* The other Death Egg boss layouts occupy unused chunks of this
+         * plane. Expose only the active boss layout beyond the VDP view. */
+        if(dez3_canvas && (nx<0 || nx>=nw) &&
+           (!dez3_boss_side || (source_bx>=0x400)!=(dez3_boss_side>=0x400)))
+            bp=0;
         if(dez3_earth && (nx<0 || nx>=nw)) {
             /* Reflect the outer half of the cartridge image and continue
              * its horizon's slope. The fixed native columns stay exact. */
