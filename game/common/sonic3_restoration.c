@@ -136,10 +136,11 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,int pre
      * for recorded and player-controlled traversal of the loaded level. */
     if(!(active&PROTO_BACKGROUNDS) || (mode!=8 && mode!=12) || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
-    /* Horizontal approach locks before the vertical drop completes.
-     * Switch back to the arena art when both native camera limits are met. */
+    /* The drop locks the native view to the retail arena, while the
+     * expanded view still sees the outgoing prototype scenery to its left. */
     int hcz_arena=bg_word(ram+0xEE80)>=0x3680 && bg_word(ram+0xEE84)>=0x638;
-    if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && !hcz_arena)which=0;
+    int hcz_outgoing=presentation_camera_x+sx<0x3680;
+    if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && (!hcz_arena || hcz_outgoing))which=0;
     else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA])which=1+ram[0xFE11];
     else return 0;
     const Background *bg=&backgrounds[which];if(!bg->pixels)return 0;
