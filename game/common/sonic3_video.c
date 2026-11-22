@@ -2255,6 +2255,17 @@ static int ending_cinematic(void)
 #endif
     return 0;
 }
+#ifndef SONIC3_STANDALONE
+static int mhz_arena_chase_active(void)
+{
+    return s_frame_level && s_frame_zone==7 && s_frame_act==1 && s_frame_bg_event==24 &&
+           s_world_frame[0xEEB3]==12 && s_world_frame[0xEED3];
+}
+static int mhz_arena_has_looped(void)
+{
+    return s_world_frame[0xEEDA] || s_world_frame[0xEEDB];
+}
+#endif
 /* Rare ship presentation has its own compiled body. In ordinary scenes,
  * keep the canonical loop free of rotor bounds, scroll and pixel work. */
 #define S3_DRAW_SCENE_FUNCTION draw_scene_sprites_ordinary
@@ -3134,7 +3145,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * The wider left view still contains stage bricks using that line;
      * retain their dry/wet stage colours instead of the boss damage flash. */
     int hcz_boss=level && s_frame_zone==1 && !s_frame_act &&
-        s_frame_fg_x>=0x3680 && s_frame_fg_y>=0x638;
+        hcz_arena_locked(s_world_frame);
     int hcz1_behind_arena=level && s_frame_zone==1 && !s_frame_act &&
         width>nw && s_frame_fg_x>=0x3500 && s_frame_fg_y>=0x300;
     uint32_t hcz_boss_colors[16];
@@ -3146,6 +3157,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         if(wet)source+=32;
         for(unsigned i=0;i<16;++i)
             hcz_boss_colors[i]=genesis_dac_cram_to_argb(scene_art_color(scene_read16(source+i*2),v),GENESIS_DAC_NORMAL);
+        if(!s_interpolating && s_handoff_palette_capture && line<224)
+            memcpy(s_handoff_art.hcz_brick_colors[line],hcz_boss_colors,sizeof hcz_boss_colors);
     }
     int bg_world=level && !special;
     /* The fire is a streamed Plane B composition, not the background at
@@ -3229,6 +3242,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 #endif
     int mhz_arena_fg=mhz_arena_band && s_world_frame[0xEED2];
     int mhz_arena_bg=mhz_arena_band && s_world_frame[0xEED3];
+    /* Once the boss chase has looped, negative screen X can expose the
+     * approach again after the native camera subtracts $200. The extra
+     * columns are still looking at the previous lap of the arena. */
+    int mhz_retired_approach=0;
+#ifndef SONIC3_STANDALONE
+    mhz_retired_approach=width>nw && mhz_arena_chase_active() &&
+        mhz_arena_has_looped() && s_frame_fg_x>=0x4080;
+#endif
     int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || lbz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
@@ -3370,6 +3391,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * here instead of rediscovering an inactive handoff for every pixel. */
     int handoff_pixels=level && width>320 && s_handoff_art.valid &&
         s_handoff_art.zone==(int)s_frame_zone && s_frame_act==1;
+    const uint32_t *handoff_bricks=s_frame_zone==1 && (handoff_loading || handoff_pixels) &&
+        hcz_arena_locked(s_handoff_art.world)?s_handoff_art.hcz_brick_colors[line]:NULL;
     int icz_outgoing=handoff_pixels && s_frame_zone==5 && camera-origin<0;
     int icz_outgoing_x=0;
     WorldArtRow icz_outgoing_bg;
@@ -3511,6 +3534,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int world_floor=level && !dez3_flipped && !ddz_canvas;
             int ax=world_floor?wx:nx-hs_a;
             int ay=world_floor?wy:line+((dez3_flipped?fg_scroll:v->vsram[0])&1023);
+            if(mhz_retired_approach && world_floor && nx<0 && ax<0x4000)ax=0x4000+(ax&0x1FF);
             uint16_t attr;
             if(ddz_canvas) {
                 ay=line+(fg_scroll&1023);
@@ -3714,13 +3738,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int joined=join_pixels && (nx<0 || nx>=320) &&
             aiz_join_sample(v,s_display->aiz_join,s_camera,nx,wx,wy,&a,&ap);
         if(joined)apalette=palette;
-        int handoff_bg=0;
+        int handoff_bg=0,hcz_outgoing_bricks=0;
         if(handoff_pixels && wx<0) {
             if(handoff_art_sample(s_frame_zone,s_frame_act,wx,wy,&a,&ap)) {
                 joined=1;
                 /* Hydrocity's old bricks still use the outgoing raster
                  * palette while the incoming act slides into view. */
                 apalette=s_frame_zone==1?s_handoff_art.colors[line]:palette;
+                hcz_outgoing_bricks=handoff_bricks!=NULL;
             }
             if(s_frame_zone==1)
                 handoff_bg=handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
@@ -3800,8 +3825,11 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ac=genesis_dac_cram_to_argb(scene_art_color(4,v),GENESIS_DAC_NORMAL);
         if(hcz_tunnel && nx<0 && wx>=0x360 && wx<0x900 && ap>=56 && ap<=58)
             ac=hcz_tunnel_colors[ap-56];
-        if(hcz_boss && nx<0 && wx<0x3680 && ap>=16 && ap<32)
-            ac=hcz_boss_colors[ap-16];
+        if(ap>=16 && ap<32) {
+            if(hcz_outgoing_bricks)ac=handoff_bricks[ap-16];
+            else if(hcz_boss && nx<0 && wx<0x3680)
+                ac=(handoff_bricks?handoff_bricks:hcz_boss_colors)[ap-16];
+        }
         uint32_t bc=bp?(restored_background && restored_color!=0xFFFF?
             genesis_dac_cram_to_argb(restored_art_color(restored_color,v),GENESIS_DAC_NORMAL):plane_color_row(&plane_colors,line,b,bp,bpalette)):owned_backdrop;
         out[x]=foreground?ac:bc;

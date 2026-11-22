@@ -10,6 +10,9 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
 #ifndef SONIC3_STANDALONE
     int mhz_rotors=s_frame_level && s_frame_zone==7 && s_frame_act==1 &&
         (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16;
+    int mhz_chase=width>320 && mhz_arena_chase_active();
+    int mhz_retired_approach=mhz_chase && mhz_arena_has_looped() && s_camera>=0x4080;
+    int mhz_approach=mhz_chase && !mhz_arena_has_looped();
 #endif
 #endif
     unsigned card_slot=UINT_MAX;int card_offset=0;
@@ -92,7 +95,15 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
          * the ordinary sprite pixel path free of optional rotor work. */
         int first=0,last=drawn_width,center=(width-320)/2;
         if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY) {
-            if(base<origin) {if(last>origin-base)last=origin-base;}
+            if(base<origin) {
+                if(last>origin-base)last=origin-base;
+#ifndef SONIC3_STANDALONE
+                /* The first lap still has a real approach behind the
+                 * arena. Loop copies cannot extend into that terrain. */
+                if(mhz_approach && first<origin+0x4000-s_camera-base)
+                    first=origin+0x4000-s_camera-base;
+#endif
+            }
             else if(first<origin+320-base)first=origin+320-base;
         } else if(s->hud==SCENE_MHZ_ROTOR) {
             if(base<center) {if(last>center-base)last=center-base;}
@@ -101,6 +112,13 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             if(first<center-base)first=center-base;
             if(last>center+320-base)last=center+320-base;
         }
+#ifndef SONIC3_STANDALONE
+        else if(mhz_retired_approach && world && slot && slot<SCENE_SLOTS &&
+                s_display->ox[slot]<0x4000 && first<origin-base) {
+            /* The approach's live placements can outlast its visible terrain. */
+            first=origin-base;
+        }
+#endif
         for(int i=first;i<last;++i) {
 #else
         for(int i=0;i<drawn_width;++i) {

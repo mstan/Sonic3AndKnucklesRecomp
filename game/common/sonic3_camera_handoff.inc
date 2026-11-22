@@ -26,10 +26,16 @@ typedef struct {
     unsigned tick;
     uint8_t world[0x10000];
     uint32_t colors[224][64];
+    uint32_t hcz_brick_colors[224][16];
     GVDP video;
 } CameraHandoffArt;
 static CameraHandoffArt s_handoff_art;
 static int s_handoff_palette_capture;
+static int hcz_arena_locked(const uint8_t *world)
+{
+    return ((unsigned)world[0xEE80]<<8 | world[0xEE81])>=0x3680 &&
+           ((unsigned)world[0xEE84]<<8 | world[0xEE85])>=0x638;
+}
 static void handoff_art_capture(const GVDP *v,const uint8_t *world,int camera,
                                 unsigned zone,unsigned act,unsigned event)
 {
@@ -101,6 +107,7 @@ static void handoff_art_state(S3StateIO *io,int sparse)
     S3_STATE(io,s_handoff_art.world);S3_STATE(io,s_handoff_art.video.vram);
     S3_STATE(io,s_handoff_art.video.vsram);S3_STATE(io,s_handoff_art.video.reg);
     S3_STATE(io,s_handoff_art.colors);
+    if(!sparse || zone==1)S3_STATE(io,s_handoff_art.hcz_brick_colors);
 }
 
 static int handoff_origin(int camera,int desired,int width,int map_width,
