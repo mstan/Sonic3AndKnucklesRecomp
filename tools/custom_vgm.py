@@ -11,6 +11,7 @@ import struct
 
 MASTER=53693175
 LIMIT=64*1024*1024
+MAX_LOOP_STATES=1024
 
 def convert(data):
     if data[:2]==b'\x1f\x8b':
@@ -33,6 +34,26 @@ def convert(data):
     loop=0x1c+u32(0x1c)if u32(0x1c)else 0
     if loop and not start<=loop<end:raise ValueError('Invalid VGM loop offset')
     events=[];banks={};blocks={};streams={};time=Fraction(0);pc=start;seek=0;loop_event=0xffffffff;loop_time=0
+    loop_entries = {}
+    loop_prefixes = {}
+    loop_sample = None
+    checking_prefix = replaying = False
+
+    def loop_state():
+        state = []
+        for ident, stream in sorted(streams.items()):
+            setup = tuple(stream.get(field) for field in ('configured', 'bank', 'step', 'base', 'frequency'))
+            playback = ()
+            if stream.get('active'):
+                playback = (stream['position'], stream['left'], stream['reverse'], stream['loop'],
+                            stream['next'] - time)
+                if stream['loop']:
+                    playback += (stream['first'], stream['count'])
+            state.append((ident, setup, playback))
+        # Blocks are append-only on the first pass and are skipped on replay.
+        bank_layout = tuple((kind, len(bank), len(blocks[kind])) for kind, bank in sorted(banks.items()))
+        return seek, bank_layout, tuple(state)
+
     def emit(at,kind,a,b=0):
         tick=int(at*MASTER/44100)
         events.append((tick,kind,a,b,0,0))
@@ -66,8 +87,20 @@ def convert(data):
         if count<=0 or min(first,last)<0 or max(first,last)>=len(bank):raise ValueError('Invalid VGM DAC stream extent')
         s.update(active=True,position=first,first=first,count=count,left=count,next=time,reverse=reverse,loop=repeat)
     while pc<end:
-        if pc==loop:loop_event=len(events);loop_time=int(time*MASTER/44100)
+        if pc == loop:
+            state = loop_state()
+            if state in loop_entries:
+                loop_event, loop_time = loop_entries[state]
+                break
+            if len(loop_entries) >= MAX_LOOP_STATES:
+                raise ValueError('VGM loop playback state does not repeat within importer limits')
+            loop_sample = time
+            loop_event, loop_time = len(events), int(time * MASTER / 44100)
+            loop_entries[state] = (loop_event, loop_time)
+            checking_prefix = True
+        command_pc = pc
         op=take(1)[0]
+        wait = 0
         if op==0:continue
         if op==0x50:
             if not psg:raise ValueError('VGM writes an undeclared PSG')
@@ -76,18 +109,22 @@ def convert(data):
             if not fm:raise ValueError('VGM writes an undeclared YM2612')
             a,b=take(2);emit(time,op-0x51,a,b)
             if op==0x52 and a==0x27 and b&0xc0:raise ValueError('Timer-driven CSM synthesis is not supported')
-        elif op==0x61:advance(int.from_bytes(take(2),'little'))
-        elif op in (0x62,0x63):advance(735 if op==0x62 else 882)
-        elif 0x70<=op<=0x7f:advance((op&15)+1)
+        elif op==0x61:wait=int.from_bytes(take(2),'little')
+        elif op in (0x62,0x63):wait=735 if op==0x62 else 882
+        elif 0x70<=op<=0x7f:wait=(op&15)+1
         elif op==0x67:
             marker,kind=take(2);size=int.from_bytes(take(4),'little')
             if marker!=0x66 or kind!=0:raise ValueError('Use uncompressed YM2612 PCM data blocks')
-            raw=take(size);bank=banks.setdefault(kind,bytearray());blocks.setdefault(kind,[]).append((len(bank),size));bank.extend(raw)
+            raw = take(size)
+            if not replaying:
+                bank = banks.setdefault(kind, bytearray())
+                blocks.setdefault(kind, []).append((len(bank), size))
+                bank.extend(raw)
         elif op==0xe0:seek=int.from_bytes(take(4),'little')
         elif 0x80<=op<=0x8f:
             bank=banks.get(0,b'')
             if seek>=len(bank)or not fm:raise ValueError('VGM DAC seek exceeds its data bank')
-            emit(time,1,0x2a,bank[seek]);seek+=1;advance(op&15)
+            emit(time,1,0x2a,bank[seek]);seek+=1;wait=op&15
         elif 0x90<=op<=0x95:
             length={0x90:4,0x91:4,0x92:5,0x93:10,0x94:1,0x95:4}[op];raw=take(length);ident=raw[0]
             if ident==255:
@@ -118,13 +155,35 @@ def convert(data):
                 if length==2:size=size*s.get('frequency',0)//1000
                 elif length==3:size=(len(banks.get(s.get('bank'),b''))-offset-s.get('base',0)+s.get('step',1)-1)//s.get('step',1)
                 begin(s,offset,size,bool(mode&16),bool(mode&128))
-        elif op==0x66:break
+        elif op == 0x66:
+            if not loop:
+                break
+            if loop_sample is None or time == loop_sample:
+                raise ValueError('VGM loop must reach a timed command boundary')
+            replaying = True
+            pc = loop
         else:raise ValueError(f'Unsupported Genesis VGM command ${op:02X}')
+        if not wait:
+            continue
+        if checking_prefix:
+            # Starts/stops before the first wait can replace a carried DAC
+            # stream without emitting any of its samples. Reuse a pass when
+            # both its zero-time writes and its resulting state match.
+            checking_prefix = False
+            prefixes = loop_prefixes.setdefault((command_pc, loop_state()), [])
+            count = len(events) - loop_event
+            matching = next((entry for entry in prefixes if entry[2] == count and all(
+                events[entry[0] + i][1:] == events[loop_event + i][1:] for i in range(count))), None)
+            if matching is not None:
+                del events[loop_event:]
+                loop_event, loop_time, _ = matching
+                break
+            prefixes.append((loop_event, loop_time, count))
+        advance(wait)
     else:raise ValueError('VGM has no end command')
     total=int(time*MASTER/44100)
     if not events or total<=0:raise ValueError('VGM has no timed music')
     if loop and(loop_event==0xffffffff or loop_time>=total):raise ValueError('VGM loop must reach a timed command boundary')
-    if loop and any(s.get('active')for s in streams.values()):raise ValueError('End DAC streams before the VGM loop boundary')
     if loop and(len(events)-loop_event)*MASTER>(total-loop_time)*500000:raise ValueError('VGM loop writes registers too frequently')
     # A data block's commands can precede stream-generated writes at the same
     # time; stable ordering preserves the file order for equal timestamps.

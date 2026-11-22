@@ -56,6 +56,36 @@ stream=bytes.fromhex('676600040000008090a0b0900002002a9100000100920044ac00009500
 events=convert(vgm(stream));assert struct.unpack_from('<I',events,8)[0]==4
 assert [struct.unpack_from('<Q',events,i)[0]for i in range(32,len(events),16)]==[int(n*MASTER/44100)for n in range(4)]
 looped=convert(vgm(bytes.fromhex('50866250876266'),3));assert struct.unpack_from('<I',looped,12)[0]==1 and struct.unpack_from('<Q',looped,24)[0]==735*MASTER//44100
+
+dac_bank = bytes.fromhex('676600040000008090a0b0')
+dac_setup = bytes.fromhex('900002002a9100000100')
+dac_frequency = bytes.fromhex('920044ac0000')
+dac_start = bytes.fromhex('9500000000')
+
+def dac_loop(intro, body, loop_index, loop_sample, total_samples, values):
+    normalized = convert(vgm(intro + body + b'\x66', len(intro)))
+    _, _, count, index, total, start = struct.unpack_from('<4sIIIQQ', normalized)
+    assert count == len(values) and index == loop_index
+    assert start == loop_sample * MASTER // 44100 and total == total_samples * MASTER // 44100
+    events = [struct.unpack_from('<QBBBBI', normalized, pos) for pos in range(32, len(normalized), 16)]
+    assert [event[0] for event in events] == [n * MASTER // 44100 for n in range(total_samples)]
+    assert [event[3] for event in events] == values
+
+# Frequency and start commands at loop entry replace the unfinished stream
+# before it writes DAC data, so a second full copy is unnecessary.
+dac_loop(dac_bank + dac_setup, dac_frequency + dac_start + b'\x71', 0, 0, 2, [0x80, 0x90])
+dac_loop(dac_setup, dac_bank + dac_frequency + dac_start + b'\x71', 0, 0, 2, [0x80, 0x90])
+# If the restart follows a wait, the previous pass really does supply data.
+dac_loop(dac_bank + dac_setup + dac_frequency + dac_start, b'\x71' + dac_start + b'\x70',
+         3, 3, 6, [0x80, 0x90, 0x80, 0x90, 0xa0, 0x80])
+# A stream's own repeat can span several trips around the file-level loop.
+three_samples = bytes.fromhex('676600030000008090a0')
+dac_repeat = bytes.fromhex('9500000001')
+dac_loop(three_samples + dac_setup + dac_frequency + dac_repeat, b'\x71',
+         0, 0, 6, [0x80, 0x90, 0xa0, 0x80, 0x90, 0xa0])
+# Equal pre-wait state does not make the startup writes equal.
+dac_loop(dac_bank, bytes.fromhex('80e00100000070'), 1, 1, 2, [0x80, 0x90])
+
 source=root/'My Genesis song.vgz';source.write_bytes(gzip.compress(vgm(stream)));result=import_custom(source,cache,receipt,'aiz-1');assert b'kind=vgm\n'in result.read_bytes()
 for invalid in [vgm(b'\x52'),vgm(b'\x54\x00\x00\x66'),vgm(b'\x80\x66'),vgm(b'\x66'),vgm(b'\x50\x90\x62\x66',1),vgm(b'\x67\x66\x40\xff\xff\xff\x7f')]:
  try:convert(invalid)
