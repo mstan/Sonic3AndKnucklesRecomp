@@ -570,7 +570,7 @@ static void test_icz_exit_snow_extent(void)
             draw_scene_sprites(&v,row?0x80:0x60,out,(int)width,origin,pal);
             for(int x=0;x<(int)width;++x){
                 int nx=x-origin;
-                CHECK(out[x]==(nx>=320 && nx>=0x48A4-(int)cam?pal[33]:0));
+                CHECK(out[x]==(nx>=0x48A4-(int)cam?pal[33]:0));
             }
         }
     }

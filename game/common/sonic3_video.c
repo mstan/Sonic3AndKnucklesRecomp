@@ -1114,17 +1114,12 @@ static void extend_icz_snow(unsigned map,unsigned frame,unsigned gfx,unsigned fl
        ram16(0xFE10)!=0x501 || !enabled() || s_requested_width<=320 ||
        (zoom && zoom!=256) || x+ram16(0xEE80)!=0x4894 ||
        y+ram16(0xEE84)!=0x6D0)return;
-    /* The last authored snow pile ends inside the expanded exit view.
-     * Continue its two original pieces to the right edge, only while that
-     * real pile is published. Slot owner 7 clips this presentation-only
-     * continuation outside the native viewport; no collision object is added. */
+    /* During the outgoing fade the fixed camera can see a few pixels past
+     * the last authored pile. Start its continuation at the end of that
+     * mapping so it stays joined as the viewport moves over it. */
     int right=(s_requested_width+320+1)/2;
-    for(int sx=x+32;sx-16<right;sx+=32){
-        unsigned first=s_capture_frame->count;
+    for(int sx=x+32;sx-16<right;sx+=32)
         add_mapping(map,frame,gfx,flags,sx,y,0,0,zoom);
-        for(unsigned n=first;n<s_capture_frame->count;++n)
-            s_capture_frame->sprites[n].slot=(uint16_t)(s_capture_slot|(7u<<8));
-    }
 }
 static void load_placements(void)
 {

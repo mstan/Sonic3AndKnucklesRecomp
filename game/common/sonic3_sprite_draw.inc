@@ -109,7 +109,6 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             if(x<0 || x>=width || (s_priority[x]&2))continue;
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
-            if((s->slot>>8)==7 && x<origin+320)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
             /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
             if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
