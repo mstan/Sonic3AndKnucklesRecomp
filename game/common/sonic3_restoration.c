@@ -136,11 +136,15 @@ static int background_pixel(const uint8_t *ram,int x,int y,int sx,int sy,int pre
      * for recorded and player-controlled traversal of the loaded level. */
     if(!(active&PROTO_BACKGROUNDS) || (mode!=8 && mode!=12) || !ram[0xF711] || ram[0xF664])return 0;
     unsigned which;
-    /* The drop locks the native view to the retail arena, while the
-     * expanded view still sees the outgoing prototype scenery to its left. */
+    /* Obj_HCZMiniboss locks X before the vertical drop ends. The masonry
+     * immediately left of that shaft is already part of its retail
+     * backdrop. Keep the donor backdrop behind the farther approach. */
     int hcz_arena=bg_word(ram+0xEE80)>=0x3680 && bg_word(ram+0xEE84)>=0x638;
-    int hcz_outgoing=presentation_camera_x+sx<0x3680;
-    if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && (!hcz_arena || hcz_outgoing))which=0;
+    int hcz_locked_x=bg_word(ram+0xEE14)==0x3680 && bg_word(ram+0xEE16)==0x3680;
+    int world_x=presentation_camera_x+sx;
+    int hcz_shaft=world_x>=0x3480 && world_x<0x3500 && (hcz_locked_x || hcz_arena);
+    if(!standalone_sk && ram[0xFE10]==1 && !ram[0xFE11] && !hcz_shaft &&
+       (!hcz_arena || world_x<0x3680))which=0;
     else if(!standalone_s3 && ram[0xFE10]==4 && ram[0xFE11]<2 && !ram[0xF7AA])which=1+ram[0xFE11];
     else return 0;
     const Background *bg=&backgrounds[which];if(!bg->pixels)return 0;

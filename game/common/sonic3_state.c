@@ -82,7 +82,7 @@ void s3_state_call_resume(uint32_t pc)
 
 static void state(S3StateIO *io)
 {
-    unsigned version = 7;
+    unsigned version = 8;
     if (s3_state_peek_unsigned(io, version) != version) io->ok = 0;
     S3_STATE(io, version);
     s3_sound_state(io);

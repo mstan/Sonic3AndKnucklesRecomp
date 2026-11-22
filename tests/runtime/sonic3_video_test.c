@@ -4939,13 +4939,18 @@ static void test_mhz_arena_installed_band(void)
 static void test_mhz_arena_canvas_repeats(void)
 {
 #ifndef SONIC3_STANDALONE
-    CHECK(mhz_arena_margin_opacity(0x4042,0,0)==0);
-    CHECK(mhz_arena_margin_opacity(0x405C,0,0)==127);
-    CHECK(mhz_arena_margin_opacity(0x427E,0,0)==0);
-    CHECK(mhz_arena_margin_opacity(0x4082,1,0)==0);
-    CHECK(mhz_arena_margin_opacity(0x40A4,1,0)==127);
-    CHECK(mhz_arena_margin_opacity(0x40B8,1,0)==255);
-    CHECK(mhz_arena_margin_opacity(0x427E,1,1)==255);
+    /* The relative positions of the retiring and incoming formations
+     * each advance a few pixels during the guest's 512px camera rebase. */
+    const unsigned rows[]={47,40,30,17};
+    const int outgoing[]={-12,-20,-33,-49},incoming[]={333,348,371,400};
+    for(unsigned n=0;n<4;++n) {
+        CHECK(mhz_arena_barrier_x(0x427E,rows[n])==outgoing[n]);
+        CHECK(mhz_arena_barrier_x(0x4082,rows[n])==incoming[n]);
+        int tail=mhz_arena_barrier_x(0x4082+0x200,rows[n]);
+        int lead=mhz_arena_barrier_x(0x427E-0x200,rows[n]);
+        CHECK(tail<outgoing[n] && tail>=outgoing[n]-4);
+        CHECK(lead>incoming[n] && lead<=incoming[n]+4);
+    }
     static SceneFrame frame,original;static GVDP v;static uint8_t before[65536];
     uint32_t expanded[1595],native[1595],palette[64]={0};
     CHECK(configure("off"));CHECK(configure("32:9"));
@@ -4964,36 +4969,30 @@ static void test_mhz_arena_canvas_repeats(void)
     s_frame_level=1;s_frame_zone=7;s_frame_act=1;s_camera=s_camera_y=0;
     s_interpolating=0;test_atlas_enabled=test_private_planes=0;test_plane_color_tiles=NULL;
     if(s_priority_capacity<1593){s_priority=realloc(s_priority,1593);CHECK(s_priority);s_priority_capacity=1593;}
-    const int positions[]={503,-7,3,510},canvases[]={796,1593};
-    for(unsigned c=0;c<2;++c)for(unsigned phase=0;phase<4;++phase) {
+    const int canvases[]={796,1593};
+    for(unsigned c=0;c<2;++c) {
         int canvas=canvases[c],origin=(canvas-320)/2;
-        memset(&frame,0,sizeof frame);frame.scene=1;frame.world_tag=0x702;frame.count=1;
-        frame.sprites[0]=(SceneSprite){positions[phase],0,0x3AF,5,0,256,1};
+        memset(&frame,0,sizeof frame);frame.scene=1;frame.world_tag=0x702;frame.count=3;
+        frame.sprites[0]=(SceneSprite){-8,0,0x3AF,5,0,256,SPRITE_MHZ_ARENA<<8};
+        frame.sprites[1]=(SceneSprite){-8,0,0x3AF,5,0,256,SPRITE_MHZ_ARENA_COPY<<8};
+        frame.sprites[2]=(SceneSprite){313,0,0x3AF,5,0,256,SPRITE_MHZ_ARENA_COPY<<8};
         memcpy(&original,&frame,sizeof original);
-        repeat_scene_pieces(0,1,-origin,canvas-origin,SPRITE_MHZ_ARENA_COPY);
-        CHECK(frame.count>1);
-        for(unsigned n=1;n<frame.count;++n) {
-            CHECK((frame.sprites[n].slot>>8)==SPRITE_MHZ_ARENA_COPY);
-            CHECK(frame.sprites[n].y==original.sprites[0].y && frame.sprites[n].attr==original.sprites[0].attr);
-            CHECK((frame.sprites[n].x-original.sprites[0].x)%512==0);
-        }
+        original.count=1;original.sprites[0].slot=1;
         for(int x=0;x<canvas+2;++x)expanded[x]=native[x]=0xDEADBEEF;
         memset(s_priority,0,(size_t)canvas);s_display=&original;
         draw_scene_sprites(&v,0,native+1,canvas,origin,palette);
         memset(s_priority,0,(size_t)canvas);s_display=&frame;
         draw_scene_sprites(&v,0,expanded+1,canvas,origin,palette);
         for(int x=0;x<canvas;++x) {
-            if(x>=origin && x<origin+320)CHECK(expanded[x+1]==native[x+1]);
-            else {
-                int distance=(x-origin-positions[phase])%512;if(distance<0)distance+=512;
-                CHECK(expanded[x+1]==(distance<16?palette[1]:0xDEADBEEF));
-            }
+            int sx=x-origin;
+            if(sx>=0 && sx<320)CHECK(expanded[x+1]==native[x+1]);
+            else CHECK(expanded[x+1]==((sx>=-8 && sx<0) || (sx>=320 && sx<329)?palette[1]:0xDEADBEEF));
         }
         CHECK(expanded[0]==0xDEADBEEF && expanded[canvas+1]==0xDEADBEEF);
         CHECK(!memcmp(before,g_ram,sizeof before));
     }
-    /* Fractional presentation must use the same 512px lift for the native
-     * slot and every copy. Large-wrap rejection would otherwise stutter. */
+    /* Native slots retain their native 512px lift. Projected formations
+     * have an independent pose and do not interpolate an unrelated slot. */
     static SceneFrame saved_a,saved_b;
     static uint8_t saved_world[65536];
     SceneFrame *a=&ix_previous()->scene,*b=&ix_current()->scene;
@@ -5013,15 +5012,16 @@ static void test_mhz_arena_canvas_repeats(void)
         a->code[slot]=b->code[slot]=code?0x557C8:0x5576A;
         a->ox[slot]=reverse?0:506;b->ox[slot]=reverse?506:0;
         a->oy[slot]=50;b->oy[slot]=54;
-        for(unsigned owner=0;owner<2;++owner) {
-            SceneSprite moving={0,0,0,0,0,256,(uint16_t)(slot|(owner?SPRITE_MHZ_ARENA_COPY<<8:0))};
-            int dx=0,dy=0;presentation_object_delta(&moving,&dx,&dy);
-            CHECK(dx==(reverse?3:-3) && dy==-2);
-            ix_current()->width=320;dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
-            CHECK(dx==0 && dy==-2);ix_current()->width=796;
-            word(world,0xA80A,0);dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
-            CHECK(dx==0 && dy==-2);word(world,0xA80A,0xB128);
-        }
+        SceneSprite moving={0,0,0,0,0,256,(uint16_t)(slot|(SPRITE_MHZ_ARENA<<8))};
+        int dx=0,dy=0;presentation_object_delta(&moving,&dx,&dy);
+        CHECK(dx==(reverse?3:-3) && dy==-2);
+        ix_current()->width=320;dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+        CHECK(dx==0 && dy==-2);ix_current()->width=796;
+        word(world,0xA80A,0);dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+        CHECK(dx==0 && dy==-2);word(world,0xA80A,0xB128);
+        moving.slot=SPRITE_MHZ_ARENA_COPY<<8;
+        dx=dy=0;presentation_object_delta(&moving,&dx,&dy);
+        CHECK(dx==0 && dy==0);
     }
     memcpy(a,&saved_a,sizeof *a);memcpy(b,&saved_b,sizeof *b);
     memcpy(world,saved_world,sizeof saved_world);ix_current()->width=saved_width;

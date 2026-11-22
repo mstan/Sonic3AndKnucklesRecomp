@@ -808,7 +808,6 @@ typedef struct {
     AizPlanePose aiz_plane;
 #ifndef SONIC3_STANDALONE
     MhzDeparture mhz_departure;
-    uint8_t mhz_margin_dim; /* opacity reduction owned by this arena publication */
 #endif
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
     uint8_t competition_sat[640]; /* paired lower-view upload */
@@ -989,10 +988,8 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         q->slot=(uint16_t)(s_capture_slot|(owner<<8));
     }
 }
-/* Screen-loop actors own a512px canvas, although the expanded view can see
- * both sides at once. Reuse their published pieces, preserving their order
- * and art, rather than allocating or repositioning native objects. */
-static void repeat_scene_pieces(unsigned first,unsigned end,int lo,int hi,unsigned owner)
+/* The imported pylon repeats on its original 512px canvas. */
+static void repeat_scene_pieces(unsigned first,unsigned end,int lo,int hi)
 {
     for(unsigned n=first;n<end;++n) {
         const SceneSprite source=s_capture_frame->sprites[n];
@@ -1001,7 +998,6 @@ static void repeat_scene_pieces(unsigned first,unsigned end,int lo,int hi,unsign
         for(repeat+=512;repeat<hi;repeat+=512)
             if(repeat!=source.x && s_capture_frame->count<SCENE_SPRITES) {
                 SceneSprite fill=source;fill.x=repeat;
-                if(owner)fill.slot=(uint16_t)((fill.slot&255u)|(owner<<8));
                 s_capture_frame->sprites[s_capture_frame->count++]=fill;
             }
     }
@@ -1019,16 +1015,60 @@ static int mhz_arena_object(unsigned object,unsigned map,unsigned code)
 }
 
 #ifndef SONIC3_STANDALONE
-static unsigned mhz_arena_margin_opacity(int camera,int looped,int final_lap)
+/* sub_5550C supplies the pillar and spikes with seven samples of its
+ * 48-row shear. Keep the signed result before the cartridge masks it to
+ * 9 bits. A formation can then enter from the right and leave on the left
+ * even after the native camera and object slots are reused for the next lap. */
+static int mhz_arena_barrier_x(int camera,unsigned row)
 {
-    /* The guest first projects the barriers at $4040, then moves them to
-     * their next lane as the camera rebases from $4280 to $4080. Keep this
-     * turn outside the visible margin until the next lane is ready. */
-    int distance=camera-(looped?0x4090:0x4048);
-    if(!final_lap && 0x4270-camera<distance)distance=0x4270-camera;
-    if(distance<=0)return 0;
-    if(distance>=40)return 255;
-    return (unsigned)distance*255/40;
+    int d=camera-0x4180;
+    int shear=d-((d*0xAC00)>>16)-0x18;
+    int step=shear*0x10000/0x30;
+    return 0x4238-camera+((step*(int)row)>>16);
+}
+
+static void capture_mhz_arena_barriers(unsigned priority,int camera,int camera_y,
+                                      int mask,int left,int right)
+{
+    static const uint8_t rows[]={47,40,40,30,30,17,17};
+    unsigned lap=ram16(0xEEDA),current_pattern=ram16(0xEED8);
+    int reach=(right-left)/320+1;
+    int first=-(lap<(unsigned)reach?(int)lap:reach);
+    int last=ram16(0xEEC6)?0:reach;
+    unsigned pattern_table=0x558E8u+(ram16(0xFF08)==3?0x10u:0);
+    for(unsigned i=0;i<sizeof rows;++i) {
+        unsigned object=ram16(0xA808+2*i);
+        if(object<0xB000 || object>=0xCFE0 || ram16(object+8)!=(priority<<7))continue;
+        unsigned code=scene_read32(0xFF0000u+object);
+        if(code!=(i?0x557C8u:0x5576Au) ||
+           scene_read32(0xFF0000u+object+0xC)!=0x55908u)continue;
+        unsigned flags=g_ram[object+4],height=g_ram[object+6],radius=g_ram[object+7];
+        for(int relative=first;relative<=last;++relative) {
+            int x=mhz_arena_barrier_x(camera-relative*512,rows[i]);
+            if(x+(int)radius<=left || x-(int)radius>=right ||
+               (x-(int)radius>=0 && x+(int)radius<=320))continue;
+            int y=0x300;
+            if(i) {
+                unsigned pattern=relative?scene_read8(pattern_table+((lap+relative)&15u)):current_pattern;
+                if(ram16(object+0x30)) {
+                    if(pattern!=4)continue;
+                    pattern=0;
+                }
+                unsigned lane=ram16(object+0x2E);
+                if(lane>=3 || pattern>4)continue;
+                y=scene_read16(0x558C2u+(pattern*4+lane)*2);
+            }
+            y=((y-camera_y+(int)height)&mask)-(int)height;
+            if(y+(int)height<0 || y-(int)height>=224)continue;
+            /* This is its own lap's pose. It must not inherit the native
+             * slot's motion or height when the guest reuses that slot. */
+            s_capture_slot=0;
+            unsigned mapped=s_capture_frame->count;
+            add_mapping(0x55908,g_ram[object+0x22],ram16(object+0xA),flags,x,y,0,0,0);
+            for(unsigned n=mapped;n<s_capture_frame->count;++n)
+                s_capture_frame->sprites[n].slot=SPRITE_MHZ_ARENA_COPY<<8;
+        }
+    }
 }
 #endif
 
@@ -1476,9 +1516,6 @@ static void capture_objects(void)
     s_capture_frame->scene=bonus_stage()?3:(level_ready() || demo_level_exit())?1:0;
     if(s_capture_frame->scene!=3)s_capture_frame->bonus_card_valid=0;
     s_capture_frame->world_tag=s_capture_frame->scene==1?(unsigned)ram16(0xFE10)+1u:0u;
-#ifndef SONIC3_STANDALONE
-    s_capture_frame->mhz_margin_dim=0;
-#endif
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
     s_capture_frame->preview_knux=s_capture_frame->scene==1 && s3_knux_preview_needed(g_ram);
@@ -1537,12 +1574,8 @@ static void capture_objects(void)
     int mhz_rotors=s_requested_width>320 && s_capture_frame->scene==1 &&
         ram16(0xFE10)==0x701 && ram16(0xEEC0)==16 && enabled();
     int mhz_arena=s_requested_width>320 && s_capture_frame->scene==1 &&
-        ram16(0xFE10)==0x701 && g_ram[0xEED3] && enabled();
-#ifndef SONIC3_STANDALONE
-    if(mhz_arena && ram16(0xEEC2)==24 && ram16(0xEEB2)==12)
-        s_capture_frame->mhz_margin_dim=(uint8_t)(255-mhz_arena_margin_opacity(cam,
-            ram16(0xEEDA)!=0,ram16(0xEEC6)!=0));
-#endif
+        ram16(0xFE10)==0x701 && g_ram[0xEED3] && ram16(0xEEC2)==24 &&
+        ram16(0xEEB2)==12 && enabled();
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1661,13 +1694,16 @@ static void capture_objects(void)
             if(arena)for(unsigned n=mapped_first;n<s_capture_frame->count;++n)
                 s_capture_frame->sprites[n].slot=(uint16_t)((s_capture_frame->sprites[n].slot&255u)|
                     (SPRITE_MHZ_ARENA<<8));
-            if(pylon || arena)repeat_scene_pieces(mapped_first,s_capture_frame->count,
-                left-cam,left-cam+s_requested_width,arena?SPRITE_MHZ_ARENA_COPY:0);
+            if(pylon)repeat_scene_pieces(mapped_first,s_capture_frame->count,
+                left-cam,left-cam+s_requested_width);
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
                 gfx,flags,x,y,zoom);
             else extend_hcz_rush(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
             if(!multi)extend_icz_snow(map,g_ram[o+0x22],gfx,flags&127,x,y,zoom);
         }
+#ifndef SONIC3_STANDALONE
+        if(mhz_arena)capture_mhz_arena_barriers(pri,cam,cy,mask,left-cam,left-cam+s_requested_width);
+#endif
     }
     if(s_capture_frame->scene==3){
         unsigned tick=ram16(0xFE04);
@@ -1727,7 +1763,6 @@ static void publish_sprites(void)
     dst->aiz_plane=s_build.aiz_plane;
 #ifndef SONIC3_STANDALONE
     dst->mhz_departure=s_build.mhz_departure;
-    dst->mhz_margin_dim=s_build.mhz_margin_dim;
 #endif
     dst->aiz_join=s_build.aiz_join;
     memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
@@ -1919,7 +1954,6 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.aiz_plane=s_display->aiz_plane;
 #ifndef SONIC3_STANDALONE
         s_display_frame.mhz_departure=s_display->mhz_departure;
-        s_display_frame.mhz_margin_dim=s_display->mhz_margin_dim;
 #endif
         s_display_frame.aiz_join=s_display->aiz_join;
         memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
@@ -3270,13 +3304,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 #endif
     int mhz_arena_fg=mhz_arena_band && s_world_frame[0xEED2];
     int mhz_arena_bg=mhz_arena_band && s_world_frame[0xEED3];
-    /* Once the boss chase has looped, negative screen X can expose the
-     * approach again after the native camera subtracts $200. The extra
-     * columns are still looking at the previous lap of the arena. */
-    int mhz_retired_approach=0;
+    /* Only the first approach and the actual final departure use the
+     * terrain adjoining the $4080..$427F repeat. Across a camera rebase
+     * the wide view still sees each side of the same arena. */
+    int mhz_retired_approach=0,mhz_repeat_ahead=0;
 #ifndef SONIC3_STANDALONE
-    mhz_retired_approach=width>nw && mhz_arena_chase_active() &&
-        mhz_arena_has_looped() && s_frame_fg_x>=0x4080;
+    if(width>nw && mhz_arena_chase_active()) {
+        mhz_retired_approach=mhz_arena_has_looped() && s_frame_fg_x>=0x4080;
+        mhz_repeat_ahead=!s_world_frame[0xEEC6] && !s_world_frame[0xEEC7];
+    }
 #endif
     int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || lbz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
@@ -3562,7 +3598,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             int world_floor=level && !dez3_flipped && !ddz_canvas;
             int ax=world_floor?wx:nx-hs_a;
             int ay=world_floor?wy:line+((dez3_flipped?fg_scroll:v->vsram[0])&1023);
-            if(mhz_retired_approach && world_floor && nx<0 && ax<0x4000)ax=0x4000+(ax&0x1FF);
+            if(world_floor && ((mhz_retired_approach && nx<0 && ax<0x4080) ||
+                               (mhz_repeat_ahead && nx>=nw && ax>=0x4280))) {
+                ax=0x4080+((ax-0x4080)&0x1FF);
+            }
             uint16_t attr;
             if(ddz_canvas) {
                 ay=line+(fg_scroll&1023);

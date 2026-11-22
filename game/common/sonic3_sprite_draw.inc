@@ -12,8 +12,6 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
         (((unsigned)s_world_frame[0xEEC0]<<8)|s_world_frame[0xEEC1])==16;
     int mhz_chase=width>320 && mhz_arena_chase_active();
     int mhz_retired_approach=mhz_chase && mhz_arena_has_looped() && s_camera>=0x4080;
-    int mhz_approach=mhz_chase && !mhz_arena_has_looped();
-    unsigned mhz_margin_opacity=255u-s_display->mhz_margin_dim;
 #endif
 #endif
     unsigned card_slot=UINT_MAX;int card_offset=0;
@@ -86,7 +84,11 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
         /* Native camera scroll may advance while a completed host frame is
          * retained. Reproject its world coordinates, not its old screen
          * coordinates; otherwise stationary rings jitter with the camera. */
-        if(world)base+=s_display->camera_x-s_camera;
+        if(world) {
+            int camera_delta=s_display->camera_x-s_camera;
+            if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY)camera_delta=((camera_delta+256)&511)-256;
+            base+=camera_delta;
+        }
         int iy=(line-y)*256/(int)zoom;
         if(s->size&0x20u)iy=(iy+dy)&31;
         if(s->attr&0x1000)iy=ch*8-1-iy;
@@ -95,22 +97,13 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
          * the rotor's native/margin ownership once for that piece, leaving
          * the ordinary sprite pixel path free of optional rotor work. */
         int first=0,last=drawn_width,center=(width-320)/2;
-#ifndef SONIC3_STANDALONE
-        unsigned piece_owner=s->slot>>8;
-        unsigned margin_opacity=piece_owner==SPRITE_MHZ_ARENA ||
-            piece_owner==SPRITE_MHZ_ARENA_COPY?mhz_margin_opacity:255;
-#endif
         if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY) {
             if(base<origin) {
                 if(last>origin-base)last=origin-base;
-#ifndef SONIC3_STANDALONE
-                /* The first lap still has a real approach behind the
-                 * arena. Loop copies cannot extend into that terrain. */
-                if(mhz_approach && first<origin+0x4000-s_camera-base)
-                    first=origin+0x4000-s_camera-base;
-#endif
-            }
-            else if(first<origin+320-base)first=origin+320-base;
+            } else if(first<origin+320-base)first=origin+320-base;
+        } else if((s->slot>>8)==SPRITE_MHZ_ARENA) {
+            if(first<origin-base)first=origin-base;
+            if(last>origin+320-base)last=origin+320-base;
         } else if(s->hud==SCENE_MHZ_ROTOR) {
             if(base<center) {if(last>center-base)last=center-base;}
             else if(first<center+320-base)first=center+320-base;
@@ -131,10 +124,6 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
 #endif
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
-#if S3_DRAW_MHZ_ROTORS && !defined(SONIC3_STANDALONE)
-            unsigned opacity=margin_opacity<255 && (x<origin || x>=origin+320)?margin_opacity:255;
-            if(!opacity)continue;
-#endif
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
@@ -238,19 +227,7 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                     S3_KNUX_PREVIEW_PALETTE+(p-16)*2),v),GENESIS_DAC_NORMAL);
             /* Screen-relative coordinates are not HUD priority: AIZ2's
              * small Eggman must still pass behind the high tree canopy. */
-            if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1)) {
-#if S3_DRAW_MHZ_ROTORS && !defined(SONIC3_STANDALONE)
-                if(opacity<255) {
-                    uint32_t blended=0xFF000000u;
-                    for(unsigned shift=0;shift<24;shift+=8) {
-                        unsigned foreground=(c>>shift)&255u,background=(out[x]>>shift)&255u;
-                        blended|=((foreground*opacity+background*(255-opacity)+127)/255)<<shift;
-                    }
-                    c=blended;
-                }
-#endif
-                out[x]=c;
-            }
+            if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
         }
     }
 }
