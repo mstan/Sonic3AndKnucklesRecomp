@@ -3234,6 +3234,9 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
     int bg_scroll=flipped_planes?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
+    /* The outdoor ice panes form one perspective across the 512px canvas.
+     * Continue each side's angle in the expanded margins. */
+    int icz_pane_margins=icz_outdoor_background && by>=0x80 && by<0xB0;
     int mhz_eye=INT_MIN;
     hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
     /* Once the cave camera is selected, its full spatial layout is already
@@ -3608,6 +3611,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         const uint32_t *bpalette=background_run_palette;
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world || dez3_canvas) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
+            if(icz_pane_margins && (nx<0 || nx>=nw)) {
+                if(canvas_x<0)canvas_x&=255;
+                else if(canvas_x>=512)canvas_x=256+(canvas_x&255);
+            }
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
         }
