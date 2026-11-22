@@ -180,6 +180,7 @@ static unsigned presentation_fg_scroll(int row,unsigned fallback);
 static unsigned presentation_fg_identity(int row,unsigned fallback);
 static unsigned presentation_cram(int row,unsigned color,unsigned fallback);
 static void presentation_scroll(int row,int *a,int *b);
+static int presentation_icz_pane_position(const GVDP *v,unsigned hscroll_base);
 static int presentation_camera(int axis,int fallback);
 static int installed_actor_camera(const GVDP *v,int level,int zone,int act,int event);
 static int presentation_bg_scroll(int fallback);
@@ -3237,6 +3238,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     /* The outdoor ice panes form one perspective across the 512px canvas.
      * Continue each side's angle in the expanded margins. */
     int icz_pane_margins=icz_outdoor_background && by>=0x80 && by<0xB0;
+    /* The 40 independently deformed rows start below the offshore ice.
+     * Keep the authored pane silhouettes together as they drift. */
+    int icz_drifting_panes=width>nw && icz_pane_margins && by>=0x88;
+    int icz_pane_position=icz_drifting_panes?presentation_icz_pane_position(v,hsbase):0;
     int mhz_eye=INT_MIN;
     hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
     /* Once the cave camera is selected, its full spatial layout is already
@@ -3611,7 +3616,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         const uint32_t *bpalette=background_run_palette;
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world || dez3_canvas) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
-            if(icz_pane_margins && (nx<0 || nx>=nw)) {
+            if(icz_drifting_panes) {
+                /* $C4 falls in the clear vertical gap between the two
+                 * sets of panes. Extend the full canvas with its left and
+                 * right sections and keep their joins between pieces. */
+                enum { PANE_GAP=0xC4 };
+                int pane_x=(int)((unsigned)(x-bg_origin+icz_pane_position+PANE_GAP)&1023u);
+                canvas_x=pane_x<PANE_GAP?pane_x:
+                    pane_x<512+PANE_GAP?pane_x-PANE_GAP:pane_x-512;
+            } else if(icz_pane_margins && (nx<0 || nx>=nw)) {
                 if(canvas_x<0)canvas_x&=255;
                 else if(canvas_x>=512)canvas_x=256+(canvas_x&255);
             }
@@ -4284,6 +4297,35 @@ static unsigned presentation_column_scroll(unsigned column,unsigned fallback)
     int a=unwrap(ix_previous()->context.video.vsram[column],b);
     return (unsigned)interpolation_lerp(a,b,128);
 }
+static int icz_pane_position(const uint8_t *world,int scroll)
+{
+    unsigned camera=(world[0xEE80]<<8)|world[0xEE81];
+    unsigned clock=(world[0xFE04]<<8)|world[0xFE05];
+    int expected=(int)(((camera+(clock>>1))>>1)&1023u);
+    /* ICZ2_OutDeform masks the original drift to 7 bits. Recover the
+     * preceding or following half from the phase actually uploaded to VDP. */
+    int installed=(int)((unsigned)-scroll&127u);
+    int delta=(int)((unsigned)(installed-expected+64)&127u)-64;
+    return (int)((unsigned)(expected+delta)&1023u);
+}
+
+static int presentation_icz_pane_position(const GVDP *v,unsigned hscroll_base)
+{
+    enum { LAST_PANE_ROW=0xAF };
+    if(!s_interpolating) {
+        int scroll=(int16_t)vram16(v,hscroll_base+LAST_PANE_ROW*4+2);
+        return icz_pane_position(s_world_frame,scroll);
+    }
+    const InterpSnapshot *previous=ix_previous(),*current=ix_current();
+    int after=icz_pane_position(current->context.world,current->hs[LAST_PANE_ROW][1]);
+    if(previous->context.bg_event!=4 || previous->context.world[0xEEE8] ||
+       previous->context.world[0xEEE9])return after;
+    int before=icz_pane_position(previous->context.world,previous->hs[LAST_PANE_ROW][1]);
+    /* Interpolate across the expanded strip's 1024px wrap. */
+    before=after+(int)((unsigned)(before-after+512)&1023u)-512;
+    return interpolation_lerp(before,after,64);
+}
+
 static void presentation_scroll(int row,int *a,int *b)
 {
     if(s_interpolating && row>=0 && row<IX_LINES) {
