@@ -3069,9 +3069,15 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int restored_canvas=level && s_background_override &&
         s_background_override(s_world_frame,0,0,0,0,s_frame_fg_x,NULL,NULL,NULL);
     int icz_intro_background=level && s_frame_zone==5 && !s_frame_act && !s_frame_bg_event;
+    /* ICZ2_OutDeform supplies every scroll band, including the timed ice
+     * panes. Center that installed outdoor canvas when the foreground is
+     * clamped at the edge, so viewport movement cannot reverse its scroll. */
+    int icz_outdoor_background=level && s_frame_zone==5 && s_frame_act &&
+        s_frame_bg_event==4 && !(s_world_frame[0xEEE8] | s_world_frame[0xEEE9]);
     int centered_background=level && ((s_frame_zone>=0x20 && s_frame_zone<=0x5B) ||
         intro_background || fbz_background || soz_background || hcz_background || lbz_background ||
-        mgz_background || cnz_background || icz_intro_background || s_frame_zone==7 || restored_canvas);
+        mgz_background || cnz_background || icz_intro_background || icz_outdoor_background ||
+        s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
     if(flipped_planes){unsigned swap=base_a;base_a=base_b;base_b=swap;}
