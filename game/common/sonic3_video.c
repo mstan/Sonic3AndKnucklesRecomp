@@ -2426,6 +2426,14 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
     int hs_a=(int16_t)vram16(v,hsbase);
     int hs_b=(int16_t)vram16(v,hsbase+2);
     int clean_save=s_frame_menu==MENU_SAVE && load_menu_map();
+    unsigned mode=g_ram[0xF600];
+    int course_player_panels=s_frame_menu==MENU_COMPETITION && (mode&127u)==0x40 && hs_a==-0x58;
+    /* The cartridge clears two 9x8-tile priority rectangles for Match
+     * Race, or one centered rectangle for Time Attack. In the extra left
+     * view the portraits stay visible when A scrolls vertically. Keep
+     * their shade rectangles at the portraits' screen-space rows. */
+    unsigned player_panel_priority=((mode&128u)?(unsigned)(line-80)<64u:
+        (unsigned)(line-32)<64u || (unsigned)(line-128)<64u)?0u:128u;
     for(int x=0;x<width;++x) {
         int nx=x-origin,sx=(int)((int64_t)x*nw/width);
         unsigned a=0,b=0,sp=0,opaque=0,high=0,shadow_op=0,hilite_op=0;
@@ -2459,6 +2467,8 @@ static void render_menu(const GVDP *v,int line,int nw,uint32_t *out,int width,
                 uint16_t attr=plane_attr(v,base_a,ax,ay);
                 unsigned p=pattern_pixel(v,attr,ax,ay);
                 a=menu_plane(attr,p)|((attr&0x8000u)?128u:0u);
+                if(course_player_panels && ax>=16 && ax<88)
+                    a=(a&127u)|player_panel_priority;
             }
         }
         if(nx>=0 && nx<nw) {
