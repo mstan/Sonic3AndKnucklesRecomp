@@ -3348,7 +3348,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         /* IceCap moves the player and camera into the next layout before
          * the first boss. Keep the outgoing cave's half-speed scroll where
          * the wide viewport still sees behind the rebase. */
-        icz_outgoing_x=(camera+0x6880)/2-0x1D80;
+        /* The eased crop moves the display eye before guest X advances.
+         * Project that motion into the cave's half-speed coordinate too. */
+        int outgoing_camera=camera+(width-nw)/2-origin;
+        icz_outgoing_x=(outgoing_camera+0x6880)/2-0x1D80;
         int old_y=(camera_y-0x100)>>1;
         world_art_row_init(&icz_outgoing_bg,s_handoff_art.world,s_handoff_art.world+0x9000,
                            s_handoff_art.video.vram,old_y+line,1);
@@ -3650,7 +3653,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(s_frame_zone==1)
                 handoff_bg=handoff_art_background(s_frame_zone,s_frame_act,wx,x,line,width,nw,&b,&bp);
             else if(icz_outgoing && nx<0) {
-                bp=world_art_row_pixel(&icz_outgoing_bg,nx+icz_outgoing_x,&b);
+                int bx=x-(width-nw)/2+icz_outgoing_x;
+                bp=world_art_row_pixel(&icz_outgoing_bg,bx,&b);
                 handoff_bg=1;
             }
             if(handoff_bg)bpalette=s_handoff_art.colors[line];
