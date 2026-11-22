@@ -44,7 +44,7 @@ static void margin_pose_scanline(const MarginPose *pose,int line,uint32_t *out,
 }
 
 #ifndef SONIC3_STANDALONE
-static unsigned cnz_actor_code(const uint8_t *actor)
+static unsigned margin_actor_code(const uint8_t *actor)
 {
     return (unsigned)actor[0]<<24|(unsigned)actor[1]<<16|
            (unsigned)actor[2]<<8|actor[3];
@@ -73,10 +73,10 @@ static void cnz_waiting_scanline(int line,uint32_t *out,int width,
     int waiting=0,defeated=0,capsule=0,cannon_ready=0;
     for(unsigned o=0xB094;o<=0xCAE2;o+=0x4A) {
         const uint8_t *actor=s_world_frame+o;
-        unsigned code=cnz_actor_code(actor);
+        unsigned code=margin_actor_code(actor);
         if(code==0x6E47E || code==0x6E4B8 ||
            (code==0x6E4C6 && !actor[0x05]))waiting=1;
-        if(code==0x8488A && cnz_actor_code(actor+0x34)==0x6E6E4)defeated=1;
+        if(code==0x8488A && margin_actor_code(actor+0x34)==0x6E6E4)defeated=1;
         if(code==0x86540 && actor[0x10]==0x49 && actor[0x11]==0x90)capsule=1;
         if(code==0x6E778)cannon_ready=1;
     }

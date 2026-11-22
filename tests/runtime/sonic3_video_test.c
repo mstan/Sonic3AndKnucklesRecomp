@@ -4827,7 +4827,7 @@ static void test_mhz_capsule_waiting_pose(void)
         s_camera=test==2?0x45C0:test==3?0x46C0:0x4420;
         if(test==4)memset(s_priority,2,796); /* real sprites keep priority */
         int line=test==1?124:156;
-        mhz_capsule_preview_scanline(line,out+1,796,238,palette);
+        boss_capsule_preview_scanline(line,out+1,796,238,palette);
         int px=238+0x4640-s_camera-4;
         for(int x=0;x<796;++x) {
             int drawn=test!=2 && test!=4 && x>=px && x<px+8 && (x<238 || x>=558);
@@ -4836,12 +4836,26 @@ static void test_mhz_capsule_waiting_pose(void)
         CHECK(out[0]==0xDEADBEEF && out[797]==0xDEADBEEF);
         CHECK(!memcmp(before,s_world_frame,sizeof before));
     }
-    CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
-    scene.count=1;scene.sprites[0].slot=5u<<8;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));scene.count=0;
-    longword(s_world_frame,0xB128,0x75FD4);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
-    longword(s_world_frame,0xB128,0x85668);longword(s_world_frame,0xB15C,0x761B2);CHECK(mhz_capsule_preview_needed(s_world_frame,&scene));
-    longword(s_world_frame,0xB15C,0x761B0);CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
-    longword(s_world_frame,0xB128,0x761E8);s_world_frame[0xFE11]=0;CHECK(!mhz_capsule_preview_needed(s_world_frame,&scene));
+    CHECK(boss_capsule_preview_needed(s_world_frame,&scene));
+    scene.count=1;scene.sprites[0].slot=5u<<8;CHECK(!boss_capsule_preview_needed(s_world_frame,&scene));scene.count=0;
+    longword(s_world_frame,0xB128,0x75FD4);CHECK(!boss_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x85668);longword(s_world_frame,0xB15C,0x761B2);CHECK(boss_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB15C,0x761B0);CHECK(!boss_capsule_preview_needed(s_world_frame,&scene));
+    longword(s_world_frame,0xB128,0x761E8);s_world_frame[0xFE11]=0;CHECK(!boss_capsule_preview_needed(s_world_frame,&scene));
+    s_world_frame[0xFE10] = 5;
+    s_world_frame[0xFE11] = 1;
+    scene.world_tag = 0x502;
+    longword(s_world_frame, 0xB128, 0x85668);
+    longword(s_world_frame, 0xB15C, 0x71D80);
+    CHECK(boss_capsule_preview_needed(s_world_frame, &scene));
+    longword(s_world_frame, 0xB128, 0x8488A);
+    longword(s_world_frame, 0xB15C, 0x71D9E);
+    CHECK(boss_capsule_preview_needed(s_world_frame, &scene));
+    scene.count = 1;
+    CHECK(!boss_capsule_preview_needed(s_world_frame, &scene));
+    scene.count = 0;
+    longword(s_world_frame, 0xB15C, 0x71D80);
+    CHECK(!boss_capsule_preview_needed(s_world_frame, &scene));
     memset(&s_native_art_cache[4],0,sizeof s_native_art_cache[4]);s_display=NULL;
 #endif
 }

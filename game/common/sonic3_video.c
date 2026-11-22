@@ -2116,41 +2116,55 @@ static int giant_ring_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t
 #endif
 }
 #include "sonic3_margin_pose.inc"
-/* The original boss allocates its stationary capsule only after falling
- * below the native screen. A wider view already sees that authored ledge.
- * Extend the waiting body/button there until their real published sprites
- * take over; native allocation, collision and the camera pan are untouched. */
-static int mhz_capsule_preview_needed(const uint8_t *ram,const SceneFrame *scene)
+/* Both bosses allocate their stationary capsule late in the native defeat
+ * sequence. The wider viewport can see its landing site sooner. Let the
+ * published capsule take over from the two cartridge poses without changing
+ * native allocation, collision, timer, or the boss exit. */
+static int boss_capsule_preview_needed(const uint8_t *ram, const SceneFrame *scene)
 {
 #ifndef SONIC3_STANDALONE
-    if(!scene || scene->scene!=1 || scene->world_tag!=0x702 ||
-       ram[0xFE10]!=7 || ram[0xFE11]!=1 || ram[0xB038]>2)return 0;
-    for(unsigned n=0;n<scene->count;++n)
-        if((scene->sprites[n].slot>>8)==5)return 0;
-    for(unsigned o=0xB000;o<=0xCAE2;o+=0x4A) {
-        unsigned code=((unsigned)ram[o]<<24)|((unsigned)ram[o+1]<<16)|
-            ((unsigned)ram[o+2]<<8)|ram[o+3];
-        unsigned callback=((unsigned)ram[o+0x34]<<24)|((unsigned)ram[o+0x35]<<16)|
-            ((unsigned)ram[o+0x36]<<8)|ram[o+0x37];
-        if(code==0x76164 || code==0x761E8 || code==0x7623C ||
-           (code==0x85668 && callback==0x761B2))return 1;
+    unsigned zone = ram[0xFE10];
+    if (!scene || scene->scene != 1 || scene->world_tag != (zone << 8) + 2u ||
+        ram[0xFE11] != 1 || (zone != 5 && zone != 7) || (zone == 7 && ram[0xB038] > 2))
+        return 0;
+    for (unsigned n = 0; n < scene->count; ++n)
+        if ((scene->sprites[n].slot >> 8) == 5)
+            return 0;
+    for (unsigned o = 0xB000; o <= 0xCAE2; o += 0x4A) {
+        unsigned code = margin_actor_code(ram + o);
+        unsigned callback = margin_actor_code(ram + o + 0x34);
+        if (zone == 5) {
+            if ((code == 0x85668 && callback == 0x71D80) ||
+                (code == 0x8488A && callback == 0x71D9E))
+                return 1;
+        } else if (code == 0x76164 || code == 0x761E8 || code == 0x7623C ||
+                   (code == 0x85668 && callback == 0x761B2)) {
+            return 1;
+        }
     }
 #else
-    (void)ram;(void)scene;
+    (void)ram; (void)scene;
 #endif
     return 0;
 }
-static void mhz_capsule_preview_scanline(int line,uint32_t *out,int width,
-                                         int origin,const uint32_t *palette)
+
+static void boss_capsule_preview_scanline(int line, uint32_t *out, int width,
+                                           int origin, const uint32_t *palette)
 {
-    int y=0x320-s_camera_y;
-    if(width<=320 || !s_frame_level || s_frame_zone!=7 || s_frame_act!=1 ||
-       line<y-44 || line>=y+32 ||
-       !mhz_capsule_preview_needed(s_world_frame,s_display))return;
-    for(unsigned part=0;part<2;++part) {
-        const MarginPose pose={S3_CAPSULE_MAP,part?5u:0u,0x8494,
-            origin+0x4640-s_camera,y-(part?0x24:0),NULL,0,0};
-        margin_pose_scanline(&pose,line,out,width,origin,palette);
+    if (width <= 320 || !s_frame_level || s_frame_act != 1 ||
+        (s_frame_zone != 5 && s_frame_zone != 7))
+        return;
+    int icecap = s_frame_zone == 5;
+    int x = origin + (icecap ? 0x4560 : 0x4640) - s_camera;
+    int y = (icecap ? 0x6A3 : 0x320) - s_camera_y;
+    if (line < y - 44 || line >= y + 32 ||
+        (icecap && (x + 48 < origin + 320 || x - 48 >= width)) ||
+        !boss_capsule_preview_needed(s_world_frame, s_display))
+        return;
+    for (unsigned part = 0; part < 2; ++part) {
+        const MarginPose pose = {S3_CAPSULE_MAP, part ? 5u : 0u, 0x8494,
+            x, y - (part ? 0x24 : 0), NULL, 0, 0};
+        margin_pose_scanline(&pose, line, out, width, origin, palette);
     }
 }
 /* FBZ reloads these reservations only after its returning title card leaves.
@@ -3778,7 +3792,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         *hud_origin=0;
         draw_scene_sprites(v,line,out,width,origin,palette);
         if(lbz_incoming)lbz_preview_sprites(v,line,out,width,origin,lbz_camera,plane_y,lbz_palette,s_priority);
-        mhz_capsule_preview_scanline(line,out,width,origin,palette);
+        boss_capsule_preview_scanline(line,out,width,origin,palette);
 #ifndef SONIC3_STANDALONE
         cnz_waiting_scanline(line,out,width,origin,palette);
 #endif
