@@ -2915,7 +2915,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
 #ifndef SONIC3_STANDALONE
     fbz_flipped=level && s_frame_zone==4 && s_frame_act==1 && s_frame_bg_event==0x10;
 #endif
-    if(fbz_flipped){int swap=hs_a;hs_a=hs_b;hs_b=swap;}
+    /* DEZ3_ScreenEvent streams the physical runway on B while the
+     * separate boss and window camera scrolls A. Use the same logical
+     * plane order as the Flying Battery boss for both native scrolls. */
+    int dez3_flipped=level && s_frame_zone==0x17;
+    int flipped_planes=fbz_flipped || dez3_flipped;
+    if(flipped_planes){int swap=hs_a;hs_a=hs_b;hs_b=swap;}
     int missing_scroll=0;
     /* AIZ2's battleship borrows the top of A for a second world camera.
      * HInt6 restores ordinary foreground VSRAM below that band. Unwrapping
@@ -2944,7 +2949,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int ship_x=(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99];
     int ship_y=(s_world_frame[0xEE9C]<<8)|s_world_frame[0xEE9D];
     if(mhz_ship)ship_x=((unsigned)s_world_frame[0xA800]<<8)|s_world_frame[0xA801];
-    unsigned fg_scroll=fbz_flipped?presentation_column_scroll(1,v->vsram[1]):
+    unsigned fg_scroll=flipped_planes?presentation_column_scroll(1,v->vsram[1]):
         (split_ship || s_interpolating)?live_fg_scroll:v->vsram[0];
     /* A fractional scroll can lie between two bobbing ship positions.
      * Select the camera from this row's completed HInt identity, then
@@ -3045,7 +3050,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         mgz_background || cnz_background || icz_intro_background || s_frame_zone==7 || restored_canvas);
     int bg_origin=centered_background?(width-nw)/2:origin;
     unsigned base_a=(v->reg[2]&56u)<<10,base_b=(v->reg[4]&7u)<<13;
-    if(fbz_flipped){unsigned swap=base_a;base_a=base_b;base_b=swap;}
+    if(flipped_planes){unsigned swap=base_a;base_a=base_b;base_b=swap;}
     /* SaveScreen reverses the usual plane roles: the 320px portrait lives
      * on the full-screen Window ($E000, 64 tiles per row), while B ($C000)
      * holds the complete 1024px card strip (128 tiles per row).
@@ -3139,7 +3144,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * exit replace it progressively. DEZ3's auto-scrolling runway is a
      * live Plane B canvas edited by the boss, independent of its layout. */
     int ssz_canvas=bg_world && s_frame_zone==10 && !s_frame_act && s_frame_bg_event;
-    int dez3_canvas=bg_world && s_frame_zone==23;
+    int dez3_canvas=bg_world && dez3_flipped;
     /* HCZ2 replaces its moving wall in two bottom-up passes before the
      * normal panorama is installed. Preserve those mixed uploaded rows. */
     int hcz2_canvas=bg_world && s_frame_zone==1 && s_frame_act==1 &&
@@ -3168,7 +3173,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
     if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
-    int bg_scroll=fbz_flipped?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
+    int bg_scroll=flipped_planes?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
     int mhz_eye=INT_MIN;
     hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
@@ -3276,6 +3281,14 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         bg_width=512;
     int aiz_intro_canvas=bg_world && !s_frame_zone && !s_frame_act && !s_frame_bg_event;
     int background_x=-bg_origin-hs_b;
+    if(dez3_flipped) {
+        int bg_camera=(s_world_frame[0xEE8C]<<8)|s_world_frame[0xEE8D];
+        /* The boss room layout extends past the VDP plane ring. Its
+         * unwrapped A camera provides the background coordinates in the
+         * margins. The installed A rows still own the native viewport. */
+        background_x=unwrap(-hs_b,bg_camera)-origin;
+        bg_width=0;
+    }
     if(bg_width>0){background_x%=bg_width;if(background_x<0)background_x+=bg_width;}
     int cinematic=ending_cinematic();
     int rocket_offset=level && s_frame_zone==6 && s_frame_act==1 &&
@@ -3421,7 +3434,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
 
         if(!fg.remaining) {
-            uint16_t attr=level?world_attr(fg_world,wx,wy,0):plane_attr(v,base_a,nx-hs_a,line+(v->vsram[0]&1023));
+            int world_floor=level && !dez3_flipped;
+            int ax=world_floor?wx:nx-hs_a;
+            int ay=world_floor?wy:line+((dez3_flipped?fg_scroll:v->vsram[0])&1023);
+            uint16_t attr=world_floor?world_attr(fg_world,ax,ay,0):plane_attr(v,base_a,ax,ay);
             unsigned tile=attr&2047u;
             if(hcz1_behind_arena && nx<0 && wx<0x3500 && tile>=HCZ1_STATIC_TERRAIN_TILE &&
                tile<HCZ1_SECONDARY_TILE+sizeof s_hcz1_secondary_tiles/32 &&
@@ -3431,7 +3447,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 fg.attr=attr;
                 if(fg.remaining>-nx)fg.remaining=-nx;
             } else {
-                gtile_row_begin(&fg,world_patterns,attr,level?wx:nx-hs_a,level?wy:line+(v->vsram[0]&1023));
+                gtile_row_begin(&fg,world_patterns,attr,ax,ay);
             }
         }
         if(!bg.remaining) {
@@ -3444,7 +3460,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 gtile_row_begin(&bg,v->vram,attr,ix,iy);
                 if(!snow)icz_cave_art(attr,iy,camera,camera_y,&bg);
             } else {
-                uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,1):plane_attr(v,base_b,bx,by);
+                uint16_t attr=bg_world?world_attr(bg_world_data,source_bx,by,!dez3_flipped):plane_attr(v,base_b,bx,by);
                 gtile_row_begin(&bg,world_patterns,attr,bg_world?source_bx:bx,by);
                 if(mhz_eye!=INT_MIN)mhz_parallax_art(attr,by,mhz_eye,&bg);
             }
@@ -3481,7 +3497,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * secondary background palette needs to outlive its bank. */
         const uint32_t *apalette=palette;
         const uint32_t *bpalette=background_run_palette;
-        if(bg_canvas && !((icz_margin_world || hcz2_margin_world) && (nx<0 || nx>=nw))) {
+        if(bg_canvas && !((icz_margin_world || hcz2_margin_world || dez3_canvas) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
             b=plane_attr(v,base_b,canvas_x,by);
             bp=pattern_pixel(v,b,canvas_x,by);
@@ -3643,7 +3659,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int fire_curtain=aiz_fire && (nx<0 || nx>=nw) && (b&0x8000) && bp;
         /* Equal-priority opaque pixels still obey hardware A over B,
          * even while the background is the layer installed on A. */
-        int foreground=ap && !fire_curtain && (fbz_flipped?
+        int foreground=ap && !fire_curtain && (flipped_planes?
             (!bp || ((a&0x8000) && !(b&0x8000))):
             ((a&0x8000) || !bp || !(b&0x8000)));
         uint8_t p=foreground?ap:bp;
