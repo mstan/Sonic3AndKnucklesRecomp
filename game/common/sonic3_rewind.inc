@@ -38,7 +38,7 @@ static void rewind_presentation_state(S3StateIO *io)
 #ifdef SONIC3_STANDALONE
     unsigned version=10;
 #else
-    unsigned version=12;
+    unsigned version=13;
 #endif
     if(s3_state_peek_unsigned(io,version)!=version)io->ok=0;
     S3_STATE(io,version);

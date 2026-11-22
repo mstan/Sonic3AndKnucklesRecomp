@@ -70,7 +70,7 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
        SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
-       SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_GIANT_RING = 32 };
+       SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_HCZ_MINIBOSS = 20, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -93,6 +93,7 @@ static unsigned native_art_owner(unsigned map)
 #endif
     if(map==S3_ART_BANK+0x161212u)return SPRITE_TURBO_SPIKER;
     if(map==S3_ART_BANK+0x2E76Cu)return SPRITE_HCZ_FAN_BASE;
+    if(map==S3_ART_BANK+0x1629E0u)return SPRITE_HCZ_MINIBOSS;
     if(map==S3_EXPLOSION_MAP)return 1;
     if(map==S3_ART_BANK+0x161CB8u)return 2;
     if(map==S3_ART_BANK+0x30502u)return 3;
@@ -808,6 +809,8 @@ typedef struct {
     AizPlanePose aiz_plane;
 #ifndef SONIC3_STANDALONE
     MhzDeparture mhz_departure;
+    unsigned mhz_arena_lap; /* one-based while the arena owns its canvas */
+    int mhz_arena_final;
 #endif
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
     uint8_t competition_sat[640]; /* paired lower-view upload */
@@ -1027,14 +1030,32 @@ static int mhz_arena_barrier_x(int camera,unsigned row)
     return 0x4238-camera+((step*(int)row)>>16);
 }
 
+static int mhz_arena_first_lap(unsigned lap,int reach)
+{
+    return -(lap<(unsigned)reach?(int)lap:reach);
+}
+
+static int mhz_arena_wrap_delta(int delta)
+{
+    return ((delta+256)&511)-256;
+}
+
+/* Plane B's upper 48 rows contain just the cap over this pillar. Its
+ * six authored tile columns start 24 pixels left of the pillar axis. */
+enum { MHZ_CAP_SOURCE_X=0x1A0, MHZ_CAP_WIDTH=48 };
+static int mhz_arena_cap_left(int camera,int relative,unsigned row,int camera_delta)
+{
+    return mhz_arena_barrier_x(camera-relative*512,row)+camera_delta-24;
+}
+
 static void capture_mhz_arena_barriers(unsigned priority,int camera,int camera_y,
                                       int mask,int left,int right)
 {
     static const uint8_t rows[]={47,40,40,30,30,17,17};
-    unsigned lap=ram16(0xEEDA),current_pattern=ram16(0xEED8);
+    unsigned lap=s_capture_frame->mhz_arena_lap-1,current_pattern=ram16(0xEED8);
     int reach=(right-left)/320+1;
-    int first=-(lap<(unsigned)reach?(int)lap:reach);
-    int last=ram16(0xEEC6)?0:reach;
+    int first=mhz_arena_first_lap(lap,reach);
+    int last=s_capture_frame->mhz_arena_final?0:reach;
     unsigned pattern_table=0x558E8u+(ram16(0xFF08)==3?0x10u:0);
     for(unsigned i=0;i<sizeof rows;++i) {
         unsigned object=ram16(0xA808+2*i);
@@ -1576,6 +1597,10 @@ static void capture_objects(void)
     int mhz_arena=s_requested_width>320 && s_capture_frame->scene==1 &&
         ram16(0xFE10)==0x701 && g_ram[0xEED3] && ram16(0xEEC2)==24 &&
         ram16(0xEEB2)==12 && enabled();
+#ifndef SONIC3_STANDALONE
+    s_capture_frame->mhz_arena_lap=mhz_arena?(unsigned)ram16(0xEEDA)+1:0;
+    s_capture_frame->mhz_arena_final=mhz_arena && ram16(0xEEC6);
+#endif
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1763,6 +1788,8 @@ static void publish_sprites(void)
     dst->aiz_plane=s_build.aiz_plane;
 #ifndef SONIC3_STANDALONE
     dst->mhz_departure=s_build.mhz_departure;
+    dst->mhz_arena_lap=s_build.mhz_arena_lap;
+    dst->mhz_arena_final=s_build.mhz_arena_final;
 #endif
     dst->aiz_join=s_build.aiz_join;
     memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
@@ -1954,6 +1981,8 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.aiz_plane=s_display->aiz_plane;
 #ifndef SONIC3_STANDALONE
         s_display_frame.mhz_departure=s_display->mhz_departure;
+        s_display_frame.mhz_arena_lap=s_display->mhz_arena_lap;
+        s_display_frame.mhz_arena_final=s_display->mhz_arena_final;
 #endif
         s_display_frame.aiz_join=s_display->aiz_join;
         memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
@@ -2095,7 +2124,7 @@ static int turbo_art_pixel(unsigned attr,int x,int y,uint8_t *pixel)
  * Bind only these known mappings to their original ROM patterns. The guest
  * PLC queues, object lifetimes, palettes and private atlases stay authoritative. */
 typedef struct { unsigned address,compressed,bytes,tile,kosm; } NativeArt;
-enum { HCZ_FAN_BASE_ART = 5 };
+enum { HCZ_FAN_BASE_ART = 5, HCZ_MINIBOSS_ART };
 static const NativeArt s_native_art[]={
     {S3_EXPLOSION_ART,0x3A5,0x880,0x5A0,0},
     {S3_ART_BANK+0x16E0C4u,0x212,0x3E0,0x530,1},
@@ -2103,14 +2132,17 @@ static const NativeArt s_native_art[]={
     {S3_SPRING_ART,0x2EF,0x600,0x494,0},
     {S3_CAPSULE_ART,0x4A3,0x8C0,0x494,0},
     /* The miniboss also overwrites the small fan's moving base. */
-    [HCZ_FAN_BASE_ART]={S3_ART_BANK+0x18FD88u,0x5BF,0xB80,0x3CA,0}
+    [HCZ_FAN_BASE_ART]={S3_ART_BANK+0x18FD88u,0x5BF,0xB80,0x3CA,0},
+    /* The Act 2 loader reuses the bank before the surviving pillar leaves. */
+    [HCZ_MINIBOSS_ART]={S3_ART_BANK+0x168400u,0xE9D,0x1F00,0x304,0}
 };
-static struct { uint8_t pixels[0xB80];int attempted,ready; }
+static struct { uint8_t pixels[0x1F00];int attempted,ready; }
     s_native_art_cache[sizeof s_native_art/sizeof *s_native_art];
 static int native_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel)
 {
     unsigned index=owner-1;
     if(owner==SPRITE_HCZ_FAN_BASE)index=HCZ_FAN_BASE_ART;
+    else if(owner==SPRITE_HCZ_MINIBOSS)index=HCZ_MINIBOSS_ART;
     else if(index>=HCZ_FAN_BASE_ART)return 0;
     const NativeArt *a=&s_native_art[index];unsigned tile=attr&2047u;
     if(tile<a->tile || tile>=a->tile+a->bytes/32)return 0;
@@ -3570,6 +3602,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     PlaneColorRow plane_colors;plane_color_row_init(&plane_colors);
     const uint32_t *background_palette=handoff_loading?s_handoff_art.colors[line]:palette;
     const uint32_t *background_run_palette=background_palette;
+#ifndef SONIC3_STANDALONE
+    int mhz_caps=mhz_arena_bg && width>nw && s_display && s_display->mhz_arena_lap;
+    int cap_relative=0,cap_last=0,cap_camera=0,cap_delta=0,cap_left=0;
+    if(mhz_caps) {
+        int reach=width/320+1;
+        cap_relative=mhz_arena_first_lap(s_display->mhz_arena_lap-1,reach);
+        cap_last=s_display->mhz_arena_final?0:reach;
+        cap_camera=s_display->camera_x;
+        cap_delta=mhz_arena_wrap_delta(cap_camera-s_camera);
+        cap_left=mhz_arena_cap_left(cap_camera,cap_relative,(unsigned)line,cap_delta);
+    }
+#endif
     for(int x=0;x<width;++x) {
         int nx=x-origin,wx=level?nx+camera:nx-hs_a;
         int reference_bx=nx-hs_b,bx=x-bg_origin-hs_b;
@@ -3718,8 +3762,25 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 if(canvas_x<0)canvas_x&=255;
                 else if(canvas_x>=512)canvas_x=256+(canvas_x&255);
             }
-            b=plane_attr(v,base_b,canvas_x,by);
-            bp=pattern_pixel(v,b,canvas_x,by);
+#ifndef SONIC3_STANDALONE
+            if(mhz_caps && (nx<0 || nx>=nw)) {
+                /* Installed B has one cap. Project separate laps using the
+                 * same published camera as the pillars underneath them. */
+                while(nx>=cap_left+MHZ_CAP_WIDTH && cap_relative<cap_last) {
+                    ++cap_relative;
+                    cap_left=mhz_arena_cap_left(cap_camera,cap_relative,(unsigned)line,cap_delta);
+                }
+                if((unsigned)(nx-cap_left)<MHZ_CAP_WIDTH) {
+                    canvas_x=MHZ_CAP_SOURCE_X+nx-cap_left;
+                    b=plane_attr(v,base_b,canvas_x,by);
+                    bp=pattern_pixel(v,b,canvas_x,by);
+                } else { b=0;bp=0; }
+            } else
+#endif
+            {
+                b=plane_attr(v,base_b,canvas_x,by);
+                bp=pattern_pixel(v,b,canvas_x,by);
+            }
         }
         if(fbz_entrance && (nx<0 || nx>=nw)) {
             apalette=fbz_foreground_colors;
