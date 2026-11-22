@@ -70,7 +70,7 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
        SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
-       SPRITE_HCZ_FAN_BASE = 18, SPRITE_GIANT_RING = 32 };
+       SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -808,6 +808,7 @@ typedef struct {
     AizPlanePose aiz_plane;
 #ifndef SONIC3_STANDALONE
     MhzDeparture mhz_departure;
+    uint8_t mhz_margin_dim; /* opacity reduction owned by this arena publication */
 #endif
     unsigned aiz_join; /* owned original map/art phase across the native rebase */
     uint8_t competition_sat[640]; /* paired lower-view upload */
@@ -1016,6 +1017,20 @@ static int mhz_arena_object(unsigned object,unsigned map,unsigned code)
 #endif
     return 0;
 }
+
+#ifndef SONIC3_STANDALONE
+static unsigned mhz_arena_margin_opacity(int camera,int looped,int final_lap)
+{
+    /* The guest first projects the barriers at $4040, then moves them to
+     * their next lane as the camera rebases from $4280 to $4080. Keep this
+     * turn outside the visible margin until the next lane is ready. */
+    int distance=camera-(looped?0x4090:0x4048);
+    if(!final_lap && 0x4270-camera<distance)distance=0x4270-camera;
+    if(distance<=0)return 0;
+    if(distance>=40)return 255;
+    return (unsigned)distance*255/40;
+}
+#endif
 
 /* The two native propeller slots use 9-bit screen positions. Before a
  * native mount arrives, sub_54FEC leaves its position at zero; afterwards
@@ -1461,6 +1476,9 @@ static void capture_objects(void)
     s_capture_frame->scene=bonus_stage()?3:(level_ready() || demo_level_exit())?1:0;
     if(s_capture_frame->scene!=3)s_capture_frame->bonus_card_valid=0;
     s_capture_frame->world_tag=s_capture_frame->scene==1?(unsigned)ram16(0xFE10)+1u:0u;
+#ifndef SONIC3_STANDALONE
+    s_capture_frame->mhz_margin_dim=0;
+#endif
     s_capture_frame->aiz_join=s_capture_frame->scene==1?aiz_join_tag(g_ram):0;
     s_capture_frame->title=!s_capture_frame->scene && (g_ram[0xF600]&127)==4;
     s_capture_frame->preview_knux=s_capture_frame->scene==1 && s3_knux_preview_needed(g_ram);
@@ -1520,6 +1538,11 @@ static void capture_objects(void)
         ram16(0xFE10)==0x701 && ram16(0xEEC0)==16 && enabled();
     int mhz_arena=s_requested_width>320 && s_capture_frame->scene==1 &&
         ram16(0xFE10)==0x701 && g_ram[0xEED3] && enabled();
+#ifndef SONIC3_STANDALONE
+    if(mhz_arena && ram16(0xEEC2)==24 && ram16(0xEEB2)==12)
+        s_capture_frame->mhz_margin_dim=(uint8_t)(255-mhz_arena_margin_opacity(cam,
+            ram16(0xEEDA)!=0,ram16(0xEEC6)!=0));
+#endif
     for(unsigned pri=0;pri<8;++pri) {
         unsigned queue=0xAC00+pri*128,bytes=ram16(queue);if(bytes>126)bytes=126;
         for(unsigned k=2;k<=bytes;k+=2) {
@@ -1635,6 +1658,9 @@ static void capture_objects(void)
             } else add_mapping(map,mapping_frame,gfx,flags,x,y,anchor,(flags&32)!=0,zoom);
             if(mhz_rotors)extend_mhz_ship_rotor(o,map,mapping_frame,gfx,flags);
             int arena=mhz_arena && mhz_arena_object(o,map,s_capture_frame->code[s_capture_slot]);
+            if(arena)for(unsigned n=mapped_first;n<s_capture_frame->count;++n)
+                s_capture_frame->sprites[n].slot=(uint16_t)((s_capture_frame->sprites[n].slot&255u)|
+                    (SPRITE_MHZ_ARENA<<8));
             if(pylon || arena)repeat_scene_pieces(mapped_first,s_capture_frame->count,
                 left-cam,left-cam+s_requested_width,arena?SPRITE_MHZ_ARENA_COPY:0);
             if(multi)extend_hcz_surface(map,g_ram[o+0x22]?g_ram[o+0x22]:g_ram[o+0x1D],
@@ -1701,6 +1727,7 @@ static void publish_sprites(void)
     dst->aiz_plane=s_build.aiz_plane;
 #ifndef SONIC3_STANDALONE
     dst->mhz_departure=s_build.mhz_departure;
+    dst->mhz_margin_dim=s_build.mhz_margin_dim;
 #endif
     dst->aiz_join=s_build.aiz_join;
     memcpy(dst->competition_sat,s_build.competition_sat,sizeof dst->competition_sat);
@@ -1892,6 +1919,7 @@ static void select_scene(const GVDP *v,int retain_level)
         s_display_frame.aiz_plane=s_display->aiz_plane;
 #ifndef SONIC3_STANDALONE
         s_display_frame.mhz_departure=s_display->mhz_departure;
+        s_display_frame.mhz_margin_dim=s_display->mhz_margin_dim;
 #endif
         s_display_frame.aiz_join=s_display->aiz_join;
         memcpy(s_display_frame.competition_sat,s_display->competition_sat,sizeof s_display_frame.competition_sat);
@@ -3634,9 +3662,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             ap=pattern_pixel(v,a,ax,line);
             if(bx<0 || bx>=1024)bp=0;
         }
-        /* Primary foreground colors remain native; only the retired
-         * secondary background palette needs to outlive its bank. */
-        const uint32_t *apalette=palette;
+        /* Preserve the outgoing Hydrocity foreground palette during the fade. */
+        const uint32_t *apalette=handoff_loading && s_frame_zone==1?s_handoff_art.colors[line]:palette;
         const uint32_t *bpalette=background_run_palette;
         if(bg_canvas && !((icz_margin_world || hcz2_margin_world || dez3_canvas) && (nx<0 || nx>=nw))) {
             int canvas_x=centered_background?bx:reference_bx;
@@ -3954,7 +3981,7 @@ static void render_scanline(const GVDP *v,int line,const uint32_t *native,int nw
     const uint8_t *ram=s_interpolating?s_world_frame:g_ram;
     life_ones_scanline(v,ram,line,out,width,origin);
     time_tens_scanline(v,ram,line,out,width,origin);
-    handoff_dip(out,width);
+    if(width>nw && s_frame_level)handoff_dip(out,width);
 }
 
 static void scanline(const GVDP *v,int line,const uint32_t *native,int nw,uint32_t *out,int width)

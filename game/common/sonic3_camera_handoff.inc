@@ -135,12 +135,26 @@ static int handoff_origin(int camera,int desired,int width,int map_width,
     int loading=near_end && event==(zone==5?20u:4u);
     int incoming=!s_handoff.act && act==1 &&
         s_handoff.event==(zone==5?20u:4u);
-    if(changed && (s_handoff.active || loading || incoming)) {
+    int hcz_fade=mode==1 && zone==1 && (loading || incoming || s_handoff.alpha);
+    if(!hcz_fade && changed && (s_handoff.active || loading || incoming)) {
         s_handoff.error=s_handoff.value-desired;s_handoff.age=0;
         s_handoff.active=1;
         if(mode==3){s_handoff.alpha=255;s_handoff.fade_in=1;}
     }
-    if(mode==1) {
+    if(hcz_fade) {
+        /* The cartridge swaps the map and palette in one tick. The wide
+         * view still sees the outgoing bricks, so make the cut at black. */
+        s_handoff.active=0;
+        s_handoff.value=desired;
+        if(incoming)s_handoff.alpha=255;
+        else if(loading) {
+            s_handoff.alpha+=32;
+            if(s_handoff.alpha>255)s_handoff.alpha=255;
+        } else {
+            s_handoff.alpha-=24;
+            if(s_handoff.alpha<0)s_handoff.alpha=0;
+        }
+    } else if(mode==1) {
         if(s_handoff.active) {
             int t=s_handoff.age<45?s_handoff.age:45;
             /* Cubic smoothstep: zero velocity at either end of the pan. */
@@ -180,7 +194,7 @@ static int handoff_origin(int camera,int desired,int width,int map_width,
 }
 static void handoff_dip(uint32_t *out,int width)
 {
-    if(handoff_mode()!=3 || !s_handoff.alpha)return;
+    if(!s_handoff.alpha)return;
     unsigned light=255u-(unsigned)s_handoff.alpha;
     for(int x=0;x<width;++x) {
         uint32_t c=out[x],v=c&0xFF000000u;

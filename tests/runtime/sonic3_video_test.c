@@ -2582,17 +2582,33 @@ static void test_act_handoff_framing(void)
     s_interpolating=1;
     CHECK(handoff_origin(12,12,796,0x4800,1,0,0,100,0,1)==12);
     s_interpolating=0;memset(&s_handoff,0,sizeof s_handoff);
-    /* The real HCZ map rebase keeps its outgoing origin, pauses in place,
-     * then reaches the incoming origin monotonically over45 native ticks. */
-    CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,4,200,0,1)==412);
-    int previous=handoff_origin(0x80,128,796,0x4800,1,1,0,201,0,1);
+    /* The MGZ map rebase glides from its outgoing origin. */
+    CHECK(handoff_origin(0x2E00,412,796,0x3000,2,0,4,200,0,1)==412);
+    int previous=handoff_origin(0x80,128,796,0x4800,2,1,0,201,0,1);
     CHECK(previous==412 && s_handoff.active);
-    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,202,1,1)==previous);
+    CHECK(handoff_origin(0x80,128,796,0x4800,2,1,0,202,1,1)==previous);
     for(unsigned i=1;i<=45;++i) {
-        int current=handoff_origin(0x80,128,796,0x4800,1,1,0,201+i,0,1);
+        int current=handoff_origin(0x80,128,796,0x4800,2,1,0,201+i,0,1);
         CHECK(current>=128 && current<=previous);previous=current;
     }
     CHECK(previous==128 && !s_handoff.active);
+
+    CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,0,300,0,1)==412);
+    for(unsigned n=1;n<=8;++n) {
+        CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,4,300+n,0,1)==412);
+        CHECK(s_handoff.alpha==(n<8?(int)n*32:255));
+    }
+    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,312,0,1)==128);
+    CHECK(!s_handoff.active && s_handoff.alpha==255);
+    uint32_t pixel=0xFFAABBCCu;
+    handoff_dip(&pixel,1);
+    CHECK(pixel==0xFF000000u);
+    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,4,313,1,1)==128);
+    CHECK(s_handoff.alpha==255);
+    for(unsigned n=1;n<=11;++n) {
+        CHECK(handoff_origin(0x80,128,796,0x4800,1,1,4,313+n,0,1)==128);
+        CHECK(s_handoff.alpha==(n<11?255-(int)n*24:0));
+    }
     s_handoff=saved;s_interpolating=interpolating;
 }
 static void test_campaign_background_edges(void)
@@ -4923,6 +4939,13 @@ static void test_mhz_arena_installed_band(void)
 static void test_mhz_arena_canvas_repeats(void)
 {
 #ifndef SONIC3_STANDALONE
+    CHECK(mhz_arena_margin_opacity(0x4042,0,0)==0);
+    CHECK(mhz_arena_margin_opacity(0x405C,0,0)==127);
+    CHECK(mhz_arena_margin_opacity(0x427E,0,0)==0);
+    CHECK(mhz_arena_margin_opacity(0x4082,1,0)==0);
+    CHECK(mhz_arena_margin_opacity(0x40A4,1,0)==127);
+    CHECK(mhz_arena_margin_opacity(0x40B8,1,0)==255);
+    CHECK(mhz_arena_margin_opacity(0x427E,1,1)==255);
     static SceneFrame frame,original;static GVDP v;static uint8_t before[65536];
     uint32_t expanded[1595],native[1595],palette[64]={0};
     CHECK(configure("off"));CHECK(configure("32:9"));

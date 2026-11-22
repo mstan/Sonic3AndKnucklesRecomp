@@ -95,19 +95,21 @@ static void test_local_presentation_state(void)
     s_handoff_art.valid=0;
     size_t ordinary=presentation_state_save(NULL,0);
     CHECK(handoff_origin(0x3680,412,796,0x3800,1,0,4,200,0,1)==412);
-    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,201,0,1)==412);
+    CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,201,0,1)==128);
     s_handoff_art.valid=1;s_handoff_art.zone=1;s_handoff_art.tick=200;
     s_handoff_art.colors[17][4]=0xFF112233u;
     bytes=presentation_state_save(NULL,0);CHECK(bytes>ordinary);
     blob=(uint8_t*)malloc(bytes);CHECK(blob && presentation_state_save(blob,bytes)==bytes);
     int position=handoff_origin(0x80,128,796,0x4800,1,1,0,202,0,1);
+    int opacity=s_handoff.alpha;
     memset(&s_handoff,0,sizeof s_handoff);s_handoff_art.valid=0;
     s_handoff_art.colors[17][4]=0;
     CHECK(presentation_state_load(blob,bytes,1));
-    CHECK(s_handoff.active && s_handoff.tick==201 && s_handoff.value==412);
+    CHECK(!s_handoff.active && s_handoff.tick==201 && s_handoff.value==128 && s_handoff.alpha==255);
     CHECK(s_handoff_art.valid && s_handoff_art.zone==1 && s_handoff_art.tick==200);
     CHECK(s_handoff_art.colors[17][4]==0xFF112233u);
     CHECK(handoff_origin(0x80,128,796,0x4800,1,1,0,202,0,1)==position);
+    CHECK(s_handoff.alpha==opacity);
     memset(&s_handoff,0,sizeof s_handoff);s_handoff_art.valid=0;
     free(blob);CHECK(configure("off"));
 }

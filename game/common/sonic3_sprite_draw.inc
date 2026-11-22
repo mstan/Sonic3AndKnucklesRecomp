@@ -13,6 +13,7 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
     int mhz_chase=width>320 && mhz_arena_chase_active();
     int mhz_retired_approach=mhz_chase && mhz_arena_has_looped() && s_camera>=0x4080;
     int mhz_approach=mhz_chase && !mhz_arena_has_looped();
+    unsigned mhz_margin_opacity=255u-s_display->mhz_margin_dim;
 #endif
 #endif
     unsigned card_slot=UINT_MAX;int card_offset=0;
@@ -94,6 +95,11 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
          * the rotor's native/margin ownership once for that piece, leaving
          * the ordinary sprite pixel path free of optional rotor work. */
         int first=0,last=drawn_width,center=(width-320)/2;
+#ifndef SONIC3_STANDALONE
+        unsigned piece_owner=s->slot>>8;
+        unsigned margin_opacity=piece_owner==SPRITE_MHZ_ARENA ||
+            piece_owner==SPRITE_MHZ_ARENA_COPY?mhz_margin_opacity:255;
+#endif
         if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY) {
             if(base<origin) {
                 if(last>origin-base)last=origin-base;
@@ -125,6 +131,10 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
 #endif
             int x=base+i;
             if(x<0 || x>=width || (s_priority[x]&2))continue;
+#if S3_DRAW_MHZ_ROTORS && !defined(SONIC3_STANDALONE)
+            unsigned opacity=margin_opacity<255 && (x<origin || x>=origin+320)?margin_opacity:255;
+            if(!opacity)continue;
+#endif
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
@@ -228,7 +238,19 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                     S3_KNUX_PREVIEW_PALETTE+(p-16)*2),v),GENESIS_DAC_NORMAL);
             /* Screen-relative coordinates are not HUD priority: AIZ2's
              * small Eggman must still pass behind the high tree canopy. */
-            if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1))out[x]=c;
+            if(s->hud==1 || (s->attr&0x8000) || !(s_priority[x]&1)) {
+#if S3_DRAW_MHZ_ROTORS && !defined(SONIC3_STANDALONE)
+                if(opacity<255) {
+                    uint32_t blended=0xFF000000u;
+                    for(unsigned shift=0;shift<24;shift+=8) {
+                        unsigned foreground=(c>>shift)&255u,background=(out[x]>>shift)&255u;
+                        blended|=((foreground*opacity+background*(255-opacity)+127)/255)<<shift;
+                    }
+                    c=blended;
+                }
+#endif
+                out[x]=c;
+            }
         }
     }
 }
