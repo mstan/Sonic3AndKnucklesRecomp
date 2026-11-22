@@ -2958,6 +2958,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
      * separate boss and window camera scrolls A. Use the same logical
      * plane order as the Flying Battery boss for both native scrolls. */
     int dez3_flipped=level && s_frame_zone==0x17;
+    int ddz_canvas=level && width>nw && s_frame_zone==12 && !s_frame_act;
+    int ddz_phase=(s_world_frame[0xEED2]<<8)|s_world_frame[0xEED3];
     int flipped_planes=fbz_flipped || dez3_flipped;
     if(flipped_planes){int swap=hs_a;hs_a=hs_b;hs_b=swap;}
     int missing_scroll=0;
@@ -3338,6 +3340,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         bg_width=512;
     int aiz_intro_canvas=bg_world && !s_frame_zone && !s_frame_act && !s_frame_bg_event;
     int background_x=-bg_origin-hs_b;
+    /* DDZ moves Plane A with the craft, independently of the flight
+     * camera. The level layout holds both craft even before either reveal. */
+    int ddz_plane_x=ddz_canvas?unwrap(-hs_a,(s_world_frame[0xEE98]<<8)|s_world_frame[0xEE99]):0;
+    int ddz_bank=ddz_phase&0x400;
     if(dez3_flipped) {
         int bg_camera=(s_world_frame[0xEE8C]<<8)|s_world_frame[0xEE8D];
         /* The boss room layout extends past the VDP plane ring. Its
@@ -3494,10 +3500,23 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
 
         if(!fg.remaining) {
-            int world_floor=level && !dez3_flipped;
+            int world_floor=level && !dez3_flipped && !ddz_canvas;
             int ax=world_floor?wx:nx-hs_a;
             int ay=world_floor?wy:line+((dez3_flipped?fg_scroll:v->vsram[0])&1023);
-            uint16_t attr=world_floor?world_attr(fg_world,ax,ay,0):plane_attr(v,base_a,ax,ay);
+            uint16_t attr;
+            if(ddz_canvas) {
+                ay=line+(fg_scroll&1023);
+                if(!ddz_phase) {
+                    attr=0;
+                } else if(nx>=0 && nx<nw) {
+                    attr=plane_attr(v,base_a,ax,ay);
+                } else {
+                    ax=ddz_plane_x+nx;
+                    attr=ax>=ddz_bank && ax<ddz_bank+0x400?world_attr(fg_world,ax,ay,0):0;
+                }
+            } else {
+                attr=world_floor?world_attr(fg_world,ax,ay,0):plane_attr(v,base_a,ax,ay);
+            }
             unsigned tile=attr&2047u;
             if(hcz1_behind_arena && nx<0 && wx<0x3500 && tile>=HCZ1_STATIC_TERRAIN_TILE &&
                tile<HCZ1_SECONDARY_TILE+sizeof s_hcz1_secondary_tiles/32 &&
@@ -3508,6 +3527,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
                 if(fg.remaining>-nx)fg.remaining=-nx;
             } else {
                 gtile_row_begin(&fg,world_patterns,attr,ax,ay);
+                if(ddz_canvas && ddz_phase) {
+                    if(nx<0 && fg.remaining>-nx)fg.remaining=-nx;
+                    if(nx>=0 && nx<nw && fg.remaining>nw-nx)fg.remaining=nw-nx;
+                }
             }
         }
         if(!bg.remaining) {
@@ -3536,6 +3559,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        if(ddz_canvas && !ddz_phase)ap=0;
         /* The other Death Egg boss layouts occupy unused chunks of this
          * plane. Expose only the active boss layout beyond the VDP view. */
         if(dez3_canvas && (nx<0 || nx>=nw) &&
@@ -3722,7 +3746,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             apalette=palette;
         }
         if(cinematic && (nx<0 || nx>=nw))ap=0;
-        if(level && !joined && !dez3_earth && (wx<0 || wx>=s_stage_width))ap=0;
+        if(level && !joined && !dez3_earth && !ddz_canvas && (wx<0 || wx>=s_stage_width))ap=0;
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
