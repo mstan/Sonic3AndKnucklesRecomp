@@ -3089,6 +3089,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int level_select=!level && !special && !file_select && level_select_layout(v);
     int menu_background_period=level_select?48:nw;
     int wy=camera_y+line;
+    /* The top of DEZ3's Plane B holds a fixed 320-column Earth image.
+     * Its separately scrolled rows start at Y=$E0 and own the runway. */
+    int dez3_earth=dez3_flipped && width>nw && !hs_a &&
+        ((fg_scroll&1023)+line)<0xE0;
     /* HCZ1_Resize restores three shared colors at camera X=$900, Y=$500.
      * Only the extra left view still contains the retired current tunnel.
      * Keep its original colors there, following the native scene fade; the
@@ -3506,6 +3510,18 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         }
         uint16_t a=fg.attr,b=bg.attr;
         uint8_t ap=gtile_row_pixel(&fg),bp=gtile_row_pixel(&bg);
+        if(dez3_earth && (nx<0 || nx>=nw)) {
+            /* Reflect the outer half of the cartridge image and continue
+             * its horizon's slope. The fixed native columns stay exact. */
+            int distance=nx<0?-nx:nx-nw+1;
+            int reflected=(distance-1)%(nw*2);
+            if(reflected>=nw)reflected=nw*2-1-reflected;
+            int ax=nx<0?reflected:nw-1-reflected;
+            int ay=((int)fg_scroll&1023)+line-(7*distance+8)/16;
+            if(ay<0)ay=0;
+            a=plane_attr(v,base_a,ax,ay);
+            ap=pattern_pixel(v,a,ax,ay);
+        }
         if(s_render->mhz_custom && nx>=0 && nx<nw) {
             int ax=nx-hs_a,ay=line+(fg_scroll&1023);
             a=plane_attr(v,base_a,ax,ay);ap=pattern_pixel(v,a,ax,ay);
@@ -3666,7 +3682,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             apalette=palette;
         }
         if(cinematic && (nx<0 || nx>=nw))ap=0;
-        if(level && !joined && (wx<0 || wx>=s_stage_width))ap=0;
+        if(level && !joined && !dez3_earth && (wx<0 || wx>=s_stage_width))ap=0;
         /* Menus have a centered foreground composition, with full-width
          * scenery underneath. Special-stage planes are repeating art. */
         if(!level && !file_select && (nx<0 || nx>=nw))ap=0;
