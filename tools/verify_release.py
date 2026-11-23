@@ -86,7 +86,8 @@ def main():
             (dest / "route.input").write_text(route.replace("{out}", dest.as_posix()))
             command += ["--input-script", str(dest / "route.input")]
         env = {k: v for k, v in os.environ.items() if not k.startswith(("SDL_", "GENESIS_", "RNET_", "LNG_"))}
-        env.update(SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1", GENESIS_USER_DIR=str(dest))
+        env.update(SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1", GENESIS_USER_DIR=str(dest),
+                   GENESIS_NONINTERACTIVE="1")
         if launcher:
             env["LNG_SCRIPT"] = (f"wait:15;shot:{dest.as_posix()}/launcher.png;"
                                  f"view:controller;wait:10;shot:{dest.as_posix()}/controls.png;quit")
