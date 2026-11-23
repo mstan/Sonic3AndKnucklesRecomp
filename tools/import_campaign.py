@@ -26,9 +26,9 @@ def digest(path):
     with Path(path).open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 def converter_fingerprint():
-    files=[TOOLS/'build_stage_pack.py',TOOLS/'build_megamix_pack.py',TOOLS/'split_campaign_packs.py',Path(__file__)]
+    files=[TOOLS/'build_stage_pack.py',TOOLS/'build_megamix_pack.py',TOOLS/'split_campaign_packs.py',Path(__file__).resolve()]
     for directory in ('trilogy','megamix'):
-        files += [p for p in (TOOLS/directory).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.txt','.png')]
+        files += [p for p in (TOOLS/directory).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.txt','.png','.idx')]
     value=hashlib.sha256(b'S3K-owned-campaign-import-1\0')
     for p in sorted(files):value.update(str(p.relative_to(TOOLS)).replace('\\','/').encode()+b'\0'+p.read_bytes())
     return value.hexdigest()

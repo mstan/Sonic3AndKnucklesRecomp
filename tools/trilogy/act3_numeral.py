@@ -3,6 +3,8 @@
 (colour 6), dark shadow (colour $F), over the 2's background splash.
 Same 4x4-tile column-major layout as the retail digits."""
 
+from pathlib import Path
+
 
 def _px(art):
     """32x32 pixel grid from 16 column-major tiles."""
@@ -63,12 +65,18 @@ GLYPH = [
 ]
 
 
-CUSTOM = __import__('pathlib').Path(__file__).resolve().parents[2] / 'title_card_digits' / 'act_3_custom.png'
+CUSTOM = Path(__file__).resolve().parents[2] / 'title_card_digits' / 'act_3_custom.png'
 if not CUSTOM.exists():                   # (the shipped copy: data/)
-    CUSTOM = __import__('pathlib').Path(__file__).resolve().parent / 'data' / 'act_3_custom.png'
+    CUSTOM = Path(__file__).resolve().parent / 'data' / 'act_3_custom.png'
 
 
 def numeral_3(num2_art):
+    packed = Path(__file__).resolve().parent / 'data' / 'act_3_custom.idx'
+    if packed.exists():
+        pixels = packed.read_bytes()
+        if len(pixels) != 32 * 32:
+            raise ValueError(f'{packed}: expected 32x32 palette indices')
+        return _tiles([[pixels[y * 32 + x] & 15 for x in range(32)] for y in range(32)])
     if CUSTOM.exists():                   # a hand-drawn 3: 32x32, indexed with the card's palette indices
         from PIL import Image
         im = Image.open(CUSTOM)

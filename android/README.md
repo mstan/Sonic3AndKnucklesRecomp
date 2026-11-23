@@ -62,8 +62,15 @@ build does not create or replace signing identities. Production signing cannot
 be used with `genesisQa=true`. Verify the resulting certificate with Android's
 `apksigner verify --print-certs` before distributing an update.
 
-The Android importer accepts the raw cartridge for its selected mode above. The desktop
-runner's optional donor-ROM and external-tool conversion workflows are not
-provided by this importer. Widescreen defaults to Fit; saved mod choices are
-retained. In gameplay, the Touch controls button toggles the three-button pad.
-The pad is hidden while the launcher or a runtime menu owns input.
+Import the original game cartridge for the selected mode on the setup screen.
+For optional campaigns and sound donors, use the Mods page to open the
+Android file picker. The app validates the selected image and prepares its
+content in private storage. Choose a self-contained Sonic CD image or a ZIP
+with the original CUE and tracks.
+
+The Android build uses Python 3.11 for its bundled converter. Set
+`-PgenesisAndroidImportPython=/path/to/python3.11` when Gradle cannot find it.
+
+Widescreen defaults to Fit and saved mod choices are retained. In gameplay,
+the Touch controls button toggles the three-button pad. The pad is hidden
+while the launcher or a runtime menu owns input.

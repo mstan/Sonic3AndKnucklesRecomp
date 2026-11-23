@@ -176,7 +176,17 @@ static int set_enabled(void *c,const char *p,int on)
 static int feature_enable(void *c,const char *p,const char *f,int on)
 { return index_of(p)<0?base&&base->feature_enable&&base->feature_enable(base->ctx,p,f,on):own(p,f)&&set_enabled(c,p,on); }
 static int resource_count(void *c,const char *p,const char *f)
-{ (void)c;return index_of(p)>=0?(own(p,f)?(index_of(p)==3?3:2):0):base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0; }
+{
+    (void)c;
+    int index=index_of(p);
+    if(index<0)return base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0;
+    if(!own(p,f))return 0;
+#ifdef __ANDROID__
+    return 1; /* the original image installs every resource for this campaign */
+#else
+    return index==3?3:2;
+#endif
+}
 static void check_music(void)
 {
     if(s_music_checked)return;
@@ -186,7 +196,7 @@ static void check_music(void)
 static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncherCModResource *o)
 {
     (void)c;int i=index_of(p);if(i<0)return base&&base->feature_resource_get&&base->feature_resource_get(base->ctx,p,f,n,o);
-    if(!own(p,f)||n<0||n>=(i==3?3:2)||!o)return 0;
+    if(n<0||n>=resource_count(c,p,f)||!o)return 0;
     if(i<2 && n==0) {
         memset(o,0,sizeof *o);COPY(o->id,"source-rom");
         COPY(o->label,i==0?"Sonic the Hedgehog cartridge":"Sonic the Hedgehog 2 cartridge");
@@ -195,13 +205,22 @@ static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncher
         COPY(o->file_description,"Owned cartridge or ROM ZIP");o->import_on_select=1;
         if(!s_checked[i]){s_verified[i]=s3_pack_validate(s3_pack_paths[i],i+1,s_status[i],sizeof s_status[i]);s_checked[i]=1;}
         o->verified=*s_rom_source[i] && s_verified[i];
+#ifdef __ANDROID__
+        COPY(o->status,o->verified?"Imported campaign is ready":"Select your cartridge to import.");
+#else
         COPY(o->status,o->verified?"Imported campaign is ready":"Select your cartridge to import, or keep an existing content pack");
+#endif
         return 1;
     }
     if(i==3 && n==0) {
         memset(o,0,sizeof *o);COPY(o->id,"cd-disc");COPY(o->label,"Sonic CD (US) disc");
+#ifdef __ANDROID__
+        COPY(o->description,"Choose your owned US SGCD, ISO/BIN/IMG data image or disc ZIP. A disc ZIP can contain the original CUE and its tracks.");
+        COPY(o->path,s_cd_disc_path);COPY(o->file_patterns,"*.sgcd,*.iso,*.bin,*.img,*.zip");
+#else
         COPY(o->description,"Choose your owned US CUE/BIN, SGCD, ISO/BIN/IMG data image or CD ZIP. ZIPs import automatically. Data-only images include stages, Past PCM music and voices; CDDA needs audio tracks or existing imported music.");
         COPY(o->path,s_cd_disc_path);COPY(o->file_patterns,"*.cue,*.sgcd,*.iso,*.bin,*.img,*.zip");
+#endif
         COPY(o->file_description,"Sonic CD disc");o->import_on_select=1;
         if(!s_checked[3]){s_verified[3]=s3_pack_validate(s3_pack_paths[3],4,s_status[3],sizeof s_status[3]);s_checked[3]=1;}
         check_music();o->verified=*s_cd_disc_path && s_verified[3];
