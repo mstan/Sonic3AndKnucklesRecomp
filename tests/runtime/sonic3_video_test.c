@@ -4946,8 +4946,8 @@ static void test_mhz_arena_canvas_repeats(void)
     for(unsigned n=0;n<4;++n) {
         CHECK(mhz_arena_barrier_x(0x427E,rows[n])==outgoing[n]);
         CHECK(mhz_arena_barrier_x(0x4082,rows[n])==incoming[n]);
-        int tail=mhz_arena_barrier_x(0x4082+0x200,rows[n]);
-        int lead=mhz_arena_barrier_x(0x427E-0x200,rows[n]);
+        int tail=mhz_arena_barrier_x(0x4082 + 0x200,rows[n]);
+        int lead=mhz_arena_barrier_x(0x427E - 0x200,rows[n]);
         CHECK(tail<outgoing[n] && tail>=outgoing[n]-4);
         CHECK(lead>incoming[n] && lead<=incoming[n]+4);
     }
