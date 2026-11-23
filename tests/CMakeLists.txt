@@ -325,6 +325,46 @@ endforeach()
 
 set(S3_SOUND_DONOR_DIR "" CACHE PATH "Optional directory of private sound donor fixtures")
 set(S3_SOUND_LIBRARY_DIR "" CACHE PATH "Optional verified cartridge and CD sound donor library for provider tests")
+if(S3_AUDIO_BACKEND STREQUAL "HLE")
+    add_library(sonic3_sound_hle_test_data STATIC
+        "${S3_GAME_COMMON}/sonic3_sound_hle_assets.c"
+        "${S3_GAME_COMMON}/sonic3_sound_assets.c"
+        "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
+        "${S3_GAME_COMMON}/sonic3_sound_legacy.c"
+        "${S3_GAME_COMMON}/sonic3_sound_pcm.c"
+        "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"
+        "${CMAKE_SOURCE_DIR}/recomp-ui/src/common/sha256.c")
+    target_include_directories(sonic3_sound_hle_test_data PUBLIC
+        "${S3_GAME_COMMON}" "${CMAKE_SOURCE_DIR}/recomp-ui/src/common")
+    add_executable(sonic3_sound_hle_test runtime/sonic3_sound_hle_test.c
+        "${RUNNER_ROOT}/audio/smps_hle.c")
+    target_include_directories(sonic3_sound_hle_test PRIVATE "${RUNNER_ROOT}/audio")
+    target_link_libraries(sonic3_sound_hle_test PRIVATE sonic3_sound_hle_test_data)
+    add_executable(sonic3_sound_hle_audio_test runtime/sonic3_sound_hle_audio_test.c
+        "${RUNNER_ROOT}/audio/smps_hle.c" "${RUNNER_ROOT}/audio/smps_hle_synth.c"
+        "${RUNNER_ROOT}/audio/pcm_hle.c" "${RUNNER_ROOT}/audio/sn76489.c" ${FM_SOURCES})
+    target_include_directories(sonic3_sound_hle_audio_test PRIVATE
+        "${RUNNER_ROOT}" "${RUNNER_ROOT}/audio" "${RUNNER_ROOT}/include"
+        "${RUNNER_ROOT}/external/ymfm/src")
+    target_link_libraries(sonic3_sound_hle_audio_test PRIVATE sonic3_sound_hle_test_data)
+    if(UNIX)
+        target_link_libraries(sonic3_sound_hle_audio_test PRIVATE m)
+    endif()
+    set(_hle_donor_args "")
+    if(EXISTS "${S3_SOUND_DONOR_DIR}/s2.bin" AND
+       EXISTS "${S3_SOUND_DONOR_DIR}/s2-aug.bin" AND EXISTS "${S3_SOUND_DONOR_DIR}/s2-wai.bin")
+        list(APPEND _hle_donor_args "${S3_SOUND_DONOR_DIR}")
+    endif()
+    foreach(_mode sonic3 sonic3k sandk)
+        set(_rom "${S3_GAME_ROOT}/${_mode}/${_mode}.bin")
+        if(EXISTS "${_rom}")
+            add_test(NAME sound_hle_${_mode} COMMAND sonic3_sound_hle_test "${_rom}" ${_hle_donor_args})
+            add_test(NAME sound_hle_audio_${_mode} COMMAND sonic3_sound_hle_audio_test
+                "${_rom}" "${CMAKE_CURRENT_BINARY_DIR}/${_mode}-hle-audio.wav")
+            set_tests_properties(sound_hle_${_mode} sound_hle_audio_${_mode} PROPERTIES TIMEOUT 0)
+        endif()
+    endforeach()
+endif()
 add_executable(sonic3_sound_themes_test runtime/sonic3_sound_themes_test.c
     "${S3_GAME_COMMON}/sonic3_sound_assets.c" "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
     "${S3_GAME_COMMON}/sonic3_sound_legacy.c" "${S3_GAME_COMMON}/sonic3_sound_pcm.c" "${S3_GAME_COMMON}/sonic3_prototype_pcm.c"

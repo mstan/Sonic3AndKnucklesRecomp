@@ -51,6 +51,14 @@ set(RUNNER_ROOT "${RECOMP_ROOT}/runner")
 
 option(GENESIS_Z80_RECOMP
     "Run a Genesis sound Z80 through a flat statically-recompiled backend" OFF)
+set(S3_AUDIO_BACKEND "HLE" CACHE STRING "Sound provider (HLE or accuracy-reference LLE)")
+set_property(CACHE S3_AUDIO_BACKEND PROPERTY STRINGS HLE LLE)
+if(NOT S3_AUDIO_BACKEND MATCHES "^(HLE|LLE)$")
+    message(FATAL_ERROR "Unsupported sound provider")
+endif()
+if(S3_AUDIO_BACKEND STREQUAL "HLE" AND GENESIS_Z80_RECOMP)
+    message(FATAL_ERROR "HLE owns sound; disable GENESIS_Z80_RECOMP")
+endif()
 set(GENESIS_Z80_AOT_SOURCE "" CACHE FILEPATH
     "Generated <game>_step.c emitted by SmsRecomp --flat-step")
 set(Z80_RECOMP_CORE_ROOT "${RECOMP_ROOT}/external/z80-recomp-core")
@@ -205,7 +213,7 @@ file(GLOB_RECURSE _state_inputs CONFIGURE_DEPENDS
     "${RECOMP_ROOT}/external/m68k-recomp-core/*.c" "${RECOMP_ROOT}/external/m68k-recomp-core/*.h")
 list(FILTER _state_inputs EXCLUDE REGEX "/(generated|skdisasm|external/SDL2)/")
 list(SORT _state_inputs)
-set(_state_fingerprint "Sonic3-state-v1;${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_SIZEOF_VOID_P};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${SONIC_REVERSE_DEBUG};${GEN_ENABLE_TRACE};${GEN_DEV_TRACE};${GENESIS_Z80_RECOMP};${CMAKE_C_FLAGS};${CMAKE_CXX_FLAGS}")
+set(_state_fingerprint "Sonic3-state-v1;${CMAKE_C_COMPILER_ID};${CMAKE_C_COMPILER_VERSION};${CMAKE_CXX_COMPILER_ID};${CMAKE_CXX_COMPILER_VERSION};${CMAKE_SIZEOF_VOID_P};${CMAKE_SYSTEM_NAME};${CMAKE_SYSTEM_PROCESSOR};${SONIC_REVERSE_DEBUG};${GEN_ENABLE_TRACE};${GEN_DEV_TRACE};${GENESIS_Z80_RECOMP};${S3_AUDIO_BACKEND};${CMAKE_C_FLAGS};${CMAKE_CXX_FLAGS}")
 foreach(_input IN LISTS _state_inputs)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_input}")
     file(SHA256 "${_input}" _hash)
@@ -226,26 +234,26 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/state-$<CONFIG>/sonic3_state_build.h"
     CONTENT "#define SONIC3_STATE_BUILD_ID \"${_state_id}\"\n")
 include_directories("${CMAKE_BINARY_DIR}/state-$<CONFIG>")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
-include("${CMAKE_SOURCE_DIR}/cmake/Sonic3CloneDriver.cmake")
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(S3_CLONE_PROGRAM_DIR "")
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
     set(NATIVE_GAME "${GAME}")
-    if(S3_CLONE_PROGRAM_DIR AND EXISTS "${GAME}/${ROM}")
-        set(NATIVE_GAME "${CMAKE_BINARY_DIR}/clone-inputs/${PREFIX}")
-        file(GLOB _clone_game_inputs CONFIGURE_DEPENDS "${GAME}/*.toml" "${GAME}/*.csv" "${GAME}/*.txt")
+    set(NATIVE_ROM "${ROM}")
+    if(S3_AUDIO_BACKEND STREQUAL "HLE" AND EXISTS "${GAME}/${ROM}")
+        set(NATIVE_GAME "${CMAKE_BINARY_DIR}/hle-inputs/${PREFIX}")
+        set(NATIVE_ROM "${GAME}/${ROM}")
+        file(GLOB _hle_inputs CONFIGURE_DEPENDS "${GAME}/*.toml" "${GAME}/*.csv" "${GAME}/*.txt")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-            ${_clone_game_inputs} "${GAME}/${ROM}"
-            "${RECOMP_ROOT}/tools/sonic_disassembly.py"
-            "${S3_CLONE_PROGRAM_DIR}/program.json" "${S3_CLONE_PROGRAM_DIR}/clone-driver.bin")
-        execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_SOURCE_DIR}/tools/clone_driver/prepare_native.py"
-            --program "${S3_CLONE_PROGRAM_DIR}" --game "${GAME}" --engine "${RECOMP_ROOT}" --output "${NATIVE_GAME}"
-            RESULT_VARIABLE _clone_prepare_rc)
-        if(NOT _clone_prepare_rc EQUAL 0)
-            message(FATAL_ERROR "Unable to prepare ${PREFIX} sound software generation")
+            ${_hle_inputs} "${GAME}/${ROM}" "${CMAKE_SOURCE_DIR}/tools/prepare_sound_hle.py")
+        execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${CMAKE_SOURCE_DIR}/tools/prepare_sound_hle.py"
+            --game "${GAME}" --output "${NATIVE_GAME}" RESULT_VARIABLE _hle_rc)
+        if(NOT _hle_rc EQUAL 0)
+            message(FATAL_ERROR "Unable to prepare immutable ${PREFIX} HLE metadata")
         endif()
     endif()
     genesisrecomp_add_generated_sources(
-        GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${ROM}"
+        GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${NATIVE_ROM}"
         REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
     set(SHARED_SRC
         ${RUNNER_SOURCES}
@@ -256,8 +264,15 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         "${S3_GAME_COMMON}/sonic3_gameplay.c"
         "${S3_GAME_COMMON}/sonic3_restoration.c"
         "${S3_GAME_COMMON}/sonic3_state.c")
+    if(S3_AUDIO_BACKEND STREQUAL "HLE")
+        list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_sound_hle.c"
+            "${S3_GAME_COMMON}/sonic3_sound_hle_assets.c"
+            "${RUNNER_ROOT}/audio/smps_hle.c" "${RUNNER_ROOT}/audio/smps_hle_synth.c"
+            "${RUNNER_ROOT}/audio/pcm_hle.c")
+    else()
+        list(APPEND SHARED_SRC "${S3_GAME_COMMON}/sonic3_sound_driver.c")
+    endif()
     list(APPEND SHARED_SRC
-        "${S3_GAME_COMMON}/sonic3_sound_driver.c"
         "${S3_GAME_COMMON}/sonic3_sound_mods.c"
         "${S3_GAME_COMMON}/sonic3_sound_assets.c"
         "${S3_GAME_COMMON}/sonic3_sound_sequences.c"
@@ -348,6 +363,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE}
+        $<$<STREQUAL:${S3_AUDIO_BACKEND},HLE>:GENESIS_AUDIO_HLE=1>
+        $<$<STREQUAL:${S3_AUDIO_BACKEND},HLE>:S3_SOUND_HLE=1>
         $<$<STREQUAL:${PREFIX},sonic3>:SONIC3_STANDALONE=1>
         $<$<STREQUAL:${PREFIX},sonic3k>:S3_SOUND_COMBINED=1>
         $<$<BOOL:${GENESIS_Z80_RECOMP}>:GENESIS_Z80_RECOMP=1>

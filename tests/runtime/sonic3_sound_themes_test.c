@@ -67,11 +67,11 @@ int main(int argc,char **argv)
             CHECK(p->feature_choice_get(NULL,package,f.id,o.id,0,&choice)&&!strcmp(choice.value,"base"));
             for(int k=1;k<o.choice_count;k++){
                 CHECK(p->feature_choice_get(NULL,package,f.id,o.id,k,&choice));CHECK(strcmp(choice.value,"original"));
-                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3"))||(!strcmp(o.id,"competition-menu")&&(!strcmp(choice.value,"s2")||!strcmp(choice.value,"s2-wai"))));
+                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3"))||((!strcmp(o.id,"competition-menu")||!strcmp(o.id,"dez-1")||!strcmp(o.id,"dez-2"))&&(!strcmp(choice.value,"s2")||!strcmp(choice.value,"s2-wai"))));
                 if(!strcmp(o.id,"final-boss"))CHECK(strcmp(choice.value,"s3")&&strcmp(choice.value,"sk"));
                 if(!strcmp(o.id,"competition-menu"))CHECK(strcmp(choice.value,"s3"));
             }
-            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:!strcmp(o.id,"competition-menu")?5:3));else ++shared;
+            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:(!strcmp(o.id,"competition-menu")||!strcmp(o.id,"dez-1")||!strcmp(o.id,"dez-2"))?5:3));else ++shared;
             ++total;
         }
     }
@@ -88,7 +88,30 @@ int main(int argc,char **argv)
         CHECK(!set(p,"shared-themes","emerald","s1"));
         CHECK(set(p,"shared-themes","emerald","base"));
     }
-    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==8&&s3_theme_choices(S3_MUSIC_BOSS)==7);
+    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==8&&s3_theme_choices(S3_MUSIC_BOSS)==8);
+    {
+        const unsigned tracks[]={S3_THEME_LIFE,S3_THEME_LIFE,S3_MUSIC_DROWN,S3_MUSIC_DROWN,S3_MUSIC_BOSS};
+        const char *const ids[]={"s2-wai","s2-aug","s2-wai","s2-aug","s2-aug"};
+        const unsigned donors[]={S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_AUG};
+        const unsigned songs[]={7,7,9,9,13};
+        for(unsigned i=0;i<5;i++){
+            const char *track=s3_theme_ids[tracks[i]];
+            CHECK(offered(p,track,ids[i])&&set(p,"shared-themes",track,ids[i]));
+            CHECK(s3_music_donor(tracks[i])==(int)donors[i]);
+            CHECK(s3_music_source(tracks[i],donors[i])==songs[i]);
+            CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+            value(p,"shared-themes",track,ids[i]);
+            CHECK(set(p,"shared-themes",track,"base"));
+        }
+        if(strcmp(argv[2],"sonic3"))for(unsigned t=S3_MUSIC_DEZ1;t<=S3_MUSIC_DEZ2;t++){
+            CHECK(set(p,campaign,s3_theme_ids[t],"s2-wai"));
+            CHECK(s3_music_source(t,S3_DONOR_WAI)==7);
+            CHECK(set(p,campaign,s3_theme_ids[t],"s2"));
+            CHECK(s3_music_source(t,S3_DONOR_S2)==9);
+            CHECK(set(p,campaign,s3_theme_ids[t],"base"));
+        }
+        CHECK(p->commit(NULL,"unused-rom"));
+    }
     CHECK(s3_theme_choices(S3_MUSIC_KNUCKLES)==4);
     CHECK(s3_music_available(S3_MUSIC_DATA)&&s3_music_group(S3_MUSIC_DATA)==S3_MUSIC_SHARED);
     prototype=1;
