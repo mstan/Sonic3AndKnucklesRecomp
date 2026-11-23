@@ -87,7 +87,8 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
         if(world) {
             int camera_delta=s_display->camera_x-s_camera;
 #ifndef SONIC3_STANDALONE
-            if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY)camera_delta=mhz_arena_wrap_delta(camera_delta);
+            if((s->slot>>8)==SPRITE_MHZ_ARENA_COPY || (s->slot>>8)==SPRITE_MHZ_ARENA_SLEEVE)
+                camera_delta=mhz_arena_wrap_delta(camera_delta);
 #endif
             base+=camera_delta;
         }

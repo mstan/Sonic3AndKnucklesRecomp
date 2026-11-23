@@ -4991,6 +4991,32 @@ static void test_mhz_arena_canvas_repeats(void)
         CHECK(expanded[0]==0xDEADBEEF && expanded[canvas+1]==0xDEADBEEF);
         CHECK(!memcmp(before,g_ram,sizeof before));
     }
+    /* Both fixed sleeves stay in view through the camera rebase. The first
+     * room has no outgoing sleeve and the final room has no incoming one. */
+    uint8_t saved_mapping[10];
+    memcpy(saved_mapping,g_rom+0x55908,sizeof saved_mapping);
+    word(g_rom,0x55908,2);word(g_rom,0x5590A,1);
+    memset(g_rom+0x5590C,0,6);
+    memset(&frame,0,sizeof frame);frame.scene=1;frame.world_tag=0x702;
+    s_capture_frame=&frame;
+    frame.mhz_arena_lap=1;frame.camera_x=0x427E;
+    capture_mhz_arena_sleeve(0x3AF,4,0x4238-frame.camera_x,0,24,-238,558);
+    CHECK(frame.count==2 && frame.sprites[0].x==-70 && frame.sprites[1].x==442);
+    s_display=&frame;s_camera=0x4082;
+    memset(s_priority,0,796);memset(expanded,0,796*sizeof *expanded);
+    draw_scene_sprites(&v,0,expanded,796,238,palette);
+    CHECK(expanded[164]==palette[1] && expanded[676]==palette[1]);
+    CHECK(expanded[163]==0 && expanded[172]==0 && expanded[675]==0 && expanded[684]==0);
+    frame.count=0;frame.mhz_arena_lap=2;frame.camera_x=0x4082;
+    capture_mhz_arena_sleeve(0x3AF,4,0x4238-frame.camera_x,0,24,-238,558);
+    CHECK(frame.count==2 && frame.sprites[0].x==-74 && frame.sprites[1].x==438);
+    frame.count=0;frame.mhz_arena_lap=1;
+    capture_mhz_arena_sleeve(0x3AF,4,438,0,24,-238,558);
+    CHECK(frame.count==1 && frame.sprites[0].x==438);
+    frame.count=0;frame.mhz_arena_lap=2;frame.mhz_arena_final=1;
+    capture_mhz_arena_sleeve(0x3AF,4,-70,0,24,-238,558);
+    CHECK(frame.count==1 && frame.sprites[0].x==-70);
+    memcpy(g_rom+0x55908,saved_mapping,sizeof saved_mapping);
     /* Native slots retain their native 512px lift. Projected formations
      * have an independent pose and do not interpolate an unrelated slot. */
     static SceneFrame saved_a,saved_b;

@@ -70,7 +70,8 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_FBZ_BUTTON = 11, SPRITE_FBZ_BLASTER = 12, SPRITE_FBZ_PREBOSS = 13,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
        SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
-       SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_HCZ_MINIBOSS = 20, SPRITE_GIANT_RING = 32 };
+       SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_HCZ_MINIBOSS = 20,
+       SPRITE_MHZ_ARENA_SLEEVE = 21, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -1048,6 +1049,24 @@ static int mhz_arena_cap_left(int camera,int relative,unsigned row,int camera_de
     return mhz_arena_barrier_x(camera-relative*512,row)+camera_delta-24;
 }
 
+/* The fixed sleeve covers the moving pillar where it meets the upper
+ * canopy. The guest places it at one X and reuses it on each camera lap. */
+static void capture_mhz_arena_sleeve(unsigned gfx,unsigned flags,int x,int y,
+                                    int radius,int left,int right)
+{
+    int reach=(right-left)/320+1;
+    int first=mhz_arena_first_lap(s_capture_frame->mhz_arena_lap-1,reach);
+    int last=s_capture_frame->mhz_arena_final?0:reach;
+    for(int lap=first;lap<=last;++lap) {
+        int repeat=x+lap*512;
+        if(repeat+radius<=left || repeat-radius>=right)continue;
+        unsigned mapped=s_capture_frame->count;
+        add_mapping(0x55908,0,gfx,flags,repeat,y,0,0,0);
+        for(unsigned n=mapped;n<s_capture_frame->count;++n)
+            s_capture_frame->sprites[n].slot=SPRITE_MHZ_ARENA_SLEEVE<<8;
+    }
+}
+
 static void capture_mhz_arena_barriers(unsigned priority,int camera,int camera_y,
                                       int mask,int left,int right)
 {
@@ -1620,8 +1639,19 @@ static void capture_objects(void)
                 x=(int16_t)(ram16(o+0x10)-cam);
                 int radius=g_ram[o+7],height=g_ram[o+6];
                 y=((ram16(o+0x14)-cy+height)&mask)-height;
-                if(x+radius<left-cam || x-radius>=left-cam+s_requested_width || y+height<0 || y-height>=224)continue;
-                if(!s_capture_readonly && s_capture_frame->scene!=3 && s_visible_count<144)s_visible_objects[s_visible_count++]=o;
+                if(y+height<0 || y-height>=224)continue;
+                int lo=left-cam,hi=lo+s_requested_width;
+                int outside=x+radius<lo || x-radius>=hi;
+                if(!outside && !s_capture_readonly && s_capture_frame->scene!=3 && s_visible_count<144)
+                    s_visible_objects[s_visible_count++]=o;
+#ifndef SONIC3_STANDALONE
+                if(mhz_arena && !multi && !g_ram[o+0x22] && s_capture_frame->code[s_capture_slot]==0x5576A &&
+                   scene_read32(0xFF0000u+o+0xC)==0x55908) {
+                    capture_mhz_arena_sleeve(ram16(o+0xA),flags,x,y,radius,lo,hi);
+                    continue;
+                }
+#endif
+                if(outside)continue;
             } else {
                 x=(int16_t)ram16(o+0x10)-128;y=(int16_t)ram16(o+0x14)-128;
                 anchor=s_hud_object && s_hud_object(o)?1:2;
