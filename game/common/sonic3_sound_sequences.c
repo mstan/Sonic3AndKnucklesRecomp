@@ -15,10 +15,10 @@ typedef struct Convert {
     const uint8_t *rom;
     uint8_t *bank;
     size_t capacity,cursor,input_size;
-    uint32_t input_bank;
+    uint32_t input_bank,input_base;
     int bad,count,voices,restore_seen;
     unsigned psg_base,mod_base;
-    const uint8_t *dac_map;
+    const uint8_t *dac_map,*psg_map;
     uint8_t *drums;
     uint32_t last_pc,last_op;
     int map[0x8000*KINDS];
@@ -26,7 +26,11 @@ typedef struct Convert {
     S3SoundAssetStats stats;
 } Convert;
 static unsigned rb(Convert *c,uint32_t p)
-{if(p>=(c->input_size?c->input_size:c->source.rom_size)){c->bad=1;return 0;}return c->rom[p];}
+{
+    size_t size=c->input_size?c->input_size:c->source.rom_size;
+    if(p<c->input_base || p-c->input_base>=size){c->bad=1;return 0;}
+    return c->rom[p-c->input_base];
+}
 static unsigned rw(Convert *c,uint32_t p){return rb(c,p)|(rb(c,p+1)<<8);}
 static unsigned zb(Convert *c,uint32_t p)
 {if(p>=sizeof c->source.z80){c->bad=1;return 0;}return c->source.z80[p];}
@@ -62,7 +66,7 @@ static unsigned parameter_length(unsigned op)
 static unsigned psg_id(Convert *c,unsigned id)
 {
     if(id>c->source.volume_count){c->bad=1;return 0;}
-    return id?id+c->psg_base:0;
+    return c->psg_map?c->psg_map[id]:id?id+c->psg_base:0;
 }
 static unsigned mod_id(Convert *c,unsigned id)
 {
@@ -85,7 +89,8 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(fm<1 || fm>7 || psg>3){c->bad=1;return 0;}
         header=8+fm*4+psg*6;
         if(dest>c->capacity || header>c->capacity-dest){c->bad=1;return 0;}
-        memcpy(c->bank+dest,c->rom+input,4);c->bank[dest+4]=0;c->bank[dest+5]=1; /* native S3 PSG ties */
+        for(unsigned k=0;k<4;k++)c->bank[dest+k]=(uint8_t)rb(c,input+k);
+        c->bank[dest+4]=0;c->bank[dest+5]=1; /* native S3 PSG ties */
         c->bank[dest+6]=(uint8_t)rb(c,input+4);c->bank[dest+7]=(uint8_t)rb(c,input+5);
         for(unsigned i=0;i<fm+psg;i++){
             unsigned old=input+6+(i<fm?i*4:fm*4+(i-fm)*6),out=old-input+2;
@@ -95,7 +100,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
              * preceding music without cutting off that echo. */
             unsigned kind=i==0?1:i>=fm?2:prototype_oneup && i==fm-1?3:0;
             roots[root_count]=rw(c,old);kinds[root_count]=kind;headers[root_count++]=out;
-            unsigned n=i<fm?4:6;memcpy(c->bank+dest+out,c->rom+old,n);
+            unsigned n=i<fm?4:6;for(unsigned k=0;k<n;k++)c->bank[dest+out+k]=(uint8_t)rb(c,old+k);
             if(i>=fm){
                 c->bank[dest+out+3]<<=3;
                 c->bank[dest+out+4]=(uint8_t)mod_id(c,rb(c,old+4));
@@ -108,10 +113,10 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(tracks<1 || tracks>6){c->bad=1;return 0;}
         header=4+tracks*6;
         if(dest>c->capacity || header>c->capacity-dest){c->bad=1;return 0;}
-        memcpy(c->bank+dest,c->rom+input,header);
+        for(unsigned k=0;k<header;k++)c->bank[dest+k]=(uint8_t)rb(c,input+k);
         for(unsigned i=0;i<tracks;i++){
             unsigned old=input+4+i*6,out=old-input,ch=rb(c,old+1),kind=ch&128?2:0;
-            if(ch!=2 && ch!=4 && ch!=5 && ch!=0x80 && ch!=0xA0 && ch!=0xC0){c->bad=1;return 0;}
+            if(ch!=2 && ch!=4 && ch!=5 && ch!=6 && ch!=0x80 && ch!=0xA0 && ch!=0xC0){c->bad=1;return 0;}
             roots[root_count]=rw(c,old+2);kinds[root_count]=kind;headers[root_count++]=out+2;
             if(kind==2)c->bank[dest+out+5]<<=3;else c->voices=0;
         }
@@ -134,7 +139,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
             else if(op==0xE6&&n->kind==2)encoded=3;
             else if(op==0xFF){
                 unsigned sub=rb(c,pc+1);
-                if(sub==0){length=3;encoded=3;}
+                if(sub==0 || sub==4){length=3;encoded=3;}
                 else if(sub==7){length=2;encoded=0;} /* queue reset is internal */
                 else {c->bad=1;break;}
             }else if(op==0xEB || op==0xF1 || op==0xFD || op==0xFE){c->bad=1;break;}
@@ -193,7 +198,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         c->bank[out]=0xFF;c->bank[out+1]=commands[op-0xE0];
         if(op==0xF2 && n->kind==3)c->bank[out+1]=4;
         if(op==0xE2)continue;
-        if(op==0xFF){c->bank[out+1]=0x0A;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;}
+        if(op==0xFF){c->bank[out+1]=rb(c,pc+1)==4?0x0B:0x0A;c->bank[out+2]=(uint8_t)rb(c,pc+2);continue;}
         if(op==0xE5){
             /* Retail discards the first parameter, then changes FM volume
              * using the second. The PSG form was handled above. */
@@ -453,13 +458,27 @@ int s3_sound_convert_custom(const uint8_t *input,size_t bytes,const S3SoundSourc
        (input[0]|((unsigned)input[1]<<8))<0x8000) {
         if(error&&en)snprintf(error,en,"Use an S3 Z80 SMPS bank based at $8000 with embedded instruments");return 0;
     }
-    Convert *c=calloc(1,sizeof *c);uint8_t *rom=calloc(1,0x8000+bytes);
-    if(!c||!rom){free(c);free(rom);return 0;}memcpy(rom+0x8000,input,bytes);
+    Convert *c=calloc(1,sizeof *c);if(!c)return 0;
     if(source)c->source=*source;
     else{c->source.rom_size=0x400000;c->source.volume_count=51;c->source.modulation_count=8;}
-    c->source.prototype=0;c->rom=rom;c->input_size=0x8000+bytes;c->bank=out;c->capacity=capacity;c->cursor=0;
+    c->source.prototype=0;c->rom=input;c->input_base=0x8000;c->input_size=bytes;c->bank=out;c->capacity=capacity;c->cursor=0;
     int n=convert_song(c,0x8000,0,1),ok=n>0&&!c->bad;
     if(ok&&info){info->bytes=(unsigned)n;info->restores=c->restore_seen!=0;}
     if(!ok&&error&&en)snprintf(error,en,"Invalid or unsupported S3 SMPS sequence at $%04X, command $%02X",c->last_pc&0xFFFFu,c->last_op);
-    free(c);free(rom);return ok;
+    free(c);return ok;
+}
+
+int s3_sound_convert_bank(const uint8_t *input,size_t bytes,unsigned offset,int music,
+                           const S3SoundSource *source,const uint8_t *psg_map,const uint8_t *dac_map,
+                           uint8_t *out,size_t capacity,S3SoundCustomInfo *info,char *error,size_t en)
+{
+    if(!input || !source || !out || !bytes || bytes>0x8000 || offset>=bytes ||
+       capacity<8 || capacity>0x8000 || (music!=0 && music!=1))return 0;
+    Convert *c=calloc(1,sizeof *c);if(!c)return 0;
+    c->source=*source;c->source.prototype=0;c->rom=input;c->input_base=0x8000;c->input_size=bytes;
+    c->psg_map=psg_map;c->dac_map=dac_map;c->bank=out;c->capacity=capacity;
+    int n=convert_song(c,0x8000+offset,0,music),ok=n>0&&!c->bad;
+    if(ok && info){info->bytes=(unsigned)n;info->restores=c->restore_seen!=0;}
+    if(!ok && error && en)snprintf(error,en,"Unsupported campaign sound data at $%04X, command $%02X",c->last_pc&0xFFFFu,c->last_op);
+    free(c);return ok;
 }

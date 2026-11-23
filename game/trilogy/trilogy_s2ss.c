@@ -19,6 +19,9 @@
 #include "trilogy_obj.h"
 #include "trilogy_hooks.h"
 #include "genesis_machine.h"
+#ifdef S3_SOUND_HLE
+#include "sonic3_sound_driver.h"
+#endif
 #include "video/genesis_vdp.h"
 #include <stdio.h>
 #include <string.h>
@@ -2607,7 +2610,14 @@ static int pass_overruns(void)
     return c > 44106.0;
 }
 
-static void music_pause(int on) { g_machine.bus.z80_ram[Z80_PAUSE_FLAG] = on ? 1 : 0x80; }
+static void music_pause(int on)
+{
+#ifdef S3_SOUND_HLE
+    s3_sound_pause(on);
+#else
+    g_machine.bus.z80_ram[Z80_PAUSE_FLAG] = on ? 1 : 0x80;
+#endif
+}
 
 static int pause_game(int resume)                    /* PauseGame: 1 = now paused */
 {

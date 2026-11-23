@@ -27,6 +27,12 @@ refresh rate. Current-build saves and rewind retain sound clocks, pending
 requests, PCM position, articulation and chip state. Different build or
 sound-data identities are rejected; native battery saves are preserved.
 
+Imported Sonic 1, Sonic 2 and Megamix campaigns use the same host provider
+with their own songs, percussion and envelopes. Sonic 2 and Sonic CD effects
+also bind directly to host resources; CD background tracks retain their
+existing CD-audio provider. Experimental campaigns keep their native campaign
+saves and existing quickstate restriction.
+
 The separate **November 1993 prototype soundtrack** restoration option is
 disabled by default in all three games. Enable the music library, select your
 donor ROM in the soundtrack's resource picker, enable the soundtrack and

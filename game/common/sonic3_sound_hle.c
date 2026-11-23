@@ -23,6 +23,8 @@
 #include "genesis_machine.h"
 #ifdef S3_SOUND_COMBINED
 #include "stage_pack.h"
+#include "trilogy.h"
+#include "trilogy_music_hle.h"
 #endif
 
 static int selected,active,bound,standalone;
@@ -33,6 +35,13 @@ static SmpsHleSynth music_synth,effect_synth;
 static PcmHle pcm;
 static PcmHleClip clips[126];
 static unsigned output_channel,output_effect,stamp,write_offset,paused,fade,last_pause,speed_timeout;
+typedef struct CampaignBindings {
+    uint32_t music_root[2];
+    uint8_t music_flags[2],wanted_set,effect_set,effect_content;
+} CampaignBindings;
+static CampaignBindings bindings;
+static uint32_t default_music[2];
+static unsigned campaigns_prepared;
 static void hle_stop_all(void);
 static char settings_file[1200],error[256];
 static char prototype_path[1024];
@@ -94,6 +103,7 @@ int s3_sound_select(int on)
 void s3_sound_load(const char *path,const char *mode)
 {
     s3_hle_sound_assets_free(&assets);
+    memset(&bindings,0,sizeof bindings);memset(default_music,0,sizeof default_music);campaigns_prepared=0;
     selected=active=bound=0;initialised=tempo=tempo_dirty=0;memset(pending,0,sizeof pending);*error=0;
     memset(theme_identity,0,sizeof theme_identity);invincibility_override=super_override=0;
     s3_cd_themes_reset();
@@ -279,10 +289,73 @@ void s3_sound_post_reset(void)
     }
 
     assets.bytes=stats.bytes;s3_hle_sound_assets_index(&assets);
+    for(unsigned i=0;i<2;i++)bindings.music_root[i]=default_music[i]=assets.music[0x20-1+i];
     bind_providers();
     if(!player_bind(&stats.bytes,0x400000))fatal();
     fprintf(stderr,"[sound-hle] Immutable host sequences/PCM: %u bytes; sound CPU disabled\n",assets.bytes);
 }
+void s3_sound_campaign_restore(void)
+{
+    for(unsigned i=0;i<2;i++){
+        assets.music[0x20-1+i]=bindings.music_root[i]=default_music[i];bindings.music_flags[i]=0;
+    }
+}
+void s3_sound_campaign_prepare(void)
+{
+#ifdef S3_SOUND_COMBINED
+    if(campaigns_prepared || !s3_stage_pack_enabled)return;
+    S3SoundSource source;
+    if(!s3_sound_read_source(g_rom,0x400000,&source,error,sizeof error) ||
+       !tri_hle_sound_prepare(&assets,&source,error,sizeof error))fatal();
+    s3_hle_sound_assets_index(&assets);bind_providers();campaigns_prepared=1;
+    uint8_t hashes[64];recompui_sha256_compute(assets.data,assets.bytes,hashes);
+    s3_cd_theme_identity(hashes+32);recompui_sha256_compute(hashes,sizeof hashes,theme_identity);
+    fprintf(stderr,"[sound-hle] Immutable campaign sound data ready: %u bytes\n",assets.bytes);
+#endif
+}
+int s3_sound_campaign_music(unsigned content,unsigned game,unsigned slot,unsigned song)
+{
+#ifdef S3_SOUND_COMBINED
+    if(!campaigns_prepared || slot<0x20 || slot>0x21)return 0;
+    unsigned flags=0;uint32_t root=tri_hle_music_root(content,game,song,&flags);if(!root)return 0;
+    unsigned index=slot-0x20;bindings.music_root[index]=assets.music[slot-1]=root;
+    bindings.music_flags[index]=(uint8_t)flags;return 1;
+#else
+    (void)content;(void)game;(void)slot;(void)song;return 0;
+#endif
+}
+void s3_sound_campaign_effects_apply(unsigned set)
+{
+    bindings.effect_set=bindings.effect_content=0;
+#ifdef S3_SOUND_COMBINED
+    unsigned content=(unsigned)tri_bank_current();
+    if(campaigns_prepared && set>=1 && set<=2 && tri_hle_effects_available(content,set)){
+        bindings.effect_set=(uint8_t)set;bindings.effect_content=(uint8_t)content;
+    }
+#else
+    (void)set;
+#endif
+}
+void s3_sound_campaign_effects(unsigned set,int on)
+{
+    if(set>2)return;
+    if(on)bindings.wanted_set=(uint8_t)set;
+    else if(bindings.wanted_set==set)bindings.wanted_set=0;
+    else return;
+    s3_sound_campaign_effects_apply(bindings.wanted_set);
+}
+unsigned s3_sound_campaign_effects_wanted(void){return bindings.wanted_set;}
+unsigned s3_sound_campaign_effects_active(void){return bindings.effect_set;}
+unsigned s3_sound_campaign_effect_root(unsigned native)
+{
+#ifdef S3_SOUND_COMBINED
+    if(bindings.effect_set)return tri_hle_effect_root(bindings.effect_content,bindings.effect_set,native);
+#endif
+    return native>=0x33 && native<=0xDB?assets.effects[native-0x33]:0;
+}
+void s3_sound_pause(int on){paused=on!=0;}
+void s3_sound_effect_restart(void)
+{for(unsigned c=0;c<SMPS_HLE_TRACKS;c++){effects.state.music.track[c].effect=0;effects.state.music.track[c].continuous=0;}}
 static void hle_stop_all(void)
 {
     output_effect=1;
@@ -292,7 +365,10 @@ static void hle_stop_all(void)
 }
 static int queue(unsigned native,unsigned slot)
 {
-    (void)slot;
+    if(slot && native>=0x33 && native<=0xDF && bindings.effect_set){
+        uint32_t root=s3_sound_campaign_effect_root(native);
+        return !root || smps_hle_effect(&effects,root,native>=0xBC);
+    }
     unsigned id=native;
     if(native==0xDC && !standalone)id=0x33;
     if((prototype_active || invincibility_override || super_override) && standalone && native==0x2C && g_ram[0xFE19])id=0x33;
@@ -302,6 +378,7 @@ static int queue(unsigned native,unsigned slot)
         if(!id || !assets.music[id-1])return 1;
         fade=0;
         unsigned flags=native==0x2A?SMPS_HLE_INTERRUPT:0;
+        if(native>=0x20 && native<=0x21)flags=bindings.music_flags[native-0x20];
         if(native==0x2A && s3_music_active(S3_THEME_LIFE))flags|=SMPS_HLE_ONE_PASS;
         return smps_hle_music(&music,assets.music[id-1],flags);
     }
@@ -336,7 +413,8 @@ int s3_sound_hook(uint32_t pc)
     if(!s3_sound_owns(pc))return 0;
     stamp=machine_z80_stamp();write_offset=0;
     if(pc==(standalone?0x1562:0x12CE)){
-        s3_cd_theme_driver_init();hle_stop_all();bind_providers();initialised=1;zero_move_flags();return 1;
+        s3_cd_theme_driver_init();hle_stop_all();bind_providers();s3_sound_campaign_restore();
+        bindings.effect_set=bindings.effect_content=0;initialised=1;zero_move_flags();return 1;
     }
     if(pc==(standalone?0x15E2:0x1358)){
         if(!s_player.open){pending[0]=(uint8_t)g_cpu.D[0];s_player.last_music=pending[0];}
@@ -402,10 +480,16 @@ void s3_sound_vblank(void)
 int s3_sound_dispatch_miss(uint32_t pc){(void)pc;return 0;}
 void s3_sound_state(S3StateIO *io)
 {
-    uint8_t identity[40]={'S','3','H','L',1,0,0,0},incoming[40];
+    uint8_t identity[40]={'S','3','H','L',2,0,0,0},incoming[40];
     identity[5]=(uint8_t)active;identity[6]=(uint8_t)prototype_active;memcpy(identity+8,theme_identity,32);
     memcpy(incoming,identity,sizeof incoming);s3_state_peek(io,0,incoming,sizeof incoming);if(memcmp(incoming,identity,sizeof incoming))io->ok=0;
     S3_STATE(io,identity);
+    CampaignBindings binding_check=bindings;
+    s3_state_peek(io,0,&binding_check,sizeof binding_check);
+    for(unsigned i=0;i<2;i++)if(binding_check.music_root[i] && (binding_check.music_root[i]<8192 || binding_check.music_root[i]>=assets.bytes))io->ok=0;
+    if((binding_check.music_flags[0]&~3) || (binding_check.music_flags[1]&~3) || binding_check.wanted_set>2 || binding_check.effect_set>2 || binding_check.effect_content>4)io->ok=0;
+    S3_STATE(io,bindings);
+    if(io->mode==2 && io->ok)for(unsigned i=0;i<2;i++)assets.music[0x20-1+i]=bindings.music_root[i];
     SmpsHleState ms=music.state,es=effects.state;PcmHleState ps=pcm.state;
     s3_state_peek(io,0,&ms,sizeof ms);s3_state_peek(io,sizeof ms,&es,sizeof es);s3_state_peek(io,sizeof ms+sizeof es,&ps,sizeof ps);
     if(!smps_hle_state_valid(&music,&ms)||!smps_hle_state_valid(&effects,&es)||!pcm_hle_state_valid(&pcm,&ps))io->ok=0;
@@ -440,5 +524,5 @@ void s3_sound_command(int id,const char *json)
 #else
     (void)json;
 #endif
-    char response[480];snprintf(response,sizeof response,"{\"id\":%d,\"ok\":true,\"backend\":\"hle\",\"selected\":%d,\"active\":%d,\"initialised\":%u,\"pending\":[%u,%u,%u],\"song\":%u,\"failed\":%u}",id,selected,active,initialised,pending[0],pending[1],pending[2],music.state.song,music.state.failed|effects.state.failed);cmd_send_response(response);
+    char response[480];snprintf(response,sizeof response,"{\"id\":%d,\"ok\":true,\"backend\":\"hle\",\"selected\":%d,\"active\":%d,\"initialised\":%u,\"pending\":[%u,%u,%u],\"song\":%u,\"effect_set\":%u,\"effect_content\":%u,\"campaign_slots\":[%u,%u],\"failed\":%u}",id,selected,active,initialised,pending[0],pending[1],pending[2],music.state.song,bindings.effect_set,bindings.effect_content,bindings.music_root[0],bindings.music_root[1],music.state.failed|effects.state.failed);cmd_send_response(response);
 }

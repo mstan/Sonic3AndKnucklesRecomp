@@ -76,9 +76,9 @@ def stage(build, dest, version, mode, engine_root=None):
     assert info["mode"] == mode and info["target"] == spec["target"], "Wrong build mode"
     for key in ("trace", "reverse_debug", "dev_trace", "cosim"):
         assert info[key] == "OFF", f"Development option enabled: {key}"
-    assert info["z80_recompiled"] == "OFF", "Release requires the standard Z80 backend"
-    sound_sha = info["clone_driver_sha256"]
-    assert len(sound_sha) == 64 and set(sound_sha) <= set("0123456789abcdef"), "Missing Clone Driver software"
+    assert info["audio_backend"] == "HLE", "Release requires host-native sound"
+    assert info["z80_recompiled"] == "OFF", "HLE release must not compile the sound CPU"
+    assert info["clone_driver_sha256"] == "", "HLE release must not contain an uploaded sound program"
     for key, repo, relative in (("source_commit", ROOT, None),
             ("engine_commit", engine, "segagenesisrecomp"),
             ("ui_commit", ROOT / "recomp-ui", "recomp-ui"),
@@ -98,7 +98,7 @@ def stage(build, dest, version, mode, engine_root=None):
     # Gameplay/launcher captions contain only the clean game name. Build
     # identity is emitted separately by the shared runner for logs/About.
     image = binary.read_bytes()
-    assert sound_sha.encode() + b"\0" in image, "Binary does not contain the declared sound driver"
+    assert b"[sound-hle]" in image, "Binary does not contain the declared host sound provider"
     for label, stamp in (("game title", spec["title"]), ("version", version),
                          ("source commit", info["source_commit"][:10]),
                          ("engine commit", info["engine_commit"][:10])):

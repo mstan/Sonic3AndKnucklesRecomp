@@ -50,6 +50,8 @@ void s3_hle_sound_assets_index(S3HleSoundAssets *out)
         if(!start || end<start || end>result.bytes)continue;
         result.samples[i].start=start;result.samples[i].bytes=end-start;
         result.samples[i].rate_numerator=descriptor[1]*25100u;result.samples[i].rate_denominator=256;
+        uint32_t numerator=pointer(data,0x1000+i*8),denominator=pointer(data,0x1004+i*8);
+        if(numerator && denominator){result.samples[i].rate_numerator=numerator;result.samples[i].rate_denominator=denominator;}
     }
     result.samples[0xC6-0x81].rate_numerator=3579545;
     result.samples[0xC6-0x81].rate_denominator=245;

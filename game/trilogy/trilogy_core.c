@@ -72,6 +72,12 @@ void tri_bank_level(void)
 }
 
 int tri_bank_loaded(void) { return s_bank != NULL; }
+const uint8_t *tri_bank_resource(int content,size_t *bytes)
+{
+    unsigned index=(unsigned)(content-1);
+    if(bytes)*bytes=index<4?s_sizes[index]:0;
+    return index<4?s_banks[index]:NULL;
+}
 int tri_bank_current(void){return s_selected+1;}
 
 /* A newer save schema must leave native saving available without any addon

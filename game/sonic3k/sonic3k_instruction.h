@@ -13,7 +13,14 @@
 
 static int s3k_instruction(uint32_t pc)
 {
+#ifdef S3_SOUND_HLE
+    if(s3_sound_owns(pc)){
+        if((pc==TH_CD_MUSIC_REQUEST || pc==TH_CD_MUSIC_TEMPO) && trilogy_instruction(pc))return 1;
+        return s3_sound_hook(pc);
+    }
+#else
     if(s3_sound_active() && s3_sound_owns(pc))return s3_sound_hook(pc);
+#endif
     if(s3_restoration_instruction(pc))return 0;
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);

@@ -256,6 +256,8 @@ target_include_directories(sonic3_sound_dispatch_test PRIVATE
     "${RUNNER_ROOT}" "${RUNNER_ROOT}/include" "${RUNNER_ROOT}/video"
     "${RUNNER_ROOT}/external/clowncommon" "${RUNNER_ROOT}/external/superzazu")
 target_compile_definitions(sonic3_sound_dispatch_test PRIVATE OWN_BACKEND=1)
+target_compile_definitions(sonic3_sound_dispatch_test PRIVATE
+    $<$<STREQUAL:${S3_AUDIO_BACKEND},HLE>:S3_SOUND_HLE=1>)
 add_test(NAME sound_dispatch COMMAND sonic3_sound_dispatch_test)
 # Optional cartridge fixtures exercise the complete sound corpus without
 # storing any music, instruments or samples in the repository.
@@ -340,6 +342,28 @@ if(S3_AUDIO_BACKEND STREQUAL "HLE")
         "${RUNNER_ROOT}/audio/smps_hle.c")
     target_include_directories(sonic3_sound_hle_test PRIVATE "${RUNNER_ROOT}/audio")
     target_link_libraries(sonic3_sound_hle_test PRIVATE sonic3_sound_hle_test_data)
+    add_executable(sonic3_campaign_sound_hle_test runtime/sonic3_campaign_sound_hle_test.c
+        "${S3_GAME_ROOT}/trilogy/trilogy_music_hle.c"
+        "${S3_GAME_ROOT}/trilogy/scd_resource.c" "${S3_GAME_ROOT}/trilogy/scd_pack.c"
+        "${RUNNER_ROOT}/audio/smps_hle.c" "${RUNNER_ROOT}/audio/smps_hle_synth.c")
+    target_compile_definitions(sonic3_campaign_sound_hle_test PRIVATE S3_SOUND_HLE=1 OWN_BACKEND=1)
+    target_include_directories(sonic3_campaign_sound_hle_test PRIVATE "${S3_GAME_ROOT}/trilogy"
+        "${RUNNER_ROOT}/audio" "${RUNNER_ROOT}" "${RUNNER_ROOT}/include"
+        "${RUNNER_ROOT}/external/clowncommon")
+    target_link_libraries(sonic3_campaign_sound_hle_test PRIVATE sonic3_sound_hle_test_data)
+    set(S3_CAMPAIGN_SOUND_FIXTURES "" CACHE PATH "Optional directory of original-image-derived Sonic1/2/Megamix resource fixtures")
+    set(S3_CD_SOUND_FIXTURE "" CACHE FILEPATH "Optional original-disc-derived Sonic CD resource fixture")
+    if(EXISTS "${S3_GAME_ROOT}/sonic3k/sonic3k.bin" AND EXISTS "${S3_CD_SOUND_FIXTURE}"
+       AND EXISTS "${S3_CAMPAIGN_SOUND_FIXTURES}/sonic1-stages.pak"
+       AND EXISTS "${S3_CAMPAIGN_SOUND_FIXTURES}/sonic2-stages.pak"
+       AND EXISTS "${S3_CAMPAIGN_SOUND_FIXTURES}/megamix-stages.pak")
+        add_test(NAME sound_hle_campaigns COMMAND sonic3_campaign_sound_hle_test
+            "${S3_GAME_ROOT}/sonic3k/sonic3k.bin"
+            "${S3_CAMPAIGN_SOUND_FIXTURES}/sonic1-stages.pak"
+            "${S3_CAMPAIGN_SOUND_FIXTURES}/sonic2-stages.pak"
+            "${S3_CAMPAIGN_SOUND_FIXTURES}/megamix-stages.pak" "${S3_CD_SOUND_FIXTURE}")
+        set_tests_properties(sound_hle_campaigns PROPERTIES TIMEOUT 0)
+    endif()
     add_executable(sonic3_sound_hle_audio_test runtime/sonic3_sound_hle_audio_test.c
         "${RUNNER_ROOT}/audio/smps_hle.c" "${RUNNER_ROOT}/audio/smps_hle_synth.c"
         "${RUNNER_ROOT}/audio/pcm_hle.c" "${RUNNER_ROOT}/audio/sn76489.c" ${FM_SOURCES})
