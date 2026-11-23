@@ -26,8 +26,38 @@ static int pcm(void *user,unsigned note,unsigned pan)
     return note>=0x81&&note<=0xFD&&a->samples[note-0x81].bytes&&a->samples[note-0x81].rate_numerator&&(pan&~0xC0)==0;
 }
 static int request(void *user,unsigned id){(void)user;return id<=255;}
+static int prototype(const char *original,const char *donor_path)
+{
+    size_t bytes=0,donor_bytes=0;uint8_t *image=load(original,&bytes),*donor=load(donor_path,&donor_bytes);CHECK(image&&donor);
+    S3HleSoundAssets a={0};char error[256]={0};S3SoundSource source;
+    CHECK(s3_hle_sound_assets(image,bytes,&a,error,sizeof error));CHECK(s3_sound_read_source(image,bytes,&source,error,sizeof error));
+    unsigned available[51];for(unsigned i=0;i<51;i++)available[i]=a.music[i]!=0;
+    uint32_t native_effects[169];memcpy(native_effects,a.effects,sizeof native_effects);
+    S3SoundLayout layout={8192,0x400000,0x400100,0x400500,0x400900};
+    S3SoundPCMLayout pcm_layout={0x400A00,0x400F00,0x400F80,0xC6,126};
+    if(!s3_sound_build_prototype_music(donor,donor_bytes,&layout,a.data,0x400000,&a.bytes,source.standalone_sonic3,error,sizeof error) ||
+       !s3_sound_build_prototype_pcm(donor,donor_bytes,&pcm_layout,a.data,0x400000,&a.bytes,error,sizeof error)){
+        fprintf(stderr,"prototype preparation: %s\n",error);return 1;
+    }
+    s3_hle_sound_assets_index(&a);unsigned songs=0;
+    for(unsigned i=0;i<51;i++)if(available[i])CHECK(a.music[i]);
+    CHECK(a.music[0x25-1]&&a.music[0x2A-1]&&a.music[0x31-1]);CHECK(!memcmp(native_effects,a.effects,sizeof native_effects));
+    for(unsigned id=1;id<=51;id++)if(a.music[id-1]){
+        SmpsHleSynth synth;SmpsHleChipOutput output={fm,psg,pcm,request,&a};
+        smps_hle_synth_init(&synth,a.data,a.bytes,output);synth.psg_envelopes=a.psg_envelopes;synth.psg_count=256;synth.modulation_envelopes=a.modulation;synth.modulation_count=32;
+        SmpsHle sequence;smps_hle_init(&sequence,a.data,a.bytes,smps_hle_synth_event,&synth);
+        CHECK(smps_hle_music(&sequence,a.music[0x25-1],0));CHECK(smps_hle_music(&sequence,a.music[id-1],id==0x2A?SMPS_HLE_INTERRUPT:0));
+        for(unsigned tick=0;tick<1200;tick++)if(!smps_hle_frame(&sequence)){
+            fprintf(stderr,"prototype song%02X tick%u: %s\n",id,tick,sequence.error);return 1;
+        }
+        ++songs;
+    }
+    printf("PASS full prototype soundtrack: %u available songs with actual host FM/PSG/PCM bindings; native effect bindings preserved\n",songs);
+    s3_hle_sound_assets_free(&a);free(image);free(donor);return 0;
+}
 int main(int argc,char **argv)
 {
+    if(argc==3)return prototype(argv[1],argv[2]);
     CHECK(argc==6);size_t image_bytes=0;uint8_t *image=load(argv[1],&image_bytes);CHECK(image);
     for(unsigned i=0;i<3;i++){banks[i]=load(argv[2+i],&sizes[i]);CHECK(banks[i]);}
     char error[256]={0};CHECK(scd_pack_open(&cd,argv[5],error,sizeof error));

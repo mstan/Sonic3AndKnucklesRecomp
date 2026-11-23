@@ -206,7 +206,13 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         }
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);
         if(op==0xF5)c->bank[out+2]=(uint8_t)psg_id(c,rb(c,pc+1));
-        if(op==0xF4)c->bank[out+2]=(uint8_t)mod_id(c,rb(c,pc+1));
+        if(op==0xF4){
+            unsigned id=rb(c,pc+1);
+            /* November's F4 handler increments its zero-based argument;
+             * FF consequently disables the envelope. Headers are one-based. */
+            if(c->source.prototype)id=(id+1)&255u;
+            c->bank[out+2]=(uint8_t)mod_id(c,id);
+        }
         /* Retail's absolute key command is biased by $40; Clone stores
          * the signed transpose directly. Credits changes key repeatedly. */
         if(op==0xED)c->bank[out+2]=(uint8_t)(rb(c,pc+1)-0x40u);
