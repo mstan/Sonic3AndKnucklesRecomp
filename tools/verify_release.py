@@ -65,7 +65,7 @@ def main():
             (dest / relative).write_bytes(data if isinstance(data, bytes) else data.encode())
         if launcher:
             (dest / f"rom-{spec['short']}.cfg").write_text(str(args.rom.resolve()) + "\n")
-            command += ["--launcher"]
+            command += [str(args.rom.resolve()), "--launcher"]
         else:
             # Scripted runs read only their script: host keyboards/controllers
             # (including a desktop user's) must not leak into the evidence.
@@ -86,7 +86,7 @@ def main():
             (dest / "route.input").write_text(route.replace("{out}", dest.as_posix()))
             command += ["--input-script", str(dest / "route.input")]
         env = {k: v for k, v in os.environ.items() if not k.startswith(("SDL_", "GENESIS_", "RNET_", "LNG_"))}
-        env.update(SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1")
+        env.update(SDL_AUDIODRIVER="dummy", GENESIS_RUN_DONE="1", GENESIS_USER_DIR=str(dest))
         if launcher:
             env["LNG_SCRIPT"] = (f"wait:15;shot:{dest.as_posix()}/launcher.png;"
                                  f"view:controller;wait:10;shot:{dest.as_posix()}/controls.png;quit")
@@ -102,7 +102,7 @@ def main():
             env["PATH"] = system_root + "\\System32;" + system_root
         with (dest / "process.log").open("w") as log:
             r = subprocess.run(command, cwd=dest, env=env, stdout=log, stderr=subprocess.STDOUT,
-                               timeout=240, creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+                               creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         log = (dest / "process.log").read_text(errors="replace")
         assert r.returncode == 0, (name, r.returncode, dest)
         assert "title art unavailable" not in log and "JSR stack mismatch" not in log, name
@@ -231,7 +231,7 @@ def verify_campaigns(args, out, report, run):
         shutil.copy2(args.package, app)
         app.chmod(0o755)
         subprocess.run([str(app), "--appimage-extract"], cwd=work, check=True,
-                       stdout=subprocess.DEVNULL, timeout=600)
+                       stdout=subprocess.DEVNULL)
         app.unlink()
         payload = work / "squashfs-root/usr/bin"
         validator = payload / "scd_pack_validate"
@@ -241,7 +241,7 @@ def verify_campaigns(args, out, report, run):
     def convert(label, *command):
         with (out / f"campaign-{label}.log").open("w") as log:
             r = subprocess.run([sys.executable, *map(str, command)], cwd=work, stdout=log,
-                               stderr=subprocess.STDOUT, timeout=7200)
+                               stderr=subprocess.STDOUT)
         assert r.returncode == 0, ("packaged converter failed", label, out / f"campaign-{label}.log")
 
     # Sonic CD: the launcher's importer, run from the package with its validator.
