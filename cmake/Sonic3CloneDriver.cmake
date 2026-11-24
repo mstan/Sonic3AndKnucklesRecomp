@@ -6,7 +6,12 @@ if(NOT S3_CLONE_DRIVER_SUPPORT MATCHES "^(AUTO|ON|OFF)$")
 endif()
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(_clone_tools "${CMAKE_SOURCE_DIR}/tools/clone_driver")
-file(GLOB _clone_inputs CONFIGURE_DEPENDS "${_clone_tools}/*.py" "${_clone_tools}/*.asm" "${_clone_tools}/*.json")
+file(GLOB _clone_inputs CONFIGURE_DEPENDS
+    "${_clone_tools}/*.py" "${_clone_tools}/*.asm" "${_clone_tools}/*.json"
+    "${RECOMP_ROOT}/tools/clone_driver/*.py"
+    "${RECOMP_ROOT}/tools/clone_driver/*.asm"
+    "${RECOMP_ROOT}/tools/clone_driver/*.json")
+list(SORT _clone_inputs)
 set(_clone_key "")
 foreach(_file IN LISTS _clone_inputs)
     file(SHA256 "${_file}" _hash)
@@ -20,7 +25,7 @@ elseif(NOT S3_CLONE_PROGRAM_DIR)
     set(_clone_out "${CMAKE_BINARY_DIR}/clone-software/${_clone_key}")
     if(NOT EXISTS "${_clone_out}/program.json")
         execute_process(COMMAND "${Python3_EXECUTABLE}" -B "${_clone_tools}/build.py"
-            --cache "${CMAKE_BINARY_DIR}/clone-cache" --output "${_clone_out}"
+            --engine "${RECOMP_ROOT}" --cache "${CMAKE_BINARY_DIR}/clone-cache" --output "${_clone_out}"
             RESULT_VARIABLE _clone_rc)
         if(NOT _clone_rc EQUAL 0)
             if(S3_CLONE_DRIVER_SUPPORT STREQUAL "ON")

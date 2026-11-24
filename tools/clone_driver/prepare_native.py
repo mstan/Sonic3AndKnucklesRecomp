@@ -1,7 +1,6 @@
 """Prepare private generation inputs. Original cartridge bytes stay unchanged."""
 from pathlib import Path
 import argparse,hashlib,importlib.util,json,re,subprocess,sys
-from build import HEADER,FIELDS,SOURCE_COMMIT
 
 def write(p,data):
     if isinstance(data,str):data=data.encode('utf-8')
@@ -12,6 +11,8 @@ def main():
     for name in ('program','game','engine','output'):ap.add_argument('--'+name,type=Path,required=True)
     a=ap.parse_args();program,game,engine,out=(getattr(a,k).resolve() for k in ('program','game','engine','output'))
     if out==game or out.is_relative_to(game) or out==engine or out.is_relative_to(engine):ap.error('Output must be separate from source')
+    sys.path.insert(0, str(engine / "tools/clone_driver"))
+    from build import HEADER, FIELDS, SOURCE_COMMIT
     info=json.loads((program/'program.json').read_text());payload=(program/'clone-driver.bin').read_bytes()
     magic,*fields=HEADER.unpack_from(payload)
     if magic!=b'S3CR' or info['source']!=SOURCE_COMMIT or info['sha256']!=hashlib.sha256(payload).hexdigest() or any(info[k]!=v for k,v in zip(FIELDS,fields)):ap.error('Software image identity mismatch')
@@ -39,7 +40,7 @@ def main():
     # It needs a callable entry even when it was formerly interior code.
     entries.update(pc+8 for pc in pause)
     for pc in sorted(set(sites)):config+=f'\n[[widescreen_site]]\naddr = 0x{pc:06X}\nkind = "game_hook"\n'
-    write(out/'game.toml',config);write(out/(mode+'.bin'),image)
+    write(out/'game.toml',config)
     write(out/'clone_driver.toml','[functions]\nextra = [\n'+''.join(f'    0x{pc:06X},\n' for pc in sorted(entries))+']\n')
     code=module.instruction_starts(program/'driver.lst',image)
     # Mega PCM ships its 68000 library as dc.l software words. This pinned

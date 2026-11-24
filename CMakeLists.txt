@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(Sonic3AndKnucklesRecomp VERSION 0.8.11 LANGUAGES C)
+project(Sonic3AndKnucklesRecomp VERSION 0.8.19 LANGUAGES C)
 set(S3_BUILD_VERSION "${PROJECT_VERSION}" CACHE STRING "Release version")
 if(NOT S3_BUILD_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$")
     message(FATAL_ERROR "Invalid S3_BUILD_VERSION")
@@ -234,6 +234,7 @@ endif()
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
     set(NATIVE_GAME "${GAME}")
+    set(_generation_options)
     if(S3_RETAINED_GENERATION_DIR)
         set(NATIVE_GAME "${CMAKE_BINARY_DIR}/clone-inputs/${PREFIX}")
         configure_file(
@@ -260,11 +261,15 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
         if(NOT _clone_prepare_rc EQUAL 0)
             message(FATAL_ERROR "Unable to prepare ${PREFIX} sound software generation")
         endif()
+        list(APPEND _generation_options
+            ROM_PATH "${GAME}/${ROM}"
+            SOFTWARE_OVERLAY_ADDRESS 0x400000
+            SOFTWARE_OVERLAY_FILE "${S3_CLONE_PROGRAM_DIR}/clone-driver.bin")
     endif()
     if(NOT S3_RETAINED_GENERATION_DIR)
         genesisrecomp_add_generated_sources(
             GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${ROM}"
-            REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
+            REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}" ${_generation_options})
     endif()
     set(SHARED_SRC
         ${RUNNER_SOURCES}

@@ -1,0 +1,8 @@
+{
+  "load_address": 4194304,
+  "ram_address": 9437184,
+  "ram_capacity": 2048,
+  "tempo_policy": "host_queue",
+  "legacy_psg_period": false,
+  "legacy_gloop": false
+}
