@@ -3,9 +3,6 @@
  */
 #include "trilogy_obj.h"
 #include "genesis_machine.h"
-#ifdef S3_SOUND_HLE
-#include "sonic3_sound_driver.h"
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -351,23 +348,13 @@ void o_sfx(int id)
     static int log = -1;
     if (log < 0) log = getenv("TRILOGY_SFXLOG") != NULL;
     if (log && id >= 0x33 && id <= 0xDF) {
-#ifdef S3_SOUND_HLE
-        fprintf(stderr,"[sfx] f=%u $%02X set %u host root $%06X\n",(unsigned)r16(RAM_Level_frame_counter),id,
-                s3_sound_campaign_effects_active(),s3_sound_campaign_effect_root((unsigned)id));
-#else
         const uint8_t *z = g_machine.bus.z80_ram;
         fprintf(stderr, "[sfx] f=%u $%02X %s ptr $%04X\n", (unsigned)r16(RAM_Level_frame_counter), id,
                 tri_scd_sound_set_on() ? "CD" : tri_sound_set_foreign() ? "S2" : "S3K",
                 (unsigned)(z[Z80_SFX_PTRS + (id - 0x33) * 2] | z[Z80_SFX_PTRS + (id - 0x33) * 2 + 1] << 8));
-#endif
     }
-    if (id >= 0xBC && id != 0xBC && id != 0xC8 && tri_sound_set_foreign()) {
-#ifdef S3_SOUND_HLE
-        s3_sound_effect_restart();
-#else
+    if (id >= 0xBC && id != 0xBC && id != 0xC8 && tri_sound_set_foreign())
         g_machine.bus.z80_ram[Z80_CONTINUOUS_SFX] = 0;
-#endif
-    }
     D(0) = (uint32_t)id;
     tri_jsr(S3K_Play_SFX);
 }

@@ -14,11 +14,6 @@
 #pragma once
 #include <stdint.h>
 #include <stddef.h>
-/* Read-only host resources, independent of the currently displayed campaign.
- * Call after trilogy_init; audio preparation does not patch guest tables. */
-const uint8_t *tri_bank_resource(int content,size_t *bytes);
-struct ScdPack;
-const struct ScdPack *tri_scd_pack(void);
 #include "trilogy_syms.h"
 #include "trilogy_hooks.h"
 #include "scd_geometry_sites.h"

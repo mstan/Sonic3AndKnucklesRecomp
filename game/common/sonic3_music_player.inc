@@ -23,18 +23,7 @@ static unsigned player_id(unsigned row)
 static const char *player_name(unsigned row)
 {return s_player_tracks[row]==S3_MUSIC_COUNT?"Ending Theme":s3_theme_names[s_player_tracks[row]];}
 static unsigned player_pointer(unsigned row)
-{
-#ifdef S3_SOUND_HLE
-    unsigned offset=assets.music[player_id(row)-1];return offset?0x400000+offset:0;
-#else
-    return m68k_read32(S3_CLONE_MUSIC_INDEX+4*(player_id(row)-1))&0xFFFFFEu;
-#endif
-}
-#ifdef S3_SOUND_HLE
-#define S3_PLAYER_DATA assets.data
-#else
-#define S3_PLAYER_DATA g_rom_ext
-#endif
+{return m68k_read32(S3_CLONE_MUSIC_INDEX+4*(player_id(row)-1))&0xFFFFFEu;}
 static int player_recorded(unsigned row)
 {
     unsigned t=player_theme(row);
@@ -51,14 +40,14 @@ static int player_channel(unsigned row,unsigned solo)
     }
     unsigned a=player_pointer(row);
     if(a<0x400000 || a+8>s_player_bank_end)return 0;
-    unsigned fm=S3_PLAYER_DATA[a-0x400000+2],psg=S3_PLAYER_DATA[a-0x400000+3];
+    unsigned fm=g_rom_ext[a-0x400000+2],psg=g_rom_ext[a-0x400000+3];
     if(fm<1 || fm>7 || psg>3 || !(solo<=7?solo<=fm:solo-8<psg))return 0;
     unsigned at=8+(solo<=7?(solo-1)*4:fm*4+(solo-8)*6),offset=a-0x400000;
-    unsigned root=((unsigned)S3_PLAYER_DATA[offset+at]<<8)|S3_PLAYER_DATA[offset+at+1];
+    unsigned root=((unsigned)g_rom_ext[offset+at]<<8)|g_rom_ext[offset+at+1];
     if(a+root+2>s_player_bank_end)return 0;
     /* An immediately stopped header entry has no voice to audition. */
-    return S3_PLAYER_DATA[offset+root]!=0xFF ||
-        (S3_PLAYER_DATA[offset+root+1]!=0x10 && S3_PLAYER_DATA[offset+root+1]!=0x18);
+    return g_rom_ext[offset+root]!=0xFF ||
+        (g_rom_ext[offset+root+1]!=0x10 && g_rom_ext[offset+root+1]!=0x18);
 }
 static void player_audition(void)
 {
@@ -71,13 +60,8 @@ static void player_audition(void)
 }
 static void player_stop(void)
 {
-#ifdef S3_SOUND_HLE
-    hle_stop_all();
-    s3_cd_theme_request(0xE0);
-#else
     g_cpu.A[6]=S3_CLONE_RAM_ADDRESS;recomp_call_addr(S3_CLONE_STOP_ALL);
     s3_cd_theme_request(0xE0);sound_ram[S3_CLONE_PAUSE_OFFSET]=0;
-#endif
     memset(pending,0,sizeof pending);tempo_dirty=0;
 }
 static void player_reset(void)
@@ -91,17 +75,9 @@ static int player_bind(uint32_t *used,size_t capacity)
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_available(t) || t==S3_MUSIC_EMERALD || t==S3_MUSIC_SUPER) {
         s_player_tracks[s_player_count]=t;
         unsigned id=player_id(s_player_count);
-#ifdef S3_SOUND_HLE
-        if(assets.music[id-1])++s_player_count;
-#else
         if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(id-1)))++s_player_count;
-#endif
     }
-#ifdef S3_SOUND_HLE
-    if(assets.music[0x32-1])s_player_tracks[s_player_count++]=S3_MUSIC_COUNT;
-#else
     if(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1)))s_player_tracks[s_player_count++]=S3_MUSIC_COUNT;
-#endif
     return s_player_count!=0;
 }
 void s3_sound_player_frame(unsigned buttons)
@@ -109,13 +85,10 @@ void s3_sound_player_frame(unsigned buttons)
     unsigned pressed=buttons&~s_player.previous;s_player.previous=buttons;
     unsigned mode=g_ram[0xF600]&127;
     if(!active || !initialised || !s_player_count)return;
-    /* Startup and the title share mode 4. Wait for the native title cue;
-     * opening earlier stops SEGA and extends its own countdown to 600. */
-    int available=mode==0x28 || (mode==4 && s_player.last_music==0x25);
-    if(s_player.open && !available) {
+    if(s_player.open && mode!=4 && mode!=0x28) {
         s_player.open=s_player.playing=s_player.paused=0;s_player.request=2;s_player.swallow=1;
     }
-    if(!s_player.open && available &&
+    if(!s_player.open && (mode==4 || mode==0x28) &&
        (buttons&0x60)==0x60 && (pressed&0x60)) {
         s_player.open=1;s_player.solo=s_player.playing=s_player.paused=0;
         s_player.return_music=s_player.last_music;s_player.request=2;

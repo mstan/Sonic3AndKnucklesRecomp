@@ -1,52 +1,3 @@
-#ifdef S3_SOUND_HLE
-/* Campaign bindings refer to immutable host sound resources. No sound CPU
- * memory, bank-switch code or uploaded pointer tables participate. */
-#define TRILOGY_INTERNAL 1
-#include "trilogy.h"
-#include "trilogy_music_hle.h"
-#include "sonic3_sound_driver.h"
-#include <stdio.h>
-#include <stdlib.h>
-
-enum { SET_S3K, SET_S2, SET_CD };
-static int s_game_override;
-void tri_music_patch(int slot,int song)
-{
-    uint32_t entry=tri_dir();
-    unsigned game=s_game_override?s_game_override:entry?tri_rd8(entry+TD_GAME):0;
-    /* CD background music belongs to the existing host CD-audio provider. */
-    if(!game || game==TRI_GAME_CD)return;
-    if(!s3_sound_campaign_music((unsigned)tri_bank_current(),game,(unsigned)slot,(unsigned)song)){
-        fprintf(stderr,"[sound-hle] Missing campaign music: content %d game %u song $%02X\n",tri_bank_current(),game,song);
-        exit(1);
-    }
-}
-void tri_music_restore(void){s3_sound_campaign_restore();}
-void tri_music_play(int slot,int song)
-{
-    tri_music_patch(slot,song);D(0)=(uint32_t)slot;tri_jsr(S3K_Play_Music);
-}
-void tri_music_play_s2(int slot,int song)
-{s_game_override=TRI_GAME_S2;tri_music_play(slot,song);s_game_override=0;}
-void tri_music_zone(void)
-{uint32_t entry=tri_dir();if(entry)tri_music_play(TRI_SLOT_ZONE,tri_rd8(entry+TD_MUSIC));}
-void tri_s2_sound_set(int on){s3_sound_campaign_effects(SET_S2,on);}
-void tri_scd_sound_set(int on){s3_sound_campaign_effects(SET_CD,on);}
-void tri_sound_set_for_zone(void)
-{
-    uint32_t entry=tri_dir();unsigned game=entry?tri_rd8(entry+TD_GAME):TRI_GAME_S3K;
-    s3_sound_campaign_effects(game==TRI_GAME_S2?SET_S2:game==TRI_GAME_CD?SET_CD:SET_S3K,1);
-}
-void tri_sound_set_tick(void)
-{
-    unsigned mode=r8(RAM_Game_mode)&0x7F;
-    s3_sound_campaign_effects_apply(mode==0x08 || mode==0x0C || mode==0x10?s3_sound_campaign_effects_wanted():SET_S3K);
-}
-int tri_sound_set_foreign(void){return s3_sound_campaign_effects_active()!=SET_S3K;}
-int tri_scd_sound_set_on(void){return s3_sound_campaign_effects_active()==SET_CD;}
-int tri_s2_sfx_id(int id){return (int)tri_hle_effect_id((unsigned)tri_bank_current(),SET_S2,(unsigned)id);}
-int tri_scd_sfx_id(int id){return (int)tri_hle_effect_id((unsigned)tri_bank_current(),SET_CD,(unsigned)id);}
-#else
 /*
  * trilogy_music.c — Sonic 1 and Sonic 2 songs on the retail S3K sound driver.
  *
@@ -335,4 +286,3 @@ int tri_scd_sfx_id(int fm)
     if (!b || fm < 0x90 || fm > 0xDF) return 0;
     return tri_rd8(b + 1u + SFX_COUNT * 2u + (uint32_t)(fm - 0x90));
 }
-#endif

@@ -8,7 +8,6 @@
 #define CHECK(x) do{if(!(x)){fprintf(stderr,"VGM line %d: %s\n",__LINE__,#x);exit(1);}}while(0)
 AppConfig g_app_config;
 size_t s3_vgm_fm_rb_save(void *,size_t);size_t s3_vgm_psg_rb_save(void *,size_t);
-void s3_vgm_fm_write(uint8_t port,uint8_t value);
 static void put32(uint8_t *p,unsigned v){for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(v>>(i*8));}
 static void put64(uint8_t *p,uint64_t v){put32(p,(unsigned)v);put32(p+4,(unsigned)(v>>32));}
 static unsigned count;
@@ -56,15 +55,6 @@ int main(int argc,char **argv)
     memset(first,0,sizeof first);memset(second,0,sizeof second);s3_vgm_frame(S3_MUSIC_AIZ2,0);s3_vgm_mix(first,3732,223721,65536);
     load.pos=0;s3_vgm_state(&load);s3_vgm_frame(S3_MUSIC_AIZ2,0);s3_vgm_mix(second,3732,223721,65536);CHECK(!memcmp(first,second,sizeof first));
     s3_vgm_frame(S3_MUSIC_AIZ2,1);memset(second,0,sizeof second);s3_vgm_mix(second,3732,223721,65536);CHECK(!energy(second,7464));
-    /* A previously played track can leave DAC enabled. A restart restores
-     * the original powered-on chip state before consuming the new stream. */
-    s3_vgm_start(S3_MUSIC_AIZ2);s3_vgm_audition(0x7ff);
-    s3_vgm_frame(S3_MUSIC_AIZ2,0);memset(first,0,sizeof first);s3_vgm_mix(first,3732,223721,65536);
-    s3_vgm_fm_write(0,0x2b);s3_vgm_fm_write(1,0x80);
-    s3_vgm_fm_write(0,0x2a);s3_vgm_fm_write(1,0x10);
-    s3_vgm_start(S3_MUSIC_AIZ2);s3_vgm_audition(0x7ff);
-    s3_vgm_frame(S3_MUSIC_AIZ2,0);memset(second,0,sizeof second);s3_vgm_mix(second,3732,223721,65536);
-    CHECK(!memcmp(first,second,sizeof first));
     CHECK(ym2612_rb_save(check,nf)==nf&&!memcmp(check,oldf,nf));CHECK(psg_rb_save(check,np)==np&&!memcmp(check,oldp,np));
     free(state);free(after);free(oldf);free(oldp);free(check);s3_vgm_reset();puts("PASS VGM real FM/PSG, loop, masks, pure mix, pause, state, invalid-state rejection and cartridge-chip isolation");return 0;
 }

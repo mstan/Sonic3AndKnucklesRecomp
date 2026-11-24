@@ -70,14 +70,17 @@ int s3_sound_read_source(const uint8_t *rom,size_t size,S3SoundSource *out,char 
     if((b>=a && b-a<size) || (a>=b && a-b<sizeof *out))
         return fail(error,error_size,"Sound-source output aliases the ROM");
     char hash[65];hex_digest(rom,size,hash);
-    /* Verify supported original headers directly, including the Steam
-     * lock-on image and its S3 donor slice. No normalized ROM copy exists. */
-    int s3=!strcmp(hash,"d6404843c5ba32486f4c8c744acb7e1932069376960d886b1de37969787d3f9c") ||
-        !strcmp(hash,"f3314b3603fa717cbfecacab3e4b39e03a130d61d058d53fa0acceed17b07012");
+    if(size==0x400000 && strcmp(hash,"fba0677fde9f76df93f3e98d6310d8af68b9847bde16e253d73cd4dd8134ed23") && rom[0x2001F0]=='J'){
+        /* The supported Steam dump differs only in the locked-on region
+         * header. Normalize a private copy for verification, never the ROM. */
+        uint8_t *copy=(uint8_t*)malloc(size);
+        if(!copy)return fail(error,error_size,"Unable to verify sound-source ROM");
+        memcpy(copy,rom,size);copy[0x2001F0]='U';hex_digest(copy,size,hash);free(copy);
+    }
+    int s3=!strcmp(hash,"d6404843c5ba32486f4c8c744acb7e1932069376960d886b1de37969787d3f9c");
     int sk=!strcmp(hash,"6e12e6b33c26ebfcd0be433251d21cf6284eafe9f71b027bda3767ae59affec1");
-    int combined=!strcmp(hash,"fba0677fde9f76df93f3e98d6310d8af68b9847bde16e253d73cd4dd8134ed23") ||
-        !strcmp(hash,"fa52ac946dfd576538d00aa858b790b9d81a1217e25aa5193693a4e57f4f89d9");
-    if(!s3 && !sk && !combined)return fail(error,error_size,"Sound requires a supported original Sonic 3-family ROM");
+    int combined=!strcmp(hash,"fba0677fde9f76df93f3e98d6310d8af68b9847bde16e253d73cd4dd8134ed23");
+    if(!s3 && !sk && !combined)return fail(error,error_size,"Clone Driver requires a supported original Sonic 3-family ROM");
     S3SoundSource source;memset(&source,0,sizeof source);source.rom_size=(uint32_t)size;source.standalone_sonic3=(uint8_t)s3;
     if(s3)memcpy(source.z80,rom+0xE6000,7167); /* original byte-copy count */
     else if(!kos(rom,size,0xF6960,source.z80,0x1300) ||

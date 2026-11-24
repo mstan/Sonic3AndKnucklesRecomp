@@ -14,13 +14,7 @@ int s3_gameplay_title_card_sprite(uint32_t pc,const uint8_t *ram,uint32_t actor)
 void recomp_tail_call(uint32_t pc){card_tail=pc;}
 int s3_sound_active(void){return clone;}
 int s3_sound_owns(uint32_t pc){return pc==0x12CE || pc==0x1358 || pc==0x13C2;}
-int s3_sound_hook(uint32_t pc){(void)pc;++audio_calls;
-#ifdef S3_SOUND_HLE
-return 1;
-#else
-return clone;
-#endif
-}
+int s3_sound_hook(uint32_t pc){(void)pc;++audio_calls;return clone;}
 int trilogy_owns(uint32_t pc){return pc==0x1358 || pc==0x13C2;}
 int trilogy_instruction(uint32_t pc)
 {if(cd && trilogy_owns(pc)){++cd_calls;g_cpu.D[0]=0xCD;return 1;}return 0;}
@@ -55,24 +49,12 @@ int main(void)
         clone=0;cd=1;audio_calls=cd_calls=renderer_calls=0;g_cpu.D[0]=0x2C;
         CHECK(s3k_instruction(requests[i])==1);CHECK(cd_calls==1 && !audio_calls && !renderer_calls && g_cpu.D[0]==0xCD);
         cd=0;audio_calls=cd_calls=renderer_calls=0;g_cpu.D[0]=0x2C;
-#ifdef S3_SOUND_HLE
-        CHECK(s3k_instruction(requests[i]));CHECK(audio_calls==1 && !cd_calls && !renderer_calls && g_cpu.D[0]==0x2C);
-#else
         CHECK(!s3k_instruction(requests[i]));CHECK(!audio_calls && !cd_calls && !renderer_calls && g_cpu.D[0]==0x2C);
-#endif
         clone=1;cd=1;audio_calls=cd_calls=renderer_calls=0;
-#ifdef S3_SOUND_HLE
-        CHECK(s3k_instruction(requests[i])==1);CHECK(!audio_calls && cd_calls==1 && !renderer_calls);
-#else
         CHECK(s3k_instruction(requests[i])==1);CHECK(audio_calls==1 && !cd_calls && !renderer_calls);
-#endif
     }
     clone=cd=0;renderer_calls=0;g_cpu.D[0]=0x1234;
-#ifdef S3_SOUND_HLE
-    audio_calls=0;CHECK(s3k_instruction(0x12CE));CHECK(audio_calls==1 && !renderer_calls && g_cpu.D[0]==0x1234);
-#else
     CHECK(!s3k_instruction(0x12CE));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
-#endif
     CHECK(!s3k_instruction(0x2D6A6));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0xDE9C));CHECK(hud_reset_calls==1 && !renderer_calls && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0x695A));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
@@ -89,5 +71,5 @@ int main(void)
     card_tail=0;g_cpu.SR=0xA71F;
     CHECK(!s3k_instruction(0x537B4));
     CHECK(!card_tail&&!renderer_calls&&g_cpu.D[0]==0x1234&&g_cpu.SR==0xA71B);
-    puts("PASS actual hook composition: default sound, library selection, CD music/tempo and renderer isolation");return 0;
+    puts("PASS actual hook composition: original/CD music and tempo, active Clone priority, renderer isolation");return 0;
 }

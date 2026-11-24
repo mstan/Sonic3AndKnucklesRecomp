@@ -30,11 +30,6 @@ typedef struct S3SoundCustomInfo {unsigned bytes,restores;} S3SoundCustomInfo;
  * source validates its graph without binding cartridge-specific percussion. */
 int s3_sound_convert_custom(const uint8_t *input,size_t bytes,const S3SoundSource *source,
                             uint8_t *output,size_t capacity,S3SoundCustomInfo *info,char *error,size_t error_size);
-/* Decode an immutable converted resource bank directly. Offsets model its
- * local sequence pointers; no padded ROM or guest address space is built. */
-int s3_sound_convert_bank(const uint8_t *input,size_t bytes,unsigned offset,int music,
-                           const S3SoundSource *source,const uint8_t *psg_map,const uint8_t *dac_map,
-                           uint8_t *output,size_t capacity,S3SoundCustomInfo *info,char *error,size_t error_size);
 
 typedef struct S3SoundLayout {
     uint32_t program_size;
