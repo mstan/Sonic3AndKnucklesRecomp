@@ -15,7 +15,7 @@ typedef struct Convert {
     const uint8_t *rom;
     uint8_t *bank;
     size_t capacity,cursor,input_size;
-    uint32_t input_bank;
+    uint32_t input_bank,input_base;
     int bad,count,voices,restore_seen;
     unsigned psg_base,mod_base;
     const uint8_t *dac_map;
@@ -26,7 +26,11 @@ typedef struct Convert {
     S3SoundAssetStats stats;
 } Convert;
 static unsigned rb(Convert *c,uint32_t p)
-{if(p>=(c->input_size?c->input_size:c->source.rom_size)){c->bad=1;return 0;}return c->rom[p];}
+{
+    size_t size=c->input_size?c->input_size:c->source.rom_size;
+    if(p<c->input_base || p-c->input_base>=size){c->bad=1;return 0;}
+    return c->rom[p-c->input_base];
+}
 static unsigned rw(Convert *c,uint32_t p){return rb(c,p)|(rb(c,p+1)<<8);}
 static unsigned zb(Convert *c,uint32_t p)
 {if(p>=sizeof c->source.z80){c->bad=1;return 0;}return c->source.z80[p];}
@@ -85,7 +89,8 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(fm<1 || fm>7 || psg>3){c->bad=1;return 0;}
         header=8+fm*4+psg*6;
         if(dest>c->capacity || header>c->capacity-dest){c->bad=1;return 0;}
-        memcpy(c->bank+dest,c->rom+input,4);c->bank[dest+4]=0;c->bank[dest+5]=1; /* native S3 PSG ties */
+        for(unsigned k=0;k<4;k++)c->bank[dest+k]=(uint8_t)rb(c,input+k);
+        c->bank[dest+4]=0;c->bank[dest+5]=1; /* native S3 PSG ties */
         c->bank[dest+6]=(uint8_t)rb(c,input+4);c->bank[dest+7]=(uint8_t)rb(c,input+5);
         for(unsigned i=0;i<fm+psg;i++){
             unsigned old=input+6+(i<fm?i*4:fm*4+(i-fm)*6),out=old-input+2;
@@ -95,7 +100,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
              * preceding music without cutting off that echo. */
             unsigned kind=i==0?1:i>=fm?2:prototype_oneup && i==fm-1?3:0;
             roots[root_count]=rw(c,old);kinds[root_count]=kind;headers[root_count++]=out;
-            unsigned n=i<fm?4:6;memcpy(c->bank+dest+out,c->rom+old,n);
+            unsigned n=i<fm?4:6;for(unsigned k=0;k<n;k++)c->bank[dest+out+k]=(uint8_t)rb(c,old+k);
             if(i>=fm){
                 c->bank[dest+out+3]<<=3;
                 c->bank[dest+out+4]=(uint8_t)mod_id(c,rb(c,old+4));
@@ -108,7 +113,7 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         if(tracks<1 || tracks>6){c->bad=1;return 0;}
         header=4+tracks*6;
         if(dest>c->capacity || header>c->capacity-dest){c->bad=1;return 0;}
-        memcpy(c->bank+dest,c->rom+input,header);
+        for(unsigned k=0;k<header;k++)c->bank[dest+k]=(uint8_t)rb(c,input+k);
         for(unsigned i=0;i<tracks;i++){
             unsigned old=input+4+i*6,out=old-input,ch=rb(c,old+1),kind=ch&128?2:0;
             if(ch!=2 && ch!=4 && ch!=5 && ch!=0x80 && ch!=0xA0 && ch!=0xC0){c->bad=1;return 0;}
@@ -201,7 +206,13 @@ static int convert_song(Convert *c,uint32_t input,size_t dest,int music)
         }
         for(unsigned j=1;j<n->length;j++)c->bank[out+j+1]=(uint8_t)rb(c,pc+j);
         if(op==0xF5)c->bank[out+2]=(uint8_t)psg_id(c,rb(c,pc+1));
-        if(op==0xF4)c->bank[out+2]=(uint8_t)mod_id(c,rb(c,pc+1));
+        if(op==0xF4){
+            unsigned id=rb(c,pc+1);
+            /* November's F4 handler increments its zero-based argument;
+             * FF consequently disables the envelope. Headers are one-based. */
+            if(c->source.prototype)id=(id+1)&255u;
+            c->bank[out+2]=(uint8_t)mod_id(c,id);
+        }
         /* Retail's absolute key command is biased by $40; Clone stores
          * the signed transpose directly. Credits changes key repeatedly. */
         if(op==0xED)c->bank[out+2]=(uint8_t)(rb(c,pc+1)-0x40u);
@@ -453,13 +464,12 @@ int s3_sound_convert_custom(const uint8_t *input,size_t bytes,const S3SoundSourc
        (input[0]|((unsigned)input[1]<<8))<0x8000) {
         if(error&&en)snprintf(error,en,"Use an S3 Z80 SMPS bank based at $8000 with embedded instruments");return 0;
     }
-    Convert *c=calloc(1,sizeof *c);uint8_t *rom=calloc(1,0x8000+bytes);
-    if(!c||!rom){free(c);free(rom);return 0;}memcpy(rom+0x8000,input,bytes);
+    Convert *c=calloc(1,sizeof *c);if(!c)return 0;
     if(source)c->source=*source;
     else{c->source.rom_size=0x400000;c->source.volume_count=51;c->source.modulation_count=8;}
-    c->source.prototype=0;c->rom=rom;c->input_size=0x8000+bytes;c->bank=out;c->capacity=capacity;c->cursor=0;
+    c->source.prototype=0;c->rom=input;c->input_base=0x8000;c->input_size=bytes;c->bank=out;c->capacity=capacity;c->cursor=0;
     int n=convert_song(c,0x8000,0,1),ok=n>0&&!c->bad;
     if(ok&&info){info->bytes=(unsigned)n;info->restores=c->restore_seen!=0;}
     if(!ok&&error&&en)snprintf(error,en,"Invalid or unsupported S3 SMPS sequence at $%04X, command $%02X",c->last_pc&0xFFFFu,c->last_op);
-    free(c);free(rom);return ok;
+    free(c);return ok;
 }

@@ -7,6 +7,8 @@ All tracks default to **Stock**.
 
 Choose each song independently in its dropdown. A zone or act offers only
 **Stock** and **that same zone or act's November 1993 prototype theme**.
+Death Egg's two acts additionally offer retail Sonic 2 and Simon Wai Death Egg,
+with an independent choice for each act.
 Sky Sanctuary also offers Sonic 3's unused version of that same song.
 Other zone music cannot be exchanged with other zones or other Sonic games.
 Lava Reef Act 2 and Hidden Palace share one song and one dropdown.
@@ -16,14 +18,14 @@ Competition, bonus stages and menus have their own applicable rows. The Competit
 
 | Selector | Replacements |
 |---|---|
-| 1-UP | Sonic 1 / Sonic 2; Sonic 3 prototype; Sonic 3; Sonic & Knuckles |
+| 1-UP | Sonic 1 / Sonic 2; Simon Wai Death Egg; August 21 CNZ2P; Sonic 3 prototype; Sonic 3; Sonic & Knuckles |
 | Game Over | Sonic 1 / Sonic 2; Sonic 3 & Knuckles; Sonic CD (US) |
 | Continue Screen | Sonic 1 / Sonic 2; Sonic 3; Sonic & Knuckles |
 | Act Clear | Sonic 1 / Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 prototype; Sonic 3 & Knuckles; Sonic CD (US) |
 | Invincibility | Sonic 1; Sonic 2 August 21 prototype; Sonic 2; Sonic 3; Sonic & Knuckles; Sonic CD (US); unused November 1993 prototype theme; Simon Wai Invincibility / Super Sonic |
-| Drowning | Sonic 1 / Sonic 2; Sonic 3 prototype |
-| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
-| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
+| Drowning | Sonic 1 / Sonic 2; Simon Wai Level Select; August 21 Death Egg; Sonic 3 prototype |
+| Main Boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; August 21 CPZ; Sonic 3 / Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
+| Mini-boss | Sonic 1; Sonic 2; Sonic 2 Simon Wai prototype; August 21 CPZ; Sonic 3; Sonic & Knuckles; Sonic 3 prototype; Sonic CD (US) |
 | Title Screen | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |
 | Special Stage | Sonic 3 prototype; Sonic 2; Sonic 2 Simon Wai prototype; Sonic 1 |
 | Knuckles | Sonic 3; Sonic & Knuckles; Sonic 3 prototype |

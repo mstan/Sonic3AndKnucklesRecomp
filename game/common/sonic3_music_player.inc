@@ -85,10 +85,13 @@ void s3_sound_player_frame(unsigned buttons)
     unsigned pressed=buttons&~s_player.previous;s_player.previous=buttons;
     unsigned mode=g_ram[0xF600]&127;
     if(!active || !initialised || !s_player_count)return;
-    if(s_player.open && mode!=4 && mode!=0x28) {
+    /* Startup and the title share mode 4. Wait for the native title cue;
+     * opening earlier stops SEGA and extends its own countdown to 600. */
+    int available=mode==0x28 || (mode==4 && s_player.last_music==0x25);
+    if(s_player.open && !available) {
         s_player.open=s_player.playing=s_player.paused=0;s_player.request=2;s_player.swallow=1;
     }
-    if(!s_player.open && (mode==4 || mode==0x28) &&
+    if(!s_player.open && available &&
        (buttons&0x60)==0x60 && (pressed&0x60)) {
         s_player.open=1;s_player.solo=s_player.playing=s_player.paused=0;
         s_player.return_music=s_player.last_music;s_player.request=2;

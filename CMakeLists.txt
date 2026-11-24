@@ -227,10 +227,27 @@ file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/state-$<CONFIG>/sonic3_state_build.h"
 include_directories("${CMAKE_BINARY_DIR}/state-$<CONFIG>")
 include("${RECOMP_ROOT}/cmake/GenesisRecompGenerated.cmake")
 include("${CMAKE_SOURCE_DIR}/cmake/Sonic3CloneDriver.cmake")
+set(S3_RETAINED_GENERATION_DIR "" CACHE PATH "Verified native sources and Clone Driver headers from v0.8.14")
+if(S3_RETAINED_GENERATION_DIR AND (NOT S3_CLONE_PROGRAM_DIR OR SONIC_REVERSE_DEBUG))
+    message(FATAL_ERROR "Retained native sources require the matching Clone Driver program and release code generation")
+endif()
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
     set(NATIVE_GAME "${GAME}")
-    if(S3_CLONE_PROGRAM_DIR AND EXISTS "${GAME}/${ROM}")
+    if(S3_RETAINED_GENERATION_DIR)
+        set(NATIVE_GAME "${CMAKE_BINARY_DIR}/clone-inputs/${PREFIX}")
+        configure_file(
+            "${S3_RETAINED_GENERATION_DIR}/clone-inputs/${PREFIX}/sonic3_clone_program.h"
+            "${NATIVE_GAME}/sonic3_clone_program.h" COPYONLY)
+        set(_retained "${S3_RETAINED_GENERATION_DIR}/generated/${PREFIX}")
+        file(GLOB GENERATED_SOURCES "${_retained}/${PREFIX}_part[0-9][0-9].c")
+        list(LENGTH GENERATED_SOURCES _part_count)
+        if(NOT _part_count EQUAL 32 OR NOT EXISTS "${_retained}/${PREFIX}_decls.h")
+            message(FATAL_ERROR "Incomplete retained native sources for ${PREFIX}")
+        endif()
+        list(APPEND GENERATED_SOURCES "${_retained}/${PREFIX}_dispatch.c" "${_retained}/${PREFIX}_layout.c")
+        set(GENERATED_SOURCES_CYCLES "${_retained}/${PREFIX}_cycles.c")
+    elseif(S3_CLONE_PROGRAM_DIR AND EXISTS "${GAME}/${ROM}")
         set(NATIVE_GAME "${CMAKE_BINARY_DIR}/clone-inputs/${PREFIX}")
         file(GLOB _clone_game_inputs CONFIGURE_DEPENDS "${GAME}/*.toml" "${GAME}/*.csv" "${GAME}/*.txt")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
@@ -244,9 +261,11 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             message(FATAL_ERROR "Unable to prepare ${PREFIX} sound software generation")
         endif()
     endif()
-    genesisrecomp_add_generated_sources(
-        GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${ROM}"
-        REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
+    if(NOT S3_RETAINED_GENERATION_DIR)
+        genesisrecomp_add_generated_sources(
+            GENERATED_SOURCES "${PREFIX}" "${NATIVE_GAME}" "${ROM}"
+            REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
+    endif()
     set(SHARED_SRC
         ${RUNNER_SOURCES}
         ${GENERATED_SOURCES}
@@ -344,7 +363,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # Native â€” recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
     add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
-    add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
+    if(GENERATED_SOURCES_TARGET)
+        add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
+    endif()
     target_compile_definitions(${TARGET} PRIVATE
         INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
         DEFAULT_DEBUG_PORT=${PORT_NATIVE}
@@ -402,7 +423,9 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             "${RUNNER_ROOT}/cosim.c"
             "${RUNNER_ROOT}/cosim_visible.c" "${RUNNER_ROOT}/cosim_cycles.c"
             "${RUNNER_ROOT}/game_cycles.c" "${GENERATED_SOURCES_CYCLES}")
-        add_dependencies(${TARGET}_cosim ${GENERATED_SOURCES_TARGET})
+        if(GENERATED_SOURCES_TARGET)
+            add_dependencies(${TARGET}_cosim ${GENERATED_SOURCES_TARGET})
+        endif()
         target_compile_definitions(${TARGET}_cosim PRIVATE
             INCLUDE_GENERATED_CODE=1 ENABLE_RECOMPILED_CODE=1 OWN_BACKEND=1
             GENESIS_COSIM=1 DEFAULT_DEBUG_PORT=4398

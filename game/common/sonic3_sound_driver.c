@@ -196,16 +196,7 @@ void s3_sound_post_reset(void)
             else if(donor==S3_DONOR_S3 || donor==S3_DONOR_SK){
                 sizes[donor]=0x200000;
 #ifdef S3_SOUND_COMBINED
-                if(donor==S3_DONOR_S3){
-                    inputs[donor]=g_rom+0x200000;
-                    /* Normalize only the verified Steam cartridge's private
-                     * donor view, never the bytes read by the guest. */
-                    if(inputs[donor][0x1F0]=='J'){
-                        owned[donor]=malloc(sizes[donor]);
-                        if(owned[donor]){memcpy(owned[donor],inputs[donor],sizes[donor]);owned[donor][0x1F0]='U';}
-                        inputs[donor]=owned[donor];
-                    }
-                }
+                if(donor==S3_DONOR_S3)inputs[donor]=g_rom+0x200000;
 #endif
             }
         }
