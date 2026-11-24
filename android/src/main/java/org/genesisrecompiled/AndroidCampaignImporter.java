@@ -38,7 +38,8 @@ public final class AndroidCampaignImporter {
                 File candidate = new File(context.getCodeCacheDir(), "campaign-converter").getCanonicalFile();
                 stage(context, "campaign-converter", candidate);
                 if (!Python.isStarted()) Python.start(new AndroidPlatform(context.getApplicationContext()));
-                Python.getInstance().getModule("sys").get("path").callAttr("insert", 0, candidate.getPath());
+                File tools = new File(candidate, "tools");
+                Python.getInstance().getModule("sys").get("path").callAttr("insert", 0, tools.getPath());
                 recipe = candidate;
             }
             String[] argv = new String[arguments.length];

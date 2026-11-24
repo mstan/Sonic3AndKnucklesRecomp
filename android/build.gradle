@@ -64,14 +64,18 @@ tasks.register('stageCampaignNumeral') {
 }
 tasks.named('stagePublicAssets').configure {
     dependsOn('stageCampaignNumeral')
-    from(numeralIndices) { into 'campaign-converter/trilogy/data' }
+    from(numeralIndices) { into 'campaign-converter/tools/trilogy/data' }
     from(new File(game, 'tools')) {
         include 'android_campaign_import.py', 'import_campaign.py', 'build_stage_pack.py',
                 'build_megamix_pack.py', 'split_campaign_packs.py', 'import_sound_donor.py',
                 'import_cd_sound_donor.py', 'import_sonic_cd.py', 'build_sonic_cd_pack.py'
         include 'trilogy/**/*.py', 'trilogy/data/**', 'megamix/**/*.py', 'megamix/data/**'
         exclude 'trilogy/data/act_3_custom.png'
-        into 'campaign-converter'
+        into 'campaign-converter/tools'
+    }
+    from(new File(engine, 'tools/segacd')) {
+        include 'disc_image.py', 'owned_media.py', 'sgcd_owned_extract.py'
+        into 'campaign-converter/tools/segacd'
     }
 }
 android.sourceSets.main.java.srcDir('src/main/java')
