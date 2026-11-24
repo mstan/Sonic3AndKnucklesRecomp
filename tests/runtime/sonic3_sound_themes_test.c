@@ -41,6 +41,7 @@ int main(int argc,char **argv)
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_S2)==17);
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_WAI)==8);
     CHECK(s3_music_source(S3_MUSIC_SPECIAL,S3_DONOR_S1)==8);
+    CHECK(s3_music_source(S3_MUSIC_SLOTS,S3_DONOR_S1)==8);
     CHECK(s3_music_source(S3_THEME_INVINCIBLE,S3_DONOR_WAI)==20);
     CHECK(s3_music_source(S3_MUSIC_SUPER,S3_DONOR_S2)==21);
     CHECK(s3_music_source(S3_MUSIC_SUPER,S3_DONOR_WAI)==20);
@@ -63,19 +64,38 @@ int main(int argc,char **argv)
         for(int j=0;j<f.option_count;j++){
             RecompLauncherCModOption o;RecompLauncherCModChoice choice;
             CHECK(p->feature_option_get(NULL,package,f.id,j,&o));CHECK(o.type==RECOMP_MOD_OPTION_CHOICE&&!o.disabled);
+            const int campaign_track=strcmp(f.id,"shared-themes")!=0;
+            const int is_slots=!strcmp(o.id,"slots");
+            const int is_sky=!strcmp(o.id,"sky-sanctuary");
+            const int has_s2=!strcmp(o.id,"competition-menu")||
+                !strcmp(o.id,"dez-1")||!strcmp(o.id,"dez-2");
             CHECK(!strcmp(o.value,"base")&&!strcmp(o.default_value,"base"));
             CHECK(p->feature_choice_get(NULL,package,f.id,o.id,0,&choice)&&!strcmp(choice.value,"base"));
             for(int k=1;k<o.choice_count;k++){
                 CHECK(p->feature_choice_get(NULL,package,f.id,o.id,k,&choice));CHECK(strcmp(choice.value,"original"));
-                if(strcmp(f.id,"shared-themes"))CHECK(!strcmp(choice.value,"custom")||!strcmp(choice.value,"s3-proto")||(!strcmp(o.id,"sky-sanctuary")&&!strcmp(choice.value,"s3"))||((!strcmp(o.id,"competition-menu")||!strcmp(o.id,"dez-1")||!strcmp(o.id,"dez-2"))&&(!strcmp(choice.value,"s2")||!strcmp(choice.value,"s2-wai"))));
+                if(campaign_track)CHECK(!strcmp(choice.value,"custom")||
+                    !strcmp(choice.value,"s3-proto")||(is_slots&&!strcmp(choice.value,"s1"))||
+                    (is_sky&&!strcmp(choice.value,"s3"))||
+                    (has_s2&&(!strcmp(choice.value,"s2")||!strcmp(choice.value,"s2-wai"))));
                 if(!strcmp(o.id,"final-boss"))CHECK(strcmp(choice.value,"s3")&&strcmp(choice.value,"sk"));
                 if(!strcmp(o.id,"competition-menu"))CHECK(strcmp(choice.value,"s3"));
             }
-            if(strcmp(f.id,"shared-themes"))CHECK(o.choice_count==(!strcmp(o.id,"sky-sanctuary")?4:(!strcmp(o.id,"competition-menu")||!strcmp(o.id,"dez-1")||!strcmp(o.id,"dez-2"))?5:3));else ++shared;
+            if(campaign_track)CHECK(o.choice_count==3+is_slots+is_sky+2*has_s2);else ++shared;
             ++total;
         }
     }
     CHECK(total==(combined?48:!strcmp(argv[2],"sonic3")?35:29));CHECK(shared==(!strcmp(argv[2],"sonic3")?16:15));
+    if(s3_music_available(S3_MUSIC_SLOTS)){
+        RecompLauncherCModChoice choice;
+        CHECK(p->feature_choice_get(NULL,package,campaign,"slots",2,&choice)&&!strcmp(choice.value,"s1"));
+        CHECK(set(p,campaign,"slots","s1"));
+        CHECK(s3_music_active(S3_MUSIC_SLOTS)==s3_donor_verified(S3_DONOR_S1));
+        CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
+        value(p,campaign,"slots","s1");
+        CHECK(set(p,campaign,"slots","base")&&p->commit(NULL,"unused-rom"));
+        s3_themes_load(argv[1],argv[2]);value(p,campaign,"slots","base");
+        CHECK(!s3_music_active(S3_MUSIC_SLOTS));
+    }
     CHECK(s3_music_available(S3_MUSIC_FINAL)&&s3_music_available(S3_MUSIC_EMERALD));
     CHECK(s3_theme_choices(S3_MUSIC_EMERALD)==1);
     {

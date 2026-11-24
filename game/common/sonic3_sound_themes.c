@@ -26,7 +26,7 @@ const char *const s3_theme_names[]={
 };
 #undef TRACK
 typedef struct MusicRow {unsigned group,target;const char *section;unsigned choices;} MusicRow;
-enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL,SPECIAL,DATA,SKY,SUPER,EMERALD,DEATH_EGG};
+enum {LIFE,OVER,CONTINUE,CLEAR,INVINCIBLE,DROWN,BOSS,MINIBOSS,TITLE,PROTOTYPE,MENU,CREDITS,KNUCKLES,FINAL,SPECIAL,DATA,SKY,SUPER,EMERALD,DEATH_EGG,SLOTS};
 #define TRACK(symbol,id,label,group,section,target,choices) {group,target,section,choices},
 static const MusicRow rows[]={
 #include "sonic3_music_catalog.inc"
@@ -55,8 +55,9 @@ static const S3ThemeChoice choices[][8]={
     {{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2","Sonic 2 Super Sonic",S3_DONOR_S2},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2-wai","Sonic 2 Simon Wai Death Egg",S3_DONOR_WAI},{"s2","Sonic 2 Death Egg",S3_DONOR_S2}},
+    {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s1","Sonic 1 Special Stage",S3_DONOR_S1}},
 };
-static const unsigned counts[]={6,3,5,5,8,4,7,8,3,1,4,3,3,7,4,5,2,3,1,3};
+static const unsigned counts[]={6,3,5,5,8,4,7,8,3,1,4,3,3,7,4,5,2,3,1,3,2};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -109,7 +110,7 @@ unsigned s3_music_source(unsigned t,unsigned donor)
         if(t==S3_MUSIC_DEZ1 || t==S3_MUSIC_DEZ2)return donor==S3_DONOR_WAI?7:9;
         if(t==S3_MUSIC_EMERALD)return donor==S3_DONOR_S1?18:donor==S3_DONOR_S2?29:0;
         if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_WAI?20:donor==S3_DONOR_S2?21:0;
-        if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_S1)return 8;
+        if((t==S3_MUSIC_SPECIAL || t==S3_MUSIC_SLOTS) && donor==S3_DONOR_S1)return 8;
         if(t==S3_MUSIC_SPECIAL && donor==S3_DONOR_S2)return 17;
         if((t==S3_MUSIC_DATA || t==S3_MUSIC_COMPETITION) && donor==S3_DONOR_S2)return 16;
         /* Simon Wai's own playlist: Special Stage $89, Level Select $8A.

@@ -43,6 +43,10 @@ preserves its previous section's enabled state until Shared is changed.
 Main boss and mini-boss choices are independent. For example, choose the
 Simon Wai boss tune for mini-bosses and retail Sonic 2 for main bosses.
 The mini-boss control covers each cartridge's applicable mini-boss queues.
+
+In the Sonic 3 & Knuckles and Sonic & Knuckles campaign sections, the Slot
+Machine Bonus Stage can use the Sonic 1 Special Stage theme. Select a
+supported original Sonic 1 ROM through the donor picker to enable that choice.
 Sonic 3 can use either the S&K or prototype mini-boss and S&K title music; S&K and the
 combined game can use Sonic 3's mini-boss and title music.
 
