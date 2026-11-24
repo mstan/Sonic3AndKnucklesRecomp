@@ -34,7 +34,7 @@ static SmpsHle music,effects;
 static SmpsHleSynth music_synth,effect_synth;
 static PcmHle pcm;
 static PcmHleClip clips[126];
-static unsigned output_channel,output_effect,stamp,write_offset,paused,fade,last_pause,speed_timeout;
+static unsigned output_channel,output_effect,stamp,write_offset,paused,fade,fade_delay,last_pause,speed_timeout;
 typedef struct CampaignBindings {
     uint32_t music_root[2];
     uint8_t music_flags[2],wanted_set,effect_set,effect_content;
@@ -147,9 +147,10 @@ static int host_fm(void *user,unsigned port,unsigned reg,unsigned value)
     (void)user;if(port>1 || reg>255 || value>255)return 0;
     if(output_owned()){
         audio_event_push_latched(stamp+write_offset,(uint8_t)(port*2+1),(uint8_t)reg,(uint8_t)value);
-        /* Preserve key edges at the chip's sample clock without executing a
-         * software register-write loop. All output remains in this tick. */
-        write_offset+=144;
+        /* The mixer stamps are in master cycles. YMFM samples the live key
+         * state once per 144 YM clocks (1008 master cycles). A key-off must
+         * survive a chip sample or a following key-on cannot retrigger. */
+        write_offset += port == 0 && reg == 0x28 && !(value & 0xF0) ? 144 * 7 : 144;
     }
     return 1;
 }
@@ -361,7 +362,7 @@ static void hle_stop_all(void)
     output_effect=1;
     if(!smps_hle_stop(&effects) || !smps_hle_stop(&music))fatal();
     pcm_hle_stop(&pcm);output_channel=0;host_fm(NULL,0,0x2B,0);
-    memset(pending,0,sizeof pending);paused=fade=tempo=tempo_dirty=requested=last_pause=speed_timeout=0;
+    memset(pending,0,sizeof pending);paused=fade=fade_delay=tempo=tempo_dirty=requested=last_pause=speed_timeout=0;
 }
 static int queue(unsigned native,unsigned slot)
 {
@@ -387,7 +388,7 @@ static int queue(unsigned native,unsigned slot)
         if(!root)return 1;return smps_hle_effect(&effects,root,native>=0xBC);
     }
     if(native==0xFF){hle_stop_all();return host_pcm(NULL,0xC6,0xC0);}
-    if(native==0xE1 || native==0xE5){fade=1;return 1;}
+    if(native==0xE1 || native==0xE5){fade=40;fade_delay=4;tempo=0;return 1;}
     if(native==0xE4){
         unsigned owned=0;for(unsigned c=1;c<10;c++)if(effects.state.music.track[c].active)owned|=1u<<c;
         if(!smps_hle_stop(&effects))return 0;
@@ -464,14 +465,14 @@ void s3_sound_vblank(void)
     }
     output_effect=0;
     for(unsigned i=0;i<10;i++)if((owned&(1u<<i)) && !effects.state.music.track[i].active){output_channel=i;if(!smps_hle_synth_resume(&music_synth,i))fatal();}
-    if(fade && !paused){
-        int any=0;
+    if(fade && !paused && !--fade_delay){
+        fade_delay=4;
         for(unsigned i=1;i<10;i++){
             SmpsHleTrack *t=&music.state.music.track[i];if(!t->active)continue;
-            unsigned volume=t->volume+(i>=7?8:1);if(volume>127)volume=127;else any=1;
+            unsigned volume=t->volume+(i>=7?4:1);if(volume>127)volume=127;
             t->volume=(uint8_t)volume;SmpsHleEvent ev={SMPS_HLE_VOLUME,i,volume,0};if(!event(&music_synth,&ev))fatal();
         }
-        if(!any)hle_stop_all();
+        if(!--fade)hle_stop_all();
     }
     if(requested){unsigned id=requested;requested=0;if(!queue(id,0))fatal();}
     s3_cd_theme_frame(paused,music.state.interrupted);
@@ -480,7 +481,7 @@ void s3_sound_vblank(void)
 int s3_sound_dispatch_miss(uint32_t pc){(void)pc;return 0;}
 void s3_sound_state(S3StateIO *io)
 {
-    uint8_t identity[40]={'S','3','H','L',2,0,0,0},incoming[40];
+    uint8_t identity[40]={'S','3','H','L',3,0,0,0},incoming[40];
     identity[5]=(uint8_t)active;identity[6]=(uint8_t)prototype_active;memcpy(identity+8,theme_identity,32);
     memcpy(incoming,identity,sizeof incoming);s3_state_peek(io,0,incoming,sizeof incoming);if(memcmp(incoming,identity,sizeof incoming))io->ok=0;
     S3_STATE(io,identity);
@@ -495,7 +496,7 @@ void s3_sound_state(S3StateIO *io)
     if(!smps_hle_state_valid(&music,&ms)||!smps_hle_state_valid(&effects,&es)||!pcm_hle_state_valid(&pcm,&ps))io->ok=0;
     S3_STATE(io,music.state);S3_STATE(io,effects.state);S3_STATE(io,pcm.state);
     S3_STATE(io,music_synth.state);S3_STATE(io,effect_synth.state);S3_STATE(io,pending);
-    S3_STATE(io,initialised);S3_STATE(io,tempo);S3_STATE(io,tempo_dirty);S3_STATE(io,paused);S3_STATE(io,fade);S3_STATE(io,requested);S3_STATE(io,last_pause);S3_STATE(io,speed_timeout);
+    S3_STATE(io,initialised);S3_STATE(io,tempo);S3_STATE(io,tempo_dirty);S3_STATE(io,paused);S3_STATE(io,fade);S3_STATE(io,fade_delay);S3_STATE(io,requested);S3_STATE(io,last_pause);S3_STATE(io,speed_timeout);
     s3_cd_theme_state(io);player_state(io);s3_vgm_state(io);
 }
 size_t s3_sound_rb_save(void *dst,size_t cap)
