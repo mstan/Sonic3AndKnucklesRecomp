@@ -88,13 +88,13 @@ int main(int argc,char **argv)
         CHECK(!set(p,"shared-themes","emerald","s1"));
         CHECK(set(p,"shared-themes","emerald","base"));
     }
-    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==8&&s3_theme_choices(S3_MUSIC_BOSS)==8);
+    CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==9&&s3_theme_choices(S3_MUSIC_BOSS)==8);
     {
-        const unsigned tracks[]={S3_THEME_LIFE,S3_THEME_LIFE,S3_MUSIC_DROWN,S3_MUSIC_DROWN,S3_MUSIC_BOSS};
-        const char *const ids[]={"s2-wai","s2-aug","s2-wai","s2-aug","s2-aug"};
-        const unsigned donors[]={S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_AUG};
-        const unsigned songs[]={7,7,9,9,13};
-        for(unsigned i=0;i<5;i++){
+        const unsigned tracks[]={S3_THEME_LIFE,S3_THEME_LIFE,S3_MUSIC_DROWN,S3_MUSIC_DROWN,S3_MUSIC_BOSS,S3_MUSIC_MINIBOSS};
+        const char *const ids[]={"s2-wai","s2-aug","s2-wai","s2-aug","s2-aug","s2-aug"};
+        const unsigned donors[]={S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_AUG,S3_DONOR_AUG};
+        const unsigned songs[]={7,7,9,9,13,13};
+        for(unsigned i=0;i<sizeof tracks/sizeof *tracks;i++){
             const char *track=s3_theme_ids[tracks[i]];
             CHECK(offered(p,track,ids[i])&&set(p,"shared-themes",track,ids[i]));
             CHECK(s3_music_donor(tracks[i])==(int)donors[i]);
@@ -202,9 +202,13 @@ int main(int argc,char **argv)
         CHECK(!p->feature_resource_set_path(NULL,package,campaign,"custom-boss",manifest));
         CHECK(!p->feature_resource_set_path(NULL,package,"shared-themes","custom-boss","missing-custom-recording.wav"));
         CHECK(!strcmp(s3_custom_path(S3_MUSIC_BOSS),manifest));
+        CHECK(set(p,"shared-themes","title","custom"));
+        CHECK(!s3_custom_ready(S3_MUSIC_TITLE) && !s3_music_active(S3_MUSIC_TITLE));
+        CHECK(s3_music_active(S3_MUSIC_BOSS) && s3_music_active(S3_MUSIC_MINIBOSS));
         CHECK(p->commit(NULL,"unused-rom"));s3_themes_load(argv[1],argv[2]);
         value(p,"shared-themes","boss","custom");value(p,"shared-themes","mini-boss","custom");
         CHECK(s3_music_active(S3_MUSIC_BOSS)&&s3_custom_ready(S3_MUSIC_MINIBOSS));
+        CHECK(!s3_music_active(S3_MUSIC_TITLE));
         puts("PASS per-track custom resources, friendly labels, profile persistence, scope and failed-import preservation");return 0;
     }
     if(argc==4){

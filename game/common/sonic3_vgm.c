@@ -7,20 +7,29 @@
 #include "app_config.h"
 
 void s3_vgm_fm_init(void);void s3_vgm_fm_advance(uint32_t);void s3_vgm_fm_write(uint8_t,uint8_t);void s3_vgm_fm_mask(unsigned);
-size_t s3_vgm_fm_available(void);size_t s3_vgm_fm_peek(int16_t*,int16_t*,size_t);size_t s3_vgm_fm_render_pair(int16_t*,int16_t*,size_t);
+size_t s3_vgm_fm_peek(int16_t*,int16_t*,size_t);size_t s3_vgm_fm_render_pair(int16_t*,int16_t*,size_t);
 size_t s3_vgm_fm_rb_save(void*,size_t);int s3_vgm_fm_rb_load(const void*,size_t);
 void s3_vgm_psg_init(void);void s3_vgm_psg_advance(uint32_t);void s3_vgm_psg_write(uint8_t);void s3_vgm_psg_mask(unsigned);
 size_t s3_vgm_psg_peek(int16_t*,int16_t*,size_t);size_t s3_vgm_psg_render_pair(int16_t*,int16_t*,size_t);
 size_t s3_vgm_psg_rb_save(void*,size_t);int s3_vgm_psg_rb_load(const void*,size_t);
 
-enum {VGM_FRAMES=3732,VGM_CHIP_BYTES=8192};
+enum {
+    VGM_FRAMES=3732, VGM_CHIP_BYTES=8192,
+    MASTER_PER_TICK=895780, FM_PERIOD=1008, PSG_PERIOD=240,
+    FM_SPAN=(MASTER_PER_TICK+FM_PERIOD-1)/FM_PERIOD,
+    PSG_SPAN=(MASTER_PER_TICK+PSG_PERIOD-1)/PSG_PERIOD
+};
 typedef struct VGMDocument {uint8_t *bytes;unsigned count,loop,channels;uint64_t total,start;} VGMDocument;
 static VGMDocument documents[S3_MUSIC_COUNT];
 static int present;
+static struct {
+    uint8_t fm[VGM_CHIP_BYTES], psg[VGM_CHIP_BYTES];
+    size_t fm_bytes, psg_bytes;
+} power_on;
 static struct VGMClock {
     uint64_t master,base;
     uint32_t theme,index,ended,mask,filter_mix,filter_start,filter_target;
-    int16_t fm[2],raw_fm[2];
+    int16_t fm[2],raw_fm[2],psg,raw_psg;
     int16_t filtered[VGM_FRAMES*2],raw[VGM_FRAMES*2];
 } vgm;
 static int16_t saturate(int value){return (int16_t)(value>32767?32767:value<-32768?-32768:value);}
@@ -29,6 +38,15 @@ unsigned s3_vgm_channels(unsigned t){return s3_vgm_ready(t)?documents[t].channel
 int s3_vgm_build(unsigned t,const char *path,const char *hash)
 {
     if(t>=S3_MUSIC_COUNT)return 0;size_t size;uint8_t *raw=s3_vgm_read(path,hash,&size);if(!raw)return 0;
+    if(!power_on.fm_bytes){
+        /* YM2612 reset alone leaves the DAC latch and other live chip
+         * state intact. Capture the initial image before any writes. */
+        s3_vgm_fm_init();s3_vgm_psg_init();
+        size_t fm_bytes=s3_vgm_fm_rb_save(power_on.fm,sizeof power_on.fm);
+        size_t psg_bytes=s3_vgm_psg_rb_save(power_on.psg,sizeof power_on.psg);
+        if(!fm_bytes || !psg_bytes){free(raw);return 0;}
+        power_on.fm_bytes=fm_bytes;power_on.psg_bytes=psg_bytes;
+    }
     VGMDocument d={raw,s3_vgm_u32(raw+8),s3_vgm_u32(raw+12),0,s3_vgm_u64(raw+16),s3_vgm_u64(raw+24)};
     unsigned latch=0;
     for(unsigned i=0;i<d.count;i++){const uint8_t *e=raw+32+i*16;
@@ -51,16 +69,14 @@ int s3_vgm_finished(void){return vgm.ended!=0;}
 void s3_vgm_start(unsigned theme)
 {
     unsigned mask=vgm.mask;memset(&vgm,0,sizeof vgm);vgm.theme=theme;vgm.mask=mask?mask:0x7ff;
-    vgm.filter_mix=vgm.filter_start=vgm.filter_target=g_app_config.audio_filter_bypass?1118:0;s3_vgm_fm_init();s3_vgm_psg_init();
+    vgm.filter_mix=vgm.filter_start=vgm.filter_target=g_app_config.audio_filter_bypass?1118:0;
+    if(!power_on.fm_bytes || !s3_vgm_fm_rb_load(power_on.fm,power_on.fm_bytes) ||
+       !s3_vgm_psg_rb_load(power_on.psg,power_on.psg_bytes))vgm.ended=1;
 }
 static void advance(unsigned cycles)
 {
     s3_vgm_fm_advance(cycles);s3_vgm_psg_advance(cycles);
-    if(s3_vgm_fm_available()){
-        int16_t filtered[4],raw[4];size_t n=s3_vgm_fm_peek(filtered,raw,2);
-        if(n){memcpy(vgm.fm,filtered+(n-1)*2,sizeof vgm.fm);memcpy(vgm.raw_fm,raw+(n-1)*2,sizeof vgm.raw_fm);}
-        s3_vgm_fm_render_pair(filtered,raw,2);
-    }
+    vgm.master+=cycles;
 }
 void s3_vgm_frame(unsigned theme,int paused)
 {
@@ -69,26 +85,52 @@ void s3_vgm_frame(unsigned theme,int paused)
     if(paused)return;
     vgm.filter_start=vgm.filter_mix;vgm.filter_target=g_app_config.audio_filter_bypass?1118:0;vgm.filter_mix=vgm.filter_target;
     VGMDocument *d=&documents[theme];s3_vgm_fm_mask(vgm.mask&127);s3_vgm_psg_mask(vgm.mask>>7);
-    for(unsigned i=0;i<VGM_FRAMES;i++){
-        uint64_t target=vgm.master+240;
-        while(!vgm.ended){
-            uint64_t next=vgm.index<d->count?s3_vgm_u64(d->bytes+32+vgm.index*16)+vgm.base:d->total+vgm.base;
-            if(next>target)break;
-            advance((unsigned)(next-vgm.master));vgm.master=next;
-            if(vgm.index==d->count){
-                if(d->loop==UINT32_MAX){vgm.ended=1;break;}
-                vgm.base+=d->total-d->start;vgm.index=d->loop;continue;
-            }
-            const uint8_t *e=d->bytes+32+vgm.index++*16;
-            if(!e[8])s3_vgm_psg_write(e[9]);else {unsigned port=(e[8]-1)*2;s3_vgm_fm_write((uint8_t)port,e[9]);s3_vgm_fm_write((uint8_t)(port+1),e[10]);}
+    const uint64_t start=vgm.master, target=start+MASTER_PER_TICK;
+    const unsigned fm_phase=(unsigned)(start%FM_PERIOD), psg_phase=(unsigned)(start%PSG_PERIOD);
+    while(!vgm.ended){
+        uint64_t next=vgm.index<d->count?s3_vgm_u64(d->bytes+32+vgm.index*16)+vgm.base:d->total+vgm.base;
+        if(next>=target)break;
+        advance((unsigned)(next-vgm.master));
+        if(vgm.index==d->count){
+            if(d->loop==UINT32_MAX){vgm.ended=1;break;}
+            vgm.base+=d->total-d->start;vgm.index=d->loop;continue;
         }
-        advance((unsigned)(target-vgm.master));vgm.master=target;
-        int16_t filtered=0,raw=0,discard;s3_vgm_psg_peek(&filtered,&raw,1);s3_vgm_psg_render_pair(&discard,NULL,1);
-        for(unsigned c=0;c<2;c++){
-            vgm.filtered[i*2+c]=vgm.ended?0:saturate(vgm.fm[c]+filtered/8);
-            vgm.raw[i*2+c]=vgm.ended?0:saturate(vgm.raw_fm[c]+raw/8);
+        const uint8_t *e=d->bytes+32+vgm.index++*16;
+        if(!e[8])s3_vgm_psg_write(e[9]);
+        else{
+            unsigned port=(e[8]-1)*2;
+            s3_vgm_fm_write((uint8_t)port,e[9]);
+            s3_vgm_fm_write((uint8_t)(port+1),e[10]);
         }
     }
+    unsigned playable=vgm.ended?(unsigned)(vgm.master-start):MASTER_PER_TICK;
+    advance((unsigned)(target-vgm.master));
+
+    /* Drain the two chip spans once. Slot zero retains the previous sample
+     * for output before the first chip clock in this interval. */
+    int16_t fm[(FM_SPAN+1)*2], raw_fm[(FM_SPAN+1)*2];
+    int16_t psg[PSG_SPAN+1], raw_psg[PSG_SPAN+1];
+    memcpy(fm,vgm.fm,sizeof vgm.fm);memcpy(raw_fm,vgm.raw_fm,sizeof vgm.raw_fm);
+    psg[0]=vgm.psg;raw_psg[0]=vgm.raw_psg;
+    size_t fm_count=s3_vgm_fm_peek(fm+2,raw_fm+2,FM_SPAN);
+    size_t psg_count=s3_vgm_psg_peek(psg+1,raw_psg+1,PSG_SPAN);
+    memcpy(vgm.fm,fm+fm_count*2,sizeof vgm.fm);
+    memcpy(vgm.raw_fm,raw_fm+fm_count*2,sizeof vgm.raw_fm);
+    vgm.psg=psg[psg_count];vgm.raw_psg=raw_psg[psg_count];
+    for(unsigned i=0;i<VGM_FRAMES && i*PSG_PERIOD<playable;i++){
+        unsigned at=i*PSG_PERIOD;
+        size_t f=(fm_phase+at)/FM_PERIOD, p=(psg_phase+at)/PSG_PERIOD;
+        if(f>fm_count)f=fm_count;
+        if(p>psg_count)p=psg_count;
+        for(unsigned c=0;c<2;c++){
+            vgm.filtered[i*2+c]=saturate(fm[f*2+c]+psg[p]/8);
+            vgm.raw[i*2+c]=saturate(raw_fm[f*2+c]+raw_psg[p]/8);
+        }
+    }
+    /* The mixer already has the audition samples; now consume the chip
+     * queues so the next frame starts with an empty span. */
+    s3_vgm_fm_render_pair(fm,NULL,FM_SPAN);
+    s3_vgm_psg_render_pair(psg,NULL,PSG_SPAN);
 }
 void s3_vgm_mix(int16_t *out,size_t frames,double rate,unsigned volume)
 {

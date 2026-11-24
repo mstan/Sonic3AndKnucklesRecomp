@@ -42,7 +42,7 @@ static const S3ThemeChoice choices[][8]={
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2-aug","Sonic 2 Aug 21, 1992 prototype",S3_DONOR_AUG},{"s2","Sonic 2",S3_DONOR_S2},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s3-proto","Unused November 1993 prototype theme",S3_DONOR_PROTO},{"s2-wai","Simon Wai prototype: Invincibility / Super Sonic",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2-wai","Simon Wai prototype (Level Select)",S3_DONOR_WAI},{"s2-aug","Aug 21 prototype (Death Egg)",S3_DONOR_AUG}},
     {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3 / Sonic & Knuckles",-1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s2-aug","Aug 21 prototype (Chemical Plant)",S3_DONOR_AUG}},
-    {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
+    {{"s1","Sonic 1",S3_DONOR_S1},{"s2","Sonic 2",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US},{"s2-aug","Aug 21 prototype (Chemical Plant)",S3_DONOR_AUG}},
     {{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO}},
     {{"s3","Retail (Sonic 3)",S3_DONOR_S3},{"s3-proto","Prototype (November 3, 1993)",S3_DONOR_PROTO},{"s2","Sonic 2 Options",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai Level Select",S3_DONOR_WAI}},
@@ -56,7 +56,7 @@ static const S3ThemeChoice choices[][8]={
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2-wai","Sonic 2 Simon Wai Death Egg",S3_DONOR_WAI},{"s2","Sonic 2 Death Egg",S3_DONOR_S2}},
 };
-static const unsigned counts[]={6,3,5,5,8,4,7,7,3,1,4,3,3,7,4,5,2,3,1,3};
+static const unsigned counts[]={6,3,5,5,8,4,7,8,3,1,4,3,3,7,4,5,2,3,1,3};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -83,7 +83,11 @@ const char *s3_music_section(unsigned t){return t<S3_MUSIC_COUNT?rows[t].section
 unsigned s3_music_target(unsigned t){return (t==S3_MUSIC_CREDITS&&!host_s3)||t==S3_MUSIC_SUPER?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;}
 int s3_music_available(unsigned t)
 {return t<S3_MUSIC_COUNT&&(t!=S3_MUSIC_SUPER||host_s3)&&(!rows[t].group||(rows[t].group==S3_MUSIC_SONIC3?(host_s3||host_combined):!host_s3));}
-int s3_music_active(unsigned t){return s3_music_available(t)&&(t==S3_MUSIC_DATA?data_group_on:group_on[rows[t].group])&&s3_themes[t].enabled;}
+int s3_music_active(unsigned t)
+{
+    return s3_music_available(t) && (t==S3_MUSIC_DATA ? data_group_on : group_on[rows[t].group]) &&
+        s3_themes[t].enabled && s3_theme_ready(t);
+}
 unsigned s3_music_source(unsigned t,unsigned donor)
 {
     static const unsigned s1[]={7,14,15,13,6,17,11,11,9};
@@ -101,7 +105,7 @@ unsigned s3_music_source(unsigned t,unsigned donor)
          * prototypes' ordinary event slots contain different sequences. */
         if(t==S3_THEME_LIFE && (donor==S3_DONOR_WAI || donor==S3_DONOR_AUG))return 7;
         if(t==S3_MUSIC_DROWN && (donor==S3_DONOR_WAI || donor==S3_DONOR_AUG))return 9;
-        if(t==S3_MUSIC_BOSS && donor==S3_DONOR_AUG)return 13;
+        if((t==S3_MUSIC_BOSS || t==S3_MUSIC_MINIBOSS) && donor==S3_DONOR_AUG)return 13;
         if(t==S3_MUSIC_DEZ1 || t==S3_MUSIC_DEZ2)return donor==S3_DONOR_WAI?7:9;
         if(t==S3_MUSIC_EMERALD)return donor==S3_DONOR_S1?18:donor==S3_DONOR_S2?29:0;
         if(t==S3_MUSIC_SUPER)return donor==S3_DONOR_WAI?20:donor==S3_DONOR_S2?21:0;
@@ -212,12 +216,13 @@ int s3_music_group_enable(unsigned group,int on)
 {
     *error=0;if(group>=S3_MUSIC_GROUPS)return 0;
     if(!on){group_set(group,0);return 1;}
-    unsigned selected=0;int seen[S3_DONOR_COUNT]={0};
+    unsigned selected=0, ready=0;int seen[S3_DONOR_COUNT]={0};
     for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_music_group(t)==group&&s3_music_available(t)&&s3_themes[t].enabled){
         ++selected;int d=s3_theme_donor(t);if(d>=0&&d<S3_DONOR_COUNT&&!seen[d]++){size_t size;free(s3_donor_read((unsigned)d,&size));}
-        if(!s3_theme_ready(t)){group_set(group,0);snprintf(error,sizeof error,"Provide the selected music's matching ROM below.");return 0;}
+        if(s3_theme_ready(t))++ready;
     }
     if(!selected){snprintf(error,sizeof error,"Choose a replacement track first.");return 0;}
+    if(!ready){snprintf(error,sizeof error,"Provide a matching image or music file for a selected track.");return 0;}
     if(!s3_sound_select(1)){snprintf(error,sizeof error,"%s",s3_sound_error());return 0;}
     group_set(group,1);return 1;
 }
@@ -228,7 +233,7 @@ int s3_music_pick(unsigned t,const char *id)
     if(!strcmp(id,"base")){s3_themes[t].enabled=0;return 1;}
     for(unsigned c=0;c<(unsigned)s3_theme_choices(t);c++)if(!strcmp(id,s3_theme_choice(t,c)->id)){
         s3_themes[t].choice=(int)c;s3_themes[t].enabled=1;
-        if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}
+        if(!s3_music_group_enable(s3_music_group(t),1))*error=0;
         return 1;
     }
     snprintf(error,sizeof error,"Unknown music choice");return 0;
@@ -261,14 +266,14 @@ void s3_themes_load(const char *settings,const char *mode)
     }
     s3_theme_offer_prototype(s3_sound_prototype_path());
     FILE *f=fopen(file,"rb");if(!f)return;
-    char line[256];int invalid_choice[S3_MUSIC_COUNT]={0},grouped=0,data_group_explicit=0;
+    char line[256];int invalid_choice[S3_MUSIC_COUNT]={0},data_group_explicit=0;
     while(fgets(line,sizeof line,f)){
         line[strcspn(line,"\r\n")]=0;
         char *value=strchr(line,'=');if(!value)continue;*value++=0;
         if(!strcmp(line,"data-select.group-enabled")){data_group_on=!strcmp(value,"1");data_group_explicit=1;}
         for(unsigned g=0;g<S3_MUSIC_GROUPS;g++){
             char key[64];snprintf(key,sizeof key,"group.%u.enabled",g);
-            if(!strcmp(key,line)){group_on[g]=!strcmp(value,"1");grouped=1;}
+            if(!strcmp(key,line))group_on[g]=!strcmp(value,"1");
         }
         for(unsigned t=0;t<S3_MUSIC_COUNT;t++){
             char key[80];snprintf(key,sizeof key,"%s.enabled",s3_theme_ids[t]);
@@ -285,10 +290,7 @@ void s3_themes_load(const char *settings,const char *mode)
     }
     fclose(f);
     if(!data_group_explicit)data_group_on=group_on[S3_MUSIC_SONIC3];
-    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(s3_themes[t].enabled){
-        if(invalid_choice[t])s3_themes[t].enabled=0;
-        else if(!s3_theme_ready(t)){if(t==S3_MUSIC_DATA)data_group_on=0;else if(grouped)group_on[rows[t].group]=0;else s3_themes[t].enabled=0;}
-    }
+    for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(invalid_choice[t])s3_themes[t].enabled=0;
 }
 int s3_themes_save(void)
 {
@@ -316,7 +318,8 @@ int s3_theme_import(unsigned t,const char *path,void (*progress)(void *,float,co
     if(s3_music_custom(t)){
         if(!s3_custom_import(t,path,progress,user))return 0;
         s3_themes[t].enabled=1;
-        if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}return 1;
+        if(!s3_music_group_enable(s3_music_group(t),1))*error=0;
+        return 1;
     }
     int expected=s3_theme_donor(t);if(expected<0)return 0;
     char imported[1024];
@@ -328,6 +331,6 @@ int s3_theme_import(unsigned t,const char *path,void (*progress)(void *,float,co
     for(unsigned d=0;d<S3_DONOR_COUNT;d++){size_t size;free(s3_donor_read(d,&size));}
     if(!s3_theme_ready(t)){snprintf(error,sizeof error,"This ROM belongs to another theme choice. Select %s.",s3_donor_names[expected]);return 0;}
     s3_themes[t].enabled=1;
-    if(!s3_music_group_enable(s3_music_group(t),1)){group_set(s3_music_group(t),0);*error=0;}
+    if(!s3_music_group_enable(s3_music_group(t),1))*error=0;
     return 1;
 }
