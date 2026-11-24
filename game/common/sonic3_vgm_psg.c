@@ -15,4 +15,4 @@
 #define psg_rb_load s3_vgm_psg_rb_load
 #define psg_cosim_dump s3_vgm_psg_dump
 #define psg_cosim_hash s3_vgm_psg_hash
-#include "../../segagenesisrecomp/runner/audio/sn76489.c"
+#include "audio/sn76489.c"

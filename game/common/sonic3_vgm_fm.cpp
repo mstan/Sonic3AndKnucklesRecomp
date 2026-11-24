@@ -14,4 +14,4 @@
 #define ym2612_rb_save s3_vgm_fm_rb_save
 #define ym2612_rb_load s3_vgm_fm_rb_load
 #define ym2612_cosim_hash s3_vgm_fm_hash
-#include "../../segagenesisrecomp/runner/audio/ym2612_ymfm.cpp"
+#include "audio/ym2612_ymfm.cpp"
