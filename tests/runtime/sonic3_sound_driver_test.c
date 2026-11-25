@@ -138,7 +138,7 @@ int main(int argc,char **argv)
         if(s3)CHECK(s3_sound_prototype_set_path(argv[3]));
         CHECK(s3_music_pick(S3_MUSIC_MINIBOSS,"sk-proto"));s3_sound_post_reset();
         uint32_t mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x18-1));CHECK(mini);
-        uint32_t main_mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x2E-1));
+        uint32_t main_mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x2E - 1));
         CHECK(main_mini);
         if(s3)CHECK(mini==base_mini_alt && main_mini!=mini);
         else CHECK(main_mini==mini);
