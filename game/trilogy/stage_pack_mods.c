@@ -181,11 +181,9 @@ static int resource_count(void *c,const char *p,const char *f)
     int index=index_of(p);
     if(index<0)return base&&base->feature_resource_count?base->feature_resource_count(base->ctx,p,f):0;
     if(!own(p,f))return 0;
-#ifdef __ANDROID__
-    return 1; /* the original image installs every resource for this campaign */
-#else
+    /* Record/replay and other metadata consumers need the complete graph.
+     * Android's converter-owned resources are hidden by their managed format. */
     return index==3?3:2;
-#endif
 }
 static void check_music(void)
 {
@@ -236,6 +234,9 @@ static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncher
         COPY(o->path,s3_cd_audio_path);COPY(o->file_patterns,"*.pak");COPY(o->file_description,"Converted Sonic CD music");
         check_music();
         o->required=0;o->verified=s_music_verified;
+#ifdef __ANDROID__
+        COPY(o->format,"managed");
+#endif
         COPY(o->status,s_music_verified?"Verified music resource":"No CDDA music installed; Past PCM music and voices remain available");return 1;
     }
     memset(o,0,sizeof *o);
@@ -253,6 +254,9 @@ static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncher
         s_verified[i]=s3_pack_validate(s3_pack_paths[i],i+1,s_status[i],sizeof s_status[i]);s_checked[i]=1;
     }
     o->required=i==2;o->verified=s_verified[i];COPY(o->status,s_status[i]);
+#ifdef __ANDROID__
+    COPY(o->format,"managed");
+#endif
     if(o->verified)COPY(o->status,"Verified content pack");return 1;
 }
 static int resource_set(void *c,const char *p,const char *f,const char *r,const char *path)
