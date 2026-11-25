@@ -520,7 +520,8 @@ static void test_hcz_rush_extent(void)
                 draw_scene_sprites(&v,row?80:48,out,(int)width,origin,pal);
                 for(int x=0;x<(int)width;++x) {
                     int nx=x-origin;
-                    CHECK(out[x]==(nx>=320 && nx<0x300?pal[33+row]:0));
+                    int first=0x40+(frame<2?(row?0x60:0x50):(row?0x20:0x30))+32;
+                    CHECK(out[x]==(nx>=first && nx<0x300?pal[33+row]:0));
                 }
             }
         }
@@ -1866,6 +1867,28 @@ static void test_private_art_tile_rows(void)
     art_row_queries=0;
     for(int x=0;x<256;++x)world_attr_blocks(g_ram,blocks[0],x,0,0);
     CHECK(art_row_queries==256);s3_video_set_world_cell(NULL);
+}
+static void test_aiz_margin_palette_cycle(void)
+{
+    GVDP v={0};uint32_t live[64],before[64],out[64];
+    uint8_t previous=s_world_frame[0xEE33];
+    v.cram[17]=0xEEE;
+    for(unsigned i=0;i<64;++i)live[i]=0xFF123400u+i;
+    s_world_frame[0xEE33]=0;
+    aiz_palette(&s_aiz_main,&v,live,before);
+    for(unsigned phase=0;phase<2;++phase) {
+        s_world_frame[0xEE33]=2;
+        for(unsigned i=0;i<64;++i)live[i]=0xFF123400u+i+phase*64;
+        aiz_palette(&s_aiz_main,&v,live,out);
+        for(unsigned i=0;i<64;++i){
+            int cycle=(i>=43 && i<=46) || (i>=60 && i<=62);
+            CHECK(out[i]==(cycle?live[i]:before[i]));
+        }
+    }
+    /* The intro bank must not borrow the forest's animation colors. */
+    aiz_palette(&s_aiz_intro,&v,live,out);
+    CHECK(out[43]!=live[43] && out[60]!=live[60]);
+    s_world_frame[0xEE33]=previous;
 }
 static void test_private_art_render_translation_count(void)
 {
@@ -5621,7 +5644,7 @@ int main(int argc,char **argv)
     test_deformation_keeps_actors_still();test_hcz2_panorama_scroll();test_hcz2_panorama_art();test_streamed_background_sources();test_icz_partial_background_rows();test_icz_outdoor_snow_edge();test_s3_ending_margin_ownership();test_lbz_incoming_margin();test_lbz_rocket_margin();test_rocket_motion();test_native_vertical_layout_wrap();test_cnz_boss_background_band();test_mgz2_falling_arena();test_lbz1_falling_columns();test_mgz2_perspective_owner();test_native_sprite_art_ownership();test_waiting_knuckles_palette();
     test_s1_undeformed_installed_camera();test_imported_pylon_wrap();test_doomsday_scrolling_viewport();test_uploaded_scene_camera();
     test_screen_actor_priority();
-    test_private_art_tile_rows();test_private_art_render_translation_count();test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
+    test_private_art_tile_rows();test_aiz_margin_palette_cycle();test_private_art_render_translation_count();test_aiz_intro_canvas_edge();test_aiz_intro_live_palette();test_aiz_cached_native_fade();test_aiz_tree_palette_boundary();test_hcz_tunnel_palette_retirement();test_hcz_boss_foreground_palette();test_aiz_intro_owned_pose();
     test_aiz_wave_original_art();test_aiz_plane_retirement();
     test_aiz2_retired_grove();test_aiz2_ship_cameras();test_mhz2_ship_cameras();test_mhz2_rotor_margins();
 #ifndef SONIC3_STANDALONE

@@ -1167,7 +1167,9 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
     if(map!=S3_HCZ_RUSH_MAP || frame>3 || flags!=4 || ram16(0xFE10)!=0x100 ||
        !enabled() || s_requested_width<=320 || (zoom && zoom!=256))return;
     /* The moving front owns a finite field of32px blue bricks. Continue
-     * those original patterns in the margins, stopping at native retirement. */
+     * its original row phase through any uncovered span and the margins,
+     * stopping at native retirement. A trailing half-piece overlaps the
+     * first repeat with identical phase; the native piece is drawn first. */
     unsigned p=map+(int16_t)scene_read16(map+frame*2),count=scene_read16(p);p+=2;
     if(count>32)return;
     int end=0x980-ram16(0xEE78),right=(s_requested_width+320+1)/2;
@@ -2557,12 +2559,21 @@ static int aiz_tree_color(int wx,int wy,int nx,int nw,uint8_t pixel)
         s_frame_fg_x>=0x2D80 && (nx<0 || nx>=nw) && pixel==47 &&
         wx>=0x2C80 && wx<0x2D80 && wy>=0x280 && wy<0x480;
 }
-static void aiz_palette(const AizArt *art,const GVDP *v,uint32_t *out)
+static void aiz_palette(const AizArt *art,const GVDP *v,const uint32_t *native,uint32_t *out)
 {
     /* Follow fades without borrowing the cutscene's unrelated colour banks.
      * AIZ's common black/white entries also cover fades to/from white. */
     int installed=art==&s_aiz_intro && !s_frame_bg_event && s_frame_fg_x<0x1300;
+    /* AIZ1_Resize installs the forest palette before its patterns and
+     * blocks replace the intro bank (Dynamic_resize_routine, $EE33).
+     * AnPal_AIZ1 already cycles the waterfall colors in that installed
+     * palette. Share those actual raster colors with the decoded forest
+     * art so both visible waterfalls follow the same native animation. */
+    int forest_live=art==&s_aiz_main && s_world_frame[0xEE33]!=0;
     for(unsigned i=0;i<64;++i) {
+        if(forest_live && ((i>=43 && i<=46) || (i>=60 && i<=62))) {
+            out[i]=native[i];continue;
+        }
         /* This is the installed intro bank, including its native component
          * fade and palette cycling. Scaling those already-faded values
          * would darken the extension twice. Other banks keep their own art. */
@@ -3391,7 +3402,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int bg_canvas=fbz_canvas || icz_canvas || ssz_canvas || dez3_canvas || hcz2_canvas || aiz2_canvas || mgz2_canvas || lbz2_canvas || mhz_arena_bg;
     int aiz_banks=bg_world && !s_frame_zone && !s_frame_act &&
         s_frame_bg_event<=8 && s_aiz_art_ready;
-    if(aiz_banks){aiz_palette(&s_aiz_intro,v,intro_palette);aiz_palette(&s_aiz_main,v,forest_palette);}
+    if(aiz_banks){aiz_palette(&s_aiz_intro,v,palette,intro_palette);aiz_palette(&s_aiz_main,v,palette,forest_palette);}
     int bg_scroll=flipped_planes?(int)live_fg_scroll:presentation_bg_scroll(v->vsram[1]);
     int by=bg_world?unwrap(bg_scroll,s_frame_bg_y)+line:line+(v->vsram[1]&1023);
     /* The outdoor ice panes form one perspective across the 512px canvas.

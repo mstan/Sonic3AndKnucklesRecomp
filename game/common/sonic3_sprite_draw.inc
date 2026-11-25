@@ -144,9 +144,13 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
-            /* Bit 6 marks the HCZ current's extra, margin-only brick fill. */
-            if((s->size&0xC0)==0x40 && ((x>=origin && x<origin+320) ||
-                                 x-origin+s_camera>=0x980))continue;
+            /* The native current's last full or half brick can end before
+             * the old viewport boundary. Ordinary repeats must bridge that
+             * gap in the expanded view; only roof-only fill stays outside
+             * the native viewport. Native pieces retain first-sprite priority. */
+            if((s->size&0xC0)==0x40 && (width<=320 ||
+                ((s->size&0x10) && x>=origin && x<origin+320) ||
+                x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
             if((s->size&0xD0u)==0x50u && (s_priority[x]&4u))continue;
