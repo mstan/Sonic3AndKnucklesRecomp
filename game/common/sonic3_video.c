@@ -2324,11 +2324,20 @@ static int fbz_art_pixel(unsigned owner,unsigned attr,int x,int y,uint8_t *pixel
 }
 static int title_card_black(const GVDP *v)
 {
-    if(!s_display || s_display->scene || v->reg[16]!=1)return 0;
+    if(!s_display || v->reg[16]!=1)return 0;
     int card=0;
     for(unsigned n=0;n<s_display->count;++n)
         if(s_display->sprites[n].hud>=6 && s_display->sprites[n].hud<=9)card=1;
     if(!card)return 0;
+    /* The incoming level can already own the name tables and sprite list
+     * while its installed world palettes are still black. Palette 0 holds
+     * the card/player colors; entry $2F is the card's red panel. Do not
+     * expose newly queued world actors through this title-only interval. */
+    int dark_world=1;
+    for(unsigned i=16;i<64;++i)
+        if((i&15u) && i!=47 && (v->cram[i]&0xEEEu)){dark_world=0;break;}
+    if(dark_world)return 1;
+    if(s_display->scene)return 0;
     unsigned a=(v->reg[2]&56u)<<10,b=(v->reg[4]&7u)<<13;
     if(a==b)return 0;
     for(unsigned i=0;i<32;++i)if(v->vram[i])return 0;
@@ -2956,9 +2965,10 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             if(p){s_priority=p;s_priority_capacity=width;}
         }
         s_frame_menu=MENU_NONE;
-        if(!s_frame_level && !s_frame_special && !s_frame_bonus && !level_select_layout(v)) {
-            if(title_card_black(v))s_frame_menu=MENU_TITLE_CARD;
-            else if(file_select_layout(v))s_frame_menu=MENU_SAVE;
+        if(!s_frame_special && !s_frame_bonus && !level_select_layout(v) && title_card_black(v))
+            s_frame_menu=MENU_TITLE_CARD;
+        else if(!s_frame_level && !s_frame_special && !s_frame_bonus && !level_select_layout(v)) {
+            if(file_select_layout(v))s_frame_menu=MENU_SAVE;
             else if(competition_layout(v))s_frame_menu=MENU_COMPETITION;
             else if(title_layout(v) && ((g_ram[0xF600]&127)==4 ||
                     (s_display && !s_display->scene && s_display->title)))

@@ -224,16 +224,6 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
                s_frame_zone==7 && s_frame_act==1 && width>320 && p==22 &&
                (x<origin || x>=origin+320))
                 c=genesis_dac_cram_to_argb(scene_art_color(0x088,v),GENESIS_DAC_NORMAL);
-            /* The current's full/half brick pieces borrow palette 2 while
-             * the identical backing uses palette 3. A wider view exposes
-             * that recoloring sweep over a large stationary wall. Keep the
-             * wall's colors on those pieces; the water-front art and the
-             * original-width composition retain their native palettes.
-             * Bit 4 marks the half pieces in HCZ, independently of the
-             * world-phase bit used by full/repeated 32px pieces. */
-            if(!ext && world && width>320 && s_frame_zone==1 && !s_frame_act &&
-               (s->size&0x30u) && (s->attr&0x6000u)==0x4000u)
-                c=palette[48u|(p&15u)];
             /* The wider view can expose the waiting cutscene actor before
              * its controller borrows palette 1. Preserve its authored colors
              * there while the hardware viewport and private providers own

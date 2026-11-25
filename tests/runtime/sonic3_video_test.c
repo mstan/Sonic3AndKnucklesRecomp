@@ -604,7 +604,9 @@ static void test_hcz_brick_palette(void)
             memset(out,0,sizeof out);memset(s_priority,0,796);
             draw_scene_sprites(&v,0,out,796,0,palette);
         }
-        CHECK(out[sample]==palette[57]);
+        /* The original current recolors the backing with palette 2. The
+         * widened continuation must carry exactly the same active colors. */
+        CHECK(out[sample]==palette[41]);
         s_build.sprites[0].x=0;
     }
     /* Native width, other areas and the actual water front keep their art. */
@@ -1058,8 +1060,20 @@ static void test_title_card_edges(void)
     memset(s_priority,0,796);for(int x=0;x<796;++x)out[x]=0xFF000000u;
     draw_scene_sprites(&v,0,out,796,238,colors);
     for(int x=0;x<796;++x)CHECK(out[x]==(x>=398 && x<406?0xFFFF0000u:0xFF000000u));
-    CHECK(title_card_black(&v));word(v.vram,0xC000,1);CHECK(!title_card_black(&v));
-    word(v.vram,0xC000,0);v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
+    CHECK(title_card_black(&v));
+    /* Incoming level name tables may be installed before its fade begins. */
+    word(v.vram,0xC000,1);v.cram[47]=14;s_display_frame.scene=1;
+    CHECK(title_card_black(&v));
+    s_display_frame.count=3;s_display_frame.sprites[2]=s_display_frame.sprites[0];
+    s_display_frame.sprites[2].hud=0;s_display_frame.sprites[2].x=10;
+    memset(s_priority,0,796);for(int x=0;x<796;++x)out[x]=0xFF000000u;
+    draw_scene_sprites(&v,0,out,796,238,colors);
+    CHECK(out[248]==0xFF000000u);
+    v.cram[17]=0x200;CHECK(!title_card_black(&v));
+    s_display_frame.scene=0;s_display_frame.count=2;
+    CHECK(!title_card_black(&v));word(v.vram,0xC000,0);
+    v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
+    v.cram[17]=v.cram[47]=0;
     /* A bonus card with a different authored target keeps its native layout. */
     write16(o+0x46,0xC8);capture_objects();CHECK(s_build.sprites[0].hud==2);
     /* Gumball's loading card owns its complete words on both hosts. */
