@@ -17,7 +17,7 @@ def modes = [
 ]
 def mode = providers.gradleProperty('genesisMode').orElse('sonic3k').get()
 if (!modes.containsKey(mode)) throw new GradleException('genesisMode must be sonic3, sandk or sonic3k')
-ext.genesisGame = modes[mode] + [version:'0.8.6-rc.2', versionCode:807, icon:'@drawable/campaign_app_icon',
+ext.genesisGame = modes[mode] + [version:'0.8.6-rc.3', versionCode:808, icon:'@drawable/campaign_app_icon',
     gameRoot:game, engineRoot:engine,
     uiRoot:file(providers.gradleProperty('genesisUiRoot').orElse('../recomp-ui').get())]
 apply from:new File(engine,'platform/android/app.gradle')
