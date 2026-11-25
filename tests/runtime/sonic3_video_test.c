@@ -2054,10 +2054,12 @@ static void test_aiz_intro_live_palette(void)
     for(unsigned i=0;i<64;i++)v.cram[i]=(uint16_t)(i&1?0x200:0);
     v.cram[16]=0;v.cram[17]=0x200;
     for(unsigned i=0;i<48;i++)s_aiz_intro.colors[i]=0xE88;
-    aiz_palette(&s_aiz_intro,&v,out);
+    aiz_palette(&s_aiz_intro,&v,NULL,out);
     for(unsigned i=0;i<64;i++)CHECK(out[i]==genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL));
     /* Shared player colours are already live even for the other art bank. */
-    aiz_palette(&s_aiz_main,&v,out);
+    uint32_t native[64];
+    for(unsigned i=0;i<64;++i)native[i]=genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL);
+    aiz_palette(&s_aiz_main,&v,native,out);
     for(unsigned i=0;i<16;i++)CHECK(out[i]==genesis_dac_cram_to_argb(v.cram[i],GENESIS_DAC_NORMAL));
     memcpy(s_aiz_intro.colors,saved,sizeof saved);
 }
@@ -2073,7 +2075,7 @@ static void test_aiz_cached_native_fade(void)
     for(unsigned step=0;step<=21;step++) {
         unsigned blue=step<7?step:7,green=step<=7?0:step<14?step-7:7,red=step<=14?0:step-14;
         v.cram[17]=(uint16_t)(blue*0x200+green*0x20+red*2);
-        aiz_palette(&s_aiz_intro,&v,out);
+        aiz_palette(&s_aiz_intro,&v,NULL,out);
         for(unsigned i=0;i<48;i++) {
             CHECK(out[i+16]==genesis_dac_cram_to_argb(expected[i],GENESIS_DAC_NORMAL));
             if(expected[i]!=targets[i%6]) {
@@ -2089,7 +2091,7 @@ static void test_aiz_cached_native_fade(void)
     for(unsigned i=0;i<48;i++)expected[i]=targets[i%6];
     v.cram[16]=0;v.cram[17]=0xEEE;
     for(unsigned step=0;step<=21;step++){
-        aiz_palette(&s_aiz_intro,&v,out);
+        aiz_palette(&s_aiz_intro,&v,NULL,out);
         for(unsigned i=0;i<48;i++){
             CHECK(out[i+16]==genesis_dac_cram_to_argb(expected[i],GENESIS_DAC_NORMAL));
             if(expected[i]&0xE)expected[i]-=2;
