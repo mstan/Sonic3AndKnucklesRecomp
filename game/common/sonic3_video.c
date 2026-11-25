@@ -648,7 +648,6 @@ static uint16_t plane_attr(const GVDP *v, unsigned base, int x, int y)
     return vram16(v, base + (unsigned)(row * wt + col) * 2u);
 }
 #include "sonic3_aiz_join.inc"
-#include "sonic3_bonus_presentation.inc"
 static int file_select_layout(const GVDP *v)
 {
     /* Keep the outgoing menu through its fade, after Game_mode changes.
@@ -828,6 +827,7 @@ static void copy_bonus_card(SceneFrame *dst,const SceneFrame *src)
 }
 static SceneFrame s_build, s_history[3], s_display_frame;
 static const SceneFrame *s_display;
+#include "sonic3_bonus_presentation.inc"
 static void presentation_object_delta(const SceneSprite *sprite,int *dx,int *dy);
 static void presentation_aiz_plane_delta(int *dx,int *dy);
 static unsigned s_serial,s_upload_serial,s_scene_tick,s_spawned,s_pool_pressure;
