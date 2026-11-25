@@ -46,6 +46,8 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
         unsigned pattern_bytes;
         const uint8_t *patterns=presentation_sprite_patterns(s->size,&pattern_bytes);
         int world=!s->hud && s_display->scene==1;
+        int hcz_brick=world && width>320 && s_frame_level && s_frame_zone==1 && !s_frame_act &&
+            (s->slot>>8)==SPRITE_HCZ_RUSH_BRICK;
 #if S3_DRAW_MHZ_ROTORS
         int native_rotor=0;
 #ifndef SONIC3_STANDALONE
@@ -144,16 +146,19 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;
-            /* The native current's last full or half brick can end before
-             * the old viewport boundary. Ordinary repeats must bridge that
-             * gap in the expanded view; only roof-only fill stays outside
-             * the native viewport. Native pieces retain first-sprite priority. */
-            if((s->size&0xC0)==0x40 && (width<=320 ||
-                ((s->size&0x10) && x>=origin && x<origin+320) ||
-                x-origin+s_camera>=0x980))continue;
+            /* Extra coverage must never outlive the original current.
+             * Both regular and raised-row coverage use the same wall
+             * pixels even across the old viewport boundary. */
+            if((s->size&0xC0)==0x40 && (width<=320 || x-origin+s_camera>=0x980))continue;
             if(menu && s_frame_menu!=MENU_TITLE_CARD && x>=origin && x<origin+320)continue;
             if(s->hud==5 && x>=(width-320)/2 && x<(width+320)/2)continue;
-            if((s->size&0xD0u)==0x50u && (s_priority[x]&4u))continue;
+            if(hcz_brick) {
+                unsigned backing=s_priority[x];
+                if(!(backing&HCZ_RUSH_BACKING))continue;
+                s_priority[x]|=2u;
+                if((s->attr&0x8000u) || !(backing&1u))out[x]=palette[32u+(backing>>4)];
+                continue;
+            }
             int ix=i*256/(int)zoom;
             if(s->size&0x20u)ix=(ix+dx)&31;
             if(s->attr&0x800)ix=cw*8-1-ix;

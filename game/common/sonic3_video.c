@@ -71,7 +71,7 @@ enum { S3_MONKEY_MAP = S3_ART_BANK+0x161776u, SPRITE_MONKEY_ART = 0x10,
        SPRITE_MHZ_ARENA_COPY = 14, SPRITE_WORLD_RING = 15,
        SPRITE_MHZ_DEPARTURE = 16, SPRITE_MHZ_MUSHROOM = 17,
        SPRITE_HCZ_FAN_BASE = 18, SPRITE_MHZ_ARENA = 19, SPRITE_HCZ_MINIBOSS = 20,
-       SPRITE_MHZ_ARENA_SLEEVE = 21, SPRITE_GIANT_RING = 32 };
+       SPRITE_MHZ_ARENA_SLEEVE = 21, SPRITE_HCZ_RUSH_BRICK = 22, SPRITE_GIANT_RING = 32 };
 #ifdef SONIC3_STANDALONE
 enum { S3_EXPLOSION_MAP=0x1C38A, S3_EXPLOSION_ART=0x15E6C0,
        S3_CAPSULE_MAP=0x163F22, S3_CAPSULE_ART=0x182180,
@@ -589,6 +589,18 @@ static uint8_t world_art_row_pixel(WorldArtRow *row,int x,uint16_t *attr)
     row->next_x=x+1;*attr=row->tile.attr;
     return gtile_row_pixel(&row->tile);
 }
+/* The HCZ1 intro tunnel has its own palette-3 backing patterns ($AE..$CE).
+ * The current recolors that same backing with the installed palette 2;
+ * its coverage does not own a new, independently phased copy of the wall.
+ * Keep the native priority bits and reserve bit 3 + the high nibble for
+ * the already-decoded backing pixel. */
+enum { HCZ_RUSH_BACKING = 8u };
+static uint8_t hcz_rush_backing_tag(uint16_t attr,unsigned pixel,int x)
+{
+    unsigned tile=attr&2047u;
+    if(x<0x360 || x>=0x980 || pixel<49 || pixel>63 || tile<0xAE || tile>0xCE)return 0;
+    return (uint8_t)(HCZ_RUSH_BACKING|((pixel&15u)<<4));
+}
 static uint8_t pattern_pixel(const GVDP *v, uint16_t attr, int x, int y)
 {
     int fx = x & 7, fy = y & 7;
@@ -972,9 +984,9 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         if(flags&2){dy=-dy-((size&3)+1)*8;attr^=0x1000;}
         /* A full brick repeats every32px while the water front advances.
          * Its coverage moves; fractional drawing keeps the texture in world phase. */
-        if(map==S3_HCZ_RUSH_MAP && zoom==256 &&
-           (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30))
-            size|=size==15?0x20:0x10;
+        int hcz_brick=map==S3_HCZ_RUSH_MAP && zoom==256 &&
+           (scene_read16(p+2)==0x18 || scene_read16(p+2)==0x30);
+        if(hcz_brick)size|=size==15?0x20:0x10;
         /* In AIZ, bit4 records immutable monkey-art ownership. The zone
          * separates it from HCZ's half-brick and extended-roof uses. */
         if(map==S3_MONKEY_MAP)size|=SPRITE_MONKEY_ART;
@@ -982,7 +994,7 @@ static void add_mapping(unsigned map,unsigned frame,unsigned gfx,unsigned flags,
         if(y+dy>=224 || y+dy+((size&3)+1)*8*(int)zoom/256<=0)continue;
         SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
         q->x=x+dx;q->y=y+dy;q->attr=attr;q->size=(uint8_t)size;q->hud=(uint8_t)anchor;q->zoom=(uint16_t)zoom;
-        unsigned owner=native_art_owner(map);
+        unsigned owner=hcz_brick?SPRITE_HCZ_RUSH_BRICK:native_art_owner(map);
 #ifndef SONIC3_STANDALONE
         if(map==0x619E0u && frame<12)owner=SPRITE_GIANT_RING+frame;
         if(map==0x3E1FEu && ((gfx&2047u)==0x369u || (gfx&2047u)==0x399u) &&
@@ -1166,10 +1178,10 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
 {
     if(map!=S3_HCZ_RUSH_MAP || frame>3 || flags!=4 || ram16(0xFE10)!=0x100 ||
        !enabled() || s_requested_width<=320 || (zoom && zoom!=256))return;
-    /* The moving front owns a finite field of32px blue bricks. Continue
-     * its original row phase through any uncovered span and the margins,
-     * stopping at native retirement. A trailing half-piece overlaps the
-     * first repeat with identical phase; the native piece is drawn first. */
+    /* The moving front owns a finite blue-brick coverage field. Continue
+     * its coverage through the expanded view, but sample the actual plane
+     * backing rather than repeating the sprite texture. In particular the
+     * raised opening has different brick rows before the front steps up. */
     unsigned p=map+(int16_t)scene_read16(map+frame*2),count=scene_read16(p);p+=2;
     if(count>32)return;
     int end=0x980-ram16(0xEE78),right=(s_requested_width+320+1)/2;
@@ -1189,18 +1201,19 @@ static void extend_hcz_rush(unsigned map,unsigned frame,unsigned gfx,unsigned fl
         for(int sx=x+dx+32;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
             SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
             q->x=sx;q->y=y+dy;q->attr=(uint16_t)(gfx+attr);
-            q->size=0x6F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+            q->size=0x6F;q->hud=0;q->zoom=256;q->slot=(uint16_t)(s_capture_slot|(SPRITE_HCZ_RUSH_BRICK<<8));
         }
         /* Only moving water fills the raised opening. The closed frames
          * retain their authored upper edge rather than tinting the dry roof.
-         * Bit4 marks this roof fill, bit5 the repeating texture, bit6 margins. */
+         * The tagged pieces carry coverage only; the real wall tiles
+         * supply their texture and clip solid ceiling/floor pixels. */
         if(top && frame<2)for(int sy=y+dy-32;sy+32>0;sy-=32) {
             int sx=x+first,margin=(s_requested_width-320)/2;
             while(sx+32<=-margin)sx+=32;
             for(;sx<end && s_capture_frame->count<SCENE_SPRITES;sx+=32) {
                 SceneSprite *q=&s_capture_frame->sprites[s_capture_frame->count++];
                 q->x=sx;q->y=sy;q->attr=(uint16_t)(gfx+attr);
-                q->size=0x7F;q->hud=0;q->zoom=256;q->slot=(uint16_t)s_capture_slot;
+                q->size=0x7F;q->hud=0;q->zoom=256;q->slot=(uint16_t)(s_capture_slot|(SPRITE_HCZ_RUSH_BRICK<<8));
             }
         }
     }
@@ -3980,13 +3993,6 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
             s_background_override(s_world_frame,bx,by,x-bg_origin,line,
                 width>nw?s_left+(width-nw)/2:s_frame_fg_x,&b,&bp,&restored_color);
         s_priority[x]=(uint8_t)(((a&0x8000)&&ap)||((b&0x8000)&&bp));
-        if(level && s_frame_zone==1 && !s_frame_act && ap && (nx<0 || nx>=nw) &&
-           wx>=0x360 && wx<0x980) {
-            /* The nonsolid blue backing is on A too. Clip new roof fill to
-             * actual terrain blocks, not every opaque foreground pixel. */
-            uint16_t roof=0;
-            if(world_block(s_world_frame,wx,wy,0,0x7Cu,&roof) && (roof&0xF000u))s_priority[x]|=4u;
-        }
         /* The authored transition viewport has no high-priority tree
          * canopy in front of its flame curtain. Expanded margins do: let
          * the opaque high-priority flames cover that extra scenery too.
@@ -3997,6 +4003,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
         int foreground=ap && !fire_curtain && (flipped_planes?
             (!bp || ((a&0x8000) && !(b&0x8000))):
             ((a&0x8000) || !bp || !(b&0x8000)));
+        if(level && width>320 && s_frame_zone==1 && !s_frame_act && foreground)
+            s_priority[x]|=hcz_rush_backing_tag(a,ap,wx);
         uint8_t p=foreground?ap:bp;
         uint32_t owned_backdrop=(handoff_loading || handoff_bg)?
             s_handoff_art.colors[line][s_handoff_art.video.reg[7]&63]:backdrop;
