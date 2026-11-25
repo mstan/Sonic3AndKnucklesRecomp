@@ -44,7 +44,7 @@ def build_content_parts(extracted, output, s3k):
             raise ValueError(f'Sonic CD {target} conversion failed')
 
 
-def main(argv=None, *, source=None):
+def main(argv=None, *, source=None, validate_on_install=False):
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--disc', '--cue', dest='cue', type=Path, required=True,
                     help='owned CUE/BIN disc or the shared .sgcd image')
@@ -58,7 +58,7 @@ def main(argv=None, *, source=None):
             from scd_media import open_disc
             args.out.resolve().parent.mkdir(parents=True, exist_ok=True)
             with open_disc(args.cue, args.out.resolve().parent) as opened:
-                return main(argv, source=opened)
+                return main(argv, source=opened, validate_on_install=validate_on_install)
         # A combined import shares one verified media/ISO instance across the
         # content and music passes, avoiding repeated full SGCD verification.
         disc = source if source is not None else Disc(args.cue)
@@ -73,7 +73,7 @@ def main(argv=None, *, source=None):
         if source_identity(disc) != US_SHA256:
             raise ValueError('unsupported Sonic CD revision; only the qualified US data track is enrolled')
         validator = None
-        if args.kind == 'content':
+        if args.kind == 'content' and (args.validator or not validate_on_install):
             candidates = [args.validator] if args.validator else [
                 ROOT / 'scd_pack_validate.exe', ROOT / 'scd_pack_validate',
                 ROOT / 'tools/scd_pack_validate.exe',

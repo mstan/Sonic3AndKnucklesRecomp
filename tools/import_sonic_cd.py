@@ -45,7 +45,7 @@ def verify_bundle(directory, manifest):
         raise ValueError('cached Sonic CD manifest does not match its resources')
 
 
-def import_disc(disc, s3k, output, validator, *, source=None):
+def import_disc(disc, s3k, output, validator, *, source=None, validate_on_install=False):
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
     # This directory is private generated data. Every cleanup is restricted to
@@ -63,7 +63,7 @@ def import_disc(disc, s3k, output, validator, *, source=None):
             args = common + ['--kind', kind, '--out', str(staging / NAMES[index])]
             if validator:
                 args += ['--validator', str(validator)]
-            if build_pack(args, source=source):
+            if build_pack(args, source=source, validate_on_install=validate_on_install):
                 raise ValueError(f'Sonic CD {kind} conversion failed; see the import log for details')
         progress(0.95, 'Checking the complete stage and music installation...')
         installed = NAMES if has_audio else NAMES[:1]
@@ -112,7 +112,7 @@ def write_receipt(path, bundle):
             os.unlink(temporary)
 
 
-def main(argv=None):
+def main(argv=None, *, validate_on_install=False):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--disc', type=Path, required=True)
     parser.add_argument('--s3k', type=Path, required=True)
@@ -127,7 +127,8 @@ def main(argv=None):
         with open_disc(args.disc, args.out.resolve()) as source:
             if args.receipt and args.receipt.resolve() in source.input_paths | {args.s3k.resolve()}:
                 raise ValueError('receipt must differ from every owned input')
-            bundle = import_disc(args.disc, args.s3k, args.out, args.validator, source=source)
+            bundle = import_disc(args.disc, args.s3k, args.out, args.validator, source=source,
+                                 validate_on_install=validate_on_install)
             if args.receipt:
                 write_receipt(args.receipt, bundle)
         progress(1.0, 'Sonic CD stages and music are ready.' if (bundle / NAMES[1]).is_file() else

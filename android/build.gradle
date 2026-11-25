@@ -1,4 +1,7 @@
-plugins { id 'com.android.application' version '8.7.3' }
+plugins {
+    id 'com.android.application' version '8.7.3'
+    id 'com.chaquo.python' version '17.2.0'
+}
 def game = file('..')
 def engine = file(providers.gradleProperty('genesisEngineRoot').orElse('../segagenesisrecomp').get())
 def modes = [
@@ -14,7 +17,7 @@ def modes = [
 ]
 def mode = providers.gradleProperty('genesisMode').orElse('sonic3k').get()
 if (!modes.containsKey(mode)) throw new GradleException('genesisMode must be sonic3, sandk or sonic3k')
-ext.genesisGame = modes[mode] + [version:'0.8.6-rc.2', versionCode:807,
+ext.genesisGame = modes[mode] + [version:'0.8.6-rc.2', versionCode:807, icon:'@drawable/campaign_app_icon',
     gameRoot:game, engineRoot:engine,
     uiRoot:file(providers.gradleProperty('genesisUiRoot').orElse('../recomp-ui').get())]
 apply from:new File(engine,'platform/android/app.gradle')
@@ -22,3 +25,59 @@ apply from:new File(engine,'platform/android/app.gradle')
 // Each application imports and runs only its selected cartridge mode.
 android.packagingOptions.jniLibs.excludes.addAll(
     modes.values().findAll { it.target != modes[mode].target }.collect { '**/lib'+it.target+'.so' })
+
+chaquopy {
+    defaultConfig {
+        version = '3.11'
+        def python = providers.gradleProperty('genesisAndroidImportPython')
+        if (python.isPresent()) buildPython(python.get())
+    }
+}
+def iconResources = layout.buildDirectory.dir('generated/titleIconResources')
+tasks.register('stageTitleIcon', Sync) {
+    into iconResources
+    from(new File(game, modes[mode].boxart.replace('.tga', '.png'))) {
+        into 'drawable-nodpi'
+        rename { 'campaign_app_icon.png' }
+    }
+}
+def numeralSource = new File(game, 'tools/trilogy/data/act_3_custom.png')
+def numeralIndices = layout.buildDirectory.file('generated/campaignNumeral/act_3_custom.idx')
+tasks.register('stageCampaignNumeral') {
+    inputs.file(numeralSource)
+    outputs.file(numeralIndices)
+    doLast {
+        def image = javax.imageio.ImageIO.read(numeralSource)
+        if (image == null || image.width != 32 || image.height != 32 ||
+            !(image.colorModel instanceof java.awt.image.IndexColorModel)) {
+            throw new GradleException('The campaign numeral needs a 32×32 indexed PNG.')
+        }
+        def output = numeralIndices.get().asFile
+        output.parentFile.mkdirs()
+        byte[] indices = new byte[32 * 32]
+        for (int y = 0; y < 32; ++y) {
+            for (int x = 0; x < 32; ++x)
+                indices[y * 32 + x] = (byte)image.raster.getSample(x, y, 0)
+        }
+        output.bytes = indices
+    }
+}
+tasks.named('stagePublicAssets').configure {
+    dependsOn('stageCampaignNumeral')
+    from(numeralIndices) { into 'campaign-converter/tools/trilogy/data' }
+    from(new File(game, 'tools')) {
+        include 'android_campaign_import.py', 'import_campaign.py', 'build_stage_pack.py',
+                'build_megamix_pack.py', 'split_campaign_packs.py', 'import_sound_donor.py',
+                'import_cd_sound_donor.py', 'import_sonic_cd.py', 'build_sonic_cd_pack.py'
+        include 'trilogy/**/*.py', 'trilogy/data/**', 'megamix/**/*.py', 'megamix/data/**'
+        exclude 'trilogy/data/act_3_custom.png'
+        into 'campaign-converter/tools'
+    }
+    from(new File(engine, 'tools/segacd')) {
+        include 'disc_image.py', 'owned_media.py', 'sgcd_owned_extract.py'
+        into 'campaign-converter/tools/segacd'
+    }
+}
+android.sourceSets.main.java.srcDir('src/main/java')
+android.sourceSets.main.res.srcDir(iconResources)
+tasks.named('preBuild').configure { dependsOn 'stageTitleIcon' }

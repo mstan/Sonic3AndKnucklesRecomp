@@ -7,6 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#ifdef __ANDROID__
+#include <jni.h>
+#include <SDL2/SDL.h>
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #include <direct.h>
@@ -84,10 +88,122 @@ static void output_chunk(FILE *log,const char *bytes,size_t count,
     }
 }
 
+
+static int read_install_receipt(unsigned kind,const char *receipt,char content[1024],
+                                char music[1024],char *error,size_t capacity)
+{
+    char line[4096];
+    FILE *result=fopen(receipt,"rb");
+    if(!result){snprintf(error,capacity,"Unable to read the private import receipt.");return 0;}
+    int format=0,audio_absent=0;
+    while(fgets(line,sizeof line,result)) {
+        line[strcspn(line,"\r\n")]=0;
+        if(!strcmp(line,"format=1"))format=1;
+        else if(kind==4&&!strcmp(line,"audio=absent"))audio_absent=1;
+        else if(!strncmp(line,"content=",8)&&strlen(line+8)<1024)strcpy(content,line+8);
+        else if(kind==4&&!strncmp(line,"music=",6)&&strlen(line+6)<1024)strcpy(music,line+6);
+        else if(kind==3&&!strncmp(line,"rom=",4)&&strlen(line+4)<1024)strcpy(music,line+4);
+    }
+    fclose(result);remove(receipt);
+    if(format&&*content&&((kind==1||kind==2||kind==5)||*music||(kind==4&&audio_absent)))return 1;
+    snprintf(error,capacity,"Importer returned an incomplete installation; previous selection retained.");return 0;
+}
+
+#ifdef __ANDROID__
+static int run_android_converter(const char *const *args,size_t count,char *error,size_t capacity)
+{
+    JNIEnv *env=(JNIEnv *)SDL_AndroidGetJNIEnv();
+    if(!env || (*env)->PushLocalFrame(env,12)<0) {
+        snprintf(error,capacity,"The app's import converter is unavailable.");
+        return 0;
+    }
+    int success=0;
+    snprintf(error,capacity,"The app's import converter is unavailable.");
+    jobject activity=(jobject)SDL_AndroidGetActivity();
+    if(!activity)goto done;
+    jclass activity_class=(*env)->GetObjectClass(env,activity);
+    jmethodID get_loader=activity_class?(*env)->GetMethodID(env,activity_class,"getClassLoader","()Ljava/lang/ClassLoader;"):NULL;
+    if(!get_loader)goto done;
+    jobject loader=(*env)->CallObjectMethod(env,activity,get_loader);
+    if(!loader || (*env)->ExceptionCheck(env))goto done;
+    jclass loader_class=(*env)->GetObjectClass(env,loader);
+    jmethodID load_class=loader_class?(*env)->GetMethodID(env,loader_class,"loadClass","(Ljava/lang/String;)Ljava/lang/Class;"):NULL;
+    jstring name=(*env)->NewStringUTF(env,"org.genesisrecompiled.AndroidCampaignImporter");
+    if(!load_class || !name)goto done;
+    jclass bridge=(jclass)(*env)->CallObjectMethod(env,loader,load_class,name);
+    if(!bridge || (*env)->ExceptionCheck(env))goto done;
+    jmethodID run=(*env)->GetStaticMethodID(env,bridge,"run","(Landroid/content/Context;[[B)[B");
+    jclass bytes=(*env)->FindClass(env,"[B");
+    if(!run || !bytes)goto done;
+    jobjectArray argv=(*env)->NewObjectArray(env,(jsize)count,bytes,NULL);
+    if(!argv)goto done;
+    for(size_t i=0;i<count;++i) {
+        jsize size=(jsize)strlen(args[i]);
+        jbyteArray arg=(*env)->NewByteArray(env,size);
+        if(!arg)goto done;
+        (*env)->SetByteArrayRegion(env,arg,0,size,(const jbyte *)args[i]);
+        (*env)->SetObjectArrayElement(env,argv,(jsize)i,arg);
+        (*env)->DeleteLocalRef(env,arg);
+        if((*env)->ExceptionCheck(env))goto done;
+    }
+    jbyteArray failure=(jbyteArray)(*env)->CallStaticObjectMethod(env,bridge,run,activity,argv);
+    if((*env)->ExceptionCheck(env))goto done;
+    if(failure && capacity>1) {
+        size_t size=(size_t)(*env)->GetArrayLength(env,failure);
+        if(size>=capacity)size=capacity-1;
+        (*env)->GetByteArrayRegion(env,failure,0,(jsize)size,(jbyte *)error);
+        error[size]=0;
+    }
+    success=!failure;
+    if(success && capacity)error[0]=0;
+
+done:
+    if((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionClear(env);
+        success=0;
+    }
+    (*env)->PopLocalFrame(env,NULL);
+    return success;
+}
+
+static int android_media_import(unsigned kind,const char *disc,const char *rom,const char *settings,
+                                char content[1024],char music[1024],char *error,size_t capacity,
+                                void (*progress)(void *,float,const char *),void *user)
+{
+    const char *campaigns[]={"","sonic1","sonic2","megamix","sonic_cd","sound"};
+    const char *cache_names[]={"","sonic-rom-imports","sonic-rom-imports","sonic-rom-imports",
+                              "sonic-cd-imports","sonic-sound-donors"};
+    char root[1024],cache[1200],receipt[1280];
+    content[0]=music[0]=0;
+    if(kind<1 || kind>5 || !rom || !*rom || !disc || !*disc) {
+        snprintf(error,capacity,"Select your cartridge and owned media first.");
+        return 0;
+    }
+    parent(root,sizeof root,settings);
+    if(!join(cache,sizeof cache,root,cache_names[kind]) ||
+       snprintf(receipt,sizeof receipt,"%s/result-%lu.ini",cache,(unsigned long)getpid())>=(int)sizeof receipt) {
+        snprintf(error,capacity,"Import path is too long or invalid.");
+        return 0;
+    }
+    if(remove(receipt) && errno!=ENOENT) {
+        snprintf(error,capacity,"Unable to clear the private import receipt.");
+        return 0;
+    }
+    const char *args[]={"--campaign",campaigns[kind],"--source",disc,"--s3k",rom,
+                        "--out",cache,"--receipt",receipt};
+    if(progress)progress(user,-1,"Checking your selected image and preparing the game content...");
+    if(!run_android_converter(args,sizeof args/sizeof *args,error,capacity))return 0;
+    return read_install_receipt(kind,receipt,content,music,error,capacity);
+}
+#endif
+
 static int media_import(unsigned kind,const char *disc,const char *rom,const char *settings,
                  char content[1024],char music[1024],char *error,size_t capacity,
                  void (*progress)(void *,float,const char *),void *user)
 {
+#ifdef __ANDROID__
+    return android_media_import(kind,disc,rom,settings,content,music,error,capacity,progress,user);
+#else
     char root[1024],cache[1200],receipt[1280],log_path[1280],script[1200],helper[1200],builder[1200];
     char exe_dir[1024]={0},line[4096],detail[256]={0};int code=1;
     content[0]=music[0]=0;parent(root,sizeof root,settings);
@@ -254,20 +370,10 @@ static int media_import(unsigned kind,const char *disc,const char *rom,const cha
     CloseHandle(process.hThread);CloseHandle(process.hProcess);
 #endif
     if(code){snprintf(error,capacity,"%s See %s",*detail?detail:"Owned-media import failed.",log_path);return 0;}
-    FILE *result=fopen(receipt,"rb");if(!result)goto io_error;int format=0,audio_absent=0;
-    while(fgets(line,sizeof line,result)) {
-        line[strcspn(line,"\r\n")]=0;
-        if(!strcmp(line,"format=1"))format=1;
-        else if(kind==4&&!strcmp(line,"audio=absent"))audio_absent=1;
-        else if(!strncmp(line,"content=",8)&&strlen(line+8)<1024)strcpy(content,line+8);
-        else if(kind==4&&!strncmp(line,"music=",6)&&strlen(line+6)<1024)strcpy(music,line+6);
-        else if(kind==3&&!strncmp(line,"rom=",4)&&strlen(line+4)<1024)strcpy(music,line+4);
-    }
-    fclose(result);remove(receipt);
-    if(format&&*content&&((kind==1||kind==2||kind==5)||*music||(kind==4&&audio_absent)))return 1;
-    snprintf(error,capacity,"Importer returned an incomplete installation; previous selection retained.");return 0;
+    return read_install_receipt(kind,receipt,content,music,error,capacity);
 path_error:snprintf(error,capacity,"Import path is too long or invalid.");return 0;
 io_error:snprintf(error,capacity,"Unable to read or write the private import directory.");return 0;
+#endif
 }
 
 int s3_cd_import(const char *disc,const char *rom,const char *settings,

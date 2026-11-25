@@ -26,9 +26,9 @@ def digest(path):
     with Path(path).open('rb')as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
 
 def converter_fingerprint():
-    files=[TOOLS/'build_stage_pack.py',TOOLS/'build_megamix_pack.py',TOOLS/'split_campaign_packs.py',Path(__file__)]
+    files=[TOOLS/'build_stage_pack.py',TOOLS/'build_megamix_pack.py',TOOLS/'split_campaign_packs.py',Path(__file__).resolve()]
     for directory in ('trilogy','megamix'):
-        files += [p for p in (TOOLS/directory).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.txt','.png')]
+        files += [p for p in (TOOLS/directory).rglob('*') if p.is_file() and p.suffix in ('.py','.json','.txt','.png','.idx')]
     value=hashlib.sha256(b'S3K-owned-campaign-import-1\0')
     for p in sorted(files):value.update(str(p.relative_to(TOOLS)).replace('\\','/').encode()+b'\0'+p.read_bytes())
     return value.hexdigest()
@@ -130,7 +130,7 @@ def write_receipt(path,bundle,kind):
     finally:
         if os.path.exists(temp):os.unlink(temp)
 
-def main(argv=None):
+def main(argv=None, *, validate_on_install=False):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--campaign',required=True,choices=tuple(KINDS)+('sonic_cd','sound'))
     for n in ('source','s3k','out'):p.add_argument('--'+n,required=True,type=Path)
@@ -146,7 +146,7 @@ def main(argv=None):
             args=['--disc',str(a.source),'--s3k',str(a.s3k),'--out',str(a.out)]
             if a.receipt:args+=['--receipt',str(a.receipt)]
             if a.validator:args+=['--validator',str(a.validator)]
-            return cd(args)
+            return cd(args, validate_on_install=validate_on_install)
         bundle=import_campaign(a.campaign,a.source,a.s3k,a.out)
         if a.receipt:write_receipt(a.receipt,bundle,a.campaign)
         return 0
