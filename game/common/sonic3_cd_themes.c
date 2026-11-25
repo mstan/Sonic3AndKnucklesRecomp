@@ -18,12 +18,14 @@ typedef struct CDClock {uint64_t position,frame_position;uint32_t theme,active,p
 static CDClock clock_state;
 static const unsigned events[S3_MUSIC_COUNT]={
     [S3_THEME_OVER]=0x27,[S3_THEME_CLEAR]=0x29,[S3_THEME_INVINCIBLE]=0x2C,
-    [S3_MUSIC_BOSS]=0x19,[S3_MUSIC_MINIBOSS]=0x18,[S3_MUSIC_FINAL]=0x30};
+    [S3_MUSIC_BOSS]=0x19,[S3_MUSIC_MINIBOSS]=0x18,[S3_MUSIC_MINIBOSS_ALT]=0x18,[S3_MUSIC_FINAL]=0x30};
 static unsigned le16(const uint8_t *p){return p[0]|((unsigned)p[1]<<8);}
 static uint32_t le32(const uint8_t *p){return le16(p)|((uint32_t)le16(p+2)<<16);}
 static void be32(uint8_t *p,uint32_t v){p[0]=(uint8_t)(v>>24);p[1]=(uint8_t)(v>>16);p[2]=(uint8_t)(v>>8);p[3]=(uint8_t)v;}
 static int cd_event(unsigned t){return t<S3_MUSIC_COUNT&&events[t]!=0;}
-static int cd_loop(unsigned t){if(t<S3_MUSIC_COUNT&&songs[t].custom)return (int)songs[t].loop;return t==S3_THEME_INVINCIBLE||t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS||t==S3_MUSIC_FINAL;}
+static const char *cd_catalog_id(unsigned t)
+{return s3_theme_ids[t==S3_MUSIC_MINIBOSS_ALT?S3_MUSIC_MINIBOSS:t];}
+static int cd_loop(unsigned t){if(t<S3_MUSIC_COUNT&&songs[t].custom)return (int)songs[t].loop;return t==S3_THEME_INVINCIBLE||t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS||t==S3_MUSIC_MINIBOSS_ALT||t==S3_MUSIC_FINAL;}
 static int hex(const char *p,size_t n)
 {if(strlen(p)!=n)return 0;for(size_t i=0;i<n;i++)if(!((p[i]>='0'&&p[i]<='9')||(p[i]>='a'&&p[i]<='f')))return 0;return 1;}
 static int wav(const char *path,const char *hash,Song *out)
@@ -85,9 +87,9 @@ static int manifest_read(const char *path,unsigned donor,int wanted,Song *out,ui
         else if(!strcmp(line,"donor"))region=!strcmp(value,s3_donor_ids[donor]);
         else if(!strcmp(line,"source_sha256")&&strlen(value)==64)snprintf(source,sizeof source,"%s",value);
         else for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if(cd_event(t)){
-            char key[64];snprintf(key,sizeof key,"%s.path",s3_theme_ids[t]);
+            char key[64];snprintf(key,sizeof key,"%s.path",cd_catalog_id(t));
             if(!strcmp(line,key)&&strlen(value)<sizeof relative[t])snprintf(relative[t],sizeof relative[t],"%s",value);
-            snprintf(key,sizeof key,"%s.sha256",s3_theme_ids[t]);
+            snprintf(key,sizeof key,"%s.sha256",cd_catalog_id(t));
             if(!strcmp(line,key)&&strlen(value)==64)snprintf(hashes[t],sizeof hashes[t],"%s",value);
         }
     }
@@ -99,7 +101,7 @@ static int manifest_read(const char *path,unsigned donor,int wanted,Song *out,ui
         /* Existing libraries keep their three verified event recordings.
          * Missing added tracks require reimport only when selected. */
         if(wanted<0&&t>=S3_THEME_COUNT&&!*relative[t]&&!*hashes[t])continue;
-        char expected[160];snprintf(expected,sizeof expected,"%s-%s/%s.wav",s3_donor_ids[donor],source,s3_theme_ids[t]);
+        char expected[160];snprintf(expected,sizeof expected,"%s-%s/%s.wav",s3_donor_ids[donor],source,cd_catalog_id(t));
         if(strcmp(relative[t],expected)||!hex(hashes[t],64)||prefix+strlen(expected)>=sizeof root)return 0;
         snprintf(root+prefix,sizeof root-prefix,"%s",expected);
         if(!wav(root,hashes[t],wanted==(int)t?out:NULL))return 0;
@@ -156,8 +158,8 @@ int s3_cd_theme_build(unsigned t,unsigned donor,const char *manifest,const S3Sou
      * against the existing CD campaign's -24.2 LUFS music reference. No cold
      * analysis or floating-point gain enters playback or snapshots. */
     songs[t].gain=t==S3_THEME_OVER?23795u:t==S3_THEME_CLEAR?15541u:
-        t==S3_MUSIC_FINAL?20964u:(t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS)?19565u:17437u;
-    be32(bank+l->music_index-0x400000+(events[t]-1)*4,0x01400000u|dest);*used=dest+82;
+        t==S3_MUSIC_FINAL?20964u:(t==S3_MUSIC_BOSS||t==S3_MUSIC_MINIBOSS||t==S3_MUSIC_MINIBOSS_ALT)?19565u:17437u;
+    be32(bank+l->music_index-0x400000+(s3_music_target(t)-1)*4,0x01400000u|dest);*used=dest+82;
     audio_set_extra_source(mix);return 1;
 }
 void s3_cd_theme_driver_init(void)
@@ -189,7 +191,8 @@ int s3_cd_theme_request(unsigned native)
     }
     if(native>=1&&native<=0x33){
         for(unsigned t=0;t<S3_MUSIC_COUNT;t++)if((cd_event(t)||songs[t].custom)&&
-            (native==(songs[t].custom?songs[t].native:events[t]) || (native==0x2E&&t==S3_MUSIC_MINIBOSS))&&
+            (native==(songs[t].custom?songs[t].native:s3_music_target(t)) ||
+             (native==0x2E&&t==S3_MUSIC_MINIBOSS&&!s3_music_available(S3_MUSIC_MINIBOSS_ALT)))&&
             (songs[t].pcm||songs[t].vgm)){
             memset(&clock_state,0,sizeof clock_state);clock_state.theme=t;clock_state.active=1;clock_state.volume=65536;
             if(songs[t].vgm)s3_vgm_start(t);return 1;

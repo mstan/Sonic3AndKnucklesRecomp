@@ -14,19 +14,32 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
     int mhz_retired_approach=mhz_chase && mhz_arena_has_looped() && s_camera>=0x4080;
 #endif
 #endif
-    unsigned card_slot=UINT_MAX;int card_offset=0;
+    unsigned card_slot=UINT_MAX;int card_offset=0,bonus_offset=0;
+    if(s_display->bonus_card_valid){
+        int left=INT_MAX,distance=s_display->bonus_card_x-72;
+        for(unsigned n=0;n<s_display->count;++n)
+            if(s_display->sprites[n].hud==SCENE_BONUS_CARD && s_display->sprites[n].x<left)
+                left=s_display->sprites[n].x;
+        if(left!=INT_MAX){
+            int span=320-(left-distance);
+            if(span>0)bonus_offset=distance*((width-320+1)/2)/span;
+        }
+    }
     for(unsigned n=0;n<s_display->count;++n) {
         const SceneSprite *s=&s_display->sprites[n];
         unsigned slot=sprite_slot(s);
         int menu=s_display->scene==0;
+        if(s_frame_bonus && s_frame_zone==0x13 && s->hud!=SCENE_BONUS_CARD)continue;
         /* Results queue signed screen positions before the native SAT can
          * see them. Extend those original-size pieces through the margins;
          * the installed native row still owns the original viewport. Use
          * the published mode, including immediately after rewind. */
         int results=menu && (s_world_frame[0xF600]&127)==0x48;
         int menu_hud=menu?(results?2:file_select_layout(v)?4:3):0;
-        if(menu && (s_frame_menu==MENU_TITLE_CARD ? s->hud<6 || s->hud>9 :
-                    s->hud!=menu_hud && !(menu_hud==3 && s->hud==SCENE_COMPETITION_CHARACTER)))continue;
+        if(s_frame_menu==MENU_TITLE_CARD) {
+            if(s->hud<6 || s->hud>9)continue;
+        } else if(menu && s->hud!=menu_hud &&
+                  !(menu_hud==3 && s->hud==SCENE_COMPETITION_CHARACTER))continue;
         int cw=((s->size>>2)&3)+1,ch=(s->size&3)+1;
         unsigned zoom=s->zoom?s->zoom:256;
         int drawn_width=cw*8*(int)zoom/256,drawn_height=ch*8*(int)zoom/256;
@@ -81,6 +94,7 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
             }
             base+=card_offset;
         }
+        if(s->hud==SCENE_BONUS_CARD)base+=bonus_offset;
         /* Native camera scroll may advance while a completed host frame is
          * retained. Reproject its world coordinates, not its old screen
          * coordinates; otherwise stationary rings jitter with the camera. */
@@ -126,7 +140,7 @@ static void S3_DRAW_SCENE_FUNCTION(const GVDP *v,int line,uint32_t *out,int widt
         for(int i=0;i<drawn_width;++i) {
 #endif
             int x=base+i;
-            if(x<0 || x>=width || (s_priority[x]&2))continue;
+            if(x<0 || x>=width || ((s_priority[x]&2) && s->hud!=SCENE_BONUS_CARD))continue;
             if(cinematic && world && (x<origin || x>=origin+320) &&
                (s->slot>>8)!=SPRITE_ENDING_POSE)continue;
             if((s->slot>>8)==SPRITE_MHZ_DEPARTURE && x>=origin && x<origin+320)continue;

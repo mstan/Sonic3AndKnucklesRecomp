@@ -35,7 +35,7 @@ static const MusicRow rows[]={
 const char *const s3_donor_ids[]={"s1","s2","s2-aug","s2-wai","s3-proto","s3","sk","cd-us"};
 const char *const s3_donor_names[]={"Sonic 1","Sonic 2","Sonic 2 (Aug 21, 1992 prototype)","Sonic 2 (Simon Wai prototype)","Sonic 3 (Nov 3, 1993 prototype)","Sonic 3","Sonic & Knuckles","Sonic CD (US)"};
 static const S3ThemeChoice choices[][8]={
-    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2-wai","Simon Wai prototype (Death Egg)",S3_DONOR_WAI},{"s2-aug","Aug 21 prototype (Casino Night 2P)",S3_DONOR_AUG}},
+    {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s3","Sonic 3",S3_DONOR_S3},{"sk","Sonic & Knuckles",S3_DONOR_SK},{"s2","Sonic 2 (2P Results)",S3_DONOR_S2},{"s2-wai","Sonic 2 Simon Wai prototype (2P Results)",S3_DONOR_WAI}},
     {{"s1-s2","Sonic 1 / Sonic 2",S3_DONOR_S1},{"s2-wai","Sonic 2 Simon Wai prototype",S3_DONOR_WAI},{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s3k","Sonic 3 & Knuckles",-1},{"cd-us","Sonic CD (US)",S3_DONOR_CD_US}},
@@ -57,7 +57,7 @@ static const S3ThemeChoice choices[][8]={
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s2-wai","Sonic 2 Simon Wai Death Egg",S3_DONOR_WAI},{"s2","Sonic 2 Death Egg",S3_DONOR_S2}},
     {{"s3-proto","Sonic 3 prototype",S3_DONOR_PROTO},{"s1","Sonic 1 Special Stage",S3_DONOR_S1}},
 };
-static const unsigned counts[]={6,3,5,5,8,4,7,8,3,1,4,3,3,7,4,5,2,3,1,3,2};
+static const unsigned counts[]={4,3,5,5,8,4,7,8,3,1,4,3,3,7,4,5,2,3,1,3,2};
 static const char *const hashes[]={
     "46160baa06362c711c9f1a5017cb7371026444936c8af5e93a78996cf32ff2a6",
     "193bc4064ce0daf27ea9e908ed246d87ec576cc294833badebb590b6ad8e8f6b",
@@ -81,9 +81,13 @@ const S3ThemeChoice *s3_theme_choice(unsigned t,unsigned c){static const S3Theme
 unsigned s3_music_group(unsigned t)
 {return t<S3_MUSIC_COUNT?(host_combined&&rows[t].group==S3_MUSIC_SANDK?S3_MUSIC_SONIC3:rows[t].group):S3_MUSIC_GROUPS;}
 const char *s3_music_section(unsigned t){return t<S3_MUSIC_COUNT?rows[t].section:"";}
-unsigned s3_music_target(unsigned t){return (t==S3_MUSIC_CREDITS&&!host_s3)||t==S3_MUSIC_SUPER?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;}
+unsigned s3_music_target(unsigned t)
+{
+    if(t==S3_MUSIC_MINIBOSS && host_s3)return 0x2E;
+    return (t==S3_MUSIC_CREDITS&&!host_s3)||t==S3_MUSIC_SUPER?0x33:t<S3_MUSIC_COUNT?rows[t].target:0;
+}
 int s3_music_available(unsigned t)
-{return t<S3_MUSIC_COUNT&&(t!=S3_MUSIC_SUPER||host_s3)&&(!rows[t].group||(rows[t].group==S3_MUSIC_SONIC3?(host_s3||host_combined):!host_s3));}
+{return t<S3_MUSIC_COUNT&&((t!=S3_MUSIC_SUPER && t!=S3_MUSIC_MINIBOSS_ALT)||host_s3)&&(!rows[t].group||(rows[t].group==S3_MUSIC_SONIC3?(host_s3||host_combined):!host_s3));}
 int s3_music_active(unsigned t)
 {
     return s3_music_available(t) && (t==S3_MUSIC_DATA ? data_group_on : group_on[rows[t].group]) &&
@@ -94,6 +98,8 @@ unsigned s3_music_source(unsigned t,unsigned donor)
     static const unsigned s1[]={7,14,15,13,6,17,11,11,9};
     static const unsigned s2[]={23,26,27,25,22,30,18,18,24};
     if(t>=S3_MUSIC_COUNT)return 0;
+    /* The alternate slot has the same donor arrangements but a distinct host request. */
+    if(t==S3_MUSIC_MINIBOSS_ALT)t=S3_MUSIC_MINIBOSS;
     if(t==S3_THEME_CONTINUE){
         /* The existing shared Continue song and the 2P Results songs use
          * different playlist entries on the same Sonic 2 cartridges. */
@@ -104,7 +110,6 @@ unsigned s3_music_source(unsigned t,unsigned donor)
     if(donor<=S3_DONOR_WAI){
         /* Explicit arrangement choices use the zone/menu entries. The
          * prototypes' ordinary event slots contain different sequences. */
-        if(t==S3_THEME_LIFE && (donor==S3_DONOR_WAI || donor==S3_DONOR_AUG))return 7;
         if(t==S3_MUSIC_DROWN && (donor==S3_DONOR_WAI || donor==S3_DONOR_AUG))return 9;
         if((t==S3_MUSIC_BOSS || t==S3_MUSIC_MINIBOSS) && donor==S3_DONOR_AUG)return 13;
         if(t==S3_MUSIC_DEZ1 || t==S3_MUSIC_DEZ2)return donor==S3_DONOR_WAI?7:9;

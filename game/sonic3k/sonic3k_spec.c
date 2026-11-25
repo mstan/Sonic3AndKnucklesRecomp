@@ -298,6 +298,7 @@ const GameSpec g_game_spec = {
      * sonic3k.constants.asm: SRAM_access_flag=$A130F1, phase $200001. */
     .sram_start             = 0x200001u,
     .sram_end               = 0x203FFFu,
+    .sram_legacy_size       = 0x400u,
 
     .call_entry_point       = s3k_call_entry_point,
     .call_vblank            = s3k_call_vblank,

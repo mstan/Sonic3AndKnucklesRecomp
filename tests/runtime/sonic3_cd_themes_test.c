@@ -7,6 +7,9 @@ const char *const s3_theme_ids[]={
 };
 #undef TRACK
 const char *const s3_donor_ids[]={"s1","s2","s2-aug","s2-wai","s3-proto","s3","sk","cd-us"};
+static int standalone;
+unsigned s3_music_target(unsigned t){return standalone && t==S3_MUSIC_MINIBOSS?0x2E:events[t];}
+int s3_music_available(unsigned t){return t!=S3_MUSIC_MINIBOSS_ALT || standalone;}
 static AudioExtraSource registered;
 void audio_set_extra_source(AudioExtraSource source){registered=source;}
 static void song(unsigned theme)
@@ -67,7 +70,7 @@ int main(int argc,char **argv)
         CDClock prior=clock_state;s3_cd_theme_request(0x2A);s3_cd_theme_frame(0,1);CHECK(clock_state.position==prior.position);
         s3_cd_theme_request(0x29);CHECK(clock_state.theme==S3_THEME_CLEAR);
     }
-    /* Both cartridge miniboss IDs start the same CD or custom recording;
+    /* The combined and S&K cartridge miniboss IDs start the same CD or custom recording;
      * another ordinary song still stops it. */
     for(unsigned custom=0;custom<2;custom++){
         songs[S3_MUSIC_MINIBOSS].custom=custom;songs[S3_MUSIC_MINIBOSS].native=0x18;

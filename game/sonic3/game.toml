@@ -621,3 +621,14 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x6AD0 # LevelSelect_StartZone
 kind = "game_hook"
+
+# Keep selected HCZ1 palette through the native tunnel transition.
+[[widescreen_site]]
+addr = 0x1AC6E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1AC9E
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1ACAE
+kind = "game_hook"

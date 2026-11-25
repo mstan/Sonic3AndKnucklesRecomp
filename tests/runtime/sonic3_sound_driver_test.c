@@ -52,6 +52,7 @@ int main(int argc,char **argv)
     s3_sound_load("unused-test-settings.ini",argv[2]);CHECK(!s3_sound_selected());CHECK(s3_sound_netplay_allowed());
     size_t n=s3_sound_rb_save(NULL,0);uint8_t *disabled=malloc(n),*saved=malloc(n),*after=malloc(n);CHECK(disabled&&saved&&after);
     CHECK(s3_sound_rb_save(disabled,n)==n);CHECK(s3_sound_select(1));s3_sound_post_reset();CHECK(mapped && s3_sound_active() && !s3_sound_netplay_allowed());
+    uint32_t base_mini_alt=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x18-1));
     uint32_t base_boss=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1));
     uint32_t base_credits=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1));
     uint32_t base_ending=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x32-1));
@@ -137,7 +138,10 @@ int main(int argc,char **argv)
         if(s3)CHECK(s3_sound_prototype_set_path(argv[3]));
         CHECK(s3_music_pick(S3_MUSIC_MINIBOSS,"sk-proto"));s3_sound_post_reset();
         uint32_t mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x18-1));CHECK(mini);
-        CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x2E - 1))==mini);
+        uint32_t main_mini=m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x2E-1));
+        CHECK(main_mini);
+        if(s3)CHECK(mini==base_mini_alt && main_mini!=mini);
+        else CHECK(main_mini==mini);
         CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x33-1))==base_credits);
         CHECK(m68k_read32(S3_CLONE_MUSIC_INDEX+4*(0x19-1))==base_boss);
         CHECK(!s3_sound_prototype_active());

@@ -716,8 +716,8 @@ static void test_bonus_hud_position(void)
     memset(v.vram+0x6D2*32,0x22,32);memcpy(&before,&v,sizeof v);
     for(int x=0;x<320;++x)native[x]=0xFF778899u;
     test_bonus_hud_renders=0;
-    CHECK(bonus_without_hud(&v,0,native,320,palette,shadow)==native);
-    const uint32_t *clean=bonus_without_hud(&v,8,native,320,palette,shadow);
+    CHECK(bonus_without_layers(&v,0,native,320,palette,shadow,1,0)==native);
+    const uint32_t *clean=bonus_without_layers(&v,8,native,320,palette,shadow,1,0);
     CHECK(clean!=native && test_bonus_hud_renders==1 && clean[16]==palette[1]);
     CHECK(!vram16(&s_bonus_hud_free,0xF000));
     CHECK(vram16(&s_bonus_hud_free,0xF008)==136);
@@ -726,7 +726,7 @@ static void test_bonus_hud_position(void)
     bonus_draw_hud(&v,8,out,796,palette);
     CHECK(out[16]==palette[2] && out[238+16]==palette[1]);
     CHECK(!memcmp(&before,&v,sizeof v));
-    CHECK(bonus_without_hud(&v,40,native,320,palette,shadow)==native);
+    CHECK(bonus_without_layers(&v,40,native,320,palette,shadow,1,0)==native);
 #endif
 }
 static void test_native_bonus(void)
@@ -1062,9 +1062,8 @@ static void test_title_card_edges(void)
     word(v.vram,0xC000,0);v.vram[0]=1;CHECK(!title_card_black(&v));v.vram[0]=0;
     /* A bonus card with a different authored target keeps its native layout. */
     write16(o+0x46,0xC8);capture_objects();CHECK(s_build.sprites[0].hud==2);
-#ifndef SONIC3_STANDALONE
-    /* A loading bonus card must not reinterpret old ring/menu tables. */
-    g_ram[0xF600]=8;g_ram[0xFE10]=0x14;g_ram[0xF711]=0;
+    /* Gumball's loading card owns its complete words on both hosts. */
+    g_ram[0xF600]=8;g_ram[0xFE10]=0x13;g_ram[0xF711]=0;
     g_ram[o+0x22]=19;write16(o+0x46,0xC8);
     word(g_rom,S3_TITLE_CARD_MAP+19*2,0x40);
     word(g_rom,S3_TITLE_CARD_MAP+20*2,0x40);
@@ -1075,7 +1074,7 @@ static void test_title_card_edges(void)
     capture_objects();
     CHECK(s_build.bonus_card_valid && s_build.count==2);
     CHECK(s_build.sprites[0].y==0 && s_build.sprites[1].x-s_build.sprites[0].x==96);
-#endif
+    CHECK(s_build.sprites[0].hud==SCENE_BONUS_CARD && s_build.sprites[1].hud==SCENE_BONUS_CARD);
     CHECK(configure("off"));
 }
 static void test_file_select(void)

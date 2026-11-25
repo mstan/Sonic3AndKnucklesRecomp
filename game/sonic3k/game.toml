@@ -1258,3 +1258,14 @@ kind = "game_hook"
 [[widescreen_site]]
 addr = 0x8403C
 kind = "game_hook"
+
+# Keep selected HCZ1 palette through the native tunnel transition.
+[[widescreen_site]]
+addr = 0x1C8B2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1C8E2
+kind = "game_hook"
+[[widescreen_site]]
+addr = 0x1C8F2
+kind = "game_hook"

@@ -5,7 +5,7 @@ static GVDP s_bonus_hud_free;
 static BonusHudPiece s_bonus_hud[12];
 static unsigned s_bonus_hud_count;
 static uint8_t s_bonus_hud_rows[224];
-static void bonus_prepare_hud(const GVDP *v)
+static void bonus_prepare_layers(const GVDP *v,int remove_hud,int remove_card)
 {
     s_bonus_hud_count=0;memset(s_bonus_hud_rows,0,sizeof s_bonus_hud_rows);
     memcpy(&s_bonus_hud_free,v,sizeof *v);
@@ -16,10 +16,17 @@ static void bonus_prepare_hud(const GVDP *v)
         unsigned size=v->vram[(a+2)&65535u],height=((size&3u)+1u)*8u;
         /* These are the native bonus HUD's reserved text/digit and life
          * banks. Position guards exclude unrelated offscreen tile users. */
-        int hud=x>=0 && x<96 && ((y>=0 && y<24 && tile>=0x6CA && tile<0x700) ||
+        int hud=remove_hud && x>=0 && x<96 && ((y>=0 && y<24 && tile>=0x6CA && tile<0x700) ||
             (y>=192 && y<224 && tile>=0x7D4 && tile<0x7E0));
-        if(hud && s_bonus_hud_count<12){
-            s_bonus_hud[s_bonus_hud_count++]=(BonusHudPiece){x,y,size,attr};
+        int card=0;
+        if(remove_card && s_display && s_display->bonus_card_valid)
+            for(unsigned j=0;j<s_display->count;++j){
+                const SceneSprite *piece=&s_display->sprites[j];
+                if(piece->hud==SCENE_BONUS_CARD && piece->attr==attr &&
+                   (piece->size&15u)==(size&15u) && piece->x==x && piece->y==y){card=1;break;}
+            }
+        if(card || (hud && s_bonus_hud_count<12)){
+            if(hud&&!card)s_bonus_hud[s_bonus_hud_count++]=(BonusHudPiece){x,y,size,attr};
             for(int line=y;line<y+(int)height && line<224;++line)
                 if(line>=0)s_bonus_hud_rows[line]=1;
             /* Recompose the native underlay on a private VDP. X=0 would
@@ -29,11 +36,11 @@ static void bonus_prepare_hud(const GVDP *v)
         index=v->vram[(a+3)&65535u]&127u;if(!index)break;
     }
 }
-static const uint32_t *bonus_without_hud(const GVDP *v,int line,const uint32_t *native,int nw,
-                                        const uint32_t *palette,const uint32_t *shadow)
+static const uint32_t *bonus_without_layers(const GVDP *v,int line,const uint32_t *native,int nw,
+                                        const uint32_t *palette,const uint32_t *shadow,int hud,int card)
 {
     static uint8_t indices[GVDP_MAX_WIDTH];static uint32_t colors[GVDP_MAX_WIDTH];
-    if(line==0)bonus_prepare_hud(v);
+    if(line==0)bonus_prepare_layers(v,hud,card);
     if(line<0 || line>=224 || !s_bonus_hud_rows[line] || nw!=320)return native;
     if(gvdp_render_scanline(&s_bonus_hud_free,line,indices)!=nw)return native;
     for(int x=0;x<nw;++x){

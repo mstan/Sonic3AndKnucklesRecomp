@@ -14,7 +14,7 @@
 #include <string.h>
 
 static unsigned name_art,name_map,level_names;
-static int bound,names_active;
+static int bound,names_active,hcz_palette_exit;
 enum { PROTO_PALETTES=1,PROTO_BADNIKS=2,PROTO_BACKGROUNDS=4 };
 static unsigned selected,active,donor_address;
 static int standalone_s3,standalone_sk;
@@ -37,6 +37,7 @@ int s3_restoration_select(unsigned component,int on)
 int s3_restoration_netplay_allowed(void){return !names_active && !selected && !active;}
 void s3_restoration_load(void)
 {
+    hcz_palette_exit=0;
     bound=names_active=0;selected=active=donor_address=0;name_art=name_map=level_names=0;*settings_file=*error=0;
     for(unsigned i=0;i<3;i++){free(backgrounds[i].pixels);memset(&backgrounds[i],0,sizeof backgrounds[i]);}
     s3_video_set_title_card_name_map(0);s3_video_set_background_override(NULL);s3_video_set_palette_source(NULL);
@@ -326,6 +327,21 @@ int s3_restoration_instruction(unsigned pc)
     for(unsigned i=0;i<4;i++)if(pc==sites[i]){
         g_cpu.A[2]=palette_source(g_cpu.A[2]);
         return 1;
+    }
+    /* HCZ1 temporarily writes a retail palette triplet over the selected
+     * main palette, after both palette loads have completed. Keep the donor
+     * colors at those two native transition sites, not on every frame. */
+    if(active&PROTO_PALETTES) {
+        unsigned enter=standalone_s3?0x1AC6E:0x1C8B2;
+        unsigned exit_start=standalone_s3?0x1AC9E:0x1C8E2;
+        unsigned exit_end=standalone_s3?0x1ACAE:0x1C8F2;
+        if(pc==exit_start)hcz_palette_exit=1;
+        if(pc==enter || (pc==exit_end && hcz_palette_exit)) {
+            const uint8_t *source=g_rom_ext+donor_address-0x400000u+0x1E9B54u+80;
+            memcpy(g_ram+0xFC70,source,6);
+            hcz_palette_exit=0;
+        }
+        if(pc==enter || pc==exit_start || pc==exit_end)return 1;
     }
     /* MHZ2 copies terrain directly through A1, bypassing PalLoad.
      * Keep native copy/fade timing, destinations and object colors. */

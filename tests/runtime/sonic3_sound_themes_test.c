@@ -84,7 +84,22 @@ int main(int argc,char **argv)
             ++total;
         }
     }
-    CHECK(total==(combined?48:!strcmp(argv[2],"sonic3")?35:29));CHECK(shared==(!strcmp(argv[2],"sonic3")?16:15));
+    CHECK(total==(combined?48:!strcmp(argv[2],"sonic3")?36:29));CHECK(shared==(!strcmp(argv[2],"sonic3")?17:15));
+    const int standalone=!strcmp(argv[2],"sonic3");
+    CHECK(s3_music_target(S3_MUSIC_MINIBOSS)==(standalone?0x2E:0x18));
+    CHECK(s3_music_available(S3_MUSIC_MINIBOSS_ALT)==standalone);
+    if(standalone){
+        CHECK(s3_music_target(S3_MUSIC_MINIBOSS_ALT)==0x18);
+        CHECK(set(p,"shared-themes","mini-boss","s2"));
+        CHECK(set(p,"shared-themes","mini-boss-alternate","s2-wai"));
+        CHECK(s3_music_donor(S3_MUSIC_MINIBOSS)==S3_DONOR_S2);
+        CHECK(s3_music_donor(S3_MUSIC_MINIBOSS_ALT)==S3_DONOR_WAI);
+        CHECK(set(p,"shared-themes","mini-boss","base"));
+        CHECK(set(p,"shared-themes","mini-boss-alternate","base"));
+    }
+    CHECK(!offered(p,"extra-life","s2-wai")&&!offered(p,"extra-life","s2-aug"));
+    CHECK(!set(p,"shared-themes","extra-life","s2-wai"));
+    CHECK(!set(p,"shared-themes","extra-life","s2-aug"));
     if(s3_music_available(S3_MUSIC_SLOTS)){
         RecompLauncherCModChoice choice;
         CHECK(p->feature_choice_get(NULL,package,campaign,"slots",2,&choice)&&!strcmp(choice.value,"s1"));
@@ -110,10 +125,10 @@ int main(int argc,char **argv)
     }
     CHECK(s3_theme_choices(S3_MUSIC_MINIBOSS)==9&&s3_theme_choices(S3_MUSIC_BOSS)==8);
     {
-        const unsigned tracks[]={S3_THEME_LIFE,S3_THEME_LIFE,S3_MUSIC_DROWN,S3_MUSIC_DROWN,S3_MUSIC_BOSS,S3_MUSIC_MINIBOSS};
-        const char *const ids[]={"s2-wai","s2-aug","s2-wai","s2-aug","s2-aug","s2-aug"};
-        const unsigned donors[]={S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_AUG,S3_DONOR_AUG};
-        const unsigned songs[]={7,7,9,9,13,13};
+        const unsigned tracks[]={S3_MUSIC_DROWN,S3_MUSIC_DROWN,S3_MUSIC_BOSS,S3_MUSIC_MINIBOSS};
+        const char *const ids[]={"s2-wai","s2-aug","s2-aug","s2-aug"};
+        const unsigned donors[]={S3_DONOR_WAI,S3_DONOR_AUG,S3_DONOR_AUG,S3_DONOR_AUG};
+        const unsigned songs[]={9,9,13,13};
         for(unsigned i=0;i<sizeof tracks/sizeof *tracks;i++){
             const char *track=s3_theme_ids[tracks[i]];
             CHECK(offered(p,track,ids[i])&&set(p,"shared-themes",track,ids[i]));

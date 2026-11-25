@@ -744,7 +744,7 @@ static int load_menu_map(void)
 typedef struct { int x, y; uint16_t attr; uint8_t size, hud; uint16_t zoom,slot; } SceneSprite;
 static unsigned sprite_slot(const SceneSprite *s) { return s->slot&255u; }
 enum { IMPORTED_S1_PYLON = 0x7E0170u };
-enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12, SCENE_MHZ_ROTOR = 13 };
+enum { SCENE_SPRITES = 32768, SCENE_PLACEMENTS = 1024, SCENE_SLOTS = 112, SCENE_COMPETITION_CHARACTER = 12, SCENE_MHZ_ROTOR = 13, SCENE_BONUS_CARD = 14 };
 /* Only render ownership survives the original off-left deletion. Original
  * mappings/art remain in ROM; no guest object or provider pointer is held. */
 typedef struct { int16_t x,y; uint8_t frame,cursor,timer,flip; } AizPlaneObject;
@@ -1244,12 +1244,14 @@ static unsigned placement_code(const Placement *p)
 }
 static void hold_collapsed_platform(void)
 {
-    if(ram16(0xFE10)!=0x500 || !expanded_world() || !gameplay() || native_demo())return;
+    if(!expanded_world() || !gameplay() || native_demo())return;
     unsigned state=ram16(g_cpu.A[0]+0x48);
     if(state<0xEB00u || state>=0xEB00u+s_placement_count ||
        s_collapsed_count>=SCENE_PLACEMENTS)return;
     unsigned placement=state-0xEB00u;
     if(s_placements[placement].x!=ram16(g_cpu.A[0]+0x10))return;
+
+    for(unsigned i=0;i<s_collapsed_count;i++)if(s_collapsed_platforms[i]==placement)return;
 
     /* The native collapse just cleared the loaded bit. Its cursor stays
      * past the platform, but the wide loader can still reach it. Keep the
@@ -1566,13 +1568,8 @@ static void capture_objects(void)
        ram16(0xFE10)==1 && g_ram[0xB038]!=2)
         for(unsigned o=0xB000;o<0xCFCC;o+=0x4A)
             if(scene_read32(0xFF0000u+o)==S3_KNUX_PREVIEW_HANDOVER)s_capture_frame->preview_knux=1;
-    /* Gumball's finite chamber keeps its native actors and machine column;
-     * only the authored outer scenery extends beyond that chamber. The two
-     * SK bonuses retain complete mappings; Glowing Sphere also owns the
-     * separate, vertically sorted ring list sampled below. */
-    if(s_capture_frame->scene==3 && g_ram[0xFE10]==0x13) {
-        memset(&s_capture_frame->aiz_plane,0,sizeof s_capture_frame->aiz_plane);return;
-    }
+    /* Gumball retains native SAT composition, but capture the complete
+     * presentation list to identify the title card and moving actors. */
     capture_aiz_plane();
     int cam=ram16(0xEE80),cy=ram16(0xEE84);
     s_capture_frame->camera_x=cam;s_capture_frame->camera_y=cy;
@@ -1686,7 +1683,6 @@ static void capture_objects(void)
             (void)returning_card;
 #endif
             if(mgz2_parked_body(o,map))continue;
-#ifndef SONIC3_STANDALONE
             unsigned frame=g_ram[o+0x22];
             if(s_capture_frame->scene==3 && map==S3_TITLE_CARD_MAP && !(flags&4) &&
                ((frame==19 && ram16(o+0x46)==0xC8) ||
@@ -1704,7 +1700,6 @@ static void capture_objects(void)
                 }
                 bonus_card_found=1;continue;
             }
-#endif
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
             if((map==S3_TITLE_CARD_MAP || (s_title_name_map && map==s_title_name_map)) && !(flags&4)) {
@@ -1776,9 +1771,9 @@ static void capture_objects(void)
             if(!g_ram[0xF711])s_capture_frame->count=0;
             s_capture_slot=0;
             add_mapping(S3_TITLE_CARD_MAP,19,s_capture_frame->bonus_card_gfx,0,
-                s_capture_frame->bonus_card_x,s_capture_frame->bonus_card_y,2,0,0);
+                s_capture_frame->bonus_card_x,s_capture_frame->bonus_card_y,SCENE_BONUS_CARD,0,0);
             add_mapping(S3_TITLE_CARD_MAP,20,s_capture_frame->bonus_card_gfx,0,
-                s_capture_frame->bonus_card_x+96,s_capture_frame->bonus_card_y,2,0,0);
+                s_capture_frame->bonus_card_x+96,s_capture_frame->bonus_card_y,SCENE_BONUS_CARD,0,0);
         }
     }
     append_aiz_plane();
@@ -2985,6 +2980,7 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
          * plane registers. Its finite words do not make that old menu's
          * offscreen name-table cells into valid margin scenery. */
         if(!native)native=native_row(native_ctx);
+        if(width>nw)native=bonus_without_layers(v,line,native,nw,palette,shadow,0,1);
         int origin=(width-nw)/2;
         for(int x=0;x<width;++x){out[x]=palette[v->reg[7]&63u];s_priority[x]=(uint8_t)(x>=origin && x<origin+nw?2:0);}
         if(origin>=0)memcpy(out+origin,native,(size_t)nw*sizeof *out);
@@ -2995,10 +2991,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     if(s_frame_bonus) {
         if(!native)native=native_row(native_ctx);
         int origin=(width-nw)/2;
-        if(width>nw && (s_frame_zone==0x14 || s_frame_zone==0x15))
-            native=bonus_without_hud(v,line,native,nw,palette,shadow);
+        int bonus_hud=width>nw && (s_frame_zone==0x14 || s_frame_zone==0x15);
+        int bonus_card=width>nw && s_display && s_display->scene==3 && s_display->bonus_card_valid;
+        if(bonus_hud || bonus_card)
+            native=bonus_without_layers(v,line,native,nw,palette,shadow,bonus_hud,bonus_card);
         bonus_scanline(v,line,(unsigned)s_frame_zone,native,nw,out,width,palette,shadow,s_priority);
-        if(s_frame_zone==0x14 || s_frame_zone==0x15)
+        if(s_frame_zone==0x14 || s_frame_zone==0x15 || bonus_card)
             draw_scene_sprites(v,line,out,width,origin,palette);
         if(width>nw && (s_frame_zone==0x14 || s_frame_zone==0x15)){
             bonus_draw_hud(v,line,out,width,palette);*hud_origin=0;
@@ -3262,8 +3260,12 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     uint32_t hcz_tunnel_colors[3];
     if(hcz_tunnel) {
         static const unsigned colors[]={0xB80,0x240,0x220};
-        for(unsigned i=0;i<3;++i)
-            hcz_tunnel_colors[i]=genesis_dac_cram_to_argb(scene_art_color(colors[i],v),GENESIS_DAC_NORMAL);
+        unsigned retail=S3_ART_BANK+0x8C594u;
+        unsigned source=s_palette_source?s_palette_source(retail):retail;
+        for(unsigned i=0;i<3;++i) {
+            unsigned color=source==retail?colors[i]:scene_read16(source+80+i*2);
+            hcz_tunnel_colors[i]=genesis_dac_cram_to_argb(scene_art_color(color,v),GENESIS_DAC_NORMAL);
+        }
     }
     /* The HCZ1 boss borrows palette 1 after locking its native arena.
      * The wider left view still contains stage bricks using that line;
@@ -4617,7 +4619,7 @@ static void interpolation_capture(const GVDP *v,int line,const uint32_t *image,
             RenderContext *c=&f->context;
             memset(c,0,sizeof *c);c->video=*v;
             memcpy(c->world,g_ram,sizeof c->world);memcpy(c->background,g_ram,sizeof c->background);
-            c->level=level_ready();c->zone=g_ram[0xFE10];c->act=g_ram[0xFE11];
+            c->level=level_ready();c->bonus=bonus_stage();c->zone=g_ram[0xFE10];c->act=g_ram[0xFE11];
             c->fg_x=ram16(0xEE80);c->fg_y=ram16(0xEE84);c->bg_y=ram16(0xEE90);
             c->bg_event=ram16(0xEEC2);c->tree_reveal=ram16(0xEEC4);
             c->bg_band[0]=(int16_t)ram16(0xA802);c->bg_band[1]=(int16_t)ram16(0xA806);
@@ -4642,8 +4644,11 @@ static void interpolation_capture(const GVDP *v,int line,const uint32_t *image,
         /* Finite/native projections, scene replacement and host-only crowd
          * overlays retain their exact completed image rather than inventing
          * fractional art. Native CD geometry needs its own publication owner. */
-        f->valid=native_width==320 && f->context.level && scene && scene->scene==1 &&
-            !f->context.special && !f->context.bonus && !f->context.menu &&
+        int regular=f->context.level && scene && scene->scene==1 && !f->context.bonus;
+        int gumball=f->context.bonus && f->context.zone==0x13 &&
+            f->context.world[0xF711] && scene && scene->scene==3 && !scene->bonus_card_valid;
+        f->valid=native_width==320 && (regular || gumball) &&
+            !f->context.special && !f->context.menu &&
             !(v->reg[12]&14) && (enabled() || !s_world_publish) && !s_ix_overlay_seen &&
             !s_actor_interpolation_blocked;
         for(unsigned bank=0;bank<IX_BANKS;++bank) {
@@ -4673,6 +4678,61 @@ static void interpolation_capture(const GVDP *v,int line,const uint32_t *image,
     f->lines=line+1;
     if(s_ix_overlay_seen)f->valid=0;
 }
+/* The finite Gumball machine deliberately uses the native hardware sprite
+ * list in its center. Move only the entries that can be associated with a
+ * published world actor; preserve the original SAT order, clipping and limits. */
+static void gumball_interpolate_sat(GVDP *v)
+{
+    const SceneFrame *scene=&ix_current()->scene;
+    const SceneFrame *prior=&ix_previous()->scene;
+    int camera_dx=scene->camera_x-interpolation_lerp(prior->camera_x,scene->camera_x,128);
+    int camera_dy=scene->camera_y-interpolation_lerp(prior->camera_y,scene->camera_y,128);
+    unsigned base=(v->reg[5]&127u)<<9,index=0;
+    for(unsigned n=0;n<80;++n){
+        unsigned at=(base+index*8u)&65535u;
+        unsigned x=vram16(v,at+6)&511u,y=vram16(v,at)&511u;
+        unsigned attr=vram16(v,at+4),size=v->vram[(at+2)&65535u]&15u;
+        for(unsigned j=0;j<scene->count;++j){
+            const SceneSprite *piece=&scene->sprites[j];
+            if(piece->hud || !sprite_slot(piece) || piece->attr!=attr || (piece->size&15u)!=size ||
+               ((unsigned)(piece->x+128)&511u)!=x || ((unsigned)(piece->y+128)&511u)!=y)continue;
+            int dx=0,dy=0;presentation_object_delta(piece,&dx,&dy);
+            x=(unsigned)(x+dx+camera_dx)&511u;y=(unsigned)(y+dy+camera_dy)&511u;
+            v->vram[at]=(uint8_t)(y>>8);v->vram[(at+1)&65535u]=(uint8_t)y;
+            v->vram[(at+6)&65535u]=(uint8_t)(x>>8);v->vram[(at+7)&65535u]=(uint8_t)x;
+            break;
+        }
+        index=v->vram[(at+3)&65535u]&127u;if(!index)break;
+    }
+}
+static void interpolate_gumball(const InterpSnapshot *f,const InterpSnapshot *p,uint32_t *image,int stride)
+{
+    static GVDP v;
+    v=f->context.video;
+    gumball_interpolate_sat(&v);
+    unsigned base=(v.reg[13]&63u)<<10,mode=v.reg[11]&3u;
+    v.vsram[1]=(uint16_t)interpolation_lerp(unwrap(p->context.video.vsram[1],v.vsram[1]),v.vsram[1],128);
+    for(int y=0;y<IX_LINES;++y){
+        unsigned row=mode==0?0:mode==2?(unsigned)y&~7u:(unsigned)y;
+        unsigned at=base+4*row;
+        for(unsigned col=0;col<2;++col){
+            uint16_t x=(uint16_t)interpolation_lerp(p->hs[y][col],f->hs[y][col],128);
+            v.vram[(at+2*col)&65535u]=(uint8_t)(x>>8);v.vram[(at+2*col+1)&65535u]=(uint8_t)x;
+        }
+        v.vsram[0]=(uint16_t)presentation_fg_scroll(y,v.vsram[0]);
+        memcpy(v.cram,f->cram[y],sizeof v.cram);
+        uint8_t indices[GVDP_MAX_WIDTH];uint32_t native[GVDP_MAX_WIDTH];
+        int width=gvdp_render_scanline(&v,y,indices);
+        if(width!=320){memcpy(image+(size_t)y*stride,f->image+(size_t)y*f->width,(size_t)f->width*sizeof *image);continue;}
+        for(int x=0;x<320;++x){
+            unsigned c=indices[x];
+            native[x]=c<64?genesis_dac_cram_to_argb(v.cram[c],GENESIS_DAC_NORMAL):
+                c<128?genesis_dac_cram_to_argb(v.cram[c-64],GENESIS_DAC_SHADOW):
+                c<192?genesis_dac_cram_to_argb(v.cram[c-128],GENESIS_DAC_HIGHLIGHT):0xFF000000u;
+        }
+        render_scanline(&v,y,native,320,image+(size_t)y*stride,f->width,NULL,NULL,NULL);
+    }
+}
 static int interpolate(double phase,uint32_t *image,int stride,int height)
 {
     InterpSnapshot *f=ix_current(),*p=ix_previous();
@@ -4692,7 +4752,8 @@ static int interpolate(double phase,uint32_t *image,int stride,int height)
     RenderContext *saved_render=s_render;
     const SceneFrame *saved_scene=s_display;
     s_render=&f->context;s_display=&f->scene;s_interpolating=1;s_interpolation_phase=phase;
-    for(int y=0;y<IX_LINES;++y) {
+    if(f->context.bonus && f->context.zone==0x13)interpolate_gumball(f,p,image,stride);
+    else for(int y=0;y<IX_LINES;++y) {
         memcpy(f->context.video.cram,f->cram[y],sizeof f->cram[y]);
         render_scanline(&f->context.video,y,f->image+(size_t)y*f->width,f->native_width,
             image+(size_t)y*stride,f->width,NULL,NULL,NULL);
