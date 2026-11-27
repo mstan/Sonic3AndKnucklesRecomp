@@ -73,8 +73,9 @@ def map_frames(rom, a):
     return n
 
 
-def build(rom):
-    sym = s2_objects.symbols()
+def build(rom, sym=None):
+    if sym is None:
+        sym = s2_objects.symbols()
     table = sym['Map_SpecialStageTrack']
     fr = [be32(rom, table + f * 4) for f in range(0x38)]
     t0 = fr[0]

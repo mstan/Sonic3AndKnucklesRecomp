@@ -42,8 +42,9 @@ def be32(b, a):
     return (be16(b, a) << 16) | be16(b, a + 2)
 
 
-def build(rom):
-    sym = s2_objects.symbols()
+def build(rom, sym=None):
+    if sym is None:
+        sym = s2_objects.symbols()
     parts = []
     for it in ITEMS:
         kind, name = it[0], it[1]

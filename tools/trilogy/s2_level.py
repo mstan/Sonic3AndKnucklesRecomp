@@ -1,8 +1,7 @@
 """Sonic 2 levels -> S3K-format bank entries.
 
-Addresses are from the s2disasm listing, whose build is byte-identical to the
-REV00 cartridge (MD5 8e2c29a1e65111fe2078359e685e7943). Nothing from the ROM
-ships: build_bank.py runs this over the user's cartridge.
+The symbol tables bind the supported REV00 and Steam REV01 cartridges.
+build_bank.py reads the user's cartridge to construct the campaign pack.
 
 Sonic 2 is already close to the S3K level format: 128px chunks whose words
 carry S3K's flip and two-path solidity bits, 16px blocks, two collision
@@ -21,13 +20,7 @@ from pathlib import Path
 
 import s1_objects  # noqa: E402
 import s2_objects
-
-S2 = {
-    'LevelArtPointers': 0x042584, 'Off_Level': 0x045A80, 'Off_ColP': 0x0049DC, 'Off_ColS': 0x004A20,
-    'ColCurveMap': 0x042D50, 'ColArrayVertical': 0x042E50, 'ColArrayHorizontal': 0x043E50,
-    'LevelSize': 0x00C048, 'StartLocations': 0x00C1C4, 'Off_Objects': 0x0E6800, 'AnimPatMaps': 0x040340, 'Off_Rings': 0x0E4300,
-    'PalPointers': 0x002776, 'ArtLoadCues': 0x042650,
-}
+from owned_rom import S2_STEAM_CRC, verify_canonical
 NATIVE_S1 = 0x7E0000
 NATIVE_S2 = 0x7E1000
 
@@ -75,21 +68,24 @@ def be32(b, a): return (be16(b, a) << 16) | be16(b, a + 2)
 class Sonic2:
     def __init__(self, rom, bb):
         """bb: the build_bank module (shared codecs, Packer, palette tables)."""
-        if len(rom) != 0x100000 or be16(rom, 0x18E) != 0xDEB8:
-            raise SystemExit("Sonic 2 ROM must be the REV00 cartridge (CRC32 24AB4C3A, checksum $DEB8)")
+        crc = verify_canonical(rom,'s2')
+        if crc == S2_STEAM_CRC:
+            self.sym = s2_objects.read_symbols('s2_rev01_syms.txt')
+        else:
+            self.sym = s2_objects.symbols(from_data=True)
         self.rom = rom
         self.bb = bb
         l0 = [0] + [bb.nearest(S2_SONIC[i], bb.S3K_SONIC, bb.SUPER_CYCLED) for i in range(1, 16)]
         l0[2:6] = [0xE, 0xE, 0xD, 0xC]       # S2's four blues, off Super Sonic's cycled entries
         self.tables = {0: l0, 1: S2_L1_PERM, 2: list(range(16)), 3: list(range(16))}
-        self.objs = s2_objects.S2Objects(rom, self.tables)
+        self.objs = s2_objects.S2Objects(rom, self.tables, self.sym)
         s2_objects.write_asset_header(Path(__file__).resolve().parents[2] / 'game' / 'trilogy' / 'trilogy_assets_s2.h')
 
     def kos(self, a):
         return bytes(self.bb.kosinski_decode(self.rom, a)[0])
 
     def art_header(self, z):
-        a = S2['LevelArtPointers'] + z * 12
+        a = self.sym['LevelArtPointers'] + z * 12
         r = self.rom
         return {'art': be32(r, a) & 0xFFFFFF, 'blk16': be32(r, a + 4) & 0xFFFFFF,
                 'blk128': be32(r, a + 8) & 0xFFFFFF, 'pal': r[a + 8], 'plc1': r[a], 'plc2': r[a + 4]}
@@ -97,12 +93,12 @@ class Sonic2:
     def plc(self, pid):
         """S2 PLC list (ArtLoadCues): [(nemesis art, VRAM byte address)]"""
         r = self.rom
-        a = S2['ArtLoadCues'] + be16(r, S2['ArtLoadCues'] + pid * 2)
+        a = self.sym['ArtLoadCues'] + be16(r, self.sym['ArtLoadCues'] + pid * 2)
         return [(be32(r, a + 2 + i * 6), be16(r, a + 6 + i * 6)) for i in range(be16(r, a) + 1)]
 
     def layout(self, z, act):
         """(fg rows, bg rows), each 16 rows x 128 chunk ids."""
-        a = S2['Off_Level'] + be16(self.rom, S2['Off_Level'] + (z * 2 + act) * 2)
+        a = self.sym['Off_Level'] + be16(self.rom, self.sym['Off_Level'] + (z * 2 + act) * 2)
         d = self.kos(a)
         fg = [list(d[r * 256:r * 256 + 128]) for r in range(16)]
         bg = [list(d[r * 256 + 128:r * 256 + 256]) for r in range(16)]
@@ -117,7 +113,7 @@ class Sonic2:
 
     def palette(self, bank, palid):
         r = self.rom
-        pe = S2['PalPointers'] + palid * 8
+        pe = self.sym['PalPointers'] + palid * 8
         src, dst, cnt = be32(r, pe), be16(r, pe + 4), be16(r, pe + 6)
         pal = bytearray(r[src:src + (cnt + 1) * 4])
         if dst == 0xFB20:                         # S2 palette RAM $FB00 = S3K Normal_palette
@@ -129,7 +125,7 @@ class Sonic2:
     def water_palette(self, bank, palid):
         """S2 underwater palette: S3K's underwater player line (HCZ1) + S2 lines 1-3."""
         r = self.rom
-        src = be32(r, S2['PalPointers'] + palid * 8)
+        src = be32(r, self.sym['PalPointers'] + palid * 8)
         pal = bytearray(self.bb.S3K_WATER_LINE0) + bytearray(r[src + 0x20:src + 0x80])
         l1 = bytes(pal[0x20:0x40])
         for i in range(16):
@@ -138,21 +134,21 @@ class Sonic2:
 
     def collision(self, bank, z):
         r = self.rom
-        colp = self.kos(be32(r, S2['Off_ColP'] + z * 4))
-        cols = self.kos(be32(r, S2['Off_ColS'] + z * 4))
+        colp = self.kos(be32(r, self.sym['Off_ColP'] + z * 4))
+        cols = self.kos(be32(r, self.sym['Off_ColS'] + z * 4))
         solids = bytearray(0xC00)
         for b in range(min(len(colp), 0x300)):
             solids[b * 2] = colp[b]
         for b in range(min(len(cols), 0x300)):
             solids[0x600 + b * 2] = cols[b]
         return (bank.add(bytes(solids)),
-                bank.add(r[S2['ColCurveMap']:S2['ColCurveMap'] + 0x100]),
-                bank.add(r[S2['ColArrayVertical']:S2['ColArrayVertical'] + 0x1000]),
-                bank.add(r[S2['ColArrayHorizontal']:S2['ColArrayHorizontal'] + 0x1000]))
+                bank.add(r[self.sym['ColCurveMap']:self.sym['ColCurveMap'] + 0x100]),
+                bank.add(r[self.sym['ColArrayVertical']:self.sym['ColArrayVertical'] + 0x1000]),
+                bank.add(r[self.sym['ColArrayHorizontal']:self.sym['ColArrayHorizontal'] + 0x1000]))
 
     def placements(self, z, act):
         r = self.rom
-        a = S2['Off_Objects'] + be16(r, S2['Off_Objects'] + (z * 2 + act) * 2)
+        a = self.sym['Off_Objects'] + be16(r, self.sym['Off_Objects'] + (z * 2 + act) * 2)
         objs = []
         while be16(r, a) != 0xFFFF:
             objs.append((be16(r, a), be16(r, a + 2), r[a + 4], r[a + 5]))
@@ -171,7 +167,7 @@ class Sonic2:
         objs.sort(key=lambda o: o[0])
         objs = s1_objects.elemental_shields(objs, z * 2 + act)
         ob = b''.join(struct.pack('>HHBB', x, y, i, s) for x, y, i, s in objs) + b'\xFF\xFF\0\0\0\0'
-        a = S2['Off_Rings'] + be16(r, S2['Off_Rings'] + (z * 2 + act) * 2)
+        a = self.sym['Off_Rings'] + be16(r, self.sym['Off_Rings'] + (z * 2 + act) * 2)
         rings = []
         while be16(r, a) != 0xFFFF:
             x, yw = be16(r, a), be16(r, a + 2)
@@ -187,7 +183,7 @@ class Sonic2:
 
     def anim_scripts(self, z):
         """Dynamic_Normal scripts of the zone (PLC_DYNANM): [(dur, art, tile, ntiles, frames bytes)]"""
-        r, sym = self.rom, s2_objects.symbols()
+        r, sym = self.rom, self.sym
         t = sym['PLC_DYNANM']
         if t + be16(r, t + z * 4) not in (sym['Dynamic_Normal'], sym['Dynamic_ARZ'], sym['Dynamic_CNZ'],
                                           sym['Dynamic_HTZ']):  # ARZ/CNZ: Normal unless a boss; HTZ: + cliffs/clouds
@@ -237,7 +233,7 @@ class Sonic2:
         art = bytearray(self.kos(self.art_header(z)['art']))
         sup = {0x07: ('ArtKos_HTZ', 0x1FC), 0x06: ('ArtKos_WFZ', 0x307)}.get(z)
         if sup:
-            extra = self.kos(s2_objects.symbols()[sup[0]])
+            extra = self.kos(self.sym[sup[0]])
             o = sup[1] * 32
             art[o:o + len(extra)] = extra
         return bytes(art)
@@ -248,12 +244,12 @@ class Sonic2:
         r = self.rom
         blocks = bytearray(self.kos(self.art_header(z)['blk16']))
         if z == 0x07:
-            patch = self.kos(s2_objects.symbols()['BM16_HTZ'])
+            patch = self.kos(self.sym['BM16_HTZ'])
             blocks[0x980:0x980 + len(patch)] = patch
         blocks += bytes(max(0, 0x300 * 8 - len(blocks)))   # S2's table is 768 blocks; the rest are blank (collision-only)
         # LoadAnimatedBlocks: the zone's animated pattern maps (AnimPatMaps) overwrite the end of the
         # block table at level load - blocks whose tiles are animated art (EHZ hills, CNZ slot pictures...)
-        apm = S2['AnimPatMaps'] + be16(r, S2['AnimPatMaps'] + z * 2)
+        apm = self.sym['AnimPatMaps'] + be16(r, self.sym['AnimPatMaps'] + z * 2)
         if be16(r, apm):
             dst, n = be16(r, apm), (be16(r, apm + 2) + 1) * 2
             blocks[dst:dst + n] = r[apm + 4:apm + 4 + n]
@@ -334,9 +330,9 @@ class Sonic2:
                                      (pal_id << 24) | blocks_a, chunks_a, chunks_a))
         layout_a = bank.add(bb.s3k_layout(fg, bg))
         solids_a, ang_a, hgt_a, hgtr_a = self.collision(bank, z)
-        sa = S2['LevelSize'] + (z * 2 + s2act) * 8
+        sa = self.sym['LevelSize'] + (z * 2 + s2act) * 8
         left, right, top, bottom = (be16(r, sa + i * 2) for i in range(4))
-        st = S2['StartLocations'] + (z * 2 + s2act) * 4
+        st = self.sym['StartLocations'] + (z * 2 + s2act) * 4
         sx, sy = be16(r, st), be16(r, st + 2)
         ob, rb = self.objects(z, s2act)
         objs_a = bank.add(ob, dedupe=False)
@@ -344,7 +340,7 @@ class Sonic2:
         objptrs_a = bank.add(self.pointer_table(bb.S3K_ADDR))
         free = (set(range(pk.end(), bb.S3K_LEVEL_TILE_LIMIT)) | (set(range(1, bb.S3K_LEVEL_TILE_LIMIT)) - pk.taken)) - pk.reserved
         if __import__("os").environ.get("TRI_VRAMDBG"): print(f"    {name}{act + 1}: level end {pk.end():X}, free level tiles {len(free)}, slot {slot_tile:X}")
-        sa = S2['LevelSize'] + (z * 2 + s2act) * 8
+        sa = self.sym['LevelSize'] + (z * 2 + s2act) * 8
         sign_x = None
         if not boss and any(i == 0x0D for _, _, i, _ in self.placements(z, s2act)):
             sign_x = be16(r, sa + 2) - 0x100           # Camera_Max_X_pos - $100 (CheckLoadSignpostArt)
@@ -365,7 +361,7 @@ class Sonic2:
         if slot_tile:                                    # SlotMachine_DrawSlot's pictures, in their line's colours
             tab = self.tables[self.anim_line(blocks, slot_tile, 0x30)]
 
-            sym = s2_objects.symbols()
+            sym = self.sym
             raw = bytes(r[sym['ArtUnc_CNZSlotPics']:sym['ArtUnc_CNZSlotPics'] + 6 * 16 * 32])
             if self.anim_line(blocks, slot_tile, 0x30) == 0:   # S2 draws them on Sonic's line: keep S2's
                 slot_art = bank.add(raw)                        # colours, shown on the extended line
@@ -378,7 +374,7 @@ class Sonic2:
         cliffs_a = clouds_a = 0
         if htz_tile:                                     # Dynamic_HTZ's art, in its blocks' line colours
             tab = self.tables[self.anim_line(blocks, 0x500, 0x18)]
-            sym = s2_objects.symbols()
+            sym = self.sym
             raw = bb.nemesis_decode(r, sym['ArtNem_HTZCliffs'])[0]       # PatchHTZTiles: 8 frames x 6 x 4 tiles
             cliffs_a = bank.add(bytes(((tab[b >> 4] << 4) | tab[b & 15]) for b in raw))
             tab = self.tables[self.anim_line(blocks, 0x518, 8)]

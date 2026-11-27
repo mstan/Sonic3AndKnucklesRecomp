@@ -5,19 +5,29 @@ import zlib
 
 ROMS={'s1':(0x80000,0xAFE05EEE),'s2':(0x100000,0x24AB4C3A),
       's3k':(0x400000,0x63522553),'megamix':(1283224,0x66ECB4F4)}
+S2_STEAM_CRC=0x7B905383
 MAX_ARCHIVE=64*1024*1024
 MAX_ENTRIES=256
 
-def normalize(data,kind):
+def verify_canonical(data,kind):
     size,crc=ROMS[kind]
+    allowed=(crc,S2_STEAM_CRC) if kind=='s2' else (crc,)
+    actual=zlib.crc32(data)
+    if len(data)!=size or actual not in allowed:
+        checksums=' or '.join(f'{value:08X}' for value in allowed)
+        raise ValueError(f'{kind}: expected {size} bytes, CRC32 {checksums}; '
+                         f'got {len(data)} bytes, CRC32 {actual:08X}')
+    return actual
+
+def normalize(data,kind):
+    size,_=ROMS[kind]
     if len(data)==size+512:data=data[512:]
     # The qualified Steam release changes only the locked-on S3 region byte.
     # Converters consume a canonical private buffer; the owner's file stays
     # byte-identical and the running game retains its original ROM identity.
     if kind=='s3k' and len(data)==size and zlib.crc32(data)==0x0C06AA82:
         data=data[:0x2001F0]+b'U'+data[0x2001F1:]
-    if len(data)!=size or zlib.crc32(data)!=crc:
-        raise ValueError(f'{kind}: expected {size} bytes, CRC32 {crc:08X}')
+    verify_canonical(data,kind)
     return data
 
 def read_rom(path,kind):

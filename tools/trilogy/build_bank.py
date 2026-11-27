@@ -4,7 +4,7 @@ and Sonic 2 zones converted into Sonic 3 & Knuckles engine formats.
 
 Input: the player's own cartridges. Nothing from the ROMs is committed.
   S1: Sonic The Hedgehog (W) REV01   (header checksum $AFC7)
-  S2: Sonic The Hedgehog 2 (W) REV00 (CRC32 24AB4C3A)
+  S2: Sonic The Hedgehog 2 (W) REV00 or Steam REV01
 Output layout is documented in game/trilogy/trilogy.h.
 """
 import argparse
@@ -643,17 +643,15 @@ def main(argv=None):
     global S3K_DIAG_SPRING                                     # ArtNem_DiagonalSpring (S3K PLC art)
     S3K_DIAG_SPRING = (0x190B4C, len(nemesis_decode(_s3k, 0x190B4C)[0]) // 32)
     s1 = Sonic1(Path(args.s1).read_bytes()) if args.s1 else None
-    s2 = None
+    s2 = s2_level.Sonic2(Path(args.s2).read_bytes(), sys.modules[__name__]) if args.s2 else None
     for name in args.zones.split(','):
         if name in S1_ZONES:
             if s1 is None:
                 raise SystemExit(f"{name}: needs --s1 <Sonic 1 REV01 ROM>")
             s1.convert_zone(bank, S1_ZONES.index(name))
         elif name in s2_level.S2_ZONES:
-            if not args.s2:
-                raise SystemExit(f"{name}: needs --s2 <Sonic 2 REV00 ROM>")
             if s2 is None:
-                s2 = s2_level.Sonic2(Path(args.s2).read_bytes(), sys.modules[__name__])
+                raise SystemExit(f"{name}: needs --s2 <Sonic 2 ROM>")
             s2.convert_zone(bank, name)
     # blobs referenced by native objects (TRI_BLOB_* in trilogy.h)
     # S1-only blobs are not read for S2 stages (including oscillator hooks).
@@ -733,10 +731,15 @@ def main(argv=None):
     # pause menu: S3K's level-select font (S2 2P-options art): 0-9 * (c) : . A-Z
     blobs.append(bank.add(bytes(nemesis_decode(s3krom, S3K_SYMS['ArtNem_S22POptions'])[0][:40 * 32])))
     # Sonic 2 palette cycles (from the S2 cartridge when given)
-    s2rom = Path(args.s2).read_bytes() if args.s2 else bytes(0x100000)
-    blobs.append(bank.add(s2rom[0x001E6E:0x001E6E + 32]))   # CyclingPal_EHZ_ARZ_Water (4 x 4)
-    if args.s2:                                               # S2 songs (s2_music.py)
-        sym = s2_objects.symbols()
+    s2rom, s2sym = (s2.rom, s2.sym) if s2 else (b'', {})
+    def s2_span(symbol, size):
+        if s2 is None:
+            return bytes(size)
+        start = s2sym[symbol]
+        return s2rom[start:start + size]
+    blobs.append(bank.add(s2_span('CyclingPal_EHZ_ARZ_Water', 32)))
+    if s2:                                                    # S2 songs (s2_music.py)
+        sym = s2sym
         drv = s2_music.saxman_decode(s2rom, sym['Snd_Driver'], sym['Snd_Driver_End'] - sym['Snd_Driver'])
         envs = s2_music.s2_envelopes(s2rom, [(drv, sym['zPSG_Env%d' % i]) for i in range(1, 14)])
         s2tab, s2sizes = s2_music.build_music(s2rom, bank, sym, envs)
@@ -744,10 +747,10 @@ def main(argv=None):
         print(f"  S2 music: {len(s2sizes)} songs, {sum(s2sizes)} bytes")
     else:
         blobs.append(bank.add(bytes([0, 0])))
-    blobs.append(bank.add(s2rom[0x02297C:0x022FF4]))       # Obj1E spin tube paths (entry/exit, then main at +$508)
-    blobs.append(bank.add(s2rom[0x026594:0x0265E4] + s2rom[0x02B3B6:0x02B422]))   # Obj40 diag (0), straight ($28); Obj86 flipper x3 ($50 + $24 n)
-    blobs.append(bank.add(s2rom[0x002016:0x002096]))       # CyclingPal_CPZ1 (0), CPZ2 ($36), CPZ3 ($60)
-    blobs.append(bank.add(s2rom[0x001F82:0x002016]))       # CyclingPal_CNZ1/3/4 (0/$24/$36), CNZ1_B/2_B/3_B ($5E/$70/$84)
+    blobs.append(bank.add(s2_span('off_22980', 0x678)))    # Obj1E spin tube paths (main at +$508)
+    blobs.append(bank.add(s2_span('Obj40_SlopeData_DiagUp', 0x50) + s2_span('byte_2B3C6', 0x6C)))
+    blobs.append(bank.add(s2_span('CyclingPal_CPZ1', 0x80)))
+    blobs.append(bank.add(s2_span('CyclingPal_CNZ1', 0x94)))
     # extended sprite line 1 (line-0 object art keeps its own game's colours): per directory
     # entry ((zone-$20)*4+act) 16 colours above water, 16 below
     s1sym = __import__("s1_objects").load_symbols()
@@ -766,8 +769,7 @@ def main(argv=None):
                 water = s1rom[w:w + 32]
             ext_put(z << 8 | act, s1_sonic, water)
     if args.s2:
-        s2sym = s2_objects.symbols()
-        src = be32(s2rom, s2_level.S2['PalPointers'] + 3 * 8)        # Pal_SonicTails
+        src = be32(s2rom, s2sym['PalPointers'] + 3 * 8)        # Pal_SonicTails
         s2_sonic = s2rom[src:src + 32]
         for z in range(0x28, 0x33):
             water = {0x29: 'Pal_CPZ_U', 0x2A: 'Pal_ARZ_U'}.get(z)
@@ -778,51 +780,49 @@ def main(argv=None):
     # Obj30 lava slope (SlopedSolid, as S2 stores it) at $C4
     htz = bytearray(0xC4 + 0xCC)
     if args.s2:
-        s2s = s2_objects.symbols()
         for k, lbl in enumerate(('byte_21C8E', 'byte_21CBF')):
-            t = s2rom[s2s[lbl]:s2s[lbl] + 0x31]
+            t = s2_span(lbl, 0x31)
             htz[k * 0x62:k * 0x62 + 0x62] = bytes(b for v in t for b in (v, v))
-        htz[0xC4:0xC4 + 0xCC] = s2rom[s2s['Obj30_SlopeData']:s2s['Obj30_SlopeData'] + 0xCC]
+        htz[0xC4:0xC4 + 0xCC] = s2_span('Obj30_SlopeData', 0xCC)
     blobs.append(bank.add(bytes(htz)))                      # TRI_BLOB_S2_HTZ (40)
-    lava = s2rom[s2_objects.symbols()['CyclingPal_Lava']:][:0x80] if args.s2 else bytes(0x80)
+    lava = s2_span('CyclingPal_Lava', 0x80)
     blobs.append(bank.add(bytes(lava)))                     # TRI_BLOB_S2_HTZ_LAVA (41): CyclingPal_Lava
-    lantern = s2rom[s2_objects.symbols()['CyclingPal_Lantern']:][:8] if args.s2 else bytes(8)
+    lantern = s2_span('CyclingPal_Lantern', 8)
     blobs.append(bank.add(bytes(lantern)))                  # TRI_BLOB_S2_MCZ_LANTERN (42): CyclingPal_Lantern
-    oil = s2rom[s2_objects.symbols()['CyclingPal_Oil']:][:16] if args.s2 else bytes(16)
+    oil = s2_span('CyclingPal_Oil', 16)
     blobs.append(bank.add(bytes(oil)))                      # TRI_BLOB_S2_OOZ_OIL (43): CyclingPal_Oil
-    s2s_ = s2_objects.symbols() if args.s2 else {}
-    tubes = s2rom[s2s_['off_273F2']:s2s_['Ani_obj67']] if args.s2 else bytes(4)
+    tubes = s2rom[s2sym['off_273F2']:s2sym['Ani_obj67']] if s2 else bytes(4)
     blobs.append(bank.add(bytes(tubes)))                    # TRI_BLOB_S2_MTZ_TUBES (44): Obj67 paths (misc/obj67.asm)
-    mtzpal = (s2rom[s2s_['CyclingPal_MTZ1']:][:12] + s2rom[s2s_['CyclingPal_MTZ2']:][:12]
-              + s2rom[s2s_['CyclingPal_MTZ3']:][:20]) if args.s2 else bytes(44)
+    mtzpal = (s2_span('CyclingPal_MTZ1', 12) + s2_span('CyclingPal_MTZ2', 12)
+              + s2_span('CyclingPal_MTZ3', 20))
     blobs.append(bank.add(bytes(mtzpal)))                   # TRI_BLOB_S2_MTZ_PALCYC (45): CyclingPal_MTZ1 (0), 2 ($C), 3 ($18)
-    pilot = s2_objects.pilot_blob(s2rom, s2s_) if args.s2 else bytes(9 * 6 * 32)
+    pilot = s2_objects.pilot_blob(s2rom, s2sym) if s2 else bytes(9 * 6 * 32)
     blobs.append(bank.add(bytes(pilot)))                    # TRI_BLOB_S2_PILOT (46): Tornado pilot frames, 6 tiles each
-    wfzpal = (s2rom[s2s_['CyclingPal_WFZFire']:][:32] + s2rom[s2s_['CyclingPal_WFZBelt']:][:32]
-              + s2rom[s2s_['CyclingPal_WFZ1']:][:68] + s2rom[s2s_['CyclingPal_WFZ2']:][:24]) if args.s2 else bytes(156)
+    wfzpal = (s2_span('CyclingPal_WFZFire', 32) + s2_span('CyclingPal_WFZBelt', 32)
+              + s2_span('CyclingPal_WFZ1', 68) + s2_span('CyclingPal_WFZ2', 24))
     blobs.append(bank.add(bytes(wfzpal)))                   # TRI_BLOB_S2_WFZ_PALCYC (47): Fire 0, Belt $20, WFZ1 $40, WFZ2 $84
     import s2_ending
-    ending = s2_ending.build(s2rom) if args.s2 else bytes(8)
+    ending = s2_ending.build(s2rom, s2sym) if s2 else bytes(8)
     blobs.append(bank.add(ending))                          # TRI_BLOB_S2_ENDING (48): Sonic 2's ending (s2_ending.py)
     import s2_special
-    s2ss = s2_special.build(s2rom) if args.s2 else bytes(8)
+    s2ss = s2_special.build(s2rom, s2sym) if s2 else bytes(8)
     blobs.append(bank.add(s2ss))                            # TRI_BLOB_S2_SS (49): Sonic 2's half-pipe special stage (s2_special.py)
     import s2_sfx
     if args.s2:
-        sfxtab, sfxsize, sfxids = s2_sfx.build(s2rom, s3krom, bank, s2_objects.symbols(), envs)
+        sfxtab, sfxsize, sfxids = s2_sfx.build(s2rom, s3krom, bank, s2sym, envs)
         print(f"  S2 sound set: {len(sfxids)} S2 effects + {len(s2_sfx.S3K_KEEP)} S3K, {sfxsize} bytes")
     else:
         sfxtab = bytes(1 + (s2_sfx.LAST - s2_sfx.FIRST + 1) * 2 + (s2_sfx.S2_LAST - s2_sfx.S2_FIRST + 1))
     blobs.append(bank.add(sfxtab))                          # TRI_BLOB_S2_SFX (50): the Sonic 2 sound set (s2_sfx.py)
     import s2_dac
     if args.s2:
-        dactab, dacsize = s2_dac.build(s2rom, bank, s2_objects.symbols())
+        dactab, dacsize = s2_dac.build(s2rom, bank, s2sym)
         print(f"  S2 DAC samples: {dacsize} bytes")
     else:
         dactab = bytes(3)
     blobs.append(bank.add(dactab))                          # TRI_BLOB_S2_DAC (51): Sonic 2's DAC samples bank (s2_dac.py)
     if args.s2:                                             # TRI_BLOB_S2_CNZ_BUMPERS (52): SpecialCNZBumpers_Act1/2
-        b1, b2 = s2s_['SpecialCNZBumpers_Act1'], s2s_['SpecialCNZBumpers_Act2']
+        b1, b2 = s2sym['SpecialCNZBumpers_Act1'], s2sym['SpecialCNZBumpers_Act2']
         act1 = bytes(6) + s2rom[b1:b2]
         act2 = s2rom[b2:b2 + (b2 - b1)]
         bumpers = struct.pack('>H', 2 + len(act1)) + act1 + act2

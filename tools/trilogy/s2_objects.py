@@ -6,8 +6,8 @@ mappings converted to S3K format (S2 pieces are 8 bytes with a 2P tile word;
 S3K's are 6) and its animation script as-is (S2's AnimateSprite format is
 S1's, which o_animate transcribes).
 
-Labels come from the s2disasm listing (build/disassembly/s2/s2.lst), whose
-build is byte-identical to the REV01 cartridge. Native S2 objects live at
+The converter binds the labels to the verified original cartridge revision.
+Native S2 objects live at
 $7E1000 + id*4 (game/trilogy/s2_obj_*.c); asset ids are S2A_* in
 game/trilogy/trilogy_assets_s2.h (an act's table is S1's or S2's, so the two
 id spaces never meet).
@@ -29,6 +29,11 @@ def s8(v): return v - 256 if v & 0x80 else v
 
 _SYM = None
 
+def read_symbols(filename):
+    path = Path(__file__).resolve().parent / 'data' / filename
+    return {name: int(addr, 16) for name, addr in
+            (row.split() for row in path.read_text().splitlines() if row.strip())}
+
 
 def symbols(from_data=None):
     """Listing symbol table + ArtTile_* equates."""
@@ -36,8 +41,7 @@ def symbols(from_data=None):
     if _SYM is not None and from_data is None:
         return _SYM
     if from_data or (from_data is None and not (DIS / 's2.lst').exists()):
-        p = Path(__file__).resolve().parent / 'data' / 's2_syms.txt'
-        _SYM = {k: int(v, 16) for k, v in (l.split() for l in p.read_text().splitlines() if l.strip())}
+        _SYM = read_symbols('s2_syms.txt')
         return _SYM
     sym = {}
     lines = (DIS / 's2.lst').read_text(encoding='latin1').splitlines()
@@ -513,9 +517,9 @@ def obj_assets(oid, sub, zone):
 
 
 class S2Objects:
-    def __init__(self, rom, tables):
+    def __init__(self, rom, tables, sym):
         self.rom = rom
-        self.sym = symbols()
+        self.sym = sym
         self.tables = tables
 
     def maps(self, name):

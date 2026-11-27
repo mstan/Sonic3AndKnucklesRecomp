@@ -31,7 +31,7 @@ def main():
     campaign.add_argument("--sonic-cd-disc", type=Path, help="Owned Sonic CD (US) CUE or SGCD")
     campaign.add_argument("--megamix-rom", type=Path, help="Owned Sonic Megamix v3 ROM (CRC32 66ECB4F4)")
     campaign.add_argument("--sonic1-rom", type=Path, help="Owned Sonic 1 REV01 ROM")
-    campaign.add_argument("--sonic2-rom", type=Path, help="Owned Sonic 2 REV00 ROM")
+    campaign.add_argument("--sonic2-rom", type=Path, help="Owned Sonic 2 REV00 or Steam REV01 ROM")
     args = p.parse_args()
     campaign_inputs = (args.sonic_cd_disc, args.megamix_rom, args.sonic1_rom, args.sonic2_rom)
     if any(campaign_inputs) and (args.mode != "sonic3k" or not all(campaign_inputs)):

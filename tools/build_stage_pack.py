@@ -11,18 +11,15 @@ import subprocess
 import sys
 import tempfile
 import zlib
+from trilogy.owned_rom import ROMS as OWNED_ROMS, verify_canonical
 
 ROOT = Path(__file__).resolve().parents[1]
 ZONES = 'GHZ,LZ,MZ,SLZ,SYZ,SBZ,EHZ,CPZ,ARZ,CNZ,HTZ,MCZ,OOZ,MTZ,SCZ,WFZ,DEZ'
-ROMS = {'s1': (0x80000, 0xAFE05EEE), 's2': (0x100000, 0x24AB4C3A),
-        's3k': (0x400000, 0x63522553)}
+ROMS = {game: OWNED_ROMS[game] for game in ('s1', 's2', 's3k')}
 
 def verify(path, game):
     data = path.read_bytes()
-    size, crc = ROMS[game]
-    if len(data) != size or zlib.crc32(data) != crc:
-        raise ValueError(f'{game}: expected {size} bytes and CRC32 {crc:08X}; '
-                         f'got {len(data)} bytes and {zlib.crc32(data):08X}')
+    verify_canonical(data,game)
     return data
 
 def main(argv=None):
