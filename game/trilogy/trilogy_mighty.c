@@ -116,7 +116,13 @@ static int semantic_animation(int a)
 }
 static void animate(uint32_t p,uint32_t d)
 {
-    int native=r8(p+OBJ_anim),ani=semantic_animation(native);
+    int native_anim=r8(p+OBJ_anim),native=native_anim;
+    /* A twisting spring uses Sonic's walk animation ID and supplies the
+     * airborne pose through its separate rotation fields. Select the
+     * donor's spring pose while that native rotation is active. */
+    if(!native && (r8(p+OBJ_status)&2) && r8(p+0x27) && r8(p+0x31)==4)
+        native=0x10;
+    int ani=semantic_animation(native);
     /* S3K's ending hold has no S1 animation counterpart. Its former numeric
      * translation played the donor's bubble script and then walking frames.
      * Use the complete standing frame during native S3K result holds; imported
@@ -130,7 +136,7 @@ static void animate(uint32_t p,uint32_t d)
     }
     if(native!=old_native) {
         old_native=native;source_anim=ani;cursor=0;timer=0;
-        w8(p+0x21,(uint8_t)native);
+        w8(p+0x21,(uint8_t)native_anim);
     }
     uint32_t base=tri_rd32(d+20);
     int shadow_super=tri_shadow_active() && r8(RAM_Super_Sonic_Knux_flag);

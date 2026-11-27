@@ -318,6 +318,35 @@ static void test_native_placement_residency(void)
     }
     CHECK(configure("off"));
 }
+
+#ifndef SONIC3_STANDALONE
+static void test_incomplete_aiz_vine(void)
+{
+    memset(g_ram,0,sizeof g_ram);
+    unsigned root=0xB128,first=root+0x4A,second=first+0x4A;
+    write32(root,0x22442);
+    write8(root+0x2C,9);
+    write16(root+0x36,2);
+    write16(root+0x3E,first);
+    write16(root+0x48,0xEB3D);
+    write8(0xEB3D,0x80);
+    write32(first,0x2248A);
+    write16(first+0x3C,root);
+    write16(first+0x3E,second);
+    write32(second,0x2251E);
+    write16(second+0x3C,root);
+    CHECK(!retry_incomplete_aiz_vines()); /* a slot owned by someone else */
+    CHECK(scene_read32(0xFF0000u+second)==0x2251E);
+    write16(second+0x3C,first);
+    for(unsigned o=second+0x4A;o<=0xCAE2;o+=0x4A)write32(o,1);
+    CHECK(!retry_incomplete_aiz_vines()); /* only the two owned slots would be free */
+    for(unsigned o=second+0x4A;o<=0xCAE2;o+=0x4A)write32(o,0);
+    CHECK(retry_incomplete_aiz_vines());
+    CHECK(scene_read32(0xFF0000u+root)==0x2237E && !ram16(root+0x36) && !ram16(root+0x3E));
+    CHECK(!scene_read32(0xFF0000u+first) && !scene_read32(0xFF0000u+second));
+    CHECK(ram16(root+0x48)==0xEB3D && g_ram[0xEB3D]==0x80);
+}
+#endif
 static void test_fbz_title_card_ownership(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -5705,6 +5734,9 @@ int main(int argc,char **argv)
     test_lbz_waiting_actors();test_blue_spheres();
     test_aiz_join();
     test_native_placement_residency();
+#ifndef SONIC3_STANDALONE
+    test_incomplete_aiz_vine();
+#endif
     puts("Sonic 3 video terrain, activation, publication, file select, Blue Spheres and immutable interpolation PASS");
     return 0;
 }

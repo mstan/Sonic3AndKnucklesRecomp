@@ -361,6 +361,7 @@ WINDOWS_WET = [(0x500, 0x580)]
 # act number, the character's name); what stays on screen meanwhile avoids it
 RESULTS_TILES = set(range(0x520, 0x5B0))
 TITLE_TILES = set(range(0x500, 0x580))
+TITLE_VISIBLE = {'PROCK', 'CHOP'}
 RESULTS_VISIBLE = {'SIGN', 'BONUS', 'PRISON'}
 
 # S1 object id -> assets it draws with (subtype-dependent ones handled below)
@@ -476,9 +477,9 @@ class S1Objects:
         keep = {(art_source(ASSET_NAME[aid], nem, t0)[0], (line + pl) & 3)
                 for aid, nem, maps, anim_a, line in pending if ASSET_NAME[aid] in RESULTS_VISIBLE
                 for t0, n, pl in _piece_ranges_lines(maps, asset_frames(ASSET_NAME[aid], zone_name))}
-        title_visible = {(art_source('PROCK', nem, t0)[0], (line + pl) & 3)
-                         for aid, nem, maps, _, line in pending if ASSET_NAME[aid] == 'PROCK'
-                         for t0, _, pl in _piece_ranges_lines(maps, asset_frames('PROCK', zone_name))}
+        title_visible = {(art_source(ASSET_NAME[aid], nem, t0)[0], (line + pl) & 3)
+                         for aid, nem, maps, _, line in pending if ASSET_NAME[aid] in TITLE_VISIBLE
+                         for t0, _, pl in _piece_ranges_lines(maps, asset_frames(ASSET_NAME[aid], zone_name))}
         place = {}
         segs = {}
         order = []

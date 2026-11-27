@@ -1289,6 +1289,47 @@ static void hold_collapsed_platform(void)
     write8(state,g_ram[state]|128);
 }
 
+#ifndef SONIC3_STANDALONE
+static int retry_incomplete_aiz_vines(void)
+{
+    if(ram16(0xFE10)!=0)return 0;
+    int retried=0;
+    for(unsigned root=0xB128;root<=0xCAE2;root+=0x4A) {
+        if(scene_read32(0xFF0000u+root)!=0x22442u || ram16(root+0x40))continue;
+        unsigned expected=(g_ram[root+0x2C]&15u)+1u,installed=ram16(root+0x36);
+        if(installed>=expected)continue;
+
+        /* The cartridge keeps a partial chain when its allocator runs out.
+         * Verify each link still belongs to this placement before retiring it. */
+        unsigned links[16],count=0,parent=root;
+        for(;count<installed;++count) {
+            unsigned link=ram16(parent+0x3E);
+            unsigned code=count?0x2251Eu:0x2248Au;
+            if(link<=parent || link>0xCAE2 || (link-0xB128)%0x4A ||
+               scene_read32(0xFF0000u+link)!=code || ram16(link+0x3C)!=parent)
+                break;
+            links[count]=link;
+            parent=link;
+        }
+        if(count!=installed)continue;
+
+        unsigned available=installed;
+        for(unsigned slot=root+0x4A;slot<=0xCAE2 && available<expected;slot+=0x4A)
+            if(!scene_read32(0xFF0000u+slot))++available;
+        if(available<expected)continue;
+
+        for(unsigned n=0;n<installed;++n)
+            for(unsigned offset=0;offset<0x4A;offset+=2)
+                write16(links[n]+offset,0);
+        write16(root+0x36,0);
+        write16(root+0x3E,0);
+        write32(root,0x2237Eu); /* Obj_AIZGiantRideVine: rebuild the whole native chain */
+        retried=1;
+    }
+    return retried;
+}
+#endif
+
 static void spawn_scene(void)
 {
     unsigned zone=ram16(0xFE10);
@@ -1955,8 +1996,13 @@ int s3_video_hook(uint32_t pc)
     if(native_demo() && pc!=S3_CAPTURE && pc!=S3_PUBLISH)return 0;
     /* A background replacement needs host composition, while native-size
      * gameplay keeps the cartridge's loader, ring ranges and culling. */
-    if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active)) {
-        spawn_scene();
+    if(pc==S3_LOAD_UPDATE && gameplay()) {
+#ifndef SONIC3_STANDALONE
+        /* Leave the reclaimed slots for the native constructor on the next
+         * object pass instead of filling them with wider preloads again. */
+        if(retry_incomplete_aiz_vines())return 0;
+#endif
+        if(expanded_world() || s_loader_active)spawn_scene();
         return 0;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
