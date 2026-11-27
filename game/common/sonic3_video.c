@@ -947,6 +947,22 @@ static void activation_bounds(int camera,int w,int *lo,int *hi)
     *hi=((left+w+192)&~127)+128;
 }
 
+static S3VideoObjectLayout s_object_layout;
+void s3_video_set_object_layout(S3VideoObjectLayout fn) { s_object_layout=fn; }
+
+int s3_video_object_out_of_range(unsigned x)
+{
+    int camera=ram16(0xEE78);
+    if(s_requested_width>320 && expanded_world() && !native_demo() &&
+       s_object_layout && s_object_layout()) {
+        int lo,hi;
+        activation_bounds(camera,s_requested_width,&lo,&hi);
+        x&=0xFF80;
+        return (int)x<lo || (int)x>=hi;
+    }
+    return (uint16_t)((x&0xFF80)-((camera-128)&0xFF80))>0x280;
+}
+
 static void scene_mode_changed(int was_enabled)
 {
     if(was_enabled!=enabled()) {
@@ -1232,16 +1248,14 @@ static void extend_icz_snow(unsigned map,unsigned frame,unsigned gfx,unsigned fl
     for(int sx=x+32;sx-16<right;sx+=32)
         add_mapping(map,frame,gfx,flags,sx,y,0,0,zoom);
 }
-static void load_placements(void)
+static void load_placements(unsigned base)
 {
-    unsigned zone=ram16(0xFE10),index=(zone>>8)*8u+(zone&1u)*4u;
-    unsigned base=scene_read32(S3_PLACEMENTS+index);
     if(base==s_placement_base && s_placement_count)return;
     s_placement_base=base;s_placement_count=0;
     if(s_collapsed_count)memset(s_collapsed_platforms,0,sizeof s_collapsed_platforms);
     s_collapsed_count=0;
-    if(base>=0x400000u)return;
-    for(unsigned p=base;p+6<=0x400000u && s_placement_count<768;p+=6) {
+    unsigned end=base<0x400000u?0x400000u:0x400000u+g_rom_ext_size;
+    for(unsigned p=base;p+6<=end && s_placement_count<SCENE_PLACEMENTS;p+=6) {
         unsigned x=scene_read16(p);if(x==65535u)break;
         Placement *q=&s_placements[s_placement_count];
         q->address=p;q->x=(uint16_t)x;q->y=scene_read16(p+2);
@@ -1275,9 +1289,9 @@ static void hold_collapsed_platform(void)
     write8(state,g_ram[state]|128);
 }
 
-static void spawn_scene(void)
+static void spawn_scene(unsigned base)
 {
-    load_placements();s_loader_active=1;
+    load_placements(base);s_loader_active=1;
     int camera=ram16(0xEE78),cy=ram16(0xEE7C),w=enabled()?s_requested_width:320;
     int lo,hi;activation_bounds(camera,w,&lo,&hi);
     int native_lo=(camera-128)&~127,native_hi=(camera&~127)+640;
@@ -1717,9 +1731,16 @@ static void capture_objects(void)
             }
             /* ObjArray_TtlCard's original screen-space targets. Bonus-card
              * layouts and unrelated mappings keep their existing projection. */
-            if((map==S3_TITLE_CARD_MAP || (s_title_name_map && map==s_title_name_map)) && !(flags&4)) {
-                unsigned target=ram16(o+0x46),frame=g_ram[o+0x22];
-                if(frame>=4 && target==0x120)anchor=6;
+            unsigned card_target=ram16(o+0x46);
+            int custom_name=s_title_name_map && map==s_title_name_map;
+#ifndef SONIC3_STANDALONE
+            /* Imported names replace the mapping and can start at frame 1.
+             * Their owner and screen-space destination still identify them. */
+            custom_name|=s_capture_frame->code[s_capture_slot]==0x2D95Cu && card_target==0x120;
+#endif
+            if((map==S3_TITLE_CARD_MAP || custom_name) && !(flags&4)) {
+                unsigned target=card_target,frame=g_ram[o+0x22];
+                if((frame>=4 || custom_name) && target==0x120)anchor=6;
                 else if(frame==3 && target==0x17C)anchor=7;
                 else if(frame==2 && target==0x184)anchor=8;
                 else if(frame==1 && target==0xC0)anchor=9;
@@ -1930,8 +1951,12 @@ int s3_video_hook(uint32_t pc)
     if(native_demo() && pc!=S3_CAPTURE && pc!=S3_PUBLISH)return 0;
     /* A background replacement needs host composition, while native-size
      * gameplay keeps the cartridge's loader, ring ranges and culling. */
-    if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active) && g_ram[0xFE10]<19) {
-        spawn_scene();return 0;
+    if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active)) {
+        unsigned zone=ram16(0xFE10);
+        unsigned base=zone<0x1300?scene_read32(S3_PLACEMENTS+(zone>>8)*8u+(zone&1u)*4u):
+            s_object_layout?s_object_layout():0;
+        if(base)spawn_scene(base);
+        return 0;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
     switch(pc) {

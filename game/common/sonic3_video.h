@@ -25,6 +25,11 @@ void s3_video_set_actor_interpolation_blocked(int blocked);
 /* Game-owned expansion-stage ring layouts and Data Select previews. */
 typedef unsigned (*S3VideoRingLayout)(void);
 void s3_video_set_ring_layout(S3VideoRingLayout fn);
+/* Expansion layouts that use the regular six-byte placement records and
+ * respawn table can share the expanded camera's object admission window. */
+typedef unsigned (*S3VideoObjectLayout)(void);
+void s3_video_set_object_layout(S3VideoObjectLayout fn);
+int s3_video_object_out_of_range(unsigned x);
 /* A game-owned HUD may widen its name while retaining native positioning.
  * Return zero to use the cartridge's ordinary mapping table. */
 typedef unsigned (*S3VideoHudMapping)(void);

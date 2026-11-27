@@ -33,7 +33,7 @@ def read_rom(path,kind):
         if len(entries)>MAX_ENTRIES:raise ValueError('ROM ZIP contains too many entries')
         for entry in entries:
             if entry.is_dir() or entry.file_size not in (size,size+512):continue
-            if Path(entry.filename).suffix.lower() not in ('.bin','.md','.gen','.smd'):continue
+            if Path(entry.filename).suffix.lower() not in ('.bin','.md','.gen','.smd','.68k'):continue
             # Member names never become filesystem paths. Bound even a false
             # uncompressed-size declaration before verifying cartridge data.
             with archive.open(entry)as stream:data=stream.read(size+513)

@@ -513,7 +513,7 @@ static void purple_rock(uint32_t o)
     }
     o_solid(o, 0x1B, 0x10, 0x10, OB16(o, OBJ_x_pos));
     if (o_out_of_range(o, OB16(o, OBJ_x_pos))) { o_delete_respawnable(o); return; }
-    o_draw(o);
+    if (o_asset_title_ready(S1A_PROCK)) o_draw(o);
 }
 
 static void edge_wall(uint32_t o)

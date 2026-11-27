@@ -360,6 +360,7 @@ WINDOWS_WET = [(0x500, 0x580)]
 # S3K's act results load their art over $520-$5AF (ArtKosM_ResultsGeneral, the
 # act number, the character's name); what stays on screen meanwhile avoids it
 RESULTS_TILES = set(range(0x520, 0x5B0))
+TITLE_TILES = set(range(0x500, 0x580))
 RESULTS_VISIBLE = {'SIGN', 'BONUS', 'PRISON'}
 
 # S1 object id -> assets it draws with (subtype-dependent ones handled below)
@@ -475,6 +476,9 @@ class S1Objects:
         keep = {(art_source(ASSET_NAME[aid], nem, t0)[0], (line + pl) & 3)
                 for aid, nem, maps, anim_a, line in pending if ASSET_NAME[aid] in RESULTS_VISIBLE
                 for t0, n, pl in _piece_ranges_lines(maps, asset_frames(ASSET_NAME[aid], zone_name))}
+        title_visible = {(art_source('PROCK', nem, t0)[0], (line + pl) & 3)
+                         for aid, nem, maps, _, line in pending if ASSET_NAME[aid] == 'PROCK'
+                         for t0, _, pl in _piece_ranges_lines(maps, asset_frames('PROCK', zone_name))}
         place = {}
         segs = {}
         order = []
@@ -490,7 +494,7 @@ class S1Objects:
             if cur:
                 order.append((cur[1] - cur[0], key, cur[0]))
         def key_rank(k):
-            return 0 if k in keep else 1
+            return 0 if k in title_visible else 1 if k in keep else 2
         for n, key, start in sorted(order, key=lambda o: (key_rank(o[1]), -o[0])):
             nem, eline = key
             raw = decoded[nem]
@@ -501,7 +505,8 @@ class S1Objects:
                     continue
             tab = list(range(16)) if eline == 0 else self.tables[eline]   # line 0: own colours (extended sprite line)
             art = bytes(((tab[b >> 4] << 4) | tab[b & 15]) for b in raw[start * 32:(start + n) * 32])
-            t = _find_run(free - RESULTS_TILES, n) if key in keep else None
+            reserved = (RESULTS_TILES if key in keep else set()) | (TITLE_TILES if key in title_visible else set())
+            t = _find_run(free - reserved, n) if reserved else None
             if t is None:
                 if key in keep:
                     print(f"    WARNING {zone_name}: {key} shares the results art's tiles")

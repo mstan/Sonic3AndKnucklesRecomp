@@ -3,6 +3,7 @@
  */
 #include "trilogy_obj.h"
 #include "genesis_machine.h"
+#include "sonic3_video.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,9 +123,8 @@ void o_fall(uint32_t o)   { with_a0(o); tri_jsr(S3K_MoveSprite); }
 
 int o_out_of_range(uint32_t o, uint16_t x)
 {
-    uint16_t d0 = x & 0xFF80;
-    uint16_t cam = (uint16_t)((r16(RAM_Camera_X_pos) - 0x80) & 0xFF80);
-    return (uint16_t)(d0 - cam) > 0x280;
+    (void)o;
+    return s3_video_object_out_of_range(x);
 }
 
 void o_delete_respawnable(uint32_t o)
@@ -582,6 +582,22 @@ int o_asset_ready(int asset)
  * card's art lives in $500-$57F until the card is gone, so that window is
  * only written once it has finished (tri_obj_titlecard_done). */
 static int s_card_done;
+
+int o_asset_title_ready(int asset)
+{
+    if(s_card_done)return 1;
+    uint32_t record=asset_rec(zone_asset(asset));
+    if(!record)return 0;
+    unsigned count=tri_rd16(record+6);
+    if(count&0x4000)return 1; /* immutable host patterns */
+    uint32_t segment=tri_rd32(record+12);
+    for(unsigned n=0;segment && n<(count&0x7FFFu);++n,segment+=8) {
+        unsigned tile=tri_rd16(segment+4),length=tri_rd16(segment+6)&0x7FFFu;
+        if(tile<0x580u && tile+length>0x500u)return 0;
+    }
+    return 1;
+}
+
 static void upload_record(uint32_t r)
 {
     if(tri_rd16(r+6)&0x4000)return; /* immutable host sprite-pattern bank */

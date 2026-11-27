@@ -207,6 +207,12 @@ static unsigned ring_layout(void)
     return e ? tri_rd32(e + TD_RINGS) : 0;
 }
 
+static unsigned object_layout(void)
+{
+    uint32_t e = tri_dir();
+    return e && tri_rd8(e + TD_GAME) == TRI_GAME_S1 ? tri_rd32(e + TD_OBJECTS) : 0;
+}
+
 int tri_level_hook(uint32_t pc)
 {
     switch (pc) {
@@ -230,6 +236,7 @@ int tri_level_hook(uint32_t pc)
         tri_bank_level();
         tri_obj_level_entry();
         s3_video_set_ring_layout(ring_layout);
+        s3_video_set_object_layout(object_layout);
         tri_megamix_geometry_begin();
         tri_flow_level_entry();
         s1_obj_syz_reset();

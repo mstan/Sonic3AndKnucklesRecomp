@@ -164,6 +164,7 @@ uint32_t o_asset_anim(int asset);
 uint16_t o_asset_tile(int asset);
 uint32_t o_asset_maps(int asset);
 int      o_asset_ready(int asset);             /* deferred art in VRAM yet? */
+int      o_asset_title_ready(int asset);       /* tile reservation available during the card? */
 void     o_upload_asset(int asset);            /* deferred (boss) art -> VRAM now */
 
 /* ---- shared S1 helpers ------------------------------------------------------ */

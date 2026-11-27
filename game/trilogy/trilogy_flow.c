@@ -57,7 +57,7 @@ static int s_runoff;              /* the tally's run off screen: bit 0 Player 1,
                                    * bits 2, 3: gone (off screen, held there) */
 static uint32_t s_tail_ring_flash;
 static uint8_t s_tail_ring_lock, s_tail_ring_jump, s_tail_ring_age;
-static int s_tail_ring_entered;
+static int s_tail_ring_entered, s_tail_ring_attempted;
 #include "trilogy_tail_respawn.inc"
 
 static uint32_t find_obj(uint32_t code)
@@ -148,7 +148,7 @@ void tri_flow_level_entry(void)
     tri_sbz2_open = 0;
     s_runoff = 0;
     s_tail_ring_flash = 0;
-    s_tail_ring_entered = 0;
+    s_tail_ring_entered = s_tail_ring_attempted = 0;
     s_tail_ring_jump = s_tail_ring_age = 0;
     if (za != 0x2501) s_sbz2_ss = 0;
     w8(RAM_Disable_death_plane, 0);
@@ -342,10 +342,12 @@ static int tail_ring_flash(uint32_t o)
 static void tail_ring_release(void)
 {
     /* A sign/tally may have acquired the same native lock in the meantime. */
-    if (s_tail_ring_flash && r8(RAM_Ctrl_2_locked) == 0xFF &&
-        !s_results_started && !s_ss_pending && !(s_runoff & 2) &&
-        !find_obj(S3K_Obj_LevelResults)) {
-        w8(RAM_Ctrl_2_locked, s_tail_ring_lock);
+    if (s_tail_ring_flash && r8(RAM_Ctrl_2_locked) == 0xFF) {
+        if (!s_results_started && !s_ss_pending && !(s_runoff & 2) &&
+            !find_obj(S3K_Obj_LevelResults))
+            w8(RAM_Ctrl_2_locked, s_tail_ring_lock);
+        /* The logical pad retains its last command while the tally locks it.
+         * Clear our final steering command before handing that lock back. */
         w16(0xFFF66Au, 0);
     }
     s_tail_ring_flash = 0;
@@ -363,6 +365,7 @@ static void tail_ring_tick(void)
         return;
     }
     if (!s_tail_ring_flash) {
+        if (s_tail_ring_attempted) return;
         /* Observe actual P1 entry, never mere proximity to an unentered ring. */
         if (OB8(RAM_Player_1, 0x2E) != 0x53 || OB8(RAM_Player_1, OBJ_anim) != 0x1C)
             return;
@@ -381,6 +384,7 @@ static void tail_ring_tick(void)
             return;
         }
         if (OB8(p, 0x2E)) return;     /* do not steal flying/scripted companions */
+        s_tail_ring_attempted = 1;
         s_tail_ring_flash = flash;
         s_tail_ring_lock = r8(RAM_Ctrl_2_locked);
         s_tail_ring_jump = s_tail_ring_age = 0;

@@ -37,6 +37,13 @@ class OwnedRomTests(unittest.TestCase):
         self.assertFalse((self.root.parent/'outside.bin').exists())
         self.assertEqual(set(self.root.iterdir()),{source,archive})
 
+    def test_steam_cartridge_as_raw_file_and_zip_member(self):
+        source=self.root/'Sonic.68K';source.write_bytes(self.raw)
+        self.assertEqual(owned_rom.read_rom(source,'s1'),self.raw)
+        archive=self.root/'steam.zip'
+        with zipfile.ZipFile(archive,'w')as z:z.writestr(source.name,self.raw)
+        self.assertEqual(owned_rom.read_rom(archive,'s1'),self.raw)
+
     def test_wrong_rom_oversized_member_and_many_entries_are_rejected(self):
         source=self.root/'wrong.bin';source.write_bytes(bytes(64))
         with self.assertRaises(ValueError):owned_rom.read_rom(source,'s1')
