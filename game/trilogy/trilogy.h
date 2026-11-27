@@ -74,6 +74,8 @@ uint32_t tri_shadow_descriptor(void);
 extern int tri_shadow_selected;
 int tri_shadow_active(void);
 int tri_character_active(void);
+int tri_character_aiz_entry(uint32_t pc);
+int tri_s1_keep_tunnel_roll(uint32_t pc);
 int tri_shadow_hook(uint32_t pc);
 int tri_character_transform(void);
 void tri_shadow_menu_colors(uint16_t *top,uint16_t *bottom);

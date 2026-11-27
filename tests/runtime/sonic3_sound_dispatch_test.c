@@ -40,6 +40,8 @@ int s3_restoration_instruction(unsigned pc){(void)pc;return 0;}
 void s3_gameplay_timer_hook(uint32_t pc,const uint8_t *ram,uint32_t *d,uint16_t *sr){(void)pc;(void)ram;(void)d;(void)sr;}
 int s3_gameplay_skip_shield(uint32_t pc,const uint8_t *ram,uint32_t p,int native){(void)pc;(void)ram;(void)p;(void)native;return 0;}
 int tri_character_active(void){return 0;}
+int tri_character_aiz_entry(uint32_t pc){return pc==0x6824u;}
+int tri_s1_keep_tunnel_roll(uint32_t pc){return pc==0x1157Cu;}
 int s3_army_owns(uint32_t pc){(void)pc;return 0;}
 int s3_sk_instruction_hook(uint32_t pc){(void)pc;++renderer_calls;g_cpu.D[0]=0xBAD;return 0;}
 int main(void)
@@ -55,6 +57,8 @@ int main(void)
     }
     clone=cd=0;renderer_calls=0;g_cpu.D[0]=0x1234;
     CHECK(!s3k_instruction(0x12CE));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
+    CHECK(!s3k_instruction(0x6824));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
+    CHECK(!s3k_instruction(0x1157C));CHECK(!renderer_calls && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0x2D6A6));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0xDE9C));CHECK(hud_reset_calls==1 && !renderer_calls && g_cpu.D[0]==0x1234);
     CHECK(!s3k_instruction(0x695A));CHECK(!renderer_calls && !card_tail && g_cpu.D[0]==0x1234);

@@ -20,6 +20,39 @@ static void s1_set_behind(uint32_t p, int behind)
 
 static int s1_behind(uint32_t p) { return r8(p + OBJ_top_solid) == 0x0E; }
 
+static uint8_t s1_chunk_at(uint32_t p,uint32_t info)
+{
+    uint16_t x=r16(p+OBJ_x_pos),y=r16(p+OBJ_y_pos);
+    return tri_rd8(info+((y>>8)&7u)*64u+((x>>8)&0x3Fu));
+}
+
+static int s1_roll_chunk(uint32_t info,uint8_t chunk)
+{
+    return chunk==tri_rd8(info+514) || chunk==tri_rd8(info+515);
+}
+
+int tri_s1_keep_tunnel_roll(uint32_t pc)
+{
+    if(pc!=0x01157Cu && pc!=0x014DA6u && pc!=0x0175AEu)return 0;
+    uint32_t player=A(0)&0xFFFFFFu,entry=tri_dir();
+    if(!entry || tri_rd8(entry+TD_GAME)!=TRI_GAME_S1 ||
+       (player!=RAM_Player_1 && player!=RAM_Player_2) ||
+       r8(RAM_Debug_placement_mode) || r8(player+0x3D) ||
+       !(r8(player+OBJ_status)&4) || !(g_cpu.SR&1u) ||
+       tri_rd32(pc-4)!=0x0C400080u || tri_rd16(pc)!=0x6448)
+        return 1;
+
+    uint32_t info=tri_s1_info();
+    if(!info || !s1_roll_chunk(info,s1_chunk_at(player,info)))return 1;
+
+    /* Apply the tunnel's existing zero-speed kick before native physics
+     * and animation. The ground-speed check must keep the roll pose while
+     * the player is still inside the authored tunnel. */
+    if(!r16(player+OBJ_ground_vel))w16(player+OBJ_ground_vel,0x200);
+    g_cpu.SR&=(uint16_t)~1u;
+    return 1;
+}
+
 static void s1_chk_roll(uint32_t p)
 {
     uint8_t st = r8(p + OBJ_status);
@@ -39,10 +72,8 @@ static void s1_chk_roll(uint32_t p)
 static void s1_loops(uint32_t p, uint32_t info)
 {
     uint8_t loop1 = tri_rd8(info + 512), loop2 = tri_rd8(info + 513);
-    uint8_t roll1 = tri_rd8(info + 514), roll2 = tri_rd8(info + 515);
-    uint16_t x = r16(p + OBJ_x_pos), y = r16(p + OBJ_y_pos);
-    uint8_t c = tri_rd8(info + ((y >> 8) & 7) * 64u + ((x >> 8) & 0x3F));
-    if (c == roll1 || c == roll2) {
+    uint8_t c = s1_chunk_at(p,info);
+    if (s1_roll_chunk(info,c)) {
         uint32_t d0 = D(0), d1 = D(1), a0 = A(0), a1 = A(1);
         A(0) = RAMPTR(p);
         s1_chk_roll(p);
@@ -58,7 +89,7 @@ static void s1_loops(uint32_t p, uint32_t info)
         s1_set_behind(p, 0);
         return;
     }
-    uint8_t xl = (uint8_t)x;
+    uint8_t xl = (uint8_t)r16(p+OBJ_x_pos);
     if (xl < 44) { s1_set_behind(p, 0); return; }
     if (xl >= 224) { s1_set_behind(p, 1); return; }
     uint8_t ang = r8(p + OBJ_angle);

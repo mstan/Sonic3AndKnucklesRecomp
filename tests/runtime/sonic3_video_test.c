@@ -2805,6 +2805,24 @@ static void test_bounded_parallax_projection(void)
         }
     }
 }
+
+static void test_hcz1_bounded_deformation(void)
+{
+    static const int cameras[]={0,80,145,223,238};
+    static const struct { int row, slope; } bands[]={ {0,32},{64,28},{96,8},
+        {415,32},{416,32},{512,81},{607,128},{608,8} };
+    s_frame_level=1;s_frame_zone=1;s_frame_act=0;s_frame_bg_event=0;s_frame_fg_y=0x530;
+    for(unsigned i=0;i<sizeof bands/sizeof bands[0];++i) {
+        CHECK(hcz1_scroll_slope(bands[i].row,s_frame_fg_y)==bands[i].slope);
+        for(unsigned j=0;j<sizeof cameras/sizeof cameras[0];++j) {
+            s_camera=cameras[j];
+            int raw=-(s_camera*bands[i].slope/128);
+            CHECK(edge_parallax_scroll(raw,s_camera,s_camera,796,320,bands[i].row,NULL)==
+                -(238*bands[i].slope/128));
+            CHECK(edge_parallax_scroll(raw,s_camera,0,320,320,bands[i].row,NULL)==raw);
+        }
+    }
+}
 static void test_mhz_published_camera_phase(void)
 {
 #ifndef SONIC3_STANDALONE
@@ -5719,7 +5737,7 @@ int main(int argc,char **argv)
     test_three_digit_lives();test_life_interpolation();
     test_time_minute_tens();test_time_interpolation();
     test_presentation_restore_before_tick();test_native_state_keeps_restored_publication();
-    test_bounded_parallax_projection();test_mhz_published_camera_phase();
+    test_bounded_parallax_projection();test_hcz1_bounded_deformation();test_mhz_published_camera_phase();
     test_mhz_departure_relocation();test_fbz_bounded_camera_and_wind();
     test_mhz_animation_dma_projection();
     test_desert_snow_bounded_view();

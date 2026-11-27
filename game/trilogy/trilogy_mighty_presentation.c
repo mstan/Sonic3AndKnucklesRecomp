@@ -57,6 +57,29 @@ static void choose_current(void)
         mode&=1;w16(PLAYER_OPTION,(uint16_t)mode);w16(RAM_Player_mode,(uint16_t)mode);
     }
 }
+
+int tri_character_aiz_entry(uint32_t pc)
+{
+    unsigned branch;
+    switch(pc) {
+    case 0x00604Cu: branch=0x6406; break; /* Initial level PLC selection */
+    case 0x0060A2u: branch=0x6410; break; /* Intro-only art PLC */
+    case 0x00625Cu: branch=0x6458; break; /* Native title card */
+    case 0x006824u: branch=0x640C; break; /* Plane controller */
+    case 0x00781Eu: branch=0x6406; break; /* Level art and palette */
+    case 0x01BEA4u: branch=0x6420; break; /* Forest start and camera limits */
+    case 0x01C2BCu: branch=0x6406; break; /* Level blocks */
+    default: return 0;
+    }
+    /* Take the native intro-free branches while retaining the actual player
+     * mode. These sites do not change checkpoint, save or partner state. */
+    if(r16(RAM_Current_zone_and_act)==0 && tri_character_active() &&
+       tri_rd32(pc-6)==0x0C780002u && tri_rd16(pc-2)==0xFF08 &&
+       tri_rd16(pc)==branch)
+        g_cpu.SR&=(uint16_t)~1u;
+    return 1;
+}
+
 int tri_mighty_presentation_hook(uint32_t pc)
 {
     uint32_t p=A(0)&0xFFFFFFu;

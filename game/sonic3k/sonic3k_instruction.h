@@ -17,6 +17,7 @@ static int s3k_instruction(uint32_t pc)
     if(s3_restoration_instruction(pc))return 0;
     if (s3_state_menu_instruction(pc)) return 0;
     if(s3_kos_owns(pc))return s3_kos_instruction(pc);
+    if(tri_character_aiz_entry(pc) || tri_s1_keep_tunnel_roll(pc))return 0;
     /* These entrance-only sites do not belong in the recurring gameplay
      * chain used by timers, palette updates and decompression. */
     if(pc==0x53756u){

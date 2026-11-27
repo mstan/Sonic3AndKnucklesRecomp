@@ -2850,11 +2850,44 @@ static int cnz_parallax_active(void)
  * edge that camera can move inside a stationary physical view. Reproject
  * only the ordinary city/forest/factory, desert and snow bands from the same published phase;
  * cutscene canvases and independently moving scenery retain their owners. */
+static int hcz1_scroll_slope(int y,int camera_y)
+{
+    static const int bands[]={64,8,8,5,5,6,240,6,5,5,8,8,48};
+    for(unsigned i=0;i<sizeof bands/sizeof bands[0];++i) {
+        if(y<bands[i])return 32-4*(int)(i<=6?i:12-i);
+        y-=bands[i];
+    }
+    if(y>=192)return 8;
+
+    /* HCZ1_Deform uses the retail waterline row selector in the 192-row
+     * span between solid bands. Its generated rows step by 1/128 per pair. */
+    int height=camera_y-0x610;
+    int water=(height>=0?height/4:-((-height+3)/4))-height;
+    if(y<96) {
+        if(water<=-96)return 128-y/2;
+        if(water>=0 || y<96+water)return 32;
+    } else {
+        if(water>=96)return 128-(191-y)/2;
+        if(water<=0 || y>=96+water)return 8;
+    }
+    unsigned depth=(unsigned)(water<0?-water:water);
+    unsigned row=(unsigned)(y<96?95-y:y-96);
+    unsigned source=g_rom[S3_ART_BANK+0x6D000u+(96-depth)*96+row];
+    return source<96?128-(95-(int)source)/2:8;
+}
+
 static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by,int *mhz_eye)
 {
     if(mhz_eye)*mhz_eye=INT_MIN;
     int delta=(width-nw)/2-origin,numerator=0,phase=camera,before,after,mhz=0,divisor=32;
     if(width<=nw || !delta || !s_frame_level)return scroll;
+    if(s_frame_zone==1 && !s_frame_act && !s_frame_bg_event) {
+        int slope=hcz1_scroll_slope(by,s_frame_fg_y);
+        int installed=(camera*slope)>>7;
+        int distance=((-scroll-installed+256)&511)-256;
+        if(distance < -1 || distance > 1)return scroll;
+        return -(((s_camera+delta)*slope)>>7);
+    }
 #ifndef SONIC3_STANDALONE
     if(s_frame_zone==4 && !s_frame_act) {
         int outdoor=((unsigned)s_world_frame[0xEED6]<<8)|s_world_frame[0xEED7];

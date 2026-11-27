@@ -24,7 +24,11 @@ uint32_t tri_shadow_descriptor(void){return s3_stage_pack_shadow?0x400E00:0;}
 int tri_character_active(void){return tri_mighty_active();}
 int tri_mighty_selected;static int player_active=1,atlas_calls;
 int tri_shadow_active(void){return player_active && tri_shadow_selected;}
-uint8_t tri_rd8(uint32_t a) { CHECK(a>=0x400000 && a<0x401000);return bank[a-0x400000]; }
+uint8_t tri_rd8(uint32_t a)
+{
+    if(a<sizeof g_rom)return g_rom[a];
+    CHECK(a<0x400000u+sizeof bank);return bank[a-0x400000u];
+}
 uint16_t tri_rd16(uint32_t a) { return (uint16_t)((tri_rd8(a)<<8)|tri_rd8(a+1)); }
 uint32_t tri_rd32(uint32_t a) { return ((uint32_t)tri_rd16(a)<<16)|tri_rd16(a+2); }
 uint32_t tri_mighty_descriptor(void){uint32_t d=tri_rd32(0x400024);return d?tri_rd32(d+12):0;}
@@ -89,6 +93,13 @@ int main(void)
     CHECK(!tri_mighty_presentation_hook(TH_DS_NEWGAME));CHECK(r8(0xFFE6AE)==0x50);
     CHECK(!tri_mighty_presentation_hook(TH_LEVEL_ENTRY));
     CHECK(tri_mighty_selected && r16(RAM_Player_mode)==1 && r16(PLAYER_OPTION)==1);
+    const uint8_t plane_branch[]={0x0C,0x78,0x00,0x02,0xFF,0x08,0x64,0x0C};
+    memcpy(g_rom+0x681E,plane_branch,sizeof plane_branch);
+    g_cpu.SR=0x2301;
+    CHECK(tri_character_aiz_entry(0x6824) && g_cpu.SR==0x2300);
+    CHECK(r16(RAM_Player_mode)==1 && !r8(RAM_Last_star_post_hit));
+    g_rom[0x6825]=0;g_cpu.SR=0x2301;
+    CHECK(tri_character_aiz_entry(0x6824) && g_cpu.SR==0x2301);
     CHECK(custom_hud && custom_hud()==0x400B00);
     A(1)=0xDBB6;CHECK(!tri_mighty_presentation_hook(MG_PC_MIGHTY_HUD));
     CHECK(A(1)==0x400B00);
