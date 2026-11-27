@@ -1289,8 +1289,12 @@ static void hold_collapsed_platform(void)
     write8(state,g_ram[state]|128);
 }
 
-static void spawn_scene(unsigned base)
+static void spawn_scene(void)
 {
+    unsigned zone=ram16(0xFE10);
+    unsigned base=zone<0x1300?scene_read32(S3_PLACEMENTS+(zone>>8)*8u+(zone&1u)*4u):
+        s_object_layout?s_object_layout():0;
+    if(!base)return;
     load_placements(base);s_loader_active=1;
     int camera=ram16(0xEE78),cy=ram16(0xEE7C),w=enabled()?s_requested_width:320;
     int lo,hi;activation_bounds(camera,w,&lo,&hi);
@@ -1952,10 +1956,7 @@ int s3_video_hook(uint32_t pc)
     /* A background replacement needs host composition, while native-size
      * gameplay keeps the cartridge's loader, ring ranges and culling. */
     if(pc==S3_LOAD_UPDATE && gameplay() && (expanded_world() || s_loader_active)) {
-        unsigned zone=ram16(0xFE10);
-        unsigned base=zone<0x1300?scene_read32(S3_PLACEMENTS+(zone>>8)*8u+(zone&1u)*4u):
-            s_object_layout?s_object_layout():0;
-        if(base)spawn_scene(base);
+        spawn_scene();
         return 0;
     }
     if(!enabled() || ram16(S3_COMPETITION))return 0;
