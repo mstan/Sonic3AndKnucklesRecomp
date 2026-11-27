@@ -2715,9 +2715,9 @@ static void test_campaign_background_edges(void)
     memset(&s_build,0,sizeof s_build);s_build.scene=1;publish_sprites();
     s3_video_set_world_cell(cd_edge_cell);
     const int widths[]={320,398,523,796},cameras[]={0,8,16,31,39,40,56,100,7600,7800,7833,7872};
-    /* Ordinary CNZ1/MHZ2/FBZ1/SOZ1 derive B from A, rather than holding B while A
+    /* Ordinary HCZ1/CNZ1/MHZ2/FBZ1/SOZ1 derive B from A, rather than holding B while A
      * moves. Their real deformation contract is tested separately below. */
-    const unsigned zones[]={0,0x100,0x200,0x201,0x400,0x700,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
+    const unsigned zones[]={0,0x200,0x201,0x400,0x700,0x2000,0x2200,0x2800,0x3400,0x4000,0x5B00};
     for(unsigned z=0;z<sizeof zones/sizeof *zones;z++)for(unsigned w=0;w<4;w++) {
 #ifndef SONIC3_STANDALONE
         if(zones[z]==0x400)continue; /* Exact factory bands are tested below. */
@@ -2810,7 +2810,7 @@ static void test_hcz1_bounded_deformation(void)
 {
     static const int cameras[]={0,80,145,223,238};
     static const struct { int row, slope; } bands[]={ {0,32},{64,28},{96,8},
-        {415,32},{416,32},{512,81},{607,128},{608,8} };
+        {415,32},{416,32},{512,33},{607,128},{608,8} };
     s_frame_level=1;s_frame_zone=1;s_frame_act=0;s_frame_bg_event=0;s_frame_fg_y=0x530;
     for(unsigned i=0;i<sizeof bands/sizeof bands[0];++i) {
         CHECK(hcz1_scroll_slope(bands[i].row,s_frame_fg_y)==bands[i].slope);

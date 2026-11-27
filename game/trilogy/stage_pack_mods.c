@@ -191,7 +191,7 @@ static int resource_get(void *c,const char *p,const char *f,int n,RecompLauncher
         memset(o,0,sizeof *o);COPY(o->id,"source-rom");
         COPY(o->label,i==0?"Sonic the Hedgehog cartridge":"Sonic the Hedgehog 2 cartridge");
         COPY(o->description,"Choose your owned ROM or ROM ZIP. The game verifies it and prepares this campaign automatically; no other campaign cartridge is required.");
-        COPY(o->path,s_rom_source[i]);COPY(o->file_patterns,"*.bin,*.md,*.gen,*.68k,*.zip");
+        COPY(o->path,s_rom_source[i]);COPY(o->file_patterns,"*.bin,*.md,*.gen,*.68k,*.68K,*.zip");
         COPY(o->file_description,"Owned cartridge or ROM ZIP");o->import_on_select=1;
         if(!s_checked[i]){s_verified[i]=s3_pack_validate(s3_pack_paths[i],i+1,s_status[i],sizeof s_status[i]);s_checked[i]=1;}
         o->verified=*s_rom_source[i] && s_verified[i];

@@ -2860,20 +2860,20 @@ static int hcz1_scroll_slope(int y,int camera_y)
     if(y>=192)return 8;
 
     /* HCZ1_Deform uses the retail waterline row selector in the 192-row
-     * span between solid bands. Its generated rows step by 1/128 per pair. */
+     * span between solid bands. Its generated phase steps by 1/128 per row. */
     int height=camera_y-0x610;
     int water=(height>=0?height/4:-((-height+3)/4))-height;
     if(y<96) {
-        if(water<=-96)return 128-y/2;
+        if(water<=-96)return 128-y;
         if(water>=0 || y<96+water)return 32;
     } else {
-        if(water>=96)return 128-(191-y)/2;
+        if(water>=96)return 128-(191-y);
         if(water<=0 || y>=96+water)return 8;
     }
     unsigned depth=(unsigned)(water<0?-water:water);
     unsigned row=(unsigned)(y<96?95-y:y-96);
     unsigned source=g_rom[S3_ART_BANK+0x6D000u+(96-depth)*96+row];
-    return source<96?128-(95-(int)source)/2:8;
+    return source<96?128-(95-(int)source):8;
 }
 
 static int edge_parallax_scroll(int scroll,int camera,int origin,int width,int nw,int by,int *mhz_eye)
@@ -3531,7 +3531,8 @@ static void render_scanline_base(const GVDP *v, int line, const uint32_t *native
     int icz_drifting_panes=width>nw && icz_pane_margins && by>=0x88;
     int icz_pane_position=icz_drifting_panes?presentation_icz_pane_position(v,hsbase):0;
     int mhz_eye=INT_MIN;
-    hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
+    if(!hcz_background || !restored_canvas)
+        hs_b=edge_parallax_scroll(hs_b,camera,origin,width,nw,by,&mhz_eye);
     /* Once the cave camera is selected, its full spatial layout is already
      * available. Extend it beyond the native viewport while the uploaded
      * plane catches up; those unseen columns can still contain blank tiles. */
