@@ -5,6 +5,7 @@
 # Usage: bash tools/build-linux.sh --version 0.8.1 --jobs 8 [--no-package]
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+ENGINE="${GENESIS_RECOMP_ROOT:-$REPO/segagenesisrecomp}"
 VERSION=0.8.1
 JOBS=8
 OUT="$REPO/release-linux"
@@ -25,7 +26,7 @@ done
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || exit 2
 test "$(uname -m)" = x86_64
 cmake -S "$REPO" -B "$BUILD" -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release \
-    -DGENESIS_RECOMP_ROOT="$REPO/segagenesisrecomp" -DS3_BUILD_VERSION="$VERSION" \
+    -DGENESIS_RECOMP_ROOT="$ENGINE" -DS3_BUILD_VERSION="$VERSION" \
     -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF \
     -DS3_CLONE_DRIVER_SUPPORT=ON -DGENESIS_Z80_RECOMP=OFF
 cmake --build "$BUILD" -j"$JOBS"

@@ -3,6 +3,7 @@
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE="${GENESIS_RECOMP_ROOT:-$REPO/segagenesisrecomp}"
+if [ -z "${GENESIS_RECOMP_ROOT:-}" ] && [ -e "$REPO/engine-local" ]; then ENGINE="$REPO/engine-local"; fi
 APP_NAME="Sonic3K"
 CMAKE_TARGET="Sonic3KRecomp"
 ROM_EXTS="md bin gen"
