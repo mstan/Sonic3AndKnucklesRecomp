@@ -5,6 +5,7 @@
 # Usage: bash tools/build-linux.sh --version 0.8.1 --jobs 8 [--no-package]
 set -euo pipefail
 REPO=$(cd "$(dirname "$0")/.." && pwd)
+ENGINE="${GENESIS_RECOMP_ROOT:-$REPO/segagenesisrecomp}"
 VERSION=0.8.1
 JOBS=8
 OUT="$REPO/release-linux"
@@ -25,7 +26,7 @@ done
 [[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || exit 2
 test "$(uname -m)" = x86_64
 cmake -S "$REPO" -B "$BUILD" -G 'Unix Makefiles' -DCMAKE_BUILD_TYPE=Release \
-    -DGENESIS_RECOMP_ROOT="$REPO/segagenesisrecomp" -DS3_BUILD_VERSION="$VERSION" \
+    -DGENESIS_RECOMP_ROOT="$ENGINE" -DS3_BUILD_VERSION="$VERSION" \
     -DSONIC_REVERSE_DEBUG=OFF -DGEN_ENABLE_TRACE=OFF -DGEN_DEV_TRACE=OFF -DGENESIS_BUILD_COSIM=OFF \
     -DS3_CLONE_DRIVER_SUPPORT=ON -DGENESIS_Z80_RECOMP=OFF
 cmake --build "$BUILD" -j"$JOBS"
@@ -38,25 +39,11 @@ WORK=$(mktemp -d)
 trap 'chmod -R u+w "$WORK"; rm -rf "$WORK"' EXIT
 
 # Versioned and SHA-verified tools, matching the RKA release.
-fetch() {
-    local url="$1" sha="$2" dest="$3"
-    if [ ! -f "$dest" ] || [ "$(sha256sum "$dest" | cut -d' ' -f1)" != "$sha" ]; then
-        curl -fL --retry 3 "$url" -o "$dest.tmp"
-        printf '%s  %s\n' "$sha" "$dest.tmp" | sha256sum -c -
-        mv "$dest.tmp" "$dest"
-    fi
-    chmod +x "$dest"
-}
-LINUXDEPLOY="$BUILD/appimage-tools/linuxdeploy-x86_64.AppImage"
-APPIMAGETOOL="$BUILD/appimage-tools/appimagetool-x86_64.AppImage"
-fetch https://github.com/linuxdeploy/linuxdeploy/releases/download/1-alpha-20251107-1/linuxdeploy-x86_64.AppImage \
-    c20cd71e3a4e3b80c3483cef793cda3f4e990aca14014d23c544ca3ce1270b4d "$LINUXDEPLOY"
-fetch https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage \
-    ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0 "$APPIMAGETOOL"
-RUNTIME="$BUILD/appimage-tools/runtime-x86_64"
-OFFSET=$("$APPIMAGETOOL" --appimage-offset)
-[[ "$OFFSET" =~ ^[1-9][0-9]*$ ]] || exit 1
-head -c "$OFFSET" "$APPIMAGETOOL" > "$RUNTIME"
+ENGINE="${GENESIS_RECOMP_ROOT:-$REPO/segagenesisrecomp}"
+source "$ENGINE/tools/release/appimage.sh"
+genesis_appimage_tools "$BUILD"
+LINUXDEPLOY="$LINUXDEPLOY_BIN"
+
 for mode in sonic3 sonic3k sandk; do
     IFS='|' read -r target title short boxart size product < <(python3 - "$REPO" "$mode" <<'PY'
 import json, sys
@@ -95,7 +82,7 @@ EOF
         echo 'Forbidden file in AppImage' >&2; exit 1
     fi
     APP="$OUT/$target-linux-x86_64-v$VERSION.AppImage"
-    ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run --runtime-file "$RUNTIME" "$APPDIR" "$APP"
+    genesis_package_appimage "$APPDIR" "$APP"
     chmod +x "$APP"
     (cd "$OUT"; sha256sum "$(basename "$APP")" > "$(basename "$APP").sha256")
     echo "Built $APP"

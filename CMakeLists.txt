@@ -108,13 +108,6 @@ endforeach()
 # ---------------------------------------------------------------------------
 enable_language(CXX)
 set(CMAKE_CXX_STANDARD 17)
-set(FM_SOURCES
-    "${RUNNER_ROOT}/audio/ym2612_ymfm.cpp"
-    "${RUNNER_ROOT}/external/ymfm/src/ymfm_opn.cpp"
-    "${RUNNER_ROOT}/external/ymfm/src/ymfm_ssg.cpp"
-    "${RUNNER_ROOT}/external/ymfm/src/ymfm_adpcm.cpp"
-    "${RUNNER_ROOT}/external/ymfm/src/ymfm_pcm.cpp"
-)
 
 # Imported music owns separate wrapper instances; synthesis code stays shared.
 add_library(sonic3_vgm_music STATIC "${CMAKE_CURRENT_SOURCE_DIR}/game/common/sonic3_vgm.c"
@@ -132,50 +125,7 @@ target_include_directories(sonic3_vgm_music PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}
 option(GEN_ENABLE_TRACE
     "Build the TCP cmd server + observability rings (frame_snapshots). OFF for release." ON)
 if(GEN_ENABLE_TRACE)
-    set(GEN_TRACE_SOURCES
-        "${RUNNER_ROOT}/cmd_server.c"
-        "${RUNNER_ROOT}/frame_snapshots.c")
     add_compile_definitions(GEN_ENABLE_TRACE=1)
-else()
-    set(GEN_TRACE_SOURCES "${RUNNER_ROOT}/cmd_server_stub.c")
-endif()
-
-set(RUNNER_SOURCES
-    "${RUNNER_ROOT}/main.c"
-    "${RUNNER_ROOT}/audio.c"
-    ${GEN_TRACE_SOURCES}
-    "${RUNNER_ROOT}/glue.c"
-    "${RUNNER_ROOT}/fiber_compat.c"   # cross-platform fiber shim (Win32 Fibers / POSIX ucontext) â€” glue.c depends on it
-    "${RUNNER_ROOT}/crash_report.c"
-    "${RUNNER_ROOT}/input_script.c"
-    "${RUNNER_ROOT}/reverse_debug.c"
-    "${RUNNER_ROOT}/gamepad.c"
-    "${RUNNER_ROOT}/input_map.c"      # per-player Genesis button bindings (kbd+pad, 3/6-btn)
-    "${RUNNER_ROOT}/app_config.c"     # settings.ini + rom.cfg load/save
-    "${RUNNER_ROOT}/chip_trace.c"
-    "${RUNNER_ROOT}/audio/event_queue.c"
-    ${FM_SOURCES}
-    "${RUNNER_ROOT}/audio/sn76489.c"
-    "${RUNNER_ROOT}/audio/mixer.c"
-    "${RUNNER_ROOT}/audio/observability.c"
-    "${RUNNER_ROOT}/cosim_state.c"  # pointer-free end-state hash for benchmarks + co-sim
-    # Verified-enhancement shadow layer (opt-in via env, default OFF; links no
-    # clownmdemu, safe to ship). See docs/SHADOW_ENHANCEMENTS.md.
-    "${RUNNER_ROOT}/audio/audio_shadow.c"   # envelope-correlation verifier
-    "${RUNNER_ROOT}/audio/fm_shadow.cpp"    # parallel ymfm chip (cleaner highs)
-    "${RUNNER_ROOT}/video/color_lut.c"      # present-time 9-bit CRT/composite LUT
-)
-
-# Clean-room own backend (VDP+bus+Z80 scheduler) â€” the only backend.
-set(OWN_BACKEND_SOURCES
-    "${RUNNER_ROOT}/video/genesis_vdp.c"
-    "${RUNNER_ROOT}/video/genesis_bus.c"
-    "${RUNNER_ROOT}/video/genesis_machine.c"
-    "${RUNNER_ROOT}/external/superzazu/z80.c")   # MIT Z80 core, embedded by genesis_machine
-if(GENESIS_Z80_RECOMP)
-    list(APPEND OWN_BACKEND_SOURCES
-        "${RUNNER_ROOT}/z80_recomp.c"
-        "${GENESIS_Z80_AOT_SOURCE}")
 endif()
 
 option(SONIC_REVERSE_DEBUG
@@ -231,6 +181,9 @@ set(S3_RETAINED_GENERATION_DIR "" CACHE PATH "Verified native sources and Clone 
 if(S3_RETAINED_GENERATION_DIR AND (NOT S3_CLONE_PROGRAM_DIR OR SONIC_REVERSE_DEBUG))
     message(FATAL_ERROR "Retained native sources require the matching Clone Driver program and release code generation")
 endif()
+genesisrecomp_runner_sources(RUNNER_SOURCES
+    TRACE "${GEN_ENABLE_TRACE}" REVERSE_DEBUG "${SONIC_REVERSE_DEBUG}")
+
 function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     set(GAME "${S3_GAME_ROOT}/${GAME_DIR}")
     set(NATIVE_GAME "${GAME}")
@@ -336,13 +289,6 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     else()
         list(APPEND SHARED_SRC "${S3_GAME_ROOT}/trilogy/scd_import.c")
     endif()
-    # Clean-room 68000 interpreter/decoder/rom_parser: the _wt-cosim engine's
-    # shared glue.c references m68k_interp_run_framed (Tier-3 native floor)
-    # unconditionally, so every target built against it links these (AGPL-free).
-    set(FLOOR
-        "${RUNNER_ROOT}/m68k_interp.c"
-        "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
-        "${RECOMP_ROOT}/recompiler/src/rom_parser.c")
     # Nothing third-party beyond ymfm/superzazu/clowncommon â€” that is the
     # enforcement that no AGPL header can be compiled into a release binary
     # (clowncommon is ISC-permissive, vendored at runner/external/clowncommon).
@@ -367,7 +313,8 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
 
     # Native â€” recompiled 68K + clean-room own backend (AGPL-free; no clown
     # link, no clown headers).
-    add_executable(${TARGET} ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${FLOOR})
+    add_executable(${TARGET} ${SHARED_SRC})
+    genesisrecomp_runner_target(${TARGET})
     if(GENERATED_SOURCES_TARGET)
         add_dependencies(${TARGET} ${GENERATED_SOURCES_TARGET})
     endif()
@@ -415,19 +362,17 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
     # --- Differential co-sim targets (dev-only; see engine COSIM.md) ---------
     # Mirror native/oracle but add the cosim modules + the clean-room 68000
     # interpreter/decoder/rom_parser (the shared glue.c references them under
-    # GENESIS_COSIM; RUNNER_SOURCES omits them). game_cycles.c + the generated
+    # GENESIS_COSIM). game_cycles.c + the generated
     # <prefix>_cycles.c give the cross-backend work-cycle ruler its cost table.
     # The generation rule emits the cost table with the compiled translations,
     # so a clean build can configure these targets before either file exists.
     if(GENESIS_BUILD_COSIM)
-        set(COSIM_FLOOR
-            "${RUNNER_ROOT}/m68k_interp.c"
-            "${RECOMP_ROOT}/recompiler/src/m68k_decoder.c"
-            "${RECOMP_ROOT}/recompiler/src/rom_parser.c")
-        add_executable(${TARGET}_cosim ${SHARED_SRC} ${OWN_BACKEND_SOURCES} ${COSIM_FLOOR}
+
+        add_executable(${TARGET}_cosim ${SHARED_SRC}
             "${RUNNER_ROOT}/cosim.c"
             "${RUNNER_ROOT}/cosim_visible.c" "${RUNNER_ROOT}/cosim_cycles.c"
             "${RUNNER_ROOT}/game_cycles.c" "${GENERATED_SOURCES_CYCLES}")
+        genesisrecomp_runner_target(${TARGET}_cosim)
         if(GENERATED_SOURCES_TARGET)
             add_dependencies(${TARGET}_cosim ${GENERATED_SOURCES_TARGET})
         endif()
@@ -438,7 +383,6 @@ function(add_recomp_mode TARGET PREFIX GAME_DIR ROM PORT_NATIVE PORT_ORACLE)
             $<$<BOOL:${SONIC_REVERSE_DEBUG}>:SONIC_REVERSE_DEBUG=1>)
         target_include_directories(${TARGET}_cosim PRIVATE ${INCLUDES_NATIVE}
             "${RECOMP_ROOT}/recompiler/src")
-
 
         foreach(t ${TARGET}_cosim)
             target_link_libraries(${t} PRIVATE ${COMMON_LIBS} sonic3_vgm_music)
